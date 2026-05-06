@@ -25,3 +25,6 @@
 # Frontend build output (placeholder kept for go:embed)
 /internal/web/dist/*
 !/internal/web/dist/.gitkeep
+
+# Locally-built agent binaries (the embed dir; CI / docker rebuild them fresh)
+/internal/installer/bin/shepherd-agent-linux-*

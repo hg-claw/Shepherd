@@ -12,3 +12,4 @@ shepherd.db*
 .DS_Store
 .env
 .env.local
+internal/installer/bin/shepherd-agent-linux-*

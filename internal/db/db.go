@@ -49,6 +49,12 @@ func Open(ctx context.Context, cfg Config) (*sqlx.DB, error) {
 		if _, err := d.Exec("PRAGMA foreign_keys=ON"); err != nil {
 			return nil, err
 		}
+		// SQLite: pin the pool to a single connection so the FK pragma we just
+		// set applies to every subsequent query. SQLite is a single-writer db,
+		// and at fleet scales of O(100) agents the read concurrency isn't worth
+		// the per-connection re-pragma footwork.
+		d.SetMaxOpenConns(1)
+		d.SetMaxIdleConns(1)
 	}
 	return d, nil
 }

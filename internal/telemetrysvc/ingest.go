@@ -1,0 +1,54 @@
+package telemetrysvc
+
+import (
+	"context"
+	"encoding/json"
+	"log"
+	"time"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
+)
+
+type Ingest struct {
+	DB *sqlx.DB
+}
+
+// HandleFrame is the FrameHandler injected into AgentAPI. It dispatches by envelope type.
+func (i *Ingest) HandleFrame(ctx context.Context, serverID int64, env agentapi.Envelope) {
+	switch env.Type {
+	case agentapi.TypeTelemetry:
+		var t agentapi.Telemetry
+		if err := env.Decode(&t); err != nil {
+			log.Printf("telemetry decode (server=%d): %v", serverID, err)
+			return
+		}
+		if err := i.WriteSample(ctx, serverID, t); err != nil {
+			log.Printf("telemetry write (server=%d): %v", serverID, err)
+		}
+	case agentapi.TypeHeartbeat:
+		var h agentapi.Heartbeat
+		if err := env.Decode(&h); err != nil {
+			return
+		}
+		_, _ = i.DB.ExecContext(ctx, `UPDATE servers SET
+			agent_last_seen=$1, agent_version=$2, agent_os=$3, agent_arch=$4, agent_kernel=$5
+			WHERE id=$6`,
+			time.Now().UTC(), h.AgentVersion, h.OS, h.Arch, h.Kernel, serverID)
+	}
+}
+
+// WriteSample persists one telemetry point and bumps agent_last_seen.
+func (i *Ingest) WriteSample(ctx context.Context, serverID int64, t agentapi.Telemetry) error {
+	disksJSON, _ := json.Marshal(t.Disks)
+	if _, err := i.DB.ExecContext(ctx, `INSERT INTO telemetry_samples_30s
+		(server_id, ts, cpu_pct, mem_used, mem_total, load_1, load_5, load_15,
+		 net_rx_bps, net_tx_bps, tcp_conn, disks_json)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+		serverID, t.TS.UTC(), t.CPUPct, t.MemUsed, t.MemTotal, t.Load1, t.Load5, t.Load15,
+		t.NetRxBps, t.NetTxBps, t.TCPConn, string(disksJSON)); err != nil {
+		return err
+	}
+	_, err := i.DB.ExecContext(ctx, "UPDATE servers SET agent_last_seen=$1 WHERE id=$2", t.TS.UTC(), serverID)
+	return err
+}

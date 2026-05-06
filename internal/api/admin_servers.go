@@ -6,11 +6,16 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hg-claw/Shepherd/internal/agentsvc"
 	"github.com/hg-claw/Shepherd/internal/serversvc"
+	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
 )
 
 type ServersAPI struct {
-	Servers *serversvc.Service
+	Servers  *serversvc.Service
+	Settings *serversvc.SettingsStore
+	Query    *telemetrysvc.Query
+	Hub      *agentsvc.Hub
 }
 
 func (a *ServersAPI) List(w http.ResponseWriter, r *http.Request) {
@@ -131,6 +136,40 @@ func pathID(r *http.Request, prefix string) (int64, bool) {
 		return 0, false
 	}
 	id, err := strconv.ParseInt(rest, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return id, true
+}
+
+func (a *ServersAPI) Telemetry(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID2(r, "/api/servers/", "/telemetry")
+	if !ok {
+		writeError(w, 400, "bad path")
+		return
+	}
+	rng := telemetrysvc.Range(r.URL.Query().Get("range"))
+	pts, err := a.Query.Series(r.Context(), id, rng)
+	if err != nil {
+		writeError(w, 400, err.Error())
+		return
+	}
+	writeJSON(w, 200, pts)
+}
+
+// pathID2 extracts the numeric segment between two fixed wrappers.
+//
+//	pathID2(r, "/api/servers/", "/telemetry") on "/api/servers/42/telemetry" -> 42, true
+func pathID2(r *http.Request, prefix, suffix string) (int64, bool) {
+	p := r.URL.Path
+	if !strings.HasPrefix(p, prefix) || !strings.HasSuffix(p, suffix) {
+		return 0, false
+	}
+	mid := strings.TrimSuffix(strings.TrimPrefix(p, prefix), suffix)
+	if mid == "" || strings.ContainsRune(mid, '/') {
+		return 0, false
+	}
+	id, err := strconv.ParseInt(mid, 10, 64)
 	if err != nil {
 		return 0, false
 	}

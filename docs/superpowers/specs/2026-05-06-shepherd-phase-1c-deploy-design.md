@@ -51,6 +51,7 @@ Makefile                                         # 现有基础上加：agent-am
 
 README.md                                        # 英文，GitHub 默认渲染
 README.zh-CN.md                                  # 中文
+LICENSE                                          # MIT
 ```
 
 ---
@@ -430,7 +431,7 @@ jobs:
    - 7.8 Local Docker build：`make docker-build VERSION=v0.1.0`
 8. **API reference summary**：spec §7 routes 表格
 9. **Roadmap**：5+1 phases
-10. **License**：MIT 待加（v2 或 1.C 末尾）
+10. **License**：MIT — 同时新增根目录 `LICENSE` 文件（标准 MIT 模板，copyright `2026 hg-claw`）
 11. **Contributing**：链到 CONTRIBUTING.md（v2，本期不做）
 
 > 翻译策略：用清晰、机器友好的英文（避免双关 / 习语），中文版用书面语简体；保持代码块、命令、文件路径在两份里一致。
@@ -493,6 +494,7 @@ tar -tzf dist/shepherd-linux-amd64.tar.gz   # confirm contents
 - 真切一个 `v0.1.0` git tag，CI release.yml 触发并完整跑完，GitHub Releases 出现 tarballs（带 sha256），`ghcr.io/hg-claw/shepherd:v0.1.0` 可拉
 - `docker pull ghcr.io/hg-claw/shepherd:v0.1.0` 能在 amd64 + arm64 两种主机上跑起来
 - `README.md` 和 `README.zh-CN.md` 内容对齐，两份都包含 §7 Development（本地测试流程）
+- 根目录 `LICENSE` 文件存在（标准 MIT 模板）
 - CI on PR：lint + test 全绿
 - `actionlint .github/workflows/*.yml` 通过
 

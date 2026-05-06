@@ -12,7 +12,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-05-06-shepherd-platform-core-design.md`
 
-**Owner placeholder:** the plan uses `<owner>` for the GitHub user/org. Pick the real value at Task 1 and grep-replace before any other task runs.
+**Owner / repo:** GitHub `hg-claw/Shepherd`. Module path: `github.com/hg-claw/Shepherd`. (Repo name keeps the capital `S` to match the working directory; binary/file names stay lowercase per Go convention.)
 
 ---
 
@@ -109,10 +109,10 @@ ls
 ```
 Expected: `docs`.
 
-- [ ] **Step 2: Init Go module** (replace `<owner>` with the real GitHub user/org)
+- [ ] **Step 2: Init Go module**
 
 ```
-go mod init github.com/<owner>/shepherd
+go mod init github.com/hg-claw/Shepherd
 ```
 
 - [ ] **Step 3: Write `.gitignore`**
@@ -748,7 +748,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/<owner>/shepherd/internal/db"
+	"github.com/hg-claw/Shepherd/internal/db"
 )
 
 const (
@@ -803,7 +803,7 @@ func FromEnv() (Config, error) {
 }
 
 // BuildVersion is overridden at link time:
-//   go build -ldflags "-X github.com/<owner>/shepherd/internal/config.BuildVersion=v0.1.0" ...
+//   go build -ldflags "-X github.com/hg-claw/Shepherd/internal/config.BuildVersion=v0.1.0" ...
 var BuildVersion = "dev"
 
 func getEnvDefault(key, def string) string {
@@ -1112,7 +1112,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	shepdb "github.com/<owner>/shepherd/internal/db"
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
 )
 
 func newTestStore(t *testing.T) *Store {
@@ -1254,7 +1254,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/<owner>/shepherd/internal/auth"
+	"github.com/hg-claw/Shepherd/internal/auth"
 )
 
 type AuthAPI struct {
@@ -1328,8 +1328,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/<owner>/shepherd/internal/auth"
-	shepdb "github.com/<owner>/shepherd/internal/db"
+	"github.com/hg-claw/Shepherd/internal/auth"
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
 )
 
 func newAuthAPI(t *testing.T) (*AuthAPI, *auth.Store) {
@@ -1604,7 +1604,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	shepdb "github.com/<owner>/shepherd/internal/db"
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
 )
 
 func newSvc(t *testing.T) *Service {
@@ -1695,7 +1695,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/<owner>/shepherd/internal/serversvc"
+	"github.com/hg-claw/Shepherd/internal/serversvc"
 )
 
 type ServersAPI struct {
@@ -1835,7 +1835,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/<owner>/shepherd/internal/serversvc"
+	"github.com/hg-claw/Shepherd/internal/serversvc"
 )
 
 type SettingsAPI struct {
@@ -1881,8 +1881,8 @@ import (
 	"strconv"
 	"testing"
 
-	shepdb "github.com/<owner>/shepherd/internal/db"
-	"github.com/<owner>/shepherd/internal/serversvc"
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
+	"github.com/hg-claw/Shepherd/internal/serversvc"
 )
 
 func newServersAPI(t *testing.T) *ServersAPI {
@@ -2334,7 +2334,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	shepdb "github.com/<owner>/shepherd/internal/db"
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
 )
 
 func newSvc(t *testing.T) *Service {
@@ -2444,7 +2444,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/<owner>/shepherd/internal/agentapi"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 )
 
 var ErrAgentOffline = errors.New("agent offline")
@@ -2513,7 +2513,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/<owner>/shepherd/internal/agentapi"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 )
 
 type fakeConn struct {
@@ -2619,8 +2619,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/<owner>/shepherd/internal/agentapi"
-	"github.com/<owner>/shepherd/internal/agentsvc"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
+	"github.com/hg-claw/Shepherd/internal/agentsvc"
 )
 
 const (
@@ -2806,9 +2806,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/<owner>/shepherd/internal/agentapi"
-	"github.com/<owner>/shepherd/internal/agentsvc"
-	shepdb "github.com/<owner>/shepherd/internal/db"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
+	"github.com/hg-claw/Shepherd/internal/agentsvc"
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
 )
 
 func newAgentAPI(t *testing.T) (*AgentAPI, *agentsvc.Service) {
@@ -2930,7 +2930,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/<owner>/shepherd/internal/agentapi"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 )
 
 type Ingest struct {
@@ -2988,8 +2988,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/<owner>/shepherd/internal/agentapi"
-	shepdb "github.com/<owner>/shepherd/internal/db"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
 )
 
 func newIngest(t *testing.T) (*Ingest, int64) {
@@ -3176,8 +3176,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/<owner>/shepherd/internal/agentapi"
-	shepdb "github.com/<owner>/shepherd/internal/db"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
 )
 
 func TestRollup_5m_FoldsClosedBucket(t *testing.T) {
@@ -3430,8 +3430,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/<owner>/shepherd/internal/agentapi"
-	shepdb "github.com/<owner>/shepherd/internal/db"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
 )
 
 func TestQuery_1h_UsesRawTable(t *testing.T) {
@@ -3488,7 +3488,7 @@ git commit -m "feat(telemetry): retention pruning + range-aware time-series quer
 ```go
 // --- telemetry on admin path ---
 import (
-	"github.com/<owner>/shepherd/internal/telemetrysvc"
+	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
 )
 
 // Wire into ServersAPI by adding fields:
@@ -3545,9 +3545,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/<owner>/shepherd/internal/agentsvc"
-	"github.com/<owner>/shepherd/internal/serversvc"
-	"github.com/<owner>/shepherd/internal/telemetrysvc"
+	"github.com/hg-claw/Shepherd/internal/agentsvc"
+	"github.com/hg-claw/Shepherd/internal/serversvc"
+	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
 )
 
 type PublicAPI struct {
@@ -3699,11 +3699,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/<owner>/shepherd/internal/agentapi"
-	"github.com/<owner>/shepherd/internal/agentsvc"
-	shepdb "github.com/<owner>/shepherd/internal/db"
-	"github.com/<owner>/shepherd/internal/serversvc"
-	"github.com/<owner>/shepherd/internal/telemetrysvc"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
+	"github.com/hg-claw/Shepherd/internal/agentsvc"
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
+	"github.com/hg-claw/Shepherd/internal/serversvc"
+	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
 )
 
 func TestPublic_HidesPrivateAndExposesAlias(t *testing.T) {
@@ -3859,7 +3859,7 @@ func (EmbeddedDistribution) Provide(arch string) (io.Reader, string, bool, error
 // (append below the existing file)
 
 type GitHubDistribution struct {
-	Owner string // e.g. "lietu6"
+	Owner string // e.g. "hg-claw"
 	Repo  string // e.g. "shepherd"
 	Tag   string // e.g. "v0.1.0"
 }
@@ -4079,7 +4079,7 @@ package installer
 import "testing"
 
 func TestGitHubDistribution_Snippet(t *testing.T) {
-	d := GitHubDistribution{Owner: "lietu6", Repo: "shepherd", Tag: "v0.1.0"}
+	d := GitHubDistribution{Owner: "hg-claw", Repo: "Shepherd", Tag: "v0.1.0"}
 	_, snip, streamed, err := d.Provide("amd64")
 	if err != nil {
 		t.Fatal(err)
@@ -4160,7 +4160,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/<owner>/shepherd/internal/installer"
+	"github.com/hg-claw/Shepherd/internal/installer"
 )
 
 // Installer is the subset of *installer.Installer the state machine needs.
@@ -4286,8 +4286,8 @@ import (
 	"testing"
 	"time"
 
-	shepdb "github.com/<owner>/shepherd/internal/db"
-	"github.com/<owner>/shepherd/internal/installer"
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
+	"github.com/hg-claw/Shepherd/internal/installer"
 )
 
 type fakeInstaller struct {
@@ -4544,12 +4544,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/<owner>/shepherd/internal/agentapi"
-	"github.com/<owner>/shepherd/internal/agentsvc"
-	shepdb "github.com/<owner>/shepherd/internal/db"
-	"github.com/<owner>/shepherd/internal/installer"
-	"github.com/<owner>/shepherd/internal/serversvc"
-	"github.com/<owner>/shepherd/internal/telemetrysvc"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
+	"github.com/hg-claw/Shepherd/internal/agentsvc"
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
+	"github.com/hg-claw/Shepherd/internal/installer"
+	"github.com/hg-claw/Shepherd/internal/serversvc"
+	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
 )
 
 type fakeInstaller2 struct{ sink func(string) }
@@ -4739,15 +4739,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/<owner>/shepherd/internal/agentapi"
-	"github.com/<owner>/shepherd/internal/agentsvc"
-	"github.com/<owner>/shepherd/internal/api"
-	"github.com/<owner>/shepherd/internal/auth"
-	"github.com/<owner>/shepherd/internal/config"
-	shepdb "github.com/<owner>/shepherd/internal/db"
-	"github.com/<owner>/shepherd/internal/installer"
-	"github.com/<owner>/shepherd/internal/serversvc"
-	"github.com/<owner>/shepherd/internal/telemetrysvc"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
+	"github.com/hg-claw/Shepherd/internal/agentsvc"
+	"github.com/hg-claw/Shepherd/internal/api"
+	"github.com/hg-claw/Shepherd/internal/auth"
+	"github.com/hg-claw/Shepherd/internal/config"
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
+	"github.com/hg-claw/Shepherd/internal/installer"
+	"github.com/hg-claw/Shepherd/internal/serversvc"
+	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
 )
 
 func main() {
@@ -4855,7 +4855,7 @@ func main() {
 func ownerFromBuild() string {
 	// Replace once owner is known. To avoid drift, prefer setting
 	// AGENT_DOWNLOAD_TAG explicitly in env when running the github distribution.
-	return "<owner>"
+	return "hg-claw"
 }
 
 func tagOrFallback(override, build string) string {
@@ -5142,7 +5142,7 @@ import (
 	"strings"
 
 	"github.com/shirou/gopsutil/v3/disk"
-	"github.com/<owner>/shepherd/internal/agentapi"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 )
 
 var skipFS = map[string]struct{}{
@@ -5238,7 +5238,7 @@ import (
 	"github.com/shirou/gopsutil/v3/load"
 	"github.com/shirou/gopsutil/v3/mem"
 	gnet "github.com/shirou/gopsutil/v3/net"
-	"github.com/<owner>/shepherd/internal/agentapi"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 )
 
 type Sender interface {
@@ -5399,9 +5399,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/<owner>/shepherd/internal/agent/state"
-	"github.com/<owner>/shepherd/internal/agentapi"
-	"github.com/<owner>/shepherd/internal/agentconfig"
+	"github.com/hg-claw/Shepherd/internal/agent/state"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
+	"github.com/hg-claw/Shepherd/internal/agentconfig"
 )
 
 var ErrPermanent = errors.New("permanent agent failure")
@@ -5677,9 +5677,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/<owner>/shepherd/internal/agent/state"
-	"github.com/<owner>/shepherd/internal/agentapi"
-	"github.com/<owner>/shepherd/internal/agentconfig"
+	"github.com/hg-claw/Shepherd/internal/agent/state"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
+	"github.com/hg-claw/Shepherd/internal/agentconfig"
 )
 
 func TestAcquireToken_AutoRegisterFlow(t *testing.T) {
@@ -5740,11 +5740,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/<owner>/shepherd/internal/agent/collector"
-	"github.com/<owner>/shepherd/internal/agent/fingerprint"
-	"github.com/<owner>/shepherd/internal/agent/state"
-	"github.com/<owner>/shepherd/internal/agent/wsclient"
-	"github.com/<owner>/shepherd/internal/agentconfig"
+	"github.com/hg-claw/Shepherd/internal/agent/collector"
+	"github.com/hg-claw/Shepherd/internal/agent/fingerprint"
+	"github.com/hg-claw/Shepherd/internal/agent/state"
+	"github.com/hg-claw/Shepherd/internal/agent/wsclient"
+	"github.com/hg-claw/Shepherd/internal/agentconfig"
 )
 
 func main() {

@@ -143,3 +143,20 @@ func nullable(s string) sql.NullString {
 	}
 	return sql.NullString{String: s, Valid: true}
 }
+
+// appendInstallLog atomically appends a line + "\n" to servers.install_log.
+// Both SQLite and Postgres support COALESCE + concat with `||`.
+func (s *Service) appendInstallLog(ctx context.Context, id int64, line string) {
+	_, _ = s.DB.ExecContext(ctx,
+		`UPDATE servers SET install_log = install_log || $1 WHERE id=$2`, line+"\n", id)
+}
+
+// SetInstallStage updates install_stage, optionally clearing install_error.
+func (s *Service) SetInstallStage(ctx context.Context, id int64, stage string, errMsg *string) error {
+	if errMsg == nil {
+		_, err := s.DB.ExecContext(ctx, "UPDATE servers SET install_stage=$1, install_error=NULL WHERE id=$2", stage, id)
+		return err
+	}
+	_, err := s.DB.ExecContext(ctx, "UPDATE servers SET install_stage=$1, install_error=$2 WHERE id=$3", stage, *errMsg, id)
+	return err
+}

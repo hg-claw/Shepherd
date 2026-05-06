@@ -6,16 +6,20 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 	"github.com/hg-claw/Shepherd/internal/agentsvc"
+	"github.com/hg-claw/Shepherd/internal/installer"
 	"github.com/hg-claw/Shepherd/internal/serversvc"
 	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
 )
 
 type ServersAPI struct {
-	Servers  *serversvc.Service
-	Settings *serversvc.SettingsStore
-	Query    *telemetrysvc.Query
-	Hub      *agentsvc.Hub
+	Servers        *serversvc.Service
+	Settings       *serversvc.SettingsStore
+	Query          *telemetrysvc.Query
+	Hub            *agentsvc.Hub
+	InstallManager *serversvc.InstallManager
+	Tokens         *agentsvc.Service // for repair
 }
 
 func (a *ServersAPI) List(w http.ResponseWriter, r *http.Request) {
@@ -174,4 +178,114 @@ func pathID2(r *http.Request, prefix, suffix string) (int64, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+type installReq struct {
+	Name         string `json:"name"`
+	SSHHost      string `json:"ssh_host"`
+	SSHPort      int    `json:"ssh_port"`
+	SSHUser      string `json:"ssh_user"`
+	SSHPassword  string `json:"ssh_password"`
+	SSHKey       string `json:"ssh_key"`
+	Arch         string `json:"arch"` // amd64|arm64
+	PublicAlias  string `json:"public_alias"`
+	PublicGroup  string `json:"public_group"`
+	CountryCode  string `json:"country_code"`
+	ShowOnPublic bool   `json:"show_on_public"`
+}
+
+func (a *ServersAPI) Install(w http.ResponseWriter, r *http.Request) {
+	var in installReq
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, 400, "bad json")
+		return
+	}
+	if strings.TrimSpace(in.Name) == "" || strings.TrimSpace(in.SSHHost) == "" || strings.TrimSpace(in.SSHUser) == "" {
+		writeError(w, 400, "name, ssh_host, ssh_user required")
+		return
+	}
+	if in.SSHPassword == "" && in.SSHKey == "" {
+		writeError(w, 400, "one of ssh_password or ssh_key required")
+		return
+	}
+	if in.Arch != "amd64" && in.Arch != "arm64" {
+		writeError(w, 400, "arch must be amd64 or arm64")
+		return
+	}
+	srv, err := a.Servers.Create(r.Context(), serversvc.CreateInput{
+		Name: in.Name, SSHHost: in.SSHHost, SSHPort: in.SSHPort, SSHUser: in.SSHUser,
+		PublicAlias: in.PublicAlias, PublicGroup: in.PublicGroup,
+		CountryCode: in.CountryCode, ShowOnPublic: in.ShowOnPublic,
+	})
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	creds := installerCreds(in)
+	a.InstallManager.Start(serversvc.InstallRequest{Server: srv, Creds: creds, Arch: in.Arch})
+	writeJSON(w, 202, map[string]any{"server_id": srv.ID})
+}
+
+func installerCreds(in installReq) installer.SSHCredentials {
+	creds := installer.SSHCredentials{Host: in.SSHHost, Port: in.SSHPort, User: in.SSHUser, Password: in.SSHPassword}
+	if creds.Port == 0 {
+		creds.Port = 22
+	}
+	if in.SSHKey != "" {
+		creds.PrivateKey = []byte(in.SSHKey)
+	}
+	return creds
+}
+
+// Repair regenerates an enrollment token; the admin can use it to re-pair an agent
+// whose state file was lost or that was reinstalled. Existing machine_tokens stay valid
+// until the agent rotates them on next enroll/auto-register.
+func (a *ServersAPI) Repair(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID2(r, "/api/servers/", "/repair")
+	if !ok {
+		writeError(w, 400, "bad path")
+		return
+	}
+	tok, exp, err := a.Tokens.IssueEnrollmentToken(r.Context(), id)
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]any{
+		"enrollment_token": tok,
+		"expires_at":       exp,
+	})
+}
+
+type configReq struct {
+	TelemetryIntervalSeconds int `json:"telemetry_interval_seconds"`
+}
+
+func (a *ServersAPI) Config(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID2(r, "/api/servers/", "/config")
+	if !ok {
+		writeError(w, 400, "bad path")
+		return
+	}
+	var in configReq
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, 400, "bad json")
+		return
+	}
+	if in.TelemetryIntervalSeconds < 5 || in.TelemetryIntervalSeconds > 3600 {
+		writeError(w, 400, "telemetry_interval_seconds must be 5..3600")
+		return
+	}
+	env, err := agentapi.Frame(agentapi.TypeConfigUpdate, agentapi.ConfigUpdate{
+		TelemetryIntervalSeconds: in.TelemetryIntervalSeconds,
+	})
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	if err := a.Hub.Send(id, env); err != nil {
+		writeError(w, 409, err.Error()) // 409 — agent offline
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

@@ -7,6 +7,7 @@
   - Phase 3 — 插件运行时 + 插件中心（含市场）
   - Phase 4 — xray 插件
   - Phase 5 — relay 插件
+  - Phase 6 — 告警、通知 插件
 
 ---
 
@@ -24,11 +25,10 @@
 ### 1.2 非目标（明确排除，留给后续 phase）
 - 远程交互（PTY、脚本下发、文件上传/下载） → Phase 2
 - 插件运行时 + 第三方插件加载 → Phase 3
-- 告警、通知（用插件实现） → Phase 3+
 - xray、relay、DNS 等具体业务能力 → Phase 4/5（皆为插件）
+- 告警、通知（用插件实现） → Phase 6
 - Windows agent
 - 多 admin 用户、操作审计日志（v2）
-- 温度采集
 - TLS 直接终结于 Go 进程（统一交给反代）
 
 ---

@@ -23,10 +23,23 @@ type ServersAPI struct {
 }
 
 func (a *ServersAPI) List(w http.ResponseWriter, r *http.Request) {
-	out, err := a.Servers.List(r.Context())
+	servers, err := a.Servers.List(r.Context())
 	if err != nil {
 		writeError(w, 500, err.Error())
 		return
+	}
+	if r.URL.Query().Get("with") != "latest" {
+		writeJSON(w, 200, servers)
+		return
+	}
+	type wrapped struct {
+		*serversvc.Server
+		Latest *telemetrysvc.Point `json:"latest"`
+	}
+	out := make([]wrapped, 0, len(servers))
+	for _, s := range servers {
+		pt, _ := a.Query.Latest(r.Context(), s.ID) // nil if no telemetry yet — fine
+		out = append(out, wrapped{Server: s, Latest: pt})
 	}
 	writeJSON(w, 200, out)
 }

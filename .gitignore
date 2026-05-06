@@ -1,0 +1,23 @@
+# Binaries
+/bin/
+/shepherd-server
+/shepherd-agent
+*.exe
+
+# Data
+/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Editor
+.idea/
+.vscode/
+*.swp
+
+# Frontend (Plan 1.B)
+/web/node_modules/
+/web/dist/
+
+# OS
+.DS_Store

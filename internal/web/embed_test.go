@@ -1,6 +1,7 @@
 package web
 
 import (
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -8,6 +9,10 @@ import (
 )
 
 func TestHandler_PlaceholderWhenNoIndex(t *testing.T) {
+	sub, _ := fs.Sub(distFS, "dist")
+	if _, err := fs.ReadFile(sub, "index.html"); err == nil {
+		t.Skip("dist/index.html is present — placeholder path is not exercised")
+	}
 	h := Handler()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/", nil)
@@ -21,6 +26,10 @@ func TestHandler_PlaceholderWhenNoIndex(t *testing.T) {
 }
 
 func TestHandler_PlaceholderForAdminPath(t *testing.T) {
+	sub, _ := fs.Sub(distFS, "dist")
+	if _, err := fs.ReadFile(sub, "index.html"); err == nil {
+		t.Skip("dist/index.html is present — placeholder path is not exercised")
+	}
 	h := Handler()
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/admin/login", nil)

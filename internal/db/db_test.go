@@ -72,3 +72,35 @@ func TestOpen_UnknownDriver(t *testing.T) {
 		t.Fatal("want error")
 	}
 }
+
+func TestMigrate_SQLite_AppliesAllTables(t *testing.T) {
+	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
+	d, err := Open(context.Background(), Config{Driver: DriverSQLite, DSN: dsn})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	if err := Migrate(d, DriverSQLite); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"admins", "sessions", "servers", "enrollment_tokens", "machine_tokens",
+		"telemetry_samples_30s", "telemetry_rollup_5m", "telemetry_rollup_1h", "settings",
+	}
+	for _, name := range want {
+		var n int
+		if err := d.Get(&n, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?", name); err != nil {
+			t.Fatal(err)
+		}
+		if n != 1 {
+			t.Errorf("missing table %q", name)
+		}
+	}
+	var v string
+	if err := d.Get(&v, "SELECT value FROM settings WHERE key='public_display_mode'"); err != nil {
+		t.Fatal(err)
+	}
+	if v != "both" {
+		t.Errorf("public_display_mode=%q want both", v)
+	}
+}

@@ -13,8 +13,8 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// 0000_placeholder.* are placeholders so go:embed has matches before 0001_init lands in Task 3;
-// delete them when the first real migration is added.
+// Migrate runs all per-dialect migrations under migrations/<driver>/ via golang-migrate.
+// Tracks applied versions in the schema_migrations table that golang-migrate creates.
 //
 //go:embed migrations/sqlite/*.sql migrations/postgres/*.sql
 var migrationsFS embed.FS

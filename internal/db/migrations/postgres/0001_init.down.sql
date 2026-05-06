@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS settings;
+DROP TABLE IF EXISTS telemetry_rollup_1h;
+DROP TABLE IF EXISTS telemetry_rollup_5m;
+DROP TABLE IF EXISTS telemetry_samples_30s;
+DROP TABLE IF EXISTS machine_tokens;
+DROP TABLE IF EXISTS enrollment_tokens;
+DROP TABLE IF EXISTS servers;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS admins;

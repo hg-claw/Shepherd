@@ -1,0 +1,14 @@
+.git
+.github
+docs
+scripts
+bin
+dist
+**/node_modules
+internal/web/dist/*
+!internal/web/dist/.gitkeep
+shepherd.db*
+*.log
+.DS_Store
+.env
+.env.local

@@ -17,6 +17,7 @@ import (
 	"github.com/hg-claw/Shepherd/internal/installer"
 	"github.com/hg-claw/Shepherd/internal/serversvc"
 	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
+	shepweb "github.com/hg-claw/Shepherd/internal/web"
 )
 
 func main() {
@@ -96,7 +97,7 @@ func main() {
 	public := &api.PublicAPI{Servers: serverSvc, Settings: settingsStore, Query: tQuery, Hub: hub}
 	agentAPI := &api.AgentAPI{Agents: agentSvc, Hub: hub, OnFrame: tIngest.HandleFrame}
 
-	router := api.NewRouter(authAPI, authH.RequireAdmin, servers, settings, public, agentAPI)
+	router := api.NewRouter(authAPI, authH.RequireAdmin, servers, settings, public, agentAPI, shepweb.Handler())
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,

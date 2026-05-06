@@ -11,14 +11,17 @@ type Router struct {
 	Settings *SettingsAPI
 	Public   *PublicAPI
 	Agent    *AgentAPI
+	Web      http.Handler // SPA static + fallback; nil = catchall returns 404
 
 	requireAdmin func(http.Handler) http.Handler
 }
 
 func NewRouter(authAPI *AuthAPI, requireAdmin func(http.Handler) http.Handler,
-	servers *ServersAPI, settings *SettingsAPI, public *PublicAPI, agent *AgentAPI) *Router {
+	servers *ServersAPI, settings *SettingsAPI, public *PublicAPI, agent *AgentAPI,
+	web http.Handler) *Router {
 	return &Router{
 		Auth: authAPI, Servers: servers, Settings: settings, Public: public, Agent: agent,
+		Web:          web,
 		requireAdmin: requireAdmin,
 	}
 }
@@ -69,6 +72,12 @@ func (r *Router) Handler() http.Handler {
 	mux.HandleFunc("POST /agent/enroll", r.Agent.Enroll)
 	mux.HandleFunc("POST /agent/auto-register", r.Agent.AutoRegister)
 	mux.HandleFunc("GET /agent/ws", r.Agent.WS)
+
+	// SPA static + fallback. /api/ catchall above already swallows /api/*; the
+	// /agent/* exact patterns swallow agent paths. Anything else falls through here.
+	if r.Web != nil {
+		mux.Handle("/", r.Web)
+	}
 
 	return mux
 }

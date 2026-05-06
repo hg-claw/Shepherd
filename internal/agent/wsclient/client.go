@@ -179,6 +179,14 @@ func (c *Client) dialAndRun(ctx context.Context) error {
 	stop := make(chan struct{})
 	defer close(stop)
 	go c.heartbeatLoop(stop)
+	// Close the connection when ctx is done so ReadMessage unblocks immediately.
+	go func() {
+		select {
+		case <-stop:
+		case <-ctx.Done():
+			_ = conn.Close()
+		}
+	}()
 
 	for {
 		_, data, err := conn.ReadMessage()
@@ -217,13 +225,12 @@ func (c *Client) Send(env agentapi.Envelope) error {
 
 func (c *Client) writeJSON(env agentapi.Envelope) error {
 	c.mu.Lock()
-	conn := c.conn
-	c.mu.Unlock()
-	if conn == nil {
+	defer c.mu.Unlock()
+	if c.conn == nil {
 		return errors.New("not connected")
 	}
-	conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-	return conn.WriteJSON(env)
+	c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	return c.conn.WriteJSON(env)
 }
 
 func (c *Client) heartbeatLoop(stop <-chan struct{}) {

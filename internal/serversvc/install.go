@@ -25,6 +25,7 @@ type InstallManager struct {
 	Tokens          AgentTokenIssuer
 	ServerURL       string        // base URL agent will dial back to
 	WatchdogTimeout time.Duration // default 10m
+	Ctx             context.Context // optional; defaults to context.Background() — pass server's rootCtx for graceful shutdown
 }
 
 type InstallRequest struct {
@@ -37,7 +38,11 @@ type InstallRequest struct {
 // Updates the server row's install_stage / install_log / install_error as it goes.
 // Idempotency: caller is responsible for checking the row isn't already in 'installing'.
 func (m *InstallManager) Start(req InstallRequest) {
-	go m.run(context.Background(), req)
+	ctx := m.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	go m.run(ctx, req)
 }
 
 func (m *InstallManager) run(ctx context.Context, req InstallRequest) {

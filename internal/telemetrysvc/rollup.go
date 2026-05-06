@@ -74,6 +74,10 @@ func (r *Rollup) rollup(ctx context.Context, table string, bucket time.Duration)
 		seen[k] = struct{}{}
 		candidates = append(candidates, k)
 	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
 	rows.Close()
 
 	for _, k := range candidates {

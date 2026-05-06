@@ -77,6 +77,7 @@ func main() {
 		Installer: inst,
 		Tokens:    agentSvc,
 		ServerURL: deriveServerURL(cfg),
+		Ctx:       rootCtx,
 	}
 
 	if err := installMgr.SweepStuck(rootCtx); err != nil {

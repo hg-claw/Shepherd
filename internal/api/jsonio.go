@@ -22,3 +22,7 @@ func decodeJSON(r *http.Request, v any) error {
 	dec.DisallowUnknownFields()
 	return dec.Decode(v)
 }
+
+func envDecode(data []byte, v any) error {
+	return json.Unmarshal(data, v)
+}

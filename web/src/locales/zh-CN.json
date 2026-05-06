@@ -1,0 +1,97 @@
+{
+  "app": {
+    "name": "Shepherd",
+    "tagline": "服务器舰队管理"
+  },
+  "auth": {
+    "login": "登录",
+    "logout": "登出",
+    "username": "用户名",
+    "password": "密码",
+    "submit": "登录",
+    "invalid_credentials": "用户名或密码错误"
+  },
+  "wall": {
+    "title": "服务器状态",
+    "online": "在线",
+    "offline": "离线",
+    "no_servers": "暂无公开展示的服务器",
+    "ungrouped": "未分组"
+  },
+  "metric": {
+    "cpu": "CPU",
+    "mem": "内存",
+    "disk": "磁盘",
+    "net": "网络",
+    "load": "负载",
+    "tcp": "TCP 连接"
+  },
+  "level": {
+    "low": "低",
+    "mid": "中",
+    "high": "高",
+    "alert": "告警"
+  },
+  "range": {
+    "1h": "1 小时",
+    "24h": "24 小时",
+    "7d": "7 天"
+  },
+  "admin": {
+    "dashboard": "概览",
+    "servers": "服务器",
+    "settings": "设置",
+    "add_server": "添加服务器",
+    "name": "名称",
+    "host": "地址",
+    "agent_last_seen": "最近上线",
+    "actions": "操作",
+    "details": "详情",
+    "delete": "删除",
+    "confirm_delete": "确认删除服务器 \"{{name}}\"？此操作不可撤销。",
+    "repair": "重新配对",
+    "repair_token_issued": "已生成新的注册令牌（{{expires}} 过期）",
+    "config_interval": "采样间隔（秒）",
+    "config_pushed": "已推送给在线 agent",
+    "config_offline": "agent 离线，配置未送达",
+    "install_progress": "装机进度",
+    "install_done": "装机完成",
+    "install_failed": "装机失败",
+    "save": "保存",
+    "saved": "已保存",
+    "summary": {
+      "total": "总数",
+      "online": "在线",
+      "offline": "离线",
+      "alerts": "告警中",
+      "top_cpu": "CPU Top 5",
+      "top_mem": "内存 Top 5"
+    }
+  },
+  "settings": {
+    "public_display_mode": "公共页显示模式",
+    "mode_raw": "百分比",
+    "mode_level": "档位",
+    "mode_both": "两者都显示",
+    "retention_30s": "30s 样本保留期",
+    "retention_5m": "5min 聚合保留期",
+    "retention_1h": "1h 聚合保留期",
+    "default_telemetry_interval_seconds": "默认采样间隔（秒）"
+  },
+  "common": {
+    "loading": "加载中…",
+    "error": "出错了",
+    "retry": "重试",
+    "cancel": "取消",
+    "ok": "好",
+    "copy": "复制",
+    "copied": "已复制",
+    "back": "返回",
+    "not_found": "未找到",
+    "minute_ago": "{{n}} 分钟前",
+    "second_ago": "{{n}} 秒前",
+    "hour_ago": "{{n}} 小时前",
+    "day_ago": "{{n}} 天前",
+    "just_now": "刚刚"
+  }
+}

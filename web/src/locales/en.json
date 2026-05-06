@@ -1,0 +1,78 @@
+{
+  "app": { "name": "Shepherd", "tagline": "Server fleet manager" },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in",
+    "invalid_credentials": "Invalid username or password"
+  },
+  "wall": {
+    "title": "Server status",
+    "online": "online",
+    "offline": "offline",
+    "no_servers": "No public servers",
+    "ungrouped": "Ungrouped"
+  },
+  "metric": { "cpu": "CPU", "mem": "Memory", "disk": "Disk", "net": "Network", "load": "Load", "tcp": "TCP" },
+  "level": { "low": "low", "mid": "med", "high": "high", "alert": "alert" },
+  "range": { "1h": "1h", "24h": "24h", "7d": "7d" },
+  "admin": {
+    "dashboard": "Dashboard",
+    "servers": "Servers",
+    "settings": "Settings",
+    "add_server": "Add server",
+    "name": "Name",
+    "host": "Host",
+    "agent_last_seen": "Last seen",
+    "actions": "Actions",
+    "details": "Details",
+    "delete": "Delete",
+    "confirm_delete": "Delete server \"{{name}}\"? This cannot be undone.",
+    "repair": "Re-pair",
+    "repair_token_issued": "New enrollment token issued (expires {{expires}})",
+    "config_interval": "Sample interval (sec)",
+    "config_pushed": "Config pushed to live agent",
+    "config_offline": "Agent offline; config not delivered",
+    "install_progress": "Install progress",
+    "install_done": "Install complete",
+    "install_failed": "Install failed",
+    "save": "Save",
+    "saved": "Saved",
+    "summary": {
+      "total": "Total",
+      "online": "Online",
+      "offline": "Offline",
+      "alerts": "Alerting",
+      "top_cpu": "Top CPU",
+      "top_mem": "Top memory"
+    }
+  },
+  "settings": {
+    "public_display_mode": "Public display mode",
+    "mode_raw": "Raw values",
+    "mode_level": "Levels",
+    "mode_both": "Both",
+    "retention_30s": "30s samples retention",
+    "retention_5m": "5m rollup retention",
+    "retention_1h": "1h rollup retention",
+    "default_telemetry_interval_seconds": "Default sampling interval (sec)"
+  },
+  "common": {
+    "loading": "Loading…",
+    "error": "Error",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "ok": "OK",
+    "copy": "Copy",
+    "copied": "Copied",
+    "back": "Back",
+    "not_found": "Not found",
+    "minute_ago": "{{n}} min ago",
+    "second_ago": "{{n}} sec ago",
+    "hour_ago": "{{n}} hr ago",
+    "day_ago": "{{n}} days ago",
+    "just_now": "just now"
+  }
+}

@@ -31,3 +31,27 @@ func TestLoadMissingFileReturnsEmpty(t *testing.T) {
 		t.Errorf("expected empty state")
 	}
 }
+
+func TestStateStore_SandboxRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	s := &Store{Path: filepath.Join(dir, "agent.state.json")}
+	enabled := true
+	in := &State{
+		MachineToken: "t",
+		Fingerprint:  "f",
+		Sandbox:      &SandboxState{Enabled: &enabled, Paths: []string{"/tmp", "/var/log"}},
+	}
+	if err := s.Save(in); err != nil {
+		t.Fatal(err)
+	}
+	out, err := s.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Sandbox == nil || out.Sandbox.Enabled == nil || !*out.Sandbox.Enabled {
+		t.Fatalf("sandbox not persisted: %+v", out.Sandbox)
+	}
+	if len(out.Sandbox.Paths) != 2 || out.Sandbox.Paths[0] != "/tmp" {
+		t.Fatalf("paths=%v", out.Sandbox.Paths)
+	}
+}

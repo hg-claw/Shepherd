@@ -10,10 +10,16 @@ import (
 
 const DefaultPath = "/etc/shepherd/agent.state.json"
 
+type SandboxState struct {
+	Enabled *bool    `json:"enabled,omitempty"`
+	Paths   []string `json:"paths,omitempty"`
+}
+
 type State struct {
-	MachineToken             string `json:"machine_token"`
-	Fingerprint              string `json:"fingerprint"`
-	TelemetryIntervalSeconds int    `json:"telemetry_interval_seconds"`
+	MachineToken             string        `json:"machine_token"`
+	Fingerprint              string        `json:"fingerprint"`
+	TelemetryIntervalSeconds int           `json:"telemetry_interval_seconds"`
+	Sandbox                  *SandboxState `json:"sandbox,omitempty"`
 }
 
 type Store struct {

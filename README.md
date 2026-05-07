@@ -92,6 +92,17 @@ make web && make server
 ./bin/shepherd-server
 ```
 
+## Remote Ops (Phase 2, since v0.2.0)
+
+Once an agent is online, admins can:
+
+- **Console** — open an interactive PTY in the browser via the bottom drawer. Any registered server, no SSH credentials needed; backed by the existing reverse-WS channel. PTYs are recorded as asciicast v2 and replayable from the Recordings page.
+- **Scripts** — author parameterized scripts in the Scripts library, then run them on a single server or fan-out to many. Each target gets its own PTY (so interactive prompts work). Run history shows status per target with attach + replay buttons.
+- **Files** — browse/upload/download/mkdir/rename/delete files on any online server. Path sandbox (default `/tmp /var/log /etc/shepherd /home /opt /srv`) is configurable in Settings; toggle off only if you accept that admins == root on the agent host.
+- **Audit log** — every privileged operation (pty.open/close, script.run, file.*) writes to `audit_log` with admin/server/action/details. Default 30-day retention, configurable.
+
+Compatibility: Phase 2 requires agent v0.2.0+. Older agents continue to serve telemetry but the admin UI shows a "needs upgrade" hint when remote ops endpoints time out.
+
 ## Deployment
 
 See [`deploy/README.md`](deploy/README.md) for the three deployment forms

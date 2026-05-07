@@ -87,6 +87,17 @@ make web && make server
 ./bin/shepherd-server
 ```
 
+## 远程操作（Phase 2，v0.2.0 起）
+
+agent 上线后，管理员可以：
+
+- **Console（终端）** — 在浏览器底部抽屉打开交互式 PTY。任何已纳管服务器都能开，不需要 SSH 凭据；复用 agent 的反向 WebSocket。PTY 会以 asciicast v2 录制，可从录制回放页重放。
+- **Scripts（脚本）** — 在脚本库中编写带参数的脚本，针对单台或多台 fan-out 执行。每个目标分配独立 PTY（交互式提示可正常工作）。运行历史按目标展示状态，提供 attach 与 replay 按钮。
+- **Files（文件浏览器）** — 浏览/上传/下载/新建文件夹/重命名/删除任意在线服务器上的文件。路径白名单（默认 `/tmp /var/log /etc/shepherd /home /opt /srv`）在设置中可改；关闭沙箱意味着接受「admin = agent 主机 root」的等价权限。
+- **审计日志** — 所有特权操作（pty.open/close、script.run、file.*）写入 `audit_log` 表，记录管理员 / 服务器 / 动作 / 详情。默认保留 30 天，可配置。
+
+兼容性：Phase 2 需要 agent v0.2.0+。旧版本 agent 仍能上报遥测，但管理后台访问远程操作端点会超时；UI 会显示「需要升级 agent」提示。
+
 ## 部署
 
 [`deploy/README.md`](deploy/README.md) 详述三种部署形态（Compose / systemd 二进制 / 源码构建）

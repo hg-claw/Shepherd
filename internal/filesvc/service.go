@@ -25,7 +25,12 @@ type Service struct {
 	ChunkBytes int
 }
 
-func (s *Service) chunkSize() int { if s.ChunkBytes > 0 { return s.ChunkBytes }; return 256 * 1024 }
+func (s *Service) chunkSize() int {
+	if s.ChunkBytes > 0 {
+		return s.ChunkBytes
+	}
+	return 256 * 1024
+}
 
 func (s *Service) request(ctx context.Context, serverID int64, frameType string, payload any, timeout time.Duration) (agentapi.Envelope, error) {
 	sid := agentapi.NewSID()
@@ -34,12 +39,18 @@ func (s *Service) request(ctx context.Context, serverID int64, frameType string,
 
 	withSid := injectSid(payload, sid)
 	env, err := agentapi.Frame(frameType, withSid)
-	if err != nil { return agentapi.Envelope{}, err }
-	if err := s.Hub.Send(serverID, env); err != nil { return agentapi.Envelope{}, err }
+	if err != nil {
+		return agentapi.Envelope{}, err
+	}
+	if err := s.Hub.Send(serverID, env); err != nil {
+		return agentapi.Envelope{}, err
+	}
 
 	select {
 	case env, ok := <-ch:
-		if !ok { return agentapi.Envelope{}, ErrTimeout }
+		if !ok {
+			return agentapi.Envelope{}, ErrTimeout
+		}
 		return env, nil
 	case <-time.After(timeout):
 		return agentapi.Envelope{}, ErrTimeout
@@ -49,22 +60,34 @@ func (s *Service) request(ctx context.Context, serverID int64, frameType string,
 }
 
 func (s *Service) List(ctx context.Context, serverID int64, path string, timeout time.Duration) ([]agentapi.FileEntry, error) {
-	if timeout == 0 { timeout = 10 * time.Second }
+	if timeout == 0 {
+		timeout = 10 * time.Second
+	}
 	env, err := s.request(ctx, serverID, agentapi.TypeFileList, agentapi.FileList{Path: path}, timeout)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	var res agentapi.FileListResult
 	_ = json.Unmarshal(env.P, &res)
-	if res.Error != "" { return nil, errors.New(res.Error) }
+	if res.Error != "" {
+		return nil, errors.New(res.Error)
+	}
 	return res.Entries, nil
 }
 
 func (s *Service) Stat(ctx context.Context, serverID int64, path string) (agentapi.FileEntry, error) {
 	env, err := s.request(ctx, serverID, agentapi.TypeFileStat, agentapi.FileStat{Path: path}, 10*time.Second)
-	if err != nil { return agentapi.FileEntry{}, err }
+	if err != nil {
+		return agentapi.FileEntry{}, err
+	}
 	var res agentapi.FileStatResult
 	_ = json.Unmarshal(env.P, &res)
-	if res.Error != "" { return agentapi.FileEntry{}, errors.New(res.Error) }
-	if res.Entry == nil { return agentapi.FileEntry{}, nil }
+	if res.Error != "" {
+		return agentapi.FileEntry{}, errors.New(res.Error)
+	}
+	if res.Entry == nil {
+		return agentapi.FileEntry{}, nil
+	}
 	return *res.Entry, nil
 }
 
@@ -80,10 +103,14 @@ func (s *Service) Rm(ctx context.Context, serverID int64, path string, recursive
 
 func (s *Service) opCall(ctx context.Context, serverID int64, frameType string, payload any, timeout time.Duration) error {
 	env, err := s.request(ctx, serverID, frameType, payload, timeout)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	var res agentapi.FileOpResult
 	_ = json.Unmarshal(env.P, &res)
-	if !res.OK { return errors.New(res.Error) }
+	if !res.OK {
+		return errors.New(res.Error)
+	}
 	return nil
 }
 
@@ -95,10 +122,15 @@ type uploadAdapter struct {
 
 func (u *uploadAdapter) DeliverBinary(_ []byte) {}
 func (u *uploadAdapter) DeliverControl(env agentapi.Envelope) {
-	if env.Type != agentapi.TypeFileUploadAck { return }
+	if env.Type != agentapi.TypeFileUploadAck {
+		return
+	}
 	var ack agentapi.FileUploadAck
 	_ = json.Unmarshal(env.P, &ack)
-	select { case u.got <- ack: default: }
+	select {
+	case u.got <- ack:
+	default:
+	}
 }
 
 func (s *Service) Upload(ctx context.Context, serverID int64, path string, mode uint32, size int64, sha256hex string, body io.Reader) error {
@@ -110,22 +142,34 @@ func (s *Service) Upload(ctx context.Context, serverID int64, path string, mode 
 	begin, _ := agentapi.Frame(agentapi.TypeFileUploadBegin, agentapi.FileUploadBegin{
 		Sid: sid, Path: path, Size: size, Mode: mode, SHA256: sha256hex,
 	})
-	if err := s.Hub.Send(serverID, begin); err != nil { return err }
+	if err := s.Hub.Send(serverID, begin); err != nil {
+		return err
+	}
 
 	buf := make([]byte, s.chunkSize())
 	for {
 		n, err := body.Read(buf)
 		if n > 0 {
-			if sErr := s.Hub.SendBinary(serverID, sid, agentapi.KindFileChunk, buf[:n]); sErr != nil { return sErr }
+			if sErr := s.Hub.SendBinary(serverID, sid, agentapi.KindFileChunk, buf[:n]); sErr != nil {
+				return sErr
+			}
 		}
-		if errors.Is(err, io.EOF) { break }
-		if err != nil { return err }
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return err
+		}
 	}
 	end, _ := agentapi.Frame(agentapi.TypeFileUploadEnd, agentapi.FileUploadEnd{Sid: sid, TotalBytes: size, SHA256: sha256hex})
-	if err := s.Hub.Send(serverID, end); err != nil { return err }
+	if err := s.Hub.Send(serverID, end); err != nil {
+		return err
+	}
 	select {
 	case ack := <-a.got:
-		if !ack.OK { return errors.New(ack.Error) }
+		if !ack.OK {
+			return errors.New(ack.Error)
+		}
 		return nil
 	case <-time.After(60 * time.Second):
 		return ErrTimeout
@@ -144,13 +188,22 @@ func (d *downloadAdapter) DeliverControl(env agentapi.Envelope) {
 	case agentapi.TypeFileDownloadMeta:
 		var m agentapi.FileDownloadMeta
 		_ = json.Unmarshal(env.P, &m)
-		select { case d.metaCh <- m: default: }
+		select {
+		case d.metaCh <- m:
+		default:
+		}
 	case agentapi.TypeFileDownloadEnd:
-		select { case d.doneCh <- nil: default: }
+		select {
+		case d.doneCh <- nil:
+		default:
+		}
 	case agentapi.TypeFileCancel:
 		var c agentapi.FileCancel
 		_ = json.Unmarshal(env.P, &c)
-		select { case d.doneCh <- errors.New(c.Reason): default: }
+		select {
+		case d.doneCh <- errors.New(c.Reason):
+		default:
+		}
 	}
 }
 
@@ -160,16 +213,21 @@ func (s *Service) Download(ctx context.Context, serverID int64, path string, w i
 	s.Reg.RegisterFile(sid, a)
 	defer s.Reg.Unregister(sid)
 	env, _ := agentapi.Frame(agentapi.TypeFileDownloadBegin, agentapi.FileDownloadBegin{Sid: sid, Path: path})
-	if err := s.Hub.Send(serverID, env); err != nil { return agentapi.FileDownloadMeta{}, err }
+	if err := s.Hub.Send(serverID, env); err != nil {
+		return agentapi.FileDownloadMeta{}, err
+	}
 	var meta agentapi.FileDownloadMeta
 	select {
 	case meta = <-a.metaCh:
-		if meta.Error != "" { return meta, errors.New(meta.Error) }
+		if meta.Error != "" {
+			return meta, errors.New(meta.Error)
+		}
 	case <-time.After(30 * time.Second):
 		return meta, ErrTimeout
 	}
 	select {
-	case err := <-a.doneCh: return meta, err
+	case err := <-a.doneCh:
+		return meta, err
 	case <-ctx.Done():
 		cancel, _ := agentapi.Frame(agentapi.TypeFileCancel, agentapi.FileCancel{Sid: sid, Reason: "client cancel"})
 		_ = s.Hub.Send(serverID, cancel)
@@ -181,7 +239,9 @@ func injectSid(payload any, sid string) any {
 	b, _ := json.Marshal(payload)
 	var m map[string]any
 	_ = json.Unmarshal(b, &m)
-	if m == nil { m = map[string]any{} }
+	if m == nil {
+		m = map[string]any{}
+	}
 	m["sid"] = sid
 	return m
 }

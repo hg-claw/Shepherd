@@ -163,6 +163,8 @@ func (w *wsConn) Send(env agentapi.Envelope) error {
 	return w.c.WriteJSON(env)
 }
 
+func (w *wsConn) SendBinary([]byte) error { return nil }
+
 func (w *wsConn) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()

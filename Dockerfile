@@ -15,7 +15,7 @@ RUN npm run build
 # NO --platform pin: under buildx this stage runs natively for the target
 # arch (via QEMU when host != target). That lets CGO=1 work for the SQLite
 # driver without setting up a cross-compiler.
-FROM golang:1.22-alpine AS go-builder
+FROM golang:1.25-alpine AS go-builder
 RUN apk add --no-cache build-base sqlite-dev
 WORKDIR /src
 COPY go.mod go.sum ./

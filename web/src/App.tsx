@@ -14,6 +14,15 @@ const NotFound = lazy(() => import('./pages/NotFound'))
 
 import { PublicLayout } from './layouts/PublicLayout'
 import { AdminLayout } from './layouts/AdminLayout'
+import ScriptsListPage from './pages/admin/ScriptsListPage'
+import ScriptEditPage from './pages/admin/ScriptEditPage'
+import ScriptRunPage from './pages/admin/ScriptRunPage'
+import ScriptRunsPage from './pages/admin/ScriptRunsPage'
+import ScriptRunDetailPage from './pages/admin/ScriptRunDetailPage'
+import FileBrowserPage from './pages/admin/FileBrowserPage'
+import AuditLogPage from './pages/admin/AuditLogPage'
+import RecordingPlayerPage from './pages/admin/RecordingPlayerPage'
+import { ConsoleDock } from './components/ConsoleDock'
 
 export default function App() {
   return (
@@ -38,10 +47,20 @@ export default function App() {
           <Route path="/admin/servers/new" element={<ServerNew />} />
           <Route path="/admin/servers/:id" element={<AdminServerDetail />} />
           <Route path="/admin/settings" element={<Settings />} />
+          <Route path="/admin/scripts" element={<ScriptsListPage />} />
+          <Route path="/admin/scripts/new" element={<ScriptEditPage mode="create" />} />
+          <Route path="/admin/scripts/:id" element={<ScriptEditPage mode="edit" />} />
+          <Route path="/admin/scripts/:id/run" element={<ScriptRunPage />} />
+          <Route path="/admin/script-runs" element={<ScriptRunsPage />} />
+          <Route path="/admin/script-runs/:id" element={<ScriptRunDetailPage />} />
+          <Route path="/admin/files/:serverId" element={<FileBrowserPage />} />
+          <Route path="/admin/audit" element={<AuditLogPage />} />
+          <Route path="/admin/recordings/:id" element={<RecordingPlayerPage />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />
       </Routes>
+      <ConsoleDock />
     </Suspense>
   )
 }

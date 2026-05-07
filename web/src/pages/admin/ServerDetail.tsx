@@ -1,6 +1,7 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { FolderTree, Terminal as TerminalIcon } from 'lucide-react'
 import { useServer, useTelemetry, usePatchServer, useDeleteServer, useRepair, usePushConfig } from '@/api/servers'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -16,6 +17,8 @@ import { InstallProgress } from '@/components/InstallProgress'
 import { useUI } from '@/store/ui'
 import { bps, bytes, pct } from '@/lib/bytes'
 import type { Range } from '@/api/servers'
+import { openConsole } from '@/api/console'
+import { useConsoleTabs } from '@/store/consoleTabs'
 
 export default function AdminServerDetail() {
   const { id: idStr } = useParams<{ id: string }>()
@@ -23,6 +26,7 @@ export default function AdminServerDetail() {
   const { t } = useTranslation()
   const toast = useUI((s) => s.toast)
   const navigate = useNavigate()
+  const openTab = useConsoleTabs((s) => s.open)
 
   const server = useServer(id, {
     refetchInterval: ((q: any) => {
@@ -92,6 +96,32 @@ export default function AdminServerDetail() {
           <KV k="install_stage" v={s.install_stage} />
         </CardContent>
       </Card>
+
+      <div className="flex gap-2 mb-2">
+        <Button asChild size="sm" variant="outline">
+          <Link to={`/admin/files/${id}`}>
+            <FolderTree className="h-4 w-4 mr-1" />
+            {t('files.title', 'Files')}
+          </Link>
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={async () => {
+            const out = await openConsole(Number(id), { rows: 24, cols: 80, term: 'xterm-256color' })
+            openTab({
+              id: `console-${out.session_id}`,
+              sid: out.sid,
+              sessionId: out.session_id,
+              title: `console@${id}`,
+              kind: 'console',
+            })
+          }}
+        >
+          <TerminalIcon className="h-4 w-4 mr-1" />
+          {t('console.open', 'Console')}
+        </Button>
+      </div>
 
       {(s.install_stage === 'installing' || s.install_stage === 'failed') && (
         <Card>

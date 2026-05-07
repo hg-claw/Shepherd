@@ -1,0 +1,32 @@
+services:
+  shepherd:
+    image: ghcr.io/hg-claw/shepherd:${SHEPHERD_TAG:-latest}
+    restart: unless-stopped
+    volumes:
+      - shepherd_data:/data
+    environment:
+      SERVER_HTTP_ADDR: ":8080"
+      DATABASE_DRIVER: ${DATABASE_DRIVER:-sqlite}
+      DATABASE_DSN: ${DATABASE_DSN:-file:/data/shepherd.db?_fk=1}
+      INITIAL_ADMIN_USERNAME: ${INITIAL_ADMIN_USERNAME:-}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
+      AUTO_RECOVER_KEY: ${AUTO_RECOVER_KEY:-}
+      SERVER_PUBLIC_URL: ${SERVER_PUBLIC_URL:-}
+      AGENT_DISTRIBUTION: ${AGENT_DISTRIBUTION:-embedded}
+    ports:
+      - "${SHEPHERD_PORT:-8080}:8080"
+
+  postgres:
+    image: postgres:16-alpine
+    profiles: [pg]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: shepherd
+      POSTGRES_USER: shepherd
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-shepherd}
+    volumes:
+      - shepherd_pg_data:/var/lib/postgresql/data
+
+volumes:
+  shepherd_data:
+  shepherd_pg_data:

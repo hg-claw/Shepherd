@@ -1,0 +1,119 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: write     # for GitHub release creation
+  packages: write     # for ghcr.io image push
+
+jobs:
+  binaries:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'web/package-lock.json'
+      - name: Install + build web (for server embed)
+        run: cd web && npm ci && npm run build
+      - name: Resolve version
+        run: echo "VERSION=${{ github.event.inputs.tag || github.ref_name }}" >> $GITHUB_ENV
+      - name: Cross-compile agent (both arches embedded in server)
+        run: |
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \
+            -ldflags "-X github.com/hg-claw/Shepherd/internal/agentconfig.BuildVersion=${VERSION}" \
+            -o internal/installer/bin/shepherd-agent-linux-amd64 ./cmd/agent
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build \
+            -ldflags "-X github.com/hg-claw/Shepherd/internal/agentconfig.BuildVersion=${VERSION}" \
+            -o internal/installer/bin/shepherd-agent-linux-arm64 ./cmd/agent
+      - name: Cross-compile server for ${{ matrix.arch }}
+        run: |
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            sudo apt-get update
+            sudo apt-get install -y gcc-aarch64-linux-gnu
+            export CC=aarch64-linux-gnu-gcc
+          fi
+          mkdir -p dist
+          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=1 \
+            go build \
+            -ldflags "-X github.com/hg-claw/Shepherd/internal/config.BuildVersion=${VERSION}" \
+            -o dist/shepherd-server-linux-${{ matrix.arch }} \
+            ./cmd/server
+      - name: Package + checksum
+        run: |
+          cp internal/installer/bin/shepherd-agent-linux-${{ matrix.arch }} dist/
+          tar -czf dist/shepherd-linux-${{ matrix.arch }}.tar.gz \
+            -C dist shepherd-server-linux-${{ matrix.arch }} shepherd-agent-linux-${{ matrix.arch }}
+          (cd dist && sha256sum shepherd-linux-${{ matrix.arch }}.tar.gz \
+            > shepherd-linux-${{ matrix.arch }}.tar.gz.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bins-${{ matrix.arch }}
+          path: |
+            dist/shepherd-linux-${{ matrix.arch }}.tar.gz
+            dist/shepherd-linux-${{ matrix.arch }}.tar.gz.sha256
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve version
+        run: echo "VERSION=${{ github.event.inputs.tag || github.ref_name }}" >> $GITHUB_ENV
+      - name: Build + push multi-arch image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/hg-claw/shepherd:${{ env.VERSION }}
+            ghcr.io/hg-claw/shepherd:latest
+          build-args: |
+            VERSION=${{ env.VERSION }}
+
+  release:
+    needs: [binaries, image]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: bins-*
+      - name: Flatten artifact tree
+        run: |
+          mkdir -p out
+          mv dist/bins-*/* out/
+          ls -la out/
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: |
+            out/shepherd-linux-amd64.tar.gz
+            out/shepherd-linux-amd64.tar.gz.sha256
+            out/shepherd-linux-arm64.tar.gz
+            out/shepherd-linux-arm64.tar.gz.sha256

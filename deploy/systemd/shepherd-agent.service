@@ -1,0 +1,15 @@
+[Unit]
+Description=Shepherd agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/shepherd/agent.env
+ExecStart=/usr/local/bin/shepherd-agent
+Restart=always
+RestartSec=3
+User=root
+
+[Install]
+WantedBy=multi-user.target

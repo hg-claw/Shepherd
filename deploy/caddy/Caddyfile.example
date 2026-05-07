@@ -1,0 +1,32 @@
+# Caddyfile.example — TLS-terminating reverse proxy for Shepherd.
+# Drop into your existing Caddy config or run as a standalone Caddy alongside
+# the Shepherd container/binary. Caddy auto-provisions a Let's Encrypt cert
+# when the domain resolves to this host and ports 80/443 are reachable.
+
+shep.example.com {
+    # Forward to the Shepherd HTTP port (default 8080). If running Shepherd
+    # via docker-compose on the same host, use the service name + port.
+    reverse_proxy localhost:8080
+    # If Caddy and Shepherd share a docker network:
+    # reverse_proxy shepherd:8080
+
+    # Optional: stricter security headers.
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+    }
+
+    # Optional: log to a file.
+    # log {
+    #     output file /var/log/caddy/shepherd.log
+    #     format json
+    # }
+}
+
+# Local-dev example with an internal CA-signed cert (no public DNS required).
+# Run: caddy run --config Caddyfile.example
+# shep.localhost {
+#     tls internal
+#     reverse_proxy localhost:8080
+# }

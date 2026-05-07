@@ -14,9 +14,14 @@ jobs:
         with:
           go-version: '1.25'
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
-          version: v1.59
+          version: v2.5
+          args: --timeout=5m
+          # Disable action's built-in cache; setup-go above already caches
+          # the module graph, and the action's cache key sometimes mismatches
+          # under Go 1.25 leading to redundant downloads + context timeouts.
+          skip-cache: true
       - name: go vet
         run: go vet ./...
       - name: go test -race

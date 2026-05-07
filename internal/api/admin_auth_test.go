@@ -17,7 +17,7 @@ func newAuthAPI(t *testing.T) (*AuthAPI, *auth.Store) {
 	t.Helper()
 	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
-	t.Cleanup(func() { d.Close() })
+	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
 	store := &auth.Store{DB: d}
 	_, _ = store.CreateAdmin(context.Background(), "alice", "hunter2")

@@ -20,7 +20,7 @@ func newServersAPI(t *testing.T) *ServersAPI {
 	t.Helper()
 	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
-	t.Cleanup(func() { d.Close() })
+	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
 	return &ServersAPI{Servers: &serversvc.Service{DB: d}}
 }
@@ -68,7 +68,7 @@ func TestServersCRUD_HTTP(t *testing.T) {
 func TestServersList_WithLatest(t *testing.T) {
 	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
-	t.Cleanup(func() { d.Close() })
+	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
 
 	svc := &serversvc.Service{DB: d}
@@ -109,7 +109,7 @@ func TestServersList_WithLatest(t *testing.T) {
 func TestServersList_NoLatestByDefault(t *testing.T) {
 	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
-	t.Cleanup(func() { d.Close() })
+	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
 	svc := &serversvc.Service{DB: d}
 	api := &ServersAPI{Servers: svc, Query: &telemetrysvc.Query{DB: d}}

@@ -15,7 +15,7 @@ import (
 func TestSettingsPatch_RejectsUnknownKeys(t *testing.T) {
 	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
-	t.Cleanup(func() { d.Close() })
+	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
 	api := &SettingsAPI{Settings: &serversvc.SettingsStore{DB: d}}
 
@@ -38,7 +38,7 @@ func TestSettingsPatch_RejectsUnknownKeys(t *testing.T) {
 func TestSettingsPatch_AcceptsKnownKey(t *testing.T) {
 	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
-	t.Cleanup(func() { d.Close() })
+	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
 	api := &SettingsAPI{Settings: &serversvc.SettingsStore{DB: d}}
 
@@ -50,7 +50,7 @@ func TestSettingsPatch_AcceptsKnownKey(t *testing.T) {
 		t.Fatalf("status=%d want 200", w.Code)
 	}
 	var v string
-	d.Get(&v, "SELECT value FROM settings WHERE key='public_display_mode'")
+	_ = d.Get(&v, "SELECT value FROM settings WHERE key='public_display_mode'")
 	if v != "raw" {
 		t.Errorf("got %q", v)
 	}

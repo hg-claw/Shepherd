@@ -14,7 +14,7 @@ func newIngest(t *testing.T) (*Ingest, int64) {
 	t.Helper()
 	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
-	t.Cleanup(func() { d.Close() })
+	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
 	res, _ := d.Exec("INSERT INTO servers(name) VALUES ('h')")
 	id, _ := res.LastInsertId()

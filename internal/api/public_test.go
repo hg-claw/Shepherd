@@ -19,7 +19,7 @@ import (
 func TestPublic_HidesPrivateAndExposesAlias(t *testing.T) {
 	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
-	t.Cleanup(func() { d.Close() })
+	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
 
 	svc := &serversvc.Service{DB: d}

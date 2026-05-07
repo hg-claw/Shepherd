@@ -17,7 +17,7 @@ func newTestStore(t *testing.T) *Store {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { d.Close() })
+	t.Cleanup(func() { _ = d.Close() })
 	if err := shepdb.Migrate(d, shepdb.DriverSQLite); err != nil {
 		t.Fatal(err)
 	}

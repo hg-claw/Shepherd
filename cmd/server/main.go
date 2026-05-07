@@ -33,7 +33,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("db open: %v", err)
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	if err := shepdb.Migrate(d, cfg.DBDriver); err != nil {
 		log.Fatalf("db migrate: %v", err)
 	}

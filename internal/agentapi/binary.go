@@ -6,8 +6,9 @@ import (
 )
 
 const (
-	KindPTYOut    byte = 0x01
-	KindPTYIn     byte = 0x02
+	KindPTYOut byte = 0x01
+	KindPTYIn  byte = 0x02
+	// 0x03 .. 0x0f reserved for future PTY-related kinds.
 	KindFileChunk byte = 0x10
 )
 
@@ -31,7 +32,12 @@ func EncodeBinary(sid string, kind byte, payload []byte) ([]byte, error) {
 	return out, nil
 }
 
-// DecodeBinary returns sid, kind, payload (zero-copy slice into buf).
+// DecodeBinary parses [2B sid_len BE][1B kind][sid bytes][payload] and returns
+// (sid, kind, payload, err). The returned payload slice aliases buf — it is
+// only safe to use while buf is alive. Callers that need to retain payload
+// across the read loop's next iteration must copy it themselves. Our caller
+// (gorilla/websocket ReadMessage) returns a fresh allocation per frame so
+// aliasing is safe in our usage.
 func DecodeBinary(buf []byte) (string, byte, []byte, error) {
 	if len(buf) < 3 {
 		return "", 0, nil, ErrShortFrame

@@ -2,6 +2,7 @@ package ptysvc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -263,4 +264,46 @@ func ifEmpty(s, def string) string {
 		return def
 	}
 	return s
+}
+
+// AttachBrowserBySID looks up a session by SID and attaches the browser conn.
+// Returns false if the session is unknown or already closed.
+func (s *Service) AttachBrowserBySID(sid string, b BrowserConn) bool {
+	s.mu.Lock()
+	sess := s.sessions[sid]
+	s.mu.Unlock()
+	if sess == nil || sess.closed.Load() {
+		return false
+	}
+	sess.AttachBrowser(b)
+	return true
+}
+
+// Detach is called when the browser conn closes. The session continues until pty.exit;
+// further pty.out broadcasts to a closed conn will simply WriteBinary error and be discarded.
+func (s *Service) Detach(sid string) {
+	// No-op for v1 — DeliverBinary's WriteBinary will silently no-op once the browser conn is closed.
+}
+
+// Resize forwards a winsize change to the agent.
+func (s *Service) Resize(sid string, rows, cols int) error {
+	s.mu.Lock()
+	sess := s.sessions[sid]
+	s.mu.Unlock()
+	if sess == nil {
+		return errors.New("unknown session")
+	}
+	env, _ := agentapi.Frame(agentapi.TypePTYResize, agentapi.PTYResize{Sid: sid, Rows: rows, Cols: cols})
+	return s.Hub.Send(sess.ServerID, env)
+}
+
+// Input forwards browser stdin bytes to the agent as a binary pty.in frame.
+func (s *Service) Input(sid string, data []byte) error {
+	s.mu.Lock()
+	sess := s.sessions[sid]
+	s.mu.Unlock()
+	if sess == nil {
+		return errors.New("unknown session")
+	}
+	return s.Hub.SendBinary(sess.ServerID, sid, agentapi.KindPTYIn, data)
 }

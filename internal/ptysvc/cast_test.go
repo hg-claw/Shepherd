@@ -19,10 +19,10 @@ func TestCastWriter_Format(t *testing.T) {
 	}
 	w.WriteOutput(100*time.Millisecond, []byte("hello"))
 	w.WriteOutput(250*time.Millisecond, []byte("\nworld"))
-	w.Close()
+	_ = w.Close()
 
 	f, _ := os.Open(path)
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	sc := bufio.NewScanner(f)
 	sc.Scan()
 	var hdr map[string]any
@@ -54,7 +54,7 @@ func TestCastWriter_Cap(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		w.WriteOutput(time.Duration(i)*time.Millisecond, []byte(strings.Repeat("a", 50)))
 	}
-	w.Close()
+	_ = w.Close()
 	if !w.Truncated() {
 		t.Fatal("expected truncated=true")
 	}

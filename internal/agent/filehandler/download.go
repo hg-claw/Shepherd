@@ -44,7 +44,7 @@ func (h *Handler) HandleDownloadBegin(req agentapi.FileDownloadBegin) {
 }
 
 func (h *Handler) streamDownload(sid string, f *os.File, x *downloadXfer) {
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	defer h.transfers.Delete(sid)
 	buf := make([]byte, downloadChunk)
 	for {

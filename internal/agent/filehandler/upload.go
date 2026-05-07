@@ -75,7 +75,7 @@ func (h *Handler) HandleUploadEnd(req agentapi.FileUploadEnd) {
 		return
 	}
 	x := v.(*uploadXfer)
-	defer x.f.Close()
+	defer func() { _ = x.f.Close() }()
 	if err := x.f.Sync(); err != nil {
 		_ = os.Remove(x.temp)
 		h.sendUploadAck(req.Sid, err)

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"sync"
 	"time"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
@@ -117,7 +116,6 @@ func (s *Service) opCall(ctx context.Context, serverID int64, frameType string, 
 type uploadAdapter struct {
 	sid string
 	got chan agentapi.FileUploadAck
-	mu  sync.Mutex
 }
 
 func (u *uploadAdapter) DeliverBinary(_ []byte) {}

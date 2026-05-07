@@ -12,7 +12,9 @@ const (
 )
 
 type ConfigUpdate struct {
-	TelemetryIntervalSeconds int `json:"telemetry_interval_seconds"`
+	TelemetryIntervalSeconds int      `json:"telemetry_interval_seconds,omitempty"`
+	FileSandboxEnabled       *bool    `json:"file_sandbox_enabled,omitempty"`
+	FileSandboxPaths         []string `json:"file_sandbox_paths,omitempty"`
 }
 
 type Heartbeat struct {

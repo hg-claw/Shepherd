@@ -76,7 +76,14 @@
     "retention_30s": "30s 样本保留期",
     "retention_5m": "5min 聚合保留期",
     "retention_1h": "1h 聚合保留期",
-    "default_telemetry_interval_seconds": "默认采样间隔（秒）"
+    "default_telemetry_interval_seconds": "默认采样间隔（秒）",
+    "phase2_header": "远程运维",
+    "file_sandbox_enabled": "启用文件沙箱",
+    "file_sandbox_paths": "沙箱路径（每行一个）",
+    "audit_retention_days": "审计日志保留天数",
+    "pty_recording_enabled": "启用终端会话录制",
+    "pty_max_concurrent_per_admin": "每管理员最大并发终端数",
+    "file_upload_max_mb": "最大上传文件大小（MB）"
   },
   "common": {
     "loading": "加载中…",
@@ -93,5 +100,58 @@
     "hour_ago": "{{n}} 小时前",
     "day_ago": "{{n}} 天前",
     "just_now": "刚刚"
+  },
+  "scripts": {
+    "title": "脚本",
+    "new": "新建",
+    "edit": "编辑脚本",
+    "name": "名称",
+    "description": "描述",
+    "content": "内容",
+    "default_timeout": "默认超时（秒）",
+    "params": "参数",
+    "add_param": "添加参数",
+    "run": "执行",
+    "run_button": "在 {{n}} 台服务器上执行",
+    "targets": "目标服务器",
+    "runs": "执行历史",
+    "run_id": "执行 #",
+    "script_id": "脚本",
+    "started_at": "开始时间",
+    "finished_at": "结束时间",
+    "status": "状态",
+    "exit_code": "退出码"
+  },
+  "console": {
+    "title": "控制台",
+    "open": "控制台",
+    "attach": "接入"
+  },
+  "files": {
+    "title": "文件",
+    "name": "名称",
+    "size": "大小",
+    "mode": "权限",
+    "mtime": "修改时间",
+    "upload": "上传",
+    "mkdir": "新建文件夹",
+    "preview": "预览"
+  },
+  "audit": {
+    "title": "审计日志",
+    "ts": "时间",
+    "action": "动作",
+    "admin": "管理员",
+    "server": "服务器",
+    "result": "结果",
+    "details": "详情",
+    "action_filter": "筛选动作…",
+    "server_id_filter": "服务器 ID",
+    "from": "起始（RFC3339）",
+    "to": "终止（RFC3339）"
+  },
+  "recording": {
+    "title": "录制回放",
+    "replay": "重放"
   }
 }

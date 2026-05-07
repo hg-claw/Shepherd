@@ -77,3 +77,13 @@ func (h *Hub) IsOnline(serverID int64) bool {
 	_, ok := h.conns[serverID]
 	return ok
 }
+
+func (h *Hub) OnlineServers() []int64 {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	ids := make([]int64, 0, len(h.conns))
+	for k := range h.conns {
+		ids = append(ids, k)
+	}
+	return ids
+}

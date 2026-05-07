@@ -33,13 +33,19 @@ func TestWSConn_QueuesFrames(t *testing.T) {
 			t.Fatalf("send %d: %v", i, err)
 		}
 	}
-	// drain
-	time.Sleep(50 * time.Millisecond)
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		r.mu.Lock()
+		n := len(r.frames)
+		r.mu.Unlock()
+		if n == 4 {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if len(r.frames) != 4 {
-		t.Fatalf("frames=%d want 4", len(r.frames))
-	}
+	t.Fatalf("frames=%d want 4", len(r.frames))
 }
 
 func TestWSConn_SlowConsumerError(t *testing.T) {

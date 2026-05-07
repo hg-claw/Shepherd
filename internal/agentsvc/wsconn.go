@@ -43,8 +43,8 @@ func NewWSConn(raw RawWriter, queue int, enqWait time.Duration) *WSConn {
 func (c *WSConn) writeLoop() {
 	for f := range c.sendCh {
 		if err := c.raw.WriteFrame(f); err != nil {
-			_ = c.raw.Close()
-			break
+			c.Close()
+			return
 		}
 	}
 }

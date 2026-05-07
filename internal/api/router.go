@@ -83,7 +83,7 @@ func (r *Router) Handler() http.Handler {
 	admin.HandleFunc("POST /api/admin/files/upload", r.Files.Upload)
 
 	admin.HandleFunc("GET /api/admin/audit", r.Audit.List)
-	admin.HandleFunc("GET /api/admin/recordings/{id}.cast", r.Recordings.Cast)
+	admin.HandleFunc("GET /api/admin/recordings/{id}/cast", r.Recordings.Cast)
 
 	gated := r.requireAdmin(admin)
 

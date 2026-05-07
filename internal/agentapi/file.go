@@ -44,9 +44,9 @@ type FileStat struct {
 	Path string `json:"path"`
 }
 type FileStatResult struct {
-	Sid   string    `json:"sid"`
-	Entry FileEntry `json:"entry"`
-	Error string    `json:"error,omitempty"`
+	Sid   string     `json:"sid"`
+	Entry *FileEntry `json:"entry,omitempty"`
+	Error string     `json:"error,omitempty"`
 }
 
 type FileMkdir struct {

@@ -48,7 +48,7 @@ func TestAcquireToken_AutoRegisterFlow(t *testing.T) {
 
 func TestPostJSON_PermanentOn401(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "no", 401)
+		http.Error(w, "no", http.StatusUnauthorized)
 	}))
 	defer srv.Close()
 	c := New(agentconfig.Config{ServerURL: srv.URL}, &state.Store{Path: filepath.Join(t.TempDir(), "s.json")}, nil, "h")

@@ -14,7 +14,7 @@ func TestOpenSQLite_PragmasApplied(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 
 	var mode string
 	if err := d.Get(&mode, "PRAGMA journal_mode"); err != nil {
@@ -39,7 +39,7 @@ func TestOpenSQLite_PragmasHoldAcrossPoolConnections(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 
 	// Hit the pool concurrently. Without SetMaxOpenConns(1) we'd see
 	// at least one connection report foreign_keys=0.
@@ -79,7 +79,7 @@ func TestMigrate_SQLite_AppliesAllTables(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	if err := Migrate(d, DriverSQLite); err != nil {
 		t.Fatal(err)
 	}

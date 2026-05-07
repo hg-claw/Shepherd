@@ -60,7 +60,7 @@ func (r *Rollup) rollup(ctx context.Context, table string, bucket time.Duration)
 		var sid int64
 		var ts time.Time
 		if err := rows.Scan(&sid, &ts); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return err
 		}
 		bucketStart := ts.Truncate(bucket)
@@ -75,10 +75,10 @@ func (r *Rollup) rollup(ctx context.Context, table string, bucket time.Duration)
 		candidates = append(candidates, k)
 	}
 	if err := rows.Err(); err != nil {
-		rows.Close()
+		_ = rows.Close()
 		return err
 	}
-	rows.Close()
+	_ = rows.Close()
 
 	for _, k := range candidates {
 		var exists int

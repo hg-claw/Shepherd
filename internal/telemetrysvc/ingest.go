@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/hg-claw/Shepherd/internal/agentapi"
+	"github.com/jmoiron/sqlx"
 )
 
 type Ingest struct {

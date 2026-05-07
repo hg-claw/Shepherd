@@ -24,7 +24,7 @@ func (s *Service) AutoRegister(ctx context.Context, key, fingerprint, hostname, 
 	if err != nil {
 		return "", 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var serverID int64
 	err = tx.QueryRowxContext(ctx,

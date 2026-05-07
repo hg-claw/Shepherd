@@ -97,9 +97,9 @@ func (a *AgentAPI) WS(w http.ResponseWriter, r *http.Request) {
 		_ = conn.Close()
 	}()
 
-	c.SetReadDeadline(time.Now().Add(wsPongWait))
+	_ = c.SetReadDeadline(time.Now().Add(wsPongWait))
 	c.SetPongHandler(func(string) error {
-		c.SetReadDeadline(time.Now().Add(wsPongWait))
+		_ = c.SetReadDeadline(time.Now().Add(wsPongWait))
 		return nil
 	})
 
@@ -119,7 +119,7 @@ func (a *AgentAPI) WS(w http.ResponseWriter, r *http.Request) {
 		}
 		switch env.Type {
 		case agentapi.TypePong:
-			c.SetReadDeadline(time.Now().Add(wsPongWait))
+			_ = c.SetReadDeadline(time.Now().Add(wsPongWait))
 		default:
 			if a.OnFrame != nil {
 				a.OnFrame(r.Context(), sid, env)
@@ -159,7 +159,7 @@ type wsConn struct {
 func (w *wsConn) Send(env agentapi.Envelope) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	w.c.SetWriteDeadline(time.Now().Add(wsWriteTimeout))
+	_ = w.c.SetWriteDeadline(time.Now().Add(wsWriteTimeout))
 	return w.c.WriteJSON(env)
 }
 

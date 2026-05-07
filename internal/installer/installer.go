@@ -62,7 +62,7 @@ func (in *Installer) Run(ctx context.Context, p InstallParams) error {
 	if err != nil {
 		return fmt.Errorf("ssh dial: %w", err)
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	in.log("connected")
 
 	if err := in.runCmd(c, `mkdir -p /etc/shepherd && chmod 0750 /etc/shepherd`); err != nil {
@@ -133,7 +133,7 @@ func (in *Installer) runCmd(c *ssh.Client, cmd string) error {
 	if err != nil {
 		return err
 	}
-	defer sess.Close()
+	defer func() { _ = sess.Close() }()
 	in.log("$ %s", cmd)
 	out, err := sess.CombinedOutput(cmd)
 	if len(out) > 0 {
@@ -152,7 +152,7 @@ func (in *Installer) streamFile(c *ssh.Client, src io.Reader, remotePath string,
 	if err != nil {
 		return err
 	}
-	defer sess.Close()
+	defer func() { _ = sess.Close() }()
 	stdin, err := sess.StdinPipe()
 	if err != nil {
 		return err

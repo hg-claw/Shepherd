@@ -15,17 +15,17 @@ const (
 )
 
 type Config struct {
-	HTTPAddr              string
-	ServerPublicURL       string // optional; if set, used as the URL agents dial back to
-	DBDriver              db.Driver
-	DBDSN                 string
-	AutoRecoverKey        string
-	InitialAdminUsername  string
-	InitialAdminPassword  string
-	AgentDistribution     string // embedded | github
-	AgentDownloadTag      string // overrides BuildVersion when AgentDistribution=github
-	BuildVersion          string // injected via -ldflags at release time, defaults to "dev"
-	CookieSecure          bool   // set true behind TLS reverse proxy
+	HTTPAddr             string
+	ServerPublicURL      string // optional; if set, used as the URL agents dial back to
+	DBDriver             db.Driver
+	DBDSN                string
+	AutoRecoverKey       string
+	InitialAdminUsername string
+	InitialAdminPassword string
+	AgentDistribution    string // embedded | github
+	AgentDownloadTag     string // overrides BuildVersion when AgentDistribution=github
+	BuildVersion         string // injected via -ldflags at release time, defaults to "dev"
+	CookieSecure         bool   // set true behind TLS reverse proxy
 }
 
 func FromEnv() (Config, error) {
@@ -63,7 +63,8 @@ func FromEnv() (Config, error) {
 }
 
 // BuildVersion is overridden at link time:
-//   go build -ldflags "-X github.com/hg-claw/Shepherd/internal/config.BuildVersion=v0.1.0" ...
+//
+//	go build -ldflags "-X github.com/hg-claw/Shepherd/internal/config.BuildVersion=v0.1.0" ...
 var BuildVersion = "dev"
 
 func getEnvDefault(key, def string) string {

@@ -22,7 +22,7 @@ func newAgentAPI(t *testing.T) (*AgentAPI, *agentsvc.Service) {
 	t.Helper()
 	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
-	t.Cleanup(func() { d.Close() })
+	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
 	svc := &agentsvc.Service{DB: d, AutoRecoverKey: "k"}
 	return &AgentAPI{Agents: svc, Hub: agentsvc.NewHub()}, svc
@@ -66,7 +66,7 @@ func TestWS_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	// agent → server: heartbeat
 	env, _ := agentapi.Frame(agentapi.TypeHeartbeat, agentapi.Heartbeat{TS: time.Now().UTC(), AgentVersion: "v0"})

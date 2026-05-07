@@ -23,8 +23,8 @@ type InstallManager struct {
 	Service         *Service
 	Installer       Installer
 	Tokens          AgentTokenIssuer
-	ServerURL       string        // base URL agent will dial back to
-	WatchdogTimeout time.Duration // default 10m
+	ServerURL       string          // base URL agent will dial back to
+	WatchdogTimeout time.Duration   // default 10m
 	Ctx             context.Context // optional; defaults to context.Background() — pass server's rootCtx for graceful shutdown
 }
 

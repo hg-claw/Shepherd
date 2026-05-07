@@ -123,7 +123,7 @@ func (c *Client) postJSON(ctx context.Context, path string, body, out any) error
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	data, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode == 401 || resp.StatusCode == 403 {
 		return ErrPermanent
@@ -229,7 +229,7 @@ func (c *Client) writeJSON(env agentapi.Envelope) error {
 	if c.conn == nil {
 		return errors.New("not connected")
 	}
-	c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	_ = c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	return c.conn.WriteJSON(env)
 }
 

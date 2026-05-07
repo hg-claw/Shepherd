@@ -44,7 +44,7 @@ func (s *Service) RedeemEnrollment(ctx context.Context, enrollmentToken, fingerp
 	if err != nil {
 		return "", 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var (
 		serverID   int64

@@ -28,7 +28,7 @@ func Migrate(d *sqlx.DB, driver Driver) error {
 	if err != nil {
 		return err
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	var dbDriver database.Driver
 	switch driver {

@@ -3,8 +3,8 @@ package collector
 import (
 	"strings"
 
-	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/hg-claw/Shepherd/internal/agentapi"
+	"github.com/shirou/gopsutil/v3/disk"
 )
 
 var skipFS = map[string]struct{}{

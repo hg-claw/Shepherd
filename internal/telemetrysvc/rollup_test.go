@@ -13,7 +13,7 @@ import (
 func TestRollup_5m_FoldsClosedBucket(t *testing.T) {
 	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
-	t.Cleanup(func() { d.Close() })
+	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
 	res, _ := d.Exec("INSERT INTO servers(name) VALUES ('h')")
 	sid, _ := res.LastInsertId()
@@ -31,18 +31,18 @@ func TestRollup_5m_FoldsClosedBucket(t *testing.T) {
 	}
 	var n int
 	var cpuAvg, cpuMax float64
-	d.Get(&n, "SELECT COUNT(*) FROM telemetry_rollup_5m WHERE server_id=?", sid)
+	_ = d.Get(&n, "SELECT COUNT(*) FROM telemetry_rollup_5m WHERE server_id=?", sid)
 	if n != 1 {
 		t.Fatalf("rows=%d want 1", n)
 	}
-	d.Get(&cpuAvg, "SELECT cpu_avg FROM telemetry_rollup_5m WHERE server_id=?", sid)
-	d.Get(&cpuMax, "SELECT cpu_max FROM telemetry_rollup_5m WHERE server_id=?", sid)
+	_ = d.Get(&cpuAvg, "SELECT cpu_avg FROM telemetry_rollup_5m WHERE server_id=?", sid)
+	_ = d.Get(&cpuMax, "SELECT cpu_max FROM telemetry_rollup_5m WHERE server_id=?", sid)
 	if cpuAvg != 25 || cpuMax != 40 {
 		t.Errorf("avg=%v max=%v want 25/40", cpuAvg, cpuMax)
 	}
 	// Idempotent: second tick must not duplicate.
 	_ = r.Tick(context.Background())
-	d.Get(&n, "SELECT COUNT(*) FROM telemetry_rollup_5m WHERE server_id=?", sid)
+	_ = d.Get(&n, "SELECT COUNT(*) FROM telemetry_rollup_5m WHERE server_id=?", sid)
 	if n != 1 {
 		t.Errorf("rollup duplicated rows=%d", n)
 	}
@@ -51,7 +51,7 @@ func TestRollup_5m_FoldsClosedBucket(t *testing.T) {
 func TestRollup_OpenBucketSkipped(t *testing.T) {
 	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
-	t.Cleanup(func() { d.Close() })
+	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
 	res, _ := d.Exec("INSERT INTO servers(name) VALUES ('h')")
 	sid, _ := res.LastInsertId()
@@ -60,7 +60,7 @@ func TestRollup_OpenBucketSkipped(t *testing.T) {
 	r := &Rollup{DB: d}
 	_ = r.Tick(context.Background())
 	var n int
-	d.Get(&n, "SELECT COUNT(*) FROM telemetry_rollup_5m")
+	_ = d.Get(&n, "SELECT COUNT(*) FROM telemetry_rollup_5m")
 	if n != 0 {
 		t.Errorf("open bucket was rolled up")
 	}

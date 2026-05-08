@@ -26,10 +26,17 @@ func (s *Sandbox) Check(p string, mustExist bool) error {
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) && !mustExist {
 			parent, e2 := filepath.EvalSymlinks(filepath.Dir(abs))
-			if e2 != nil {
+			switch {
+			case e2 == nil:
+				resolved = filepath.Join(parent, filepath.Base(abs))
+			case errors.Is(e2, fs.ErrNotExist):
+				// Neither the path nor its parent is on disk. Fall back to
+				// the cleaned absolute path: there's no symlink to follow,
+				// so a literal whitelist match is sound.
+				resolved = abs
+			default:
 				return e2
 			}
-			resolved = filepath.Join(parent, filepath.Base(abs))
 		} else {
 			return err
 		}

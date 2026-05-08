@@ -1,4 +1,4 @@
-//go:build !linux
+//go:build !linux && !darwin
 
 package ptyrunner
 
@@ -26,7 +26,7 @@ type SpawnOpts struct {
 type Runner struct{}
 
 func Spawn(_ context.Context, _ SpawnOpts, _ Sender) (*Runner, error) {
-	return nil, errors.New("ptyrunner only supported on linux")
+	return nil, errors.New("ptyrunner only supported on linux/darwin")
 }
 func (r *Runner) Write(_ []byte) error  { return errors.New("unsupported") }
 func (r *Runner) Resize(_, _ int) error { return errors.New("unsupported") }

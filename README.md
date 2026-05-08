@@ -148,9 +148,18 @@ cd web && npm run dev
 
 First boot creates the SQLite DB and the initial admin. `AUTO_RECOVER_KEY` is the shared secret an agent uses to auto-register itself.
 
-### Run an agent (Linux only — for Phase 2 console / scripts / files)
+### Run an agent (Linux or macOS — for Phase 2 console / scripts / files)
 
-The agent uses real PTYs (`creack/pty`) and runs as root, so it only works on a Linux host.
+The agent uses real PTYs (`creack/pty`); it runs on Linux and macOS. **Windows is not supported** (no ConPTY backend yet). Production server-driven SSH install still targets Linux only — for macOS agents, download the binary from a GitHub Release tarball and run it manually:
+
+```bash
+# (macOS) — manual install
+curl -fL https://github.com/hg-claw/Shepherd/releases/download/v0.2.0/shepherd-agent-darwin-arm64.tar.gz \
+  | tar -xz
+sudo mv shepherd-agent-darwin-arm64 /usr/local/bin/shepherd-agent
+```
+
+For local dev (any host), run the agent directly:
 
 ```bash
 sudo mkdir -p /etc/shepherd

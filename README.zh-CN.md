@@ -143,9 +143,18 @@ cd web && npm run dev
 
 首次启动会自动建库 + 创建初始 admin。`AUTO_RECOVER_KEY` 是 agent 自动注册用的共享密钥。
 
-### 启动 agent（仅 Linux —— 验证 Phase 2 控制台/脚本/文件）
+### 启动 agent（Linux 或 macOS —— 验证 Phase 2 控制台/脚本/文件）
 
-Agent 需要真 PTY（`creack/pty`）且要 root，仅 Linux 主机能跑。
+Agent 用真 PTY（`creack/pty`），Linux 和 macOS 都可以跑。**Windows 暂不支持**（缺 ConPTY 后端）。服务端 SSH 推装仅 Linux 目标；macOS 主机请从 GitHub Release 下载二进制手动部署：
+
+```bash
+# (macOS) 手动安装
+curl -fL https://github.com/hg-claw/Shepherd/releases/download/v0.2.0/shepherd-agent-darwin-arm64.tar.gz \
+  | tar -xz
+sudo mv shepherd-agent-darwin-arm64 /usr/local/bin/shepherd-agent
+```
+
+本地开发任意主机直接 `go run`：
 
 ```bash
 sudo mkdir -p /etc/shepherd

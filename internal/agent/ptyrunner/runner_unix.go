@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux || darwin
 
 package ptyrunner
 
@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -18,6 +19,16 @@ import (
 )
 
 var validUser = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
+
+// resolveBinary returns the absolute path of name from PATH, falling back to
+// the literal name (creack/pty + exec will then return its own ENOENT).
+// Used to paper over /bin/su (linux) vs /usr/bin/su (darwin) and similar.
+func resolveBinary(name string) string {
+	if p, err := exec.LookPath(name); err == nil {
+		return p
+	}
+	return name
+}
 
 type Sender interface {
 	SendBinary(sid string, kind byte, p []byte) error
@@ -56,24 +67,32 @@ func Spawn(ctx context.Context, opts SpawnOpts, sender Sender) (*Runner, error) 
 		opts.Cols = 80
 	}
 
+	bashPath := resolveBinary("bash")
+	suPath := resolveBinary("su")
+
 	var argv []string
 	useRoot := opts.User == "" || opts.User == "root"
 	switch {
 	case opts.Kind == "console" && useRoot:
-		argv = []string{"/bin/bash", "-l"}
+		argv = []string{bashPath, "-l"}
 	case opts.Kind == "console":
-		argv = []string{"/bin/su", "-l", opts.User}
+		argv = []string{suPath, "-l", opts.User}
 	case opts.Kind == "script" && useRoot:
-		argv = []string{"/bin/bash", "-lc", opts.Exec}
+		argv = []string{bashPath, "-lc", opts.Exec}
 	default:
-		argv = []string{"/bin/su", "-l", opts.User, "-c", opts.Exec}
+		argv = []string{suPath, "-l", opts.User, "-c", opts.Exec}
 	}
 
+	defaultPath := "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+	if runtime.GOOS == "darwin" {
+		// /opt/homebrew/bin for Apple Silicon brew installs.
+		defaultPath = "/opt/homebrew/bin:" + defaultPath
+	}
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Env = []string{
 		"TERM=" + opts.Term,
-		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-		"HOME=/root",
+		"PATH=" + defaultPath,
+		"HOME=" + os.Getenv("HOME"), // best-effort; root pty inherits agent's HOME
 	}
 	for k, v := range opts.Env {
 		cmd.Env = append(cmd.Env, k+"="+v)

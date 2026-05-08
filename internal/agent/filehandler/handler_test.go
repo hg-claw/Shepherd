@@ -1,5 +1,3 @@
-//go:build linux
-
 package filehandler
 
 import (
@@ -24,7 +22,7 @@ func (c *captureSender) SendControl(env agentapi.Envelope) error {
 func (c *captureSender) SendBinary(string, byte, []byte) error { return nil }
 
 func TestHandler_ListMkdirRm(t *testing.T) {
-	dir := t.TempDir()
+	dir := realPath(t, t.TempDir())
 	enabled := true
 	h := New(&captureSender{})
 	h.SetSandbox(&Sandbox{Enabled: enabled, Allowed: []string{dir}})
@@ -60,9 +58,10 @@ func TestHandler_ListMkdirRm(t *testing.T) {
 }
 
 func TestHandler_SandboxReject(t *testing.T) {
+	dir := realPath(t, t.TempDir())
 	cs := &captureSender{}
 	h := New(cs)
-	h.SetSandbox(&Sandbox{Enabled: true, Allowed: []string{"/tmp"}})
+	h.SetSandbox(&Sandbox{Enabled: true, Allowed: []string{dir}})
 	h.HandleList(agentapi.FileList{Sid: "x", Path: "/etc/shadow"})
 	envs, _ := cs.envs.Load().([]agentapi.Envelope)
 	if len(envs) != 1 {

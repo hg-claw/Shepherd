@@ -126,34 +126,61 @@ cd web && npm ci && cd ..
 两个终端：
 
 ```bash
-# 终端 1 —— 后端
-make server-no-web   # 快，不打包 SPA
-INITIAL_ADMIN_USERNAME=alice INITIAL_ADMIN_PASSWORD=hunter2 \
-AUTO_RECOVER_KEY=secret \
-DATABASE_DSN="file:./dev.db?_fk=1" \
+# 终端 1 —— Go server（端口 :8080）
+DATABASE_DRIVER=sqlite \
+DATABASE_DSN=./data/dev.db \
+SHEPHERD_INITIAL_ADMIN_USERNAME=admin \
+SHEPHERD_INITIAL_ADMIN_PASSWORD=admin \
+HTTP_ADDR=:8080 \
 SERVER_PUBLIC_URL=http://localhost:8080 \
-./bin/shepherd-server
+AUTO_RECOVER_KEY=devkey \
+go run ./cmd/server
 
-# 终端 2 —— 前端（Vite 开发服务器，含 /api 代理）
+# 终端 2 —— Vite dev server（端口 :5173，/api 与 /agent 自动 proxy 到 :8080）
 cd web && npm run dev
-# 浏览器打开 http://localhost:5173
+# 浏览器打开 http://localhost:5173（登录：admin / admin）
 ```
+
+首次启动会自动建库 + 创建初始 admin。`AUTO_RECOVER_KEY` 是 agent 自动注册用的共享密钥。
+
+### 启动 agent（仅 Linux —— 验证 Phase 2 控制台/脚本/文件）
+
+Agent 需要真 PTY（`creack/pty`）且要 root，仅 Linux 主机能跑。
+
+```bash
+sudo mkdir -p /etc/shepherd
+echo "{}" | sudo tee /etc/shepherd/agent.state.json
+
+SHEP_SERVER_URL=http://localhost:8080 \
+AUTO_RECOVER_KEY=devkey \
+SHEP_AGENT_STATE=/etc/shepherd/agent.state.json \
+sudo -E go run ./cmd/agent
+```
+
+几秒后管理面板能看到主机上线，Console / Files / Scripts 按钮即可使用。
 
 ### 跑测试
 
 ```bash
-make test                # go test + npm test
-make vet                 # go vet
-gofmt -l .               # 列出未格式化的 Go 文件
-cd web && npx tsc --noEmit
-cd web && npx vitest run
+# 与 CI 完全对齐的本地回归（push 前必跑）
+gofmt -l .                         # 应该空
+go vet ./...                       # 应该空
+golangci-lint run --timeout=5m     # 应该 "0 issues"
+go test -race ./...                # 18 个包全绿
+( cd web && npm test )             # vitest，全绿
+( cd web && npm run build )        # tsc + vite 构建干净
+
+# 或用 make
+make test                          # go test + npm test
+make vet                           # go vet
 ```
 
 ### 端到端 smoke
 
 ```bash
-./scripts/smoke.sh       # backend 端到端（server + agent + telemetry）
-./scripts/web-smoke.sh   # 完整流程：build 前端 + server + agent + 验证 SPA + telemetry
+./scripts/smoke.sh           # Phase 1 后端（server + agent + telemetry）
+./scripts/web-smoke.sh       # Phase 1 完整流程（SPA + server + agent + telemetry）
+./scripts/phase2-smoke.sh    # Phase 2（console.open + 脚本执行 + 文件操作 + 沙箱 403 + 审计）—— 仅 Linux
 ```
 
 ### 本地 Docker 构建

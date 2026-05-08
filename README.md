@@ -131,34 +131,61 @@ cd web && npm ci && cd ..
 Two terminals:
 
 ```bash
-# Terminal 1 — backend
-make server-no-web   # quick, doesn't bundle the SPA
-INITIAL_ADMIN_USERNAME=alice INITIAL_ADMIN_PASSWORD=hunter2 \
-AUTO_RECOVER_KEY=secret \
-DATABASE_DSN="file:./dev.db?_fk=1" \
+# Terminal 1 — backend (port :8080)
+DATABASE_DRIVER=sqlite \
+DATABASE_DSN=./data/dev.db \
+SHEPHERD_INITIAL_ADMIN_USERNAME=admin \
+SHEPHERD_INITIAL_ADMIN_PASSWORD=admin \
+HTTP_ADDR=:8080 \
 SERVER_PUBLIC_URL=http://localhost:8080 \
-./bin/shepherd-server
+AUTO_RECOVER_KEY=devkey \
+go run ./cmd/server
 
-# Terminal 2 — frontend (Vite dev server with /api proxy)
+# Terminal 2 — frontend (Vite dev server, port :5173, /api+/agent proxied to :8080)
 cd web && npm run dev
-# open http://localhost:5173
+# open http://localhost:5173 (login: admin / admin)
 ```
+
+First boot creates the SQLite DB and the initial admin. `AUTO_RECOVER_KEY` is the shared secret an agent uses to auto-register itself.
+
+### Run an agent (Linux only — for Phase 2 console / scripts / files)
+
+The agent uses real PTYs (`creack/pty`) and runs as root, so it only works on a Linux host.
+
+```bash
+sudo mkdir -p /etc/shepherd
+echo "{}" | sudo tee /etc/shepherd/agent.state.json
+
+SHEP_SERVER_URL=http://localhost:8080 \
+AUTO_RECOVER_KEY=devkey \
+SHEP_AGENT_STATE=/etc/shepherd/agent.state.json \
+sudo -E go run ./cmd/agent
+```
+
+After a few seconds the admin dashboard shows the host online; Console / Files / Scripts buttons become live.
 
 ### Run tests
 
 ```bash
-make test                # go test + npm test
-make vet                 # go vet
-gofmt -l .               # list any unformatted Go files
-cd web && npx tsc --noEmit
-cd web && npx vitest run
+# Full local CI parity (run before pushing)
+gofmt -l .                         # should print nothing
+go vet ./...                       # should print nothing
+golangci-lint run --timeout=5m     # should print "0 issues"
+go test -race ./...                # 18 packages green
+( cd web && npm test )             # vitest, all green
+( cd web && npm run build )        # tsc + vite build clean
+
+# Or via make
+make test                          # go test + npm test
+make vet                           # go vet
 ```
 
 ### End-to-end smoke
 
 ```bash
-./scripts/smoke.sh       # backend e2e (server + agent + telemetry)
-./scripts/web-smoke.sh   # full e2e: build frontend + server + agent + verify SPA + telemetry
+./scripts/smoke.sh           # Phase 1 backend e2e (server + agent + telemetry)
+./scripts/web-smoke.sh       # Phase 1 full e2e (SPA + server + agent + telemetry)
+./scripts/phase2-smoke.sh    # Phase 2 e2e (console.open + scripts run + file ops + sandbox 403 + audit) — Linux only
 ```
 
 ### Local Docker build

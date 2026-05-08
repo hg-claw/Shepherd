@@ -1,5 +1,3 @@
-//go:build linux
-
 package filehandler
 
 import (
@@ -35,7 +33,7 @@ func (r *recordingSender) SendBinary(_ string, _ byte, p []byte) error {
 }
 
 func TestHandler_DownloadHappyPath(t *testing.T) {
-	dir := t.TempDir()
+	dir := realPath(t, t.TempDir())
 	src := filepath.Join(dir, "in.bin")
 	body := bytes.Repeat([]byte("a"), 700*1024)
 	if err := os.WriteFile(src, body, 0644); err != nil {
@@ -80,7 +78,7 @@ func TestHandler_DownloadHappyPath(t *testing.T) {
 }
 
 func TestHandler_DownloadCancel(t *testing.T) {
-	dir := t.TempDir()
+	dir := realPath(t, t.TempDir())
 	src := filepath.Join(dir, "big.bin")
 	body := bytes.Repeat([]byte("a"), 5*1024*1024)
 	_ = os.WriteFile(src, body, 0644)

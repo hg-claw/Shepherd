@@ -1,5 +1,3 @@
-//go:build linux
-
 package filehandler
 
 import (
@@ -14,7 +12,7 @@ import (
 )
 
 func TestHandler_UploadHappyPath(t *testing.T) {
-	dir := t.TempDir()
+	dir := realPath(t, t.TempDir())
 	cs := &captureSender{}
 	h := New(cs)
 	h.SetSandbox(&Sandbox{Enabled: true, Allowed: []string{dir}})
@@ -52,7 +50,7 @@ func TestHandler_UploadHappyPath(t *testing.T) {
 }
 
 func TestHandler_UploadShaMismatch(t *testing.T) {
-	dir := t.TempDir()
+	dir := realPath(t, t.TempDir())
 	cs := &captureSender{}
 	h := New(cs)
 	h.SetSandbox(&Sandbox{Enabled: true, Allowed: []string{dir}})

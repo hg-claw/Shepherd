@@ -34,14 +34,15 @@ jobs:
         run: cd web && npm ci && npm run build
       - name: Resolve version
         run: echo "VERSION=${{ github.event.inputs.tag || github.ref_name }}" >> $GITHUB_ENV
-      - name: Cross-compile agent (both arches embedded in server)
+      - name: Cross-compile agents (linux+darwin × amd64+arm64)
         run: |
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \
-            -ldflags "-X github.com/hg-claw/Shepherd/internal/agentconfig.BuildVersion=${VERSION}" \
-            -o internal/installer/bin/shepherd-agent-linux-amd64 ./cmd/agent
-          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build \
-            -ldflags "-X github.com/hg-claw/Shepherd/internal/agentconfig.BuildVersion=${VERSION}" \
-            -o internal/installer/bin/shepherd-agent-linux-arm64 ./cmd/agent
+          for goos in linux darwin; do
+            for goarch in amd64 arm64; do
+              GOOS=$goos GOARCH=$goarch CGO_ENABLED=0 go build \
+                -ldflags "-X github.com/hg-claw/Shepherd/internal/agentconfig.BuildVersion=${VERSION}" \
+                -o internal/installer/bin/shepherd-agent-${goos}-${goarch} ./cmd/agent
+            done
+          done
       - name: Cross-compile server for ${{ matrix.arch }}
         run: |
           if [ "${{ matrix.arch }}" = "arm64" ]; then
@@ -55,19 +56,28 @@ jobs:
             -ldflags "-X github.com/hg-claw/Shepherd/internal/config.BuildVersion=${VERSION}" \
             -o dist/shepherd-server-linux-${{ matrix.arch }} \
             ./cmd/server
-      - name: Package + checksum
+      - name: Package + checksum (linux server tarball)
         run: |
           cp internal/installer/bin/shepherd-agent-linux-${{ matrix.arch }} dist/
           tar -czf dist/shepherd-linux-${{ matrix.arch }}.tar.gz \
             -C dist shepherd-server-linux-${{ matrix.arch }} shepherd-agent-linux-${{ matrix.arch }}
           (cd dist && sha256sum shepherd-linux-${{ matrix.arch }}.tar.gz \
             > shepherd-linux-${{ matrix.arch }}.tar.gz.sha256)
+      - name: Package + checksum (darwin agent tarball)
+        run: |
+          cp internal/installer/bin/shepherd-agent-darwin-${{ matrix.arch }} dist/
+          tar -czf dist/shepherd-agent-darwin-${{ matrix.arch }}.tar.gz \
+            -C dist shepherd-agent-darwin-${{ matrix.arch }}
+          (cd dist && sha256sum shepherd-agent-darwin-${{ matrix.arch }}.tar.gz \
+            > shepherd-agent-darwin-${{ matrix.arch }}.tar.gz.sha256)
       - uses: actions/upload-artifact@v4
         with:
           name: bins-${{ matrix.arch }}
           path: |
             dist/shepherd-linux-${{ matrix.arch }}.tar.gz
             dist/shepherd-linux-${{ matrix.arch }}.tar.gz.sha256
+            dist/shepherd-agent-darwin-${{ matrix.arch }}.tar.gz
+            dist/shepherd-agent-darwin-${{ matrix.arch }}.tar.gz.sha256
 
   image:
     runs-on: ubuntu-latest
@@ -117,3 +127,7 @@ jobs:
             out/shepherd-linux-amd64.tar.gz.sha256
             out/shepherd-linux-arm64.tar.gz
             out/shepherd-linux-arm64.tar.gz.sha256
+            out/shepherd-agent-darwin-amd64.tar.gz
+            out/shepherd-agent-darwin-amd64.tar.gz.sha256
+            out/shepherd-agent-darwin-arm64.tar.gz
+            out/shepherd-agent-darwin-arm64.tar.gz.sha256

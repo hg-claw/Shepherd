@@ -11,8 +11,16 @@ const (
 	TypeTelemetry    = "telemetry"
 )
 
+// ConfigUpdate is a full snapshot pushed by the server to an agent. Each field
+// is optional via omitempty so unknown senders don't poison fields they don't
+// know about. The agent applies a non-zero/non-nil field; zero/nil is "no
+// change". TelemetryIntervalSeconds=0 therefore means "no change" in this
+// model — the server never sends 0 except in the empty-snapshot case, which
+// the agent treats as a no-op.
 type ConfigUpdate struct {
-	TelemetryIntervalSeconds int `json:"telemetry_interval_seconds"`
+	TelemetryIntervalSeconds int      `json:"telemetry_interval_seconds,omitempty"`
+	FileSandboxEnabled       *bool    `json:"file_sandbox_enabled,omitempty"`
+	FileSandboxPaths         []string `json:"file_sandbox_paths,omitempty"`
 }
 
 type Heartbeat struct {

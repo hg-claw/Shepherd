@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/hg-claw/Shepherd/internal/agentapi"
 	"github.com/hg-claw/Shepherd/internal/agentsvc"
+	"github.com/hg-claw/Shepherd/internal/sessionmux"
 )
 
 const (
@@ -21,9 +23,12 @@ const (
 )
 
 type AgentAPI struct {
-	Agents  *agentsvc.Service
-	Hub     *agentsvc.Hub
-	OnFrame FrameHandler // injected by router; receives agent->server envelopes
+	Agents            *agentsvc.Service
+	Hub               *agentsvc.Hub
+	OnFrame           FrameHandler // injected by router; receives agent->server envelopes
+	Reg               *sessionmux.Registry
+	OnAgentDisconnect func(serverID int64)
+	PushSandbox       func(serverID int64)
 }
 
 // FrameHandler dispatches agent→server frames. Implemented by ingest pipeline (Task 13).
@@ -88,14 +93,24 @@ func (a *AgentAPI) WS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn := &wsConn{c: c}
-	if prev := a.Hub.Register(sid, conn); prev != nil {
+	adapter := &wsAdapter{c: c}
+	ws := agentsvc.NewWSConn(adapter, 256, 100*time.Millisecond)
+	bc := &bridgedConn{w: ws}
+	prev := a.Hub.Register(sid, bc)
+	if prev != nil {
 		_ = prev.Close()
 	}
 	defer func() {
-		a.Hub.Unregister(sid, conn)
-		_ = conn.Close()
+		a.Hub.Unregister(sid, bc)
+		_ = bc.Close()
+		if a.OnAgentDisconnect != nil {
+			a.OnAgentDisconnect(sid)
+		}
 	}()
+
+	if a.PushSandbox != nil {
+		a.PushSandbox(sid)
+	}
 
 	_ = c.SetReadDeadline(time.Now().Add(wsPongWait))
 	c.SetPongHandler(func(string) error {
@@ -104,31 +119,39 @@ func (a *AgentAPI) WS(w http.ResponseWriter, r *http.Request) {
 	})
 
 	stop := make(chan struct{})
-	go a.pingLoop(conn, stop)
 	defer close(stop)
+	go a.pingLoop(bc, stop)
 
 	for {
-		_, data, err := c.ReadMessage()
+		mt, data, err := c.ReadMessage()
 		if err != nil {
 			return
 		}
-		var env agentapi.Envelope
-		if err := envDecode(data, &env); err != nil {
-			log.Printf("ws decode: %v", err)
-			continue
-		}
-		switch env.Type {
-		case agentapi.TypePong:
-			_ = c.SetReadDeadline(time.Now().Add(wsPongWait))
-		default:
+		switch mt {
+		case websocket.TextMessage:
+			var env agentapi.Envelope
+			if err := json.Unmarshal(data, &env); err != nil {
+				continue
+			}
+			if a.Reg != nil && a.Reg.Deliver(env) {
+				continue
+			}
 			if a.OnFrame != nil {
 				a.OnFrame(r.Context(), sid, env)
+			}
+		case websocket.BinaryMessage:
+			sid2, kind, payload, err := agentapi.DecodeBinary(data)
+			if err != nil {
+				continue
+			}
+			if a.Reg != nil {
+				a.Reg.DeliverBinary(sid2, kind, payload)
 			}
 		}
 	}
 }
 
-func (a *AgentAPI) pingLoop(c *wsConn, stop <-chan struct{}) {
+func (a *AgentAPI) pingLoop(c agentsvc.Conn, stop <-chan struct{}) {
 	t := time.NewTicker(wsPingInterval)
 	defer t.Stop()
 	for {
@@ -150,21 +173,39 @@ func bearerToken(h string) string {
 	return strings.TrimSpace(h[len(prefix):])
 }
 
-// wsConn satisfies agentsvc.Conn.
-type wsConn struct {
+// wsAdapter adapts *websocket.Conn to agentsvc.RawWriter.
+type wsAdapter struct {
 	c  *websocket.Conn
 	mu sync.Mutex
 }
 
-func (w *wsConn) Send(env agentapi.Envelope) error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	_ = w.c.SetWriteDeadline(time.Now().Add(wsWriteTimeout))
-	return w.c.WriteJSON(env)
+func (a *wsAdapter) WriteFrame(f agentsvc.OutFrame) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	_ = a.c.SetWriteDeadline(time.Now().Add(wsWriteTimeout))
+	if f.Text != nil {
+		return a.c.WriteMessage(websocket.TextMessage, f.Text)
+	}
+	return a.c.WriteMessage(websocket.BinaryMessage, f.Binary)
 }
 
-func (w *wsConn) Close() error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.c.Close()
+func (a *wsAdapter) Close() error { return a.c.Close() }
+
+// bridgedConn satisfies agentsvc.Conn backed by agentsvc.WSConn (single-writer goroutine).
+type bridgedConn struct {
+	w *agentsvc.WSConn
+}
+
+func (b *bridgedConn) Send(env agentapi.Envelope) error {
+	buf, _ := json.Marshal(env)
+	return b.w.Send(agentsvc.OutFrame{Text: buf})
+}
+
+func (b *bridgedConn) SendBinary(buf []byte) error {
+	return b.w.Send(agentsvc.OutFrame{Binary: buf})
+}
+
+func (b *bridgedConn) Close() error {
+	b.w.Close()
+	return nil
 }

@@ -6,16 +6,22 @@ import (
 	"log"
 	"net/http"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/hg-claw/Shepherd/internal/agentsvc"
 	"github.com/hg-claw/Shepherd/internal/api"
+	"github.com/hg-claw/Shepherd/internal/audit"
 	"github.com/hg-claw/Shepherd/internal/auth"
 	"github.com/hg-claw/Shepherd/internal/config"
 	shepdb "github.com/hg-claw/Shepherd/internal/db"
+	"github.com/hg-claw/Shepherd/internal/filesvc"
 	"github.com/hg-claw/Shepherd/internal/installer"
+	"github.com/hg-claw/Shepherd/internal/ptysvc"
+	"github.com/hg-claw/Shepherd/internal/scriptsvc"
 	"github.com/hg-claw/Shepherd/internal/serversvc"
+	"github.com/hg-claw/Shepherd/internal/sessionmux"
 	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
 	shepweb "github.com/hg-claw/Shepherd/internal/web"
 )
@@ -59,6 +65,42 @@ func main() {
 	tQuery := &telemetrysvc.Query{DB: d}
 	tIngest := &telemetrysvc.Ingest{DB: d}
 
+	reg := sessionmux.New()
+	auditW := &audit.Writer{DB: d, Now: time.Now}
+
+	ptyService := &ptysvc.Service{
+		DB:            d,
+		Hub:           hub,
+		Reg:           reg,
+		Audit:         auditW,
+		Now:           time.Now,
+		RecordingsDir: filepath.Join(filepath.Dir(cfg.DBDSN), "pty-recordings"),
+	}
+
+	scriptsStore := &scriptsvc.Store{DB: d, Now: time.Now}
+	scriptsService := &scriptsvc.Service{
+		DB:    d,
+		Store: scriptsStore,
+		PTY:   ptyService,
+		Reg:   reg,
+		Audit: auditW,
+		Now:   time.Now,
+	}
+	ptyService.OnSessionFinalized = scriptsService.OnPTYExit
+
+	filesService := &filesvc.Service{Hub: hub, Reg: reg}
+
+	sandboxPusher := &serversvc.SandboxPusher{Settings: settingsStore, Hub: hub}
+
+	if err := ptyService.Sweep(rootCtx); err != nil {
+		log.Printf("pty sweep: %v", err)
+	}
+	if err := scriptsService.Sweep(rootCtx); err != nil {
+		log.Printf("scripts sweep: %v", err)
+	}
+
+	go (&audit.Retention{DB: d, Settings: settingsStore, Now: time.Now}).Run(rootCtx)
+
 	var dist installer.Distribution
 	switch cfg.AgentDistribution {
 	case config.DistributionEmbedded:
@@ -95,9 +137,29 @@ func main() {
 	}
 	settings := &api.SettingsAPI{Settings: settingsStore}
 	public := &api.PublicAPI{Servers: serverSvc, Settings: settingsStore, Query: tQuery, Hub: hub}
-	agentAPI := &api.AgentAPI{Agents: agentSvc, Hub: hub, OnFrame: tIngest.HandleFrame}
+	agentAPI := &api.AgentAPI{
+		Agents:            agentSvc,
+		Hub:               hub,
+		OnFrame:           tIngest.HandleFrame,
+		Reg:               reg,
+		OnAgentDisconnect: ptyService.AgentDisconnected,
+		PushSandbox:       func(serverID int64) { sandboxPusher.PushOne(rootCtx, serverID) },
+	}
 
-	router := api.NewRouter(authAPI, authH.RequireAdmin, servers, settings, public, agentAPI, shepweb.Handler())
+	consoleAPI := &api.ConsoleAPI{PTY: ptyService}
+	scriptsAPI := &api.ScriptsAPI{Store: scriptsStore, Service: scriptsService}
+	filesAPI := &api.FilesAPI{
+		Files:     filesService,
+		Audit:     auditW,
+		MaxUpload: int64(settingsStore.GetInt(rootCtx, "file_upload_max_bytes", 100*1024*1024)),
+	}
+	auditAPI := &api.AuditAPI{DB: d}
+	recAPI := &api.RecordingsAPI{DB: d}
+
+	router := api.NewRouter(authAPI, authH.RequireAdmin,
+		servers, settings, public, agentAPI,
+		consoleAPI, scriptsAPI, filesAPI, auditAPI, recAPI,
+		shepweb.Handler())
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,

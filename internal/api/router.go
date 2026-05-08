@@ -6,21 +6,28 @@ import (
 )
 
 type Router struct {
-	Auth     *AuthAPI
-	Servers  *ServersAPI
-	Settings *SettingsAPI
-	Public   *PublicAPI
-	Agent    *AgentAPI
-	Web      http.Handler // SPA static + fallback; nil = catchall returns 404
+	Auth       *AuthAPI
+	Servers    *ServersAPI
+	Settings   *SettingsAPI
+	Public     *PublicAPI
+	Agent      *AgentAPI
+	Console    *ConsoleAPI
+	Scripts    *ScriptsAPI
+	Files      *FilesAPI
+	Audit      *AuditAPI
+	Recordings *RecordingsAPI
+	Web        http.Handler
 
 	requireAdmin func(http.Handler) http.Handler
 }
 
 func NewRouter(authAPI *AuthAPI, requireAdmin func(http.Handler) http.Handler,
 	servers *ServersAPI, settings *SettingsAPI, public *PublicAPI, agent *AgentAPI,
+	console *ConsoleAPI, scripts *ScriptsAPI, files *FilesAPI, audit *AuditAPI, recs *RecordingsAPI,
 	web http.Handler) *Router {
 	return &Router{
 		Auth: authAPI, Servers: servers, Settings: settings, Public: public, Agent: agent,
+		Console: console, Scripts: scripts, Files: files, Audit: audit, Recordings: recs,
 		Web:          web,
 		requireAdmin: requireAdmin,
 	}
@@ -54,6 +61,29 @@ func (r *Router) Handler() http.Handler {
 
 	admin.HandleFunc("GET /api/settings", r.Settings.GetAll)
 	admin.HandleFunc("PATCH /api/settings", r.Settings.Patch)
+
+	admin.HandleFunc("POST /api/admin/console/open", r.Console.Open)
+	admin.HandleFunc("GET /api/admin/console/ws", r.Console.AttachWS)
+
+	admin.HandleFunc("GET /api/admin/scripts", r.Scripts.List)
+	admin.HandleFunc("POST /api/admin/scripts", r.Scripts.Create)
+	admin.HandleFunc("PATCH /api/admin/scripts/{id}", r.Scripts.Update)
+	admin.HandleFunc("DELETE /api/admin/scripts/{id}", r.Scripts.Delete)
+	admin.HandleFunc("POST /api/admin/scripts/{id}/run", r.Scripts.Run)
+	admin.HandleFunc("GET /api/admin/script-runs", r.Scripts.RunsList)
+	admin.HandleFunc("GET /api/admin/script-runs/{id}", r.Scripts.RunDetail)
+
+	admin.HandleFunc("GET /api/admin/files", r.Files.List)
+	admin.HandleFunc("POST /api/admin/files/stat", r.Files.Stat)
+	admin.HandleFunc("POST /api/admin/files/mkdir", r.Files.Mkdir)
+	admin.HandleFunc("POST /api/admin/files/rename", r.Files.Rename)
+	admin.HandleFunc("POST /api/admin/files/rm", r.Files.Rm)
+	admin.HandleFunc("GET /api/admin/files/preview", r.Files.Preview)
+	admin.HandleFunc("GET /api/admin/files/download", r.Files.Download)
+	admin.HandleFunc("POST /api/admin/files/upload", r.Files.Upload)
+
+	admin.HandleFunc("GET /api/admin/audit", r.Audit.List)
+	admin.HandleFunc("GET /api/admin/recordings/{id}/cast", r.Recordings.Cast)
 
 	gated := r.requireAdmin(admin)
 

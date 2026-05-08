@@ -57,7 +57,14 @@
     "retention_30s": "30s samples retention",
     "retention_5m": "5m rollup retention",
     "retention_1h": "1h rollup retention",
-    "default_telemetry_interval_seconds": "Default sampling interval (sec)"
+    "default_telemetry_interval_seconds": "Default sampling interval (sec)",
+    "phase2_header": "Remote Ops",
+    "file_sandbox_enabled": "Enable file sandbox",
+    "file_sandbox_paths": "Sandbox paths (one per line)",
+    "audit_retention_days": "Audit log retention (days)",
+    "pty_recording_enabled": "Enable PTY session recording",
+    "pty_max_concurrent_per_admin": "Max concurrent PTY sessions per admin",
+    "file_upload_max_mb": "Max file upload size (MB)"
   },
   "common": {
     "loading": "Loading…",
@@ -74,5 +81,58 @@
     "hour_ago": "{{n}} hr ago",
     "day_ago": "{{n}} days ago",
     "just_now": "just now"
+  },
+  "scripts": {
+    "title": "Scripts",
+    "new": "New",
+    "edit": "Edit script",
+    "name": "Name",
+    "description": "Description",
+    "content": "Content",
+    "default_timeout": "Default timeout (s)",
+    "params": "Parameters",
+    "add_param": "Add parameter",
+    "run": "Run",
+    "run_button": "Run on {{n}} servers",
+    "targets": "Target servers",
+    "runs": "Run history",
+    "run_id": "Run #",
+    "script_id": "Script",
+    "started_at": "Started",
+    "finished_at": "Finished",
+    "status": "Status",
+    "exit_code": "Exit"
+  },
+  "console": {
+    "title": "Console",
+    "open": "Console",
+    "attach": "Attach"
+  },
+  "files": {
+    "title": "Files",
+    "name": "Name",
+    "size": "Size",
+    "mode": "Mode",
+    "mtime": "Modified",
+    "upload": "Upload",
+    "mkdir": "New folder",
+    "preview": "Preview"
+  },
+  "audit": {
+    "title": "Audit log",
+    "ts": "Time",
+    "action": "Action",
+    "admin": "Admin",
+    "server": "Server",
+    "result": "Result",
+    "details": "Details",
+    "action_filter": "filter action…",
+    "server_id_filter": "server id",
+    "from": "from (RFC3339)",
+    "to": "to (RFC3339)"
+  },
+  "recording": {
+    "title": "Recording",
+    "replay": "Replay"
   }
 }

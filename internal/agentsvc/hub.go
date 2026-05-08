@@ -13,6 +13,7 @@ var ErrAgentOffline = errors.New("agent offline")
 // by the WebSocket handler in api/agent_routes.go.
 type Conn interface {
 	Send(env agentapi.Envelope) error
+	SendBinary(buf []byte) error
 	Close() error
 }
 
@@ -56,9 +57,33 @@ func (h *Hub) Send(serverID int64, env agentapi.Envelope) error {
 	return c.Send(env)
 }
 
+func (h *Hub) SendBinary(serverID int64, sid string, kind byte, payload []byte) error {
+	buf, err := agentapi.EncodeBinary(sid, kind, payload)
+	if err != nil {
+		return err
+	}
+	h.mu.Lock()
+	c := h.conns[serverID]
+	h.mu.Unlock()
+	if c == nil {
+		return ErrAgentOffline
+	}
+	return c.SendBinary(buf)
+}
+
 func (h *Hub) IsOnline(serverID int64) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	_, ok := h.conns[serverID]
 	return ok
+}
+
+func (h *Hub) OnlineServers() []int64 {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	ids := make([]int64, 0, len(h.conns))
+	for k := range h.conns {
+		ids = append(ids, k)
+	}
+	return ids
 }

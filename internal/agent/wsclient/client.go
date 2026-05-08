@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/hg-claw/Shepherd/internal/agent/filehandler"
+	"github.com/hg-claw/Shepherd/internal/agent/ptyrunner"
 	"github.com/hg-claw/Shepherd/internal/agent/state"
 	"github.com/hg-claw/Shepherd/internal/agentapi"
 	"github.com/hg-claw/Shepherd/internal/agentconfig"
@@ -29,8 +31,9 @@ type Client struct {
 	OnConfig   func(int) // called when server pushes config.update
 	Hostname   string
 
-	mu   sync.Mutex
-	conn *websocket.Conn
+	mu      sync.Mutex
+	conn    *websocket.Conn
+	runners *runners
 }
 
 func New(cfg agentconfig.Config, st *state.Store, onCfg func(int), hostname string) *Client {
@@ -40,6 +43,7 @@ func New(cfg agentconfig.Config, st *state.Store, onCfg func(int), hostname stri
 		HTTPClient: &http.Client{Timeout: 30 * time.Second},
 		OnConfig:   onCfg,
 		Hostname:   hostname,
+		runners:    newRunners(),
 	}
 }
 
@@ -188,34 +192,15 @@ func (c *Client) dialAndRun(ctx context.Context) error {
 		}
 	}()
 
-	for {
-		_, data, err := conn.ReadMessage()
-		if err != nil {
-			return err
+	fh := filehandler.New(c)
+	if st0, _ := c.State.Load(); st0.Sandbox != nil {
+		enabled := false
+		if st0.Sandbox.Enabled != nil {
+			enabled = *st0.Sandbox.Enabled
 		}
-		var env agentapi.Envelope
-		if err := json.Unmarshal(data, &env); err != nil {
-			continue
-		}
-		switch env.Type {
-		case agentapi.TypePing:
-			pong, _ := agentapi.Frame(agentapi.TypePong, struct{}{})
-			_ = c.writeJSON(pong)
-		case agentapi.TypeConfigUpdate:
-			var u agentapi.ConfigUpdate
-			if err := env.Decode(&u); err != nil {
-				continue
-			}
-			if c.OnConfig != nil {
-				c.OnConfig(u.TelemetryIntervalSeconds)
-			}
-			if u.TelemetryIntervalSeconds > 0 {
-				st, _ := c.State.Load()
-				st.TelemetryIntervalSeconds = u.TelemetryIntervalSeconds
-				_ = c.State.Save(st)
-			}
-		}
+		fh.SetSandbox(&filehandler.Sandbox{Enabled: enabled, Allowed: st0.Sandbox.Paths})
 	}
+	return c.readPump(ctx, conn, fh)
 }
 
 // Send is the agent-side `Sender` impl used by the collector.
@@ -231,6 +216,74 @@ func (c *Client) writeJSON(env agentapi.Envelope) error {
 	}
 	_ = c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	return c.conn.WriteJSON(env)
+}
+
+func (c *Client) openPTY(ctx context.Context, p agentapi.PTYOpen) {
+	r, err := ptyrunner.Spawn(ctx, ptyrunner.SpawnOpts{
+		SID: p.Sid, Kind: p.Kind, User: p.User, Rows: p.Rows, Cols: p.Cols,
+		Term: p.Term, Exec: p.Exec, Env: p.Env,
+	}, c)
+	if err != nil {
+		exit, _ := agentapi.Frame(agentapi.TypePTYExit, agentapi.PTYExit{Sid: p.Sid, Code: 127})
+		_ = c.writeJSON(exit)
+		return
+	}
+	c.runners.addPTY(p.Sid, r)
+}
+
+func (c *Client) SendBinary(sid string, kind byte, payload []byte) error {
+	buf, err := agentapi.EncodeBinary(sid, kind, payload)
+	if err != nil {
+		return err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.conn == nil {
+		return errors.New("not connected")
+	}
+	_ = c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	return c.conn.WriteMessage(websocket.BinaryMessage, buf)
+}
+
+func (c *Client) SendExit(sid string, code int) {
+	exit, _ := agentapi.Frame(agentapi.TypePTYExit, agentapi.PTYExit{Sid: sid, Code: code})
+	_ = c.writeJSON(exit)
+	c.runners.delPTY(sid)
+}
+
+func (c *Client) SendControl(env agentapi.Envelope) error { return c.writeJSON(env) }
+
+func (c *Client) applyConfig(env agentapi.Envelope, fh *filehandler.Handler) {
+	var u agentapi.ConfigUpdate
+	if err := env.Decode(&u); err != nil {
+		return
+	}
+	if u.TelemetryIntervalSeconds > 0 {
+		if c.OnConfig != nil {
+			c.OnConfig(u.TelemetryIntervalSeconds)
+		}
+		st, _ := c.State.Load()
+		st.TelemetryIntervalSeconds = u.TelemetryIntervalSeconds
+		_ = c.State.Save(st)
+	}
+	if u.FileSandboxEnabled != nil || u.FileSandboxPaths != nil {
+		st, _ := c.State.Load()
+		if st.Sandbox == nil {
+			st.Sandbox = &state.SandboxState{}
+		}
+		if u.FileSandboxEnabled != nil {
+			st.Sandbox.Enabled = u.FileSandboxEnabled
+		}
+		if u.FileSandboxPaths != nil {
+			st.Sandbox.Paths = u.FileSandboxPaths
+		}
+		_ = c.State.Save(st)
+		enabled := false
+		if st.Sandbox.Enabled != nil {
+			enabled = *st.Sandbox.Enabled
+		}
+		fh.SetSandbox(&filehandler.Sandbox{Enabled: enabled, Allowed: st.Sandbox.Paths})
+	}
 }
 
 func (c *Client) heartbeatLoop(stop <-chan struct{}) {

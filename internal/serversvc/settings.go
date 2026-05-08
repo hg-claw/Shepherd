@@ -2,6 +2,8 @@ package serversvc
 
 import (
 	"context"
+	"strconv"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -41,4 +43,40 @@ func (s *SettingsStore) Set(ctx context.Context, key, value string) error {
 		"INSERT INTO settings(key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
 		key, value)
 	return err
+}
+
+func (s *SettingsStore) GetBool(ctx context.Context, key string, def bool) bool {
+	v, err := s.Get(ctx, key)
+	if err != nil {
+		return def
+	}
+	return v == "true" || v == "1"
+}
+
+func (s *SettingsStore) GetInt(ctx context.Context, key string, def int) int {
+	v, err := s.Get(ctx, key)
+	if err != nil {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return def
+	}
+	return n
+}
+
+func (s *SettingsStore) GetLines(ctx context.Context, key string) []string {
+	v, _ := s.Get(ctx, key)
+	if v == "" {
+		return nil
+	}
+	parts := strings.Split(v, "\n")
+	out := parts[:0]
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

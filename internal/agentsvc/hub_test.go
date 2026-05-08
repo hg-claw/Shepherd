@@ -3,6 +3,7 @@ package agentsvc
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
 )
@@ -20,7 +21,8 @@ func (f *fakeConn) Send(e agentapi.Envelope) error {
 	f.sent = append(f.sent, e)
 	return nil
 }
-func (f *fakeConn) Close() error { f.closed = true; return nil }
+func (f *fakeConn) SendBinary([]byte) error { return nil }
+func (f *fakeConn) Close() error            { f.closed = true; return nil }
 
 func TestHub_RegisterReplacesPrev(t *testing.T) {
 	h := NewHub()
@@ -71,3 +73,29 @@ func TestHub_UnregisterOnlyIfCurrent(t *testing.T) {
 		t.Error("real unregister failed")
 	}
 }
+
+func TestHub_SendBinary(t *testing.T) {
+	h := NewHub()
+	got := make(chan []byte, 1)
+	h.Register(7, &binaryRecorder{ch: got})
+	if err := h.SendBinary(7, "abc", 0x01, []byte("hi")); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case b := <-got:
+		// expect [00 03][01]['a''b''c']['h''i']
+		if string(b) != "\x00\x03\x01abchi" {
+			t.Fatalf("payload=%q", b)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("no frame")
+	}
+}
+
+type binaryRecorder struct {
+	ch chan []byte
+}
+
+func (r *binaryRecorder) Send(_ agentapi.Envelope) error { return nil }
+func (r *binaryRecorder) SendBinary(b []byte) error      { r.ch <- b; return nil }
+func (r *binaryRecorder) Close() error                   { return nil }

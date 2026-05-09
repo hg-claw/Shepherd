@@ -120,7 +120,7 @@ func (a *AgentAPI) WS(w http.ResponseWriter, r *http.Request) {
 
 	stop := make(chan struct{})
 	defer close(stop)
-	go a.pingLoop(bc, stop)
+	go a.pingLoop(c, stop)
 
 	for {
 		mt, data, err := c.ReadMessage()
@@ -151,7 +151,14 @@ func (a *AgentAPI) WS(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *AgentAPI) pingLoop(c agentsvc.Conn, stop <-chan struct{}) {
+// pingLoop sends a real WebSocket protocol ping (opcode 0x9) every
+// wsPingInterval. gorilla/websocket's default handler on the agent side
+// auto-replies with a pong (opcode 0xA), which fires this server's
+// SetPongHandler and extends the read deadline. WriteControl is safe to call
+// concurrently with the per-conn writer goroutine. Application-layer
+// ping/pong (TypePing/TypePong) was a noop relative to read deadlines and
+// has been retired.
+func (a *AgentAPI) pingLoop(c *websocket.Conn, stop <-chan struct{}) {
 	t := time.NewTicker(wsPingInterval)
 	defer t.Stop()
 	for {
@@ -159,8 +166,7 @@ func (a *AgentAPI) pingLoop(c agentsvc.Conn, stop <-chan struct{}) {
 		case <-stop:
 			return
 		case <-t.C:
-			env, _ := agentapi.Frame(agentapi.TypePing, struct{}{})
-			_ = c.Send(env)
+			_ = c.WriteControl(websocket.PingMessage, nil, time.Now().Add(wsWriteTimeout))
 		}
 	}
 }

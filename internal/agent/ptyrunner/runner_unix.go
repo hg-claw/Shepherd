@@ -31,6 +31,20 @@ func resolveBinary(name string) string {
 	return name
 }
 
+// defaultShell picks the user's preferred login shell: zsh if installed
+// (default on modern macOS), bash otherwise (default on most Linux distros),
+// /bin/sh as a POSIX-only fallback. Used for the root-side `console` and
+// `script` paths; non-root paths invoke `su -l <user>` which already honors
+// the target user's shell from /etc/passwd.
+func defaultShell() string {
+	for _, name := range []string{"zsh", "bash"} {
+		if p, err := exec.LookPath(name); err == nil {
+			return p
+		}
+	}
+	return "/bin/sh"
+}
+
 type Sender interface {
 	SendBinary(sid string, kind byte, p []byte) error
 	SendExit(sid string, code int)
@@ -68,18 +82,18 @@ func Spawn(ctx context.Context, opts SpawnOpts, sender Sender) (*Runner, error) 
 		opts.Cols = 80
 	}
 
-	bashPath := resolveBinary("bash")
+	shell := defaultShell()
 	suPath := resolveBinary("su")
 
 	var argv []string
 	useRoot := opts.User == "" || opts.User == "root"
 	switch {
 	case opts.Kind == "console" && useRoot:
-		argv = []string{bashPath, "-l"}
+		argv = []string{shell, "-l"}
 	case opts.Kind == "console":
 		argv = []string{suPath, "-l", opts.User}
 	case opts.Kind == "script" && useRoot:
-		argv = []string{bashPath, "-lc", opts.Exec}
+		argv = []string{shell, "-lc", opts.Exec}
 	default:
 		argv = []string{suPath, "-l", opts.User, "-c", opts.Exec}
 	}

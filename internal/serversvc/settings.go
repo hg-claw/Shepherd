@@ -70,6 +70,11 @@ func (s *SettingsStore) GetLines(ctx context.Context, key string) []string {
 	if v == "" {
 		return nil
 	}
+	// SQLite single-quoted string literals don't interpret \n as a newline,
+	// so the 0002_phase2 migration stored the literal two-character sequence
+	// `\n` instead of a separator. Tolerate both forms here so existing rows
+	// don't need a corrective migration.
+	v = strings.ReplaceAll(v, `\n`, "\n")
 	parts := strings.Split(v, "\n")
 	out := parts[:0]
 	for _, p := range parts {

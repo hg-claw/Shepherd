@@ -135,7 +135,10 @@ func main() {
 		Servers: serverSvc, Settings: settingsStore, Query: tQuery, Hub: hub,
 		InstallManager: installMgr, Tokens: agentSvc,
 	}
-	settings := &api.SettingsAPI{Settings: settingsStore}
+	settings := &api.SettingsAPI{
+		Settings:        settingsStore,
+		OnSandboxChange: sandboxPusher.PushAll,
+	}
 	public := &api.PublicAPI{Servers: serverSvc, Settings: settingsStore, Query: tQuery, Hub: hub}
 	agentAPI := &api.AgentAPI{
 		Agents:            agentSvc,

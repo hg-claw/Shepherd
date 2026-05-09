@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/hg-claw/Shepherd/internal/serversvc"
@@ -8,14 +9,33 @@ import (
 
 type SettingsAPI struct {
 	Settings *serversvc.SettingsStore
+	// OnSandboxChange, if set, is called after a Patch that touched any of
+	// the sandbox-related keys. cmd/server wires it to SandboxPusher.PushAll
+	// so existing online agents pick up the new whitelist without reconnect.
+	OnSandboxChange func(ctx context.Context)
 }
 
 var allowedSettingKeys = map[string]bool{
+	// Phase 1
 	"public_display_mode":                true,
 	"retention_30s":                      true,
 	"retention_5m":                       true,
 	"retention_1h":                       true,
 	"default_telemetry_interval_seconds": true,
+	// Phase 2 (added by 0002 migration)
+	"file_sandbox_enabled":         true,
+	"file_sandbox_paths":           true,
+	"audit_retention_days":         true,
+	"pty_recording_enabled":        true,
+	"pty_max_concurrent_per_admin": true,
+	"file_upload_max_bytes":        true,
+	"file_chunk_bytes":             true,
+}
+
+// Keys that, when changed, require a sandbox re-push to online agents.
+var sandboxPushKeys = map[string]bool{
+	"file_sandbox_enabled": true,
+	"file_sandbox_paths":   true,
 }
 
 func (a *SettingsAPI) GetAll(w http.ResponseWriter, r *http.Request) {
@@ -39,11 +59,18 @@ func (a *SettingsAPI) Patch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	pushSandbox := false
 	for k, v := range in {
 		if err := a.Settings.Set(r.Context(), k, v); err != nil {
 			writeError(w, 500, err.Error())
 			return
 		}
+		if sandboxPushKeys[k] {
+			pushSandbox = true
+		}
+	}
+	if pushSandbox && a.OnSandboxChange != nil {
+		a.OnSandboxChange(r.Context())
 	}
 	a.GetAll(w, r)
 }

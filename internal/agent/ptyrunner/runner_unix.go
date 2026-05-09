@@ -114,6 +114,15 @@ func Spawn(ctx context.Context, opts SpawnOpts, sender Sender) (*Runner, error) 
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
+	// Open the PTY at the agent's $HOME so console sessions land in `~/`
+	// instead of wherever the agent was launched. For `su -l <user>`, su
+	// already cd's into the target user's home, so don't override that path.
+	if useRoot {
+		if home := os.Getenv("HOME"); home != "" {
+			cmd.Dir = home
+		}
+	}
+
 	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: uint16(opts.Rows), Cols: uint16(opts.Cols)})
 	if err != nil {
 		return nil, err

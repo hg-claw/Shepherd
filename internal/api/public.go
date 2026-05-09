@@ -57,12 +57,19 @@ func (a *PublicAPI) Servers_ListPublic(w http.ResponseWriter, r *http.Request) {
 
 	out := []publicCard{}
 	for _, s := range all {
-		if !s.ShowOnPublic || !s.PublicAlias.Valid || s.PublicAlias.String == "" {
+		if !s.ShowOnPublic {
 			continue
+		}
+		// public_alias is the desensitized display name; if the admin didn't
+		// set one, fall back to the server's internal name. The desensitization
+		// is opt-in: toggling show_on_public alone should make it visible.
+		alias := s.PublicAlias.String
+		if !s.PublicAlias.Valid || alias == "" {
+			alias = s.Name
 		}
 		card := publicCard{
 			ID:          s.ID,
-			Alias:       s.PublicAlias.String,
+			Alias:       alias,
 			Group:       s.PublicGroup.String,
 			CountryCode: s.CountryCode.String,
 			Online:      s.AgentLastSeen.Valid && time.Since(s.AgentLastSeen.Time) <= threshold,

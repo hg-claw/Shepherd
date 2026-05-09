@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Folder, File as FileIcon, Trash2, Download, Plus, Upload as UploadIcon, RefreshCw } from 'lucide-react'
+import { Folder, File as FileIcon, Trash2, Download, Plus, Upload as UploadIcon, RefreshCw, ArrowRight } from 'lucide-react'
 import {
   useFiles,
   useMkdir,
@@ -30,12 +30,24 @@ function formatSize(n: number): string {
   return `${(n / 1024 / 1024 / 1024).toFixed(2)} G`
 }
 
+// Quick-jump shortcuts. Picks paths the default sandbox whitelists, with
+// macOS /Users alongside Linux /home so the same chips work on either OS.
+const QUICK_PATHS: string[] = ['/tmp', '/Users', '/home', '/var/log', '/etc/shepherd', '/opt', '/srv']
+
 export default function FileBrowserPage() {
   const { t } = useTranslation()
   const { serverId } = useParams<{ serverId: string }>()
   const sid = serverId ? Number(serverId) : 0
   const [cwd, setCwd] = useState('/tmp')
-  const { data, isLoading, refetch } = useFiles(sid, cwd)
+  // Decoupled input state so typing into the path bar doesn't fire one
+  // useFiles request per keystroke. Submit explicitly via Enter or arrow.
+  const [pathInput, setPathInput] = useState(cwd)
+  useEffect(() => { setPathInput(cwd) }, [cwd])
+  const submitPath = () => {
+    const trimmed = pathInput.trim()
+    if (trimmed && trimmed !== cwd) setCwd(trimmed)
+  }
+  const { data, isLoading, error, refetch } = useFiles(sid, cwd)
   const mkdir = useMkdir()
   const rm = useRm()
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -106,7 +118,16 @@ export default function FileBrowserPage() {
         ))}
       </div>
       <div className="flex gap-2">
-        <Input value={cwd} onChange={(e) => setCwd(e.target.value)} className="font-mono" />
+        <Input
+          value={pathInput}
+          onChange={(e) => setPathInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') submitPath() }}
+          placeholder="/tmp"
+          className="font-mono"
+        />
+        <Button size="sm" variant="outline" onClick={submitPath} title={t('files.go', 'Go')}>
+          <ArrowRight className="h-4 w-4" />
+        </Button>
         <Button size="sm" variant="outline" onClick={() => refetch()}>
           <RefreshCw className="h-4 w-4" />
         </Button>
@@ -120,8 +141,23 @@ export default function FileBrowserPage() {
           <input type="file" multiple onChange={handleUpload} className="hidden" />
         </label>
       </div>
+      <div className="flex flex-wrap gap-1">
+        {QUICK_PATHS.map((p) => (
+          <button
+            key={p}
+            onClick={() => setCwd(p)}
+            className={`px-2 py-0.5 text-xs rounded border ${cwd === p ? 'bg-muted' : 'hover:bg-muted'}`}
+          >
+            {p}
+          </button>
+        ))}
+      </div>
       {isLoading ? (
         <div>{t('common.loading')}</div>
+      ) : error ? (
+        <div className="text-sm text-destructive">
+          {(error as Error).message}
+        </div>
       ) : (
         <Table>
           <TableHeader>

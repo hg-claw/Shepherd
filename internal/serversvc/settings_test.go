@@ -59,10 +59,10 @@ func TestGetLines_RealNewlines(t *testing.T) {
 func TestGetLines_DefaultSandboxPaths(t *testing.T) {
 	s := newSettings(t)
 	got := s.GetLines(context.Background(), "file_sandbox_paths")
-	if len(got) != 6 {
-		t.Fatalf("expected 6 default paths, got %d: %v", len(got), got)
+	if len(got) != 7 {
+		t.Fatalf("expected 7 default paths, got %d: %v", len(got), got)
 	}
-	for _, p := range []string{"/tmp", "/var/log", "/etc/shepherd", "/home", "/opt", "/srv"} {
+	for _, p := range []string{"/tmp", "/var/log", "/etc/shepherd", "/home", "/Users", "/opt", "/srv"} {
 		found := false
 		for _, g := range got {
 			if g == p {

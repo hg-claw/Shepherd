@@ -55,6 +55,32 @@ func TestSandbox_PrefixBoundary(t *testing.T) {
 	}
 }
 
+// Mirrors macOS reality: server settings list a friendly path (/tmp, /var/log)
+// that the OS internally aliases to a different real path (/private/tmp).
+// The agent must accept paths under the symlinked location.
+func TestSandbox_AllowedPathIsSymlink(t *testing.T) {
+	root := realPath(t, t.TempDir())
+	real := filepath.Join(root, "real")
+	if err := os.MkdirAll(real, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(root, "alias")
+	if err := os.Symlink(real, alias); err != nil {
+		t.Fatal(err)
+	}
+	// Allowed lists the symlink-style path.
+	s := &Sandbox{Enabled: true, Allowed: []string{alias}}
+	// Request a path under the symlink — Check resolves it to the real path,
+	// so a literal-prefix check would fail without the symlink-aware path.
+	target := filepath.Join(alias, "x")
+	if err := os.WriteFile(target, []byte("hi"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Check(target, true); err != nil {
+		t.Fatalf("symlinked allowed path rejected: %v", err)
+	}
+}
+
 func TestSandbox_SymlinkEscape(t *testing.T) {
 	dir := realPath(t, t.TempDir())
 	allowed := filepath.Join(dir, "ok")

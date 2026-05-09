@@ -44,9 +44,22 @@ func (s *Sandbox) Check(p string, mustExist bool) error {
 	cleaned := filepath.Clean(resolved)
 	for _, raw := range s.Allowed {
 		ap := filepath.Clean(raw)
-		if cleaned == ap || strings.HasPrefix(cleaned, ap+string(filepath.Separator)) {
+		if matchesPrefix(cleaned, ap) {
 			return nil
+		}
+		// Also try the resolved version of the allowed path. Server settings
+		// commonly list `/tmp`, but on macOS that's a symlink to `/private/tmp`;
+		// the requested path resolves through the symlink, so we'd otherwise
+		// reject every legitimate /tmp request on darwin agents.
+		if rp, e := filepath.EvalSymlinks(ap); e == nil && rp != ap {
+			if matchesPrefix(cleaned, rp) {
+				return nil
+			}
 		}
 	}
 	return ErrPathNotAllowed
+}
+
+func matchesPrefix(target, prefix string) bool {
+	return target == prefix || strings.HasPrefix(target, prefix+string(filepath.Separator))
 }

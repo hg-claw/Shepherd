@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"regexp"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -110,35 +111,61 @@ func Spawn(ctx context.Context, opts SpawnOpts, sender Sender) (*Runner, error) 
 	return r, nil
 }
 
+// readLoop reads from the PTY master and emits pty.out frames on either
+// 4 KiB accumulated OR every 20 ms (whichever comes first), so an interactive
+// shell prompt of a few bytes still streams promptly without paying a frame
+// per byte for high-throughput output.
+//
+// The flush timer runs in its own goroutine because ptmx.Read blocks; you
+// cannot combine a blocking syscall with a timer in the same goroutine
+// without a channel.
 func (r *Runner) readLoop(sender Sender) {
 	buf := make([]byte, 16*1024)
-	flush := make([]byte, 0, 4096)
-	timer := time.NewTimer(20 * time.Millisecond)
-	timer.Stop()
-	emit := func() {
-		if len(flush) == 0 {
+	var (
+		mu      sync.Mutex
+		pending []byte
+	)
+	flushNow := func() {
+		mu.Lock()
+		if len(pending) == 0 {
+			mu.Unlock()
 			return
 		}
-		_ = sender.SendBinary(r.sid, agentapi.KindPTYOut, append([]byte(nil), flush...))
-		flush = flush[:0]
+		out := pending
+		pending = nil
+		mu.Unlock()
+		_ = sender.SendBinary(r.sid, agentapi.KindPTYOut, out)
 	}
+
+	stop := make(chan struct{})
+	go func() {
+		t := time.NewTicker(20 * time.Millisecond)
+		defer t.Stop()
+		for {
+			select {
+			case <-stop:
+				flushNow()
+				return
+			case <-t.C:
+				flushNow()
+			}
+		}
+	}()
+	defer close(stop)
+
 	for {
 		n, err := r.ptmx.Read(buf)
 		if n > 0 {
-			flush = append(flush, buf[:n]...)
-			if len(flush) >= 4096 {
-				emit()
-			} else {
-				timer.Reset(20 * time.Millisecond)
-				select {
-				case <-timer.C:
-					emit()
-				default:
-				}
+			mu.Lock()
+			pending = append(pending, buf[:n]...)
+			full := len(pending) >= 4096
+			mu.Unlock()
+			if full {
+				flushNow()
 			}
 		}
 		if err != nil {
-			emit()
+			flushNow()
 			return
 		}
 	}

@@ -58,12 +58,12 @@ func (h *Handler) streamDownload(sid string, f *os.File, x *downloadXfer) {
 			}
 		}
 		if errors.Is(err, io.EOF) {
-			env, _ := agentapi.Frame(agentapi.TypeFileDownloadEnd, agentapi.FileDownloadEnd{Sid: sid})
+			env, _ := agentapi.FrameSid(agentapi.TypeFileDownloadEnd, sid, agentapi.FileDownloadEnd{Sid: sid})
 			_ = h.sender.SendControl(env)
 			return
 		}
 		if err != nil {
-			env, _ := agentapi.Frame(agentapi.TypeFileCancel, agentapi.FileCancel{Sid: sid, Reason: err.Error()})
+			env, _ := agentapi.FrameSid(agentapi.TypeFileCancel, sid, agentapi.FileCancel{Sid: sid, Reason: err.Error()})
 			_ = h.sender.SendControl(env)
 			return
 		}
@@ -85,6 +85,6 @@ func (h *Handler) HandleCancel(req agentapi.FileCancel) {
 }
 
 func (h *Handler) sendDownloadMeta(_ string, meta agentapi.FileDownloadMeta) {
-	env, _ := agentapi.Frame(agentapi.TypeFileDownloadMeta, meta)
+	env, _ := agentapi.FrameSid(agentapi.TypeFileDownloadMeta, meta.Sid, meta)
 	_ = h.sender.SendControl(env)
 }

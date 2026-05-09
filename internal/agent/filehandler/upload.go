@@ -105,7 +105,7 @@ func (h *Handler) sendUploadAck(sid string, err error) {
 	if err != nil {
 		ack.Error = err.Error()
 	}
-	env, _ := agentapi.Frame(agentapi.TypeFileUploadAck, ack)
+	env, _ := agentapi.FrameSid(agentapi.TypeFileUploadAck, sid, ack)
 	_ = h.sender.SendControl(env)
 }
 

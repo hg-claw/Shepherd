@@ -37,7 +37,7 @@ func (h *Handler) sendOpResult(sid string, err error) {
 	if err != nil {
 		res.Error = err.Error()
 	}
-	env, _ := agentapi.Frame(agentapi.TypeFileOpResult, res)
+	env, _ := agentapi.FrameSid(agentapi.TypeFileOpResult, sid, res)
 	_ = h.sender.SendControl(env)
 }
 
@@ -69,7 +69,7 @@ func (h *Handler) HandleList(req agentapi.FileList) {
 			}
 		}
 	}
-	env, _ := agentapi.Frame(agentapi.TypeFileListResult, res)
+	env, _ := agentapi.FrameSid(agentapi.TypeFileListResult, req.Sid, res)
 	_ = h.sender.SendControl(env)
 }
 
@@ -85,7 +85,7 @@ func (h *Handler) HandleStat(req agentapi.FileStat) {
 			Mode: uint32(info.Mode()), MTime: info.ModTime().Unix(), IsDir: info.IsDir(),
 		}
 	}
-	env, _ := agentapi.Frame(agentapi.TypeFileStatResult, res)
+	env, _ := agentapi.FrameSid(agentapi.TypeFileStatResult, req.Sid, res)
 	_ = h.sender.SendControl(env)
 }
 

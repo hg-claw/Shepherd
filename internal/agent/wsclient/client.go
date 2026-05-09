@@ -224,7 +224,7 @@ func (c *Client) openPTY(ctx context.Context, p agentapi.PTYOpen) {
 		Term: p.Term, Exec: p.Exec, Env: p.Env,
 	}, c)
 	if err != nil {
-		exit, _ := agentapi.Frame(agentapi.TypePTYExit, agentapi.PTYExit{Sid: p.Sid, Code: 127})
+		exit, _ := agentapi.FrameSid(agentapi.TypePTYExit, p.Sid, agentapi.PTYExit{Sid: p.Sid, Code: 127})
 		_ = c.writeJSON(exit)
 		return
 	}
@@ -246,7 +246,7 @@ func (c *Client) SendBinary(sid string, kind byte, payload []byte) error {
 }
 
 func (c *Client) SendExit(sid string, code int) {
-	exit, _ := agentapi.Frame(agentapi.TypePTYExit, agentapi.PTYExit{Sid: sid, Code: code})
+	exit, _ := agentapi.FrameSid(agentapi.TypePTYExit, sid, agentapi.PTYExit{Sid: sid, Code: code})
 	_ = c.writeJSON(exit)
 	c.runners.delPTY(sid)
 }

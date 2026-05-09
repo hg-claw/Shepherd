@@ -21,6 +21,20 @@ func Frame(typ string, p any) (Envelope, error) {
 	return Envelope{Type: typ, P: raw}, nil
 }
 
+// FrameSid is like Frame but additionally sets Envelope.Sid for routing.
+// The server-side sessionmux.Registry dispatches incoming agent replies
+// by Envelope.Sid; the payload also carries sid for in-process consumers,
+// but routing happens BEFORE the payload is decoded so the envelope must
+// carry it too.
+func FrameSid(typ, sid string, p any) (Envelope, error) {
+	env, err := Frame(typ, p)
+	if err != nil {
+		return env, err
+	}
+	env.Sid = sid
+	return env, nil
+}
+
 // Decode unmarshals e.P into out.
 func (e Envelope) Decode(out any) error {
 	return json.Unmarshal(e.P, out)

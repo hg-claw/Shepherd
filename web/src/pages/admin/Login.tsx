@@ -45,7 +45,15 @@ export default function Login() {
     <div className="min-h-dvh flex flex-col bg-background text-foreground">
       <header className="border-b">
         <div className="container flex h-14 items-center justify-between px-4 sm:px-6">
-          <span className="font-semibold truncate">{t('app.name')}</span>
+          <span className="flex items-center gap-2 font-mono">
+            <span
+              className="inline-block h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--glow-primary)/0.7)]"
+              aria-hidden
+            />
+            <span className="text-muted-foreground text-sm">[</span>
+            <span className="text-sm font-semibold tracking-[0.18em] uppercase">{t('app.name')}</span>
+            <span className="text-muted-foreground text-sm">]</span>
+          </span>
           <div className="flex items-center gap-1 sm:gap-2">
             <ThemeToggle />
             <LangToggle />

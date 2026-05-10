@@ -25,6 +25,17 @@ type NavItem = {
   icon: React.ComponentType<{ className?: string }>
 }
 
+function BrandMark({ name }: { name: string }) {
+  return (
+    <div className="px-4 py-3 flex items-center gap-2 font-mono">
+      <span className="inline-block h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--glow-primary)/0.7)]" aria-hidden />
+      <span className="text-muted-foreground text-sm">[</span>
+      <span className="text-sm font-semibold tracking-[0.18em] uppercase">{name}</span>
+      <span className="text-muted-foreground text-sm">]</span>
+    </div>
+  )
+}
+
 export function AdminLayout() {
   const { t } = useTranslation()
   const { admin } = useAuth()
@@ -45,7 +56,7 @@ export function AdminLayout() {
   const isActive = (to: string) => loc.pathname === to || loc.pathname.startsWith(to + '/')
 
   const NavList = ({ onNavigate }: { onNavigate?: () => void }) => (
-    <nav className="px-2 py-2">
+    <nav className="px-2 py-2 space-y-0.5">
       {navItems.map((it) => {
         const active = isActive(it.to)
         return (
@@ -53,11 +64,19 @@ export function AdminLayout() {
             key={it.to}
             to={it.to}
             onClick={onNavigate}
+            aria-current={active ? 'page' : undefined}
             className={cn(
-              'flex items-center gap-2 rounded px-2 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
+              'group relative flex items-center gap-2 rounded px-2 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
               active && 'bg-accent text-accent-foreground font-medium',
             )}
           >
+            <span
+              aria-hidden
+              className={cn(
+                'absolute left-0 top-1/2 h-5 -translate-y-1/2 w-0.5 rounded-r bg-primary transition-opacity',
+                active ? 'opacity-100 dark:shadow-[0_0_8px_hsl(var(--glow-primary)/0.7)]' : 'opacity-0',
+              )}
+            />
             <it.icon className="h-4 w-4 shrink-0" />
             <span className="truncate">{it.label}</span>
           </Link>
@@ -74,7 +93,7 @@ export function AdminLayout() {
   return (
     <div className="min-h-dvh flex bg-background text-foreground">
       <aside className="hidden md:flex md:flex-col w-56 shrink-0 border-r bg-card">
-        <div className="px-4 py-3 font-semibold truncate">{t('app.name')}</div>
+        <BrandMark name={t('app.name')} />
         <NavList />
       </aside>
 
@@ -93,12 +112,18 @@ export function AdminLayout() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-64 p-0 sm:max-w-xs">
-                <div className="px-4 py-3 font-semibold border-b">{t('app.name')}</div>
+                <div className="border-b">
+                  <BrandMark name={t('app.name')} />
+                </div>
                 <NavList onNavigate={() => setDrawerOpen(false)} />
               </SheetContent>
             </Sheet>
 
-            <div className="font-semibold md:hidden truncate">{t('app.name')}</div>
+            <div className="md:hidden truncate font-mono text-sm">
+              <span className="text-muted-foreground">[</span>
+              <span className="mx-1 font-semibold tracking-wider">{t('app.name')}</span>
+              <span className="text-muted-foreground">]</span>
+            </div>
 
             <div className="ml-auto flex items-center gap-1 sm:gap-2">
               {admin && (

@@ -26,8 +26,20 @@ export function MetricCard({ card, mode }: Props) {
   const diskPct = latest?.disks_pct?.[0] ?? null
 
   return (
-    <Link to={`/public/servers/${card.id}`} className="block">
-      <Card className={cn('transition-colors hover:border-primary', offline && 'opacity-60')}>
+    <Link to={`/public/servers/${card.id}`} className="block group">
+      <Card
+        className={cn(
+          'relative overflow-hidden transition-[border-color,box-shadow] duration-200 hover:border-primary dark:group-hover:shadow-[0_0_24px_-6px_hsl(var(--glow-primary)/0.45)]',
+          offline && 'opacity-60',
+        )}
+      >
+        <span
+          aria-hidden
+          className={cn(
+            'absolute left-0 top-0 h-full w-0.5',
+            card.online ? 'bg-level-low dark:shadow-[0_0_8px_hsl(var(--level-low)/0.7)]' : 'bg-level-alert',
+          )}
+        />
         <CardContent className="space-y-3 p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

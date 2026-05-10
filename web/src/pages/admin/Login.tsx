@@ -42,17 +42,17 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-dvh flex flex-col bg-background text-foreground">
       <header className="border-b">
-        <div className="container flex h-14 items-center justify-between">
-          <span className="font-semibold">{t('app.name')}</span>
-          <div className="flex items-center gap-2">
+        <div className="container flex h-14 items-center justify-between px-4 sm:px-6">
+          <span className="font-semibold truncate">{t('app.name')}</span>
+          <div className="flex items-center gap-1 sm:gap-2">
             <ThemeToggle />
             <LangToggle />
           </div>
         </div>
       </header>
-      <main className="flex flex-1 items-center justify-center px-4">
+      <main className="flex flex-1 items-center justify-center px-4 py-8">
         <Card className="w-full max-w-sm">
           <CardHeader>
             <CardTitle>{t('auth.login')}</CardTitle>

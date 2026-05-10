@@ -57,8 +57,8 @@ export default function AdminServerDetail() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{s.name}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl sm:text-2xl font-semibold truncate min-w-0 flex-1">{s.name}</h1>
         <Dialog>
           <DialogTrigger asChild>
             <Button variant="destructive" size="sm">{t('admin.delete')}</Button>
@@ -85,7 +85,7 @@ export default function AdminServerDetail() {
 
       <Card>
         <CardHeader><CardTitle>Identity</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4 text-sm">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
           <KV k="name" v={s.name} />
           <KV k="ssh_host" v={s.ssh_host?.String ?? '-'} />
           <KV k="agent_version" v={s.agent_version?.String ?? '-'} />
@@ -97,7 +97,7 @@ export default function AdminServerDetail() {
         </CardContent>
       </Card>
 
-      <div className="flex gap-2 mb-2">
+      <div className="flex flex-wrap gap-2 mb-2">
         <Button asChild size="sm" variant="outline">
           <Link to={`/admin/files/${id}`}>
             <FolderTree className="h-4 w-4 mr-1" />
@@ -137,7 +137,7 @@ export default function AdminServerDetail() {
 
       <Card>
         <CardHeader><CardTitle>Public visibility</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field
             label="public_alias"
             defaultValue={s.public_alias?.String ?? ''}
@@ -166,7 +166,7 @@ export default function AdminServerDetail() {
       <Card>
         <CardHeader><CardTitle>Operations</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex items-end gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-2">
             <div className="flex-1">
               <Label>{t('admin.config_interval')}</Label>
               <Input
@@ -190,7 +190,7 @@ export default function AdminServerDetail() {
               push
             </Button>
           </div>
-          <div className="flex items-end gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               onClick={async () => {
                 const out = await repair.mutateAsync()
@@ -201,7 +201,7 @@ export default function AdminServerDetail() {
               {t('admin.repair')}
             </Button>
             {repairToken && (
-              <code className="rounded border bg-muted px-2 py-1 text-xs">
+              <code className="rounded border bg-muted px-2 py-1 text-xs break-all max-w-full">
                 {repairToken.token}
               </code>
             )}
@@ -214,7 +214,7 @@ export default function AdminServerDetail() {
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">Telemetry</h2>
         <Tabs value={range} onValueChange={(v) => setRange(v as Range)}>
           <TabsList>

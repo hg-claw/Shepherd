@@ -27,8 +27,8 @@ export default function RecordingPlayerPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">{t('recording.title')}</h1>
-      <div ref={ref} className="border rounded" />
+      <h1 className="text-xl sm:text-2xl font-semibold">{t('recording.title')}</h1>
+      <div ref={ref} className="border rounded overflow-hidden" />
     </div>
   )
 }

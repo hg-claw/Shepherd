@@ -85,6 +85,18 @@
     "pty_max_concurrent_per_admin": "每管理员最大并发终端数",
     "file_upload_max_mb": "最大上传文件大小（MB）"
   },
+  "theme": {
+    "label": "主题",
+    "light": "浅色",
+    "dark": "深色",
+    "system": "跟随系统"
+  },
+  "nav": {
+    "menu": "菜单",
+    "scripts": "脚本",
+    "script_runs": "执行历史",
+    "audit": "审计日志"
+  },
   "common": {
     "loading": "加载中…",
     "error": "出错了",

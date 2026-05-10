@@ -36,9 +36,9 @@ export default function ServerList() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{t('admin.servers')}</h1>
-        <Button asChild>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl sm:text-2xl font-semibold">{t('admin.servers')}</h1>
+        <Button asChild size="sm">
           <Link to="/admin/servers/new">
             <Plus className="mr-1 h-4 w-4" />
             {t('admin.add_server')}
@@ -49,92 +49,98 @@ export default function ServerList() {
         placeholder="filter…"
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
-        className="max-w-xs"
+        className="max-w-full sm:max-w-xs"
       />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('admin.name')}</TableHead>
-            <TableHead>{t('admin.host')}</TableHead>
-            <TableHead>OS</TableHead>
-            <TableHead>Stage</TableHead>
-            <TableHead>{t('admin.agent_last_seen')}</TableHead>
-            <TableHead>CPU</TableHead>
-            <TableHead>MEM</TableHead>
-            <TableHead className="w-32 text-right">{t('admin.actions')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {servers.map((s) => {
-            const online = isOnline(s)
-            const lastSeen = relativeTime(s.agent_last_seen?.Valid ? s.agent_last_seen.Time : null)
-            return (
-              <TableRow key={s.id}>
-                <TableCell className="flex items-center gap-2 font-medium">
-                  <OnlineDot online={online} />
-                  {s.name}
-                </TableCell>
-                <TableCell className="font-mono text-xs">{s.ssh_host?.String ?? '-'}</TableCell>
-                <TableCell className="text-xs">
-                  {s.agent_os?.String ?? '-'}/{s.agent_arch?.String ?? '-'}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={s.install_stage === 'failed' ? 'destructive' : 'default'}>
-                    {s.install_stage}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-xs">
-                  {lastSeen ? t(lastSeen.key, { n: lastSeen.n, lng: i18n.language }) : '-'}
-                </TableCell>
-                <TableCell className="font-mono">
-                  {s.latest?.cpu_pct != null ? `${s.latest.cpu_pct.toFixed(0)}%` : '-'}
-                </TableCell>
-                <TableCell className="font-mono">
-                  {(() => {
-                    const p = pct(s.latest?.mem_used, s.latest?.mem_total)
-                    return p == null ? '-' : `${p.toFixed(0)}%`
-                  })()}
-                </TableCell>
-                <TableCell className="text-right space-x-2">
-                  <Button asChild variant="ghost" size="sm">
-                    <Link to={`/admin/servers/${s.id}`}>{t('admin.details')}</Link>
-                  </Button>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" size="sm" aria-label="delete">
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>{t('admin.delete')}</DialogTitle>
-                        <DialogDescription>
-                          {t('admin.confirm_delete', { name: s.name })}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <DialogFooter>
-                        <Button
-                          variant="destructive"
-                          onClick={async () => {
-                            try {
-                              await del.mutateAsync(s.id)
-                              toast('success', t('common.ok'))
-                            } catch (err: any) {
-                              toast('error', err?.message ?? t('common.error'))
-                            }
-                          }}
-                        >
-                          {t('admin.delete')}
+      <div className="rounded-md border overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('admin.name')}</TableHead>
+              <TableHead className="hidden sm:table-cell">{t('admin.host')}</TableHead>
+              <TableHead className="hidden lg:table-cell">OS</TableHead>
+              <TableHead className="hidden md:table-cell">Stage</TableHead>
+              <TableHead className="hidden lg:table-cell">{t('admin.agent_last_seen')}</TableHead>
+              <TableHead>CPU</TableHead>
+              <TableHead>MEM</TableHead>
+              <TableHead className="w-24 sm:w-32 text-right">{t('admin.actions')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {servers.map((s) => {
+              const online = isOnline(s)
+              const lastSeen = relativeTime(s.agent_last_seen?.Valid ? s.agent_last_seen.Time : null)
+              return (
+                <TableRow key={s.id}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <OnlineDot online={online} />
+                      <span className="truncate max-w-[10rem] sm:max-w-none">{s.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell font-mono text-xs">
+                    {s.ssh_host?.String ?? '-'}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-xs">
+                    {s.agent_os?.String ?? '-'}/{s.agent_arch?.String ?? '-'}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <Badge variant={s.install_stage === 'failed' ? 'destructive' : 'default'}>
+                      {s.install_stage}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-xs">
+                    {lastSeen ? t(lastSeen.key, { n: lastSeen.n, lng: i18n.language }) : '-'}
+                  </TableCell>
+                  <TableCell className="font-mono tabular-nums">
+                    {s.latest?.cpu_pct != null ? `${s.latest.cpu_pct.toFixed(0)}%` : '-'}
+                  </TableCell>
+                  <TableCell className="font-mono tabular-nums">
+                    {(() => {
+                      const p = pct(s.latest?.mem_used, s.latest?.mem_total)
+                      return p == null ? '-' : `${p.toFixed(0)}%`
+                    })()}
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap">
+                    <Button asChild variant="ghost" size="sm" className="px-2">
+                      <Link to={`/admin/servers/${s.id}`}>{t('admin.details')}</Link>
+                    </Button>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" size="sm" aria-label="delete" className="px-2">
+                          <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>{t('admin.delete')}</DialogTitle>
+                          <DialogDescription>
+                            {t('admin.confirm_delete', { name: s.name })}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                          <Button
+                            variant="destructive"
+                            onClick={async () => {
+                              try {
+                                await del.mutateAsync(s.id)
+                                toast('success', t('common.ok'))
+                              } catch (err: any) {
+                                toast('error', err?.message ?? t('common.error'))
+                              }
+                            }}
+                          >
+                            {t('admin.delete')}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   )
 }

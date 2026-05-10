@@ -3,8 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
     <title>Shepherd</title>
+    <script>
+      // Apply theme before React mounts to avoid a flash of the wrong palette.
+      // Mirror the logic in src/components/ThemeToggle.tsx; reads the same
+      // localStorage key that zustand persist writes ("shepherd-ui").
+      (function () {
+        try {
+          var raw = localStorage.getItem('shepherd-ui')
+          var mode = 'system'
+          if (raw) {
+            var parsed = JSON.parse(raw)
+            if (parsed && parsed.state && parsed.state.themeMode) mode = parsed.state.themeMode
+          }
+          var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          var dark = mode === 'dark' || (mode === 'system' && sysDark)
+          if (dark) document.documentElement.classList.add('dark')
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body class="bg-background text-foreground">
     <div id="root"></div>

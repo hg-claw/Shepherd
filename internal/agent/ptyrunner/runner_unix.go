@@ -62,10 +62,11 @@ type SpawnOpts struct {
 }
 
 type Runner struct {
-	sid    string
-	cmd    *exec.Cmd
-	ptmx   *os.File
-	closed atomic.Bool
+	sid      string
+	cmd      *exec.Cmd
+	ptmx     *os.File
+	closed   atomic.Bool
+	readDone chan struct{}
 }
 
 func Spawn(ctx context.Context, opts SpawnOpts, sender Sender) (*Runner, error) {
@@ -128,7 +129,7 @@ func Spawn(ctx context.Context, opts SpawnOpts, sender Sender) (*Runner, error) 
 		return nil, err
 	}
 
-	r := &Runner{sid: opts.SID, cmd: cmd, ptmx: ptmx}
+	r := &Runner{sid: opts.SID, cmd: cmd, ptmx: ptmx, readDone: make(chan struct{})}
 	go r.readLoop(sender)
 	go r.waitLoop(sender)
 	return r, nil
@@ -143,6 +144,7 @@ func Spawn(ctx context.Context, opts SpawnOpts, sender Sender) (*Runner, error) 
 // cannot combine a blocking syscall with a timer in the same goroutine
 // without a channel.
 func (r *Runner) readLoop(sender Sender) {
+	defer close(r.readDone)
 	buf := make([]byte, 16*1024)
 	var (
 		mu      sync.Mutex
@@ -204,6 +206,15 @@ func (r *Runner) waitLoop(sender Sender) {
 		} else {
 			code = -1
 		}
+	}
+	// Wait for the read loop to drain final output before signaling exit;
+	// otherwise admins see the exit banner before the last shell prompt or
+	// `echo` output makes it through. Read loop terminates when ptmx.Read
+	// returns EIO (slave fds closed with the child) or when Close() shuts
+	// the master, with a safety timeout in case neither happens promptly.
+	select {
+	case <-r.readDone:
+	case <-time.After(2 * time.Second):
 	}
 	sender.SendExit(r.sid, code)
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard,
@@ -7,10 +7,11 @@ import {
   Settings as SettingsIcon,
   LogOut,
   Menu,
-  ScrollText,
-  PlayCircle,
-  ListChecks,
   Plus,
+  PlayCircle,
+  FolderTree,
+  Puzzle,
+  Globe,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { LangToggle } from '@/components/LangToggle'
@@ -26,6 +27,8 @@ type NavItem = {
   to: string
   label: string
   icon: React.ComponentType<{ className?: string }>
+  badge?: number
+  external?: boolean
 }
 type NavSection = { label: string; items: NavItem[] }
 
@@ -46,40 +49,45 @@ export function AdminLayout() {
   const logout = useLogout()
   const navigate = useNavigate()
   const loc = useLocation()
+  const params = useParams()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const recentIds = useRecentHosts()
-  // useServers is already cached by react-query — sidebar adds no extra fetch
-  // beyond what ServerList / Dashboard already trigger.
   const serversQuery = useServers({ refetchInterval: 60_000 })
   const recents = recentIds
     .map((id) => serversQuery.data?.find((s) => s.id === id))
     .filter((s): s is NonNullable<typeof s> => Boolean(s))
+  const hostCount = serversQuery.data?.length
 
   const sections: NavSection[] = [
     {
       label: t('nav.section.workspace', 'Workspace'),
       items: [
-        { to: '/admin/dashboard', label: t('admin.dashboard'), icon: LayoutDashboard },
-        { to: '/admin/servers', label: t('admin.servers'), icon: ServerIcon },
+        { to: '/admin/dashboard', label: t('nav.overview', 'Overview'), icon: LayoutDashboard },
+        {
+          to: '/admin/servers',
+          label: t('nav.hosts', 'Hosts'),
+          icon: ServerIcon,
+          badge: hostCount,
+        },
+        { to: '/admin/servers/new', label: t('admin.add_server'), icon: Plus },
+        { to: '/', label: t('nav.public_wall', 'Public wall'), icon: Globe, external: true },
       ],
     },
     {
       label: t('nav.section.ops', 'Operations'),
       items: [
-        { to: '/admin/scripts', label: t('nav.scripts', 'Scripts'), icon: ScrollText },
-        { to: '/admin/script-runs', label: t('nav.script_runs', 'Run history'), icon: PlayCircle },
-        { to: '/admin/audit', label: t('nav.audit', 'Audit log'), icon: ListChecks },
-      ],
-    },
-    {
-      label: t('nav.section.system', 'System'),
-      items: [
+        { to: '/admin/scripts', label: t('nav.batch', 'Batch'), icon: PlayCircle },
+        { to: '/admin/files', label: t('nav.files', 'Files'), icon: FolderTree },
+        { to: '/admin/plugins', label: t('nav.plugins', 'Plugins'), icon: Puzzle },
         { to: '/admin/settings', label: t('admin.settings'), icon: SettingsIcon },
       ],
     },
   ]
 
-  const isActive = (to: string) => loc.pathname === to || loc.pathname.startsWith(to + '/')
+  const isActive = (to: string) => {
+    if (to === '/') return false // Public wall is a separate site; never "active" in admin nav
+    return loc.pathname === to || loc.pathname.startsWith(to + '/')
+  }
 
   const NavList = ({ onNavigate }: { onNavigate?: () => void }) => (
     <nav className="flex flex-col gap-0.5 px-2 py-3">
@@ -90,20 +98,43 @@ export function AdminLayout() {
           </div>
           {sec.items.map((it) => {
             const active = isActive(it.to)
+            const cls = cn(
+              'flex items-center gap-2.5 h-[30px] px-2.5 rounded-md text-[13px] transition-colors',
+              'text-muted-foreground hover:bg-sunken hover:text-foreground',
+              active && 'bg-sunken text-foreground font-medium',
+            )
+            const body = (
+              <>
+                <it.icon className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                <span className="truncate flex-1">{it.label}</span>
+                {it.badge != null && (
+                  <span className="text-fg-dim text-[11px] font-mono">{it.badge}</span>
+                )}
+              </>
+            )
+            if (it.external) {
+              return (
+                <a
+                  key={it.to}
+                  href={it.to}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={onNavigate}
+                  className={cls}
+                >
+                  {body}
+                </a>
+              )
+            }
             return (
               <Link
                 key={it.to}
                 to={it.to}
                 onClick={onNavigate}
                 aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'flex items-center gap-2.5 h-[30px] px-2.5 rounded-md text-[13px] transition-colors',
-                  'text-muted-foreground hover:bg-sunken hover:text-foreground',
-                  active && 'bg-sunken text-foreground font-medium',
-                )}
+                className={cls}
               >
-                <it.icon className="h-3.5 w-3.5 shrink-0 opacity-70" />
-                <span className="truncate">{it.label}</span>
+                {body}
               </Link>
             )
           })}
@@ -150,19 +181,73 @@ export function AdminLayout() {
     navigate('/admin/login')
   }
 
-  // Resolve current page label for breadcrumb. Lookup is best-effort —
-  // unmatched routes fall back to a hyphen, which is rare since every
-  // admin route lives under a known prefix.
-  const crumb = (() => {
-    for (const sec of sections) {
-      for (const it of sec.items) {
-        if (isActive(it.to)) return it.label
-      }
+  // Breadcrumb (3 levels max): Dashboard / <section> / <leaf>. The leaf is
+  // present on host detail pages where the URL has a numeric :id, on script
+  // run detail pages, and on file browser pages — anywhere a sub-resource
+  // identity adds context the section label can't show on its own.
+  type Crumb = { label: string; to?: string }
+  const crumbs: Crumb[] = (() => {
+    const path = loc.pathname
+    const out: Crumb[] = [{ label: t('admin.dashboard'), to: '/admin/dashboard' }]
+    if (path === '/admin/dashboard' || path === '/admin' || path === '/admin/') {
+      return out
     }
-    if (loc.pathname.startsWith('/admin/servers/new')) return t('admin.add_server')
-    if (loc.pathname.startsWith('/admin/files/')) return t('files.title', 'Files')
-    if (loc.pathname.startsWith('/admin/recordings/')) return t('recording.title')
-    return '—'
+    if (path.startsWith('/admin/servers')) {
+      out.push({ label: t('nav.hosts', 'Hosts'), to: '/admin/servers' })
+      if (path === '/admin/servers/new') {
+        out.push({ label: t('admin.add_server') })
+      } else if (params.id || /^\/admin\/servers\/\d+/.test(path)) {
+        const id = Number(path.split('/')[3])
+        const s = serversQuery.data?.find((sv) => sv.id === id)
+        out.push({ label: s?.name ?? `#${id}` })
+      }
+      return out
+    }
+    if (path.startsWith('/admin/scripts')) {
+      out.push({ label: t('nav.batch', 'Batch'), to: '/admin/scripts' })
+      if (path.match(/^\/admin\/scripts\/\d+\/run$/)) {
+        out.push({ label: t('scripts.run', 'Run') })
+      } else if (path === '/admin/scripts/new') {
+        out.push({ label: t('scripts.new', 'New') })
+      } else if (path.match(/^\/admin\/scripts\/\d+/)) {
+        out.push({ label: t('scripts.edit', 'Edit') })
+      }
+      return out
+    }
+    if (path.startsWith('/admin/script-runs')) {
+      out.push({ label: t('nav.script_runs', 'Run history') })
+      if (path.match(/^\/admin\/script-runs\/\d+/)) {
+        out.push({ label: '#' + path.split('/')[3] })
+      }
+      return out
+    }
+    if (path.startsWith('/admin/files')) {
+      out.push({ label: t('nav.files', 'Files'), to: '/admin/files' })
+      const m = path.match(/^\/admin\/files\/(\d+)/)
+      if (m) {
+        const id = Number(m[1])
+        const s = serversQuery.data?.find((sv) => sv.id === id)
+        out.push({ label: s?.name ?? `#${id}` })
+      }
+      return out
+    }
+    if (path.startsWith('/admin/audit')) {
+      out.push({ label: t('audit.title') })
+      return out
+    }
+    if (path.startsWith('/admin/plugins')) {
+      out.push({ label: t('nav.plugins', 'Plugins') })
+      return out
+    }
+    if (path.startsWith('/admin/settings')) {
+      out.push({ label: t('admin.settings') })
+      return out
+    }
+    if (path.startsWith('/admin/recordings')) {
+      out.push({ label: t('recording.title') })
+      return out
+    }
+    return out
   })()
 
   return (
@@ -196,10 +281,32 @@ export function AdminLayout() {
           <BrandMark />
         </div>
 
-        <div className="hidden md:flex items-center gap-2 text-muted-foreground text-[13px] whitespace-nowrap">
-          <span>{t('admin.dashboard')}</span>
-          <span className="text-fg-dim">/</span>
-          <span className="text-foreground font-medium truncate max-w-[20rem]">{crumb}</span>
+        <div className="hidden md:flex items-center gap-2 text-muted-foreground text-[13px] whitespace-nowrap min-w-0 flex-1">
+          {crumbs.map((c, i) => {
+            const last = i === crumbs.length - 1
+            return (
+              <span key={i} className="flex items-center gap-2 min-w-0">
+                {i > 0 && <span className="text-fg-dim shrink-0">/</span>}
+                {c.to && !last ? (
+                  <Link
+                    to={c.to}
+                    className="hover:text-foreground transition-colors truncate"
+                  >
+                    {c.label}
+                  </Link>
+                ) : (
+                  <span
+                    className={cn(
+                      'truncate max-w-[16rem]',
+                      last && 'text-foreground font-medium',
+                    )}
+                  >
+                    {c.label}
+                  </span>
+                )}
+              </span>
+            )
+          })}
         </div>
 
         <div className="ml-auto flex items-center gap-1.5">

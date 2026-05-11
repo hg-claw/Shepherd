@@ -20,6 +20,8 @@ import ScriptRunPage from './pages/admin/ScriptRunPage'
 import ScriptRunsPage from './pages/admin/ScriptRunsPage'
 import ScriptRunDetailPage from './pages/admin/ScriptRunDetailPage'
 import FileBrowserPage from './pages/admin/FileBrowserPage'
+import FilesHubPage from './pages/admin/FilesHubPage'
+import PluginsPage from './pages/admin/PluginsPage'
 import AuditLogPage from './pages/admin/AuditLogPage'
 import RecordingPlayerPage from './pages/admin/RecordingPlayerPage'
 import { ConsoleDock } from './components/ConsoleDock'
@@ -54,7 +56,9 @@ export default function App() {
           <Route path="/admin/scripts/:id/run" element={<ScriptRunPage />} />
           <Route path="/admin/script-runs" element={<ScriptRunsPage />} />
           <Route path="/admin/script-runs/:id" element={<ScriptRunDetailPage />} />
+          <Route path="/admin/files" element={<FilesHubPage />} />
           <Route path="/admin/files/:serverId" element={<FileBrowserPage />} />
+          <Route path="/admin/plugins" element={<PluginsPage />} />
           <Route path="/admin/audit" element={<AuditLogPage />} />
           <Route path="/admin/recordings/:id" element={<RecordingPlayerPage />} />
         </Route>

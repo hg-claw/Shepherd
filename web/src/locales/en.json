@@ -87,6 +87,12 @@
   },
   "nav": {
     "menu": "Menu",
+    "overview": "Overview",
+    "hosts": "Hosts",
+    "public_wall": "Public wall",
+    "batch": "Batch",
+    "files": "Files",
+    "plugins": "Plugins",
     "scripts": "Scripts",
     "script_runs": "Run history",
     "audit": "Audit log",
@@ -97,6 +103,26 @@
       "recent": "Recent hosts"
     },
     "recent_empty": "visit a host to see it here"
+  },
+  "filter": {
+    "all": "All",
+    "ok": "Healthy",
+    "warn": "Warn",
+    "err": "Critical",
+    "offline": "Offline"
+  },
+  "view": {
+    "grid": "Grid",
+    "table": "Table"
+  },
+  "hosts": {
+    "of": "of",
+    "kpi": {
+      "online": "Online",
+      "cpu": "Avg CPU",
+      "mem": "Avg memory",
+      "alerts": "Alerts"
+    }
   },
   "common": {
     "loading": "Loading…",
@@ -148,7 +174,14 @@
     "mtime": "Modified",
     "upload": "Upload",
     "mkdir": "New folder",
-    "preview": "Preview"
+    "preview": "Preview",
+    "hub_sub": "Pick a host to browse its filesystem and transfer files.",
+    "hub_empty": "No hosts available"
+  },
+  "plugins": {
+    "subtitle": "Extend the Shepherd agent with log parsers, extra metric collectors, and alert routers.",
+    "placeholder_title": "Plugin runtime not enabled",
+    "placeholder_body": "This release ships without a plugin host. The plugin sandbox, signed distribution, and per-host enablement are tracked separately."
   },
   "audit": {
     "title": "Audit log",

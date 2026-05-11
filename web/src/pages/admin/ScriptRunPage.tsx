@@ -28,7 +28,7 @@ export default function ScriptRunPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">
+      <h1 className="text-xl sm:text-2xl font-semibold break-all">
         {t('scripts.run', 'Run')}: {script.name}
       </h1>
       <Card>
@@ -50,9 +50,9 @@ export default function ScriptRunPage() {
       <Card>
         <CardContent className="pt-4">
           <Label>{t('scripts.targets', 'Target servers')}</Label>
-          <div className="grid grid-cols-2 gap-1 mt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2 mt-2">
             {(servers ?? []).map((s) => (
-              <label key={s.id} className="flex items-center gap-2">
+              <label key={s.id} className="flex items-center gap-2 min-h-[2rem] cursor-pointer">
                 <input
                   type="checkbox"
                   checked={targets.includes(s.id)}
@@ -61,14 +61,19 @@ export default function ScriptRunPage() {
                       e.target.checked ? [...prev, s.id] : prev.filter((x) => x !== s.id),
                     )
                   }
+                  className="h-4 w-4 accent-primary"
                 />
-                <span className="text-sm">{s.name}</span>
+                <span className="text-sm truncate">{s.name}</span>
               </label>
             ))}
           </div>
         </CardContent>
       </Card>
-      <Button onClick={submit} disabled={targets.length === 0 || run.isPending}>
+      <Button
+        onClick={submit}
+        disabled={targets.length === 0 || run.isPending}
+        className="w-full sm:w-auto"
+      >
         {t('scripts.run_button', 'Run on {{n}} servers', { n: targets.length })}
       </Button>
     </div>

@@ -27,7 +27,7 @@ export default function Wall() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-semibold">{t('wall.title')}</h1>
+      <h1 className="text-xl sm:text-2xl font-semibold">{t('wall.title')}</h1>
       {orderedGroups.map(([group, servers]) => (
         <section key={group} className="space-y-3">
           <h2 className="text-sm uppercase text-muted-foreground">

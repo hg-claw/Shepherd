@@ -51,14 +51,14 @@ export default function AuditLogPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{t('audit.title')}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl sm:text-2xl font-semibold">{t('audit.title')}</h1>
         <Button size="sm" variant="outline" onClick={handleDownloadCSV}>
           <Download className="h-4 w-4 mr-1" />
           CSV
         </Button>
       </div>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
         <Input
           placeholder={t('audit.action_filter')}
           value={action}
@@ -83,34 +83,36 @@ export default function AuditLogPage() {
       {isLoading ? (
         <div>{t('common.loading')}</div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('audit.ts')}</TableHead>
-              <TableHead>{t('audit.action')}</TableHead>
-              <TableHead>{t('audit.admin')}</TableHead>
-              <TableHead>{t('audit.server')}</TableHead>
-              <TableHead>{t('audit.result')}</TableHead>
-              <TableHead>{t('audit.details')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {(data ?? []).map((r) => (
-              <TableRow key={r.id}>
-                <TableCell className="font-mono text-xs">{r.ts}</TableCell>
-                <TableCell className="font-mono text-xs">{r.action}</TableCell>
-                <TableCell>{r.admin_id ?? '-'}</TableCell>
-                <TableCell>{r.server_id ?? '-'}</TableCell>
-                <TableCell className={r.result === 'error' ? 'text-red-500' : ''}>
-                  {r.result}
-                </TableCell>
-                <TableCell className="font-mono text-xs max-w-md truncate">
-                  {r.details}
-                </TableCell>
+        <div className="rounded-md border overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('audit.ts')}</TableHead>
+                <TableHead>{t('audit.action')}</TableHead>
+                <TableHead className="hidden sm:table-cell">{t('audit.admin')}</TableHead>
+                <TableHead className="hidden sm:table-cell">{t('audit.server')}</TableHead>
+                <TableHead>{t('audit.result')}</TableHead>
+                <TableHead className="hidden md:table-cell">{t('audit.details')}</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {(data ?? []).map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="font-mono text-xs whitespace-nowrap">{r.ts}</TableCell>
+                  <TableCell className="font-mono text-xs">{r.action}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{r.admin_id ?? '-'}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{r.server_id ?? '-'}</TableCell>
+                  <TableCell className={r.result === 'error' ? 'text-destructive' : ''}>
+                    {r.result}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell font-mono text-xs max-w-md truncate">
+                    {r.details}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </div>
   )

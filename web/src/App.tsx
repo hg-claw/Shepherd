@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { RequireAdmin } from './components/RequireAdmin'
 
 const Wall = lazy(() => import('./pages/public/Wall'))
@@ -42,6 +42,7 @@ export default function App() {
             </RequireAdmin>
           }
         >
+          <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="/admin/dashboard" element={<Dashboard />} />
           <Route path="/admin/servers" element={<ServerList />} />
           <Route path="/admin/servers/new" element={<ServerNew />} />

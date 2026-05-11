@@ -50,7 +50,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">{t('admin.dashboard')}</h1>
+      <h1 className="text-xl sm:text-2xl font-semibold">{t('admin.dashboard')}</h1>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <SummaryCard label={t('admin.summary.total')} value={total} />
         <SummaryCard label={t('admin.summary.online')} value={online} />

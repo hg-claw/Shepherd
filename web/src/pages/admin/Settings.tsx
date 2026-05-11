@@ -95,11 +95,11 @@ export default function Settings() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">{t('admin.settings')}</h1>
+      <h1 className="text-xl sm:text-2xl font-semibold">{t('admin.settings')}</h1>
       <Card>
         <CardHeader><CardTitle>{t('admin.settings')}</CardTitle></CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-w-md">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-w-full sm:max-w-md">
             <div className="space-y-1">
               <Label>{t('settings.public_display_mode')}</Label>
               <Select value={mode} onValueChange={(v) => setValue('public_display_mode', v as 'raw' | 'level' | 'both')}>
@@ -134,7 +134,7 @@ export default function Settings() {
                 <div className="space-y-1">
                   <Label>{t('settings.file_sandbox_paths')}</Label>
                   <textarea
-                    className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
+                    className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     placeholder="/var/www&#10;/home"
                     {...register('file_sandbox_paths')}
                   />

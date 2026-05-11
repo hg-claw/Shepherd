@@ -33,46 +33,48 @@ export default function ScriptRunDetailPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">
+      <h1 className="text-xl sm:text-2xl font-semibold">
         {t('scripts.run', 'Run')} #{id}
       </h1>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('admin.servers', 'Server')}</TableHead>
-            <TableHead>{t('scripts.status', 'Status')}</TableHead>
-            <TableHead>{t('scripts.exit_code', 'Exit')}</TableHead>
-            <TableHead className="text-right">{t('admin.actions', 'Actions')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {targets.map((tgt) => (
-            <TableRow key={tgt.id}>
-              <TableCell>{serverName(tgt.server_id)}</TableCell>
-              <TableCell>
-                <Badge variant={tgt.status === 'succeeded' ? 'default' : 'secondary'}>
-                  {tgt.status}
-                </Badge>
-              </TableCell>
-              <TableCell>{tgt.exit_code ?? '-'}</TableCell>
-              <TableCell className="text-right">
-                {tgt.status === 'running' && (
-                  <Button size="sm" variant="outline" onClick={() => attach(tgt.server_id)}>
-                    {t('console.attach', 'Attach')}
-                  </Button>
-                )}
-                {tgt.pty_session_id && tgt.status !== 'running' && (
-                  <Button size="sm" variant="ghost" asChild>
-                    <a href={`/admin/recordings/${tgt.pty_session_id}`}>
-                      {t('recording.replay', 'Replay')}
-                    </a>
-                  </Button>
-                )}
-              </TableCell>
+      <div className="rounded-md border overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('admin.servers', 'Server')}</TableHead>
+              <TableHead>{t('scripts.status', 'Status')}</TableHead>
+              <TableHead className="hidden sm:table-cell">{t('scripts.exit_code', 'Exit')}</TableHead>
+              <TableHead className="text-right">{t('admin.actions', 'Actions')}</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {targets.map((tgt) => (
+              <TableRow key={tgt.id}>
+                <TableCell className="truncate max-w-[10rem]">{serverName(tgt.server_id)}</TableCell>
+                <TableCell>
+                  <Badge variant={tgt.status === 'succeeded' ? 'default' : 'secondary'}>
+                    {tgt.status}
+                  </Badge>
+                </TableCell>
+                <TableCell className="hidden sm:table-cell">{tgt.exit_code ?? '-'}</TableCell>
+                <TableCell className="text-right whitespace-nowrap">
+                  {tgt.status === 'running' && (
+                    <Button size="sm" variant="outline" onClick={() => attach(tgt.server_id)}>
+                      {t('console.attach', 'Attach')}
+                    </Button>
+                  )}
+                  {tgt.pty_session_id && tgt.status !== 'running' && (
+                    <Button size="sm" variant="ghost" asChild>
+                      <a href={`/admin/recordings/${tgt.pty_session_id}`}>
+                        {t('recording.replay', 'Replay')}
+                      </a>
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   )
 }

@@ -105,8 +105,8 @@ export default function FileBrowserPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">{t('files.title', 'Files')}</h1>
-      <div className="flex items-center gap-1 text-sm">
+      <h1 className="text-xl sm:text-2xl font-semibold">{t('files.title', 'Files')}</h1>
+      <div className="flex items-center gap-1 text-sm flex-wrap">
         <button onClick={() => setCwd('/')} className="hover:underline">/</button>
         {breadcrumbs.map((p, i) => (
           <span key={i} className="flex items-center gap-1">
@@ -117,36 +117,40 @@ export default function FileBrowserPage() {
           </span>
         ))}
       </div>
-      <div className="flex gap-2">
-        <Input
-          value={pathInput}
-          onChange={(e) => setPathInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') submitPath() }}
-          placeholder="/tmp"
-          className="font-mono"
-        />
-        <Button size="sm" variant="outline" onClick={submitPath} title={t('files.go', 'Go')}>
-          <ArrowRight className="h-4 w-4" />
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4" />
-        </Button>
-        <Button size="sm" variant="outline" onClick={handleMkdir}>
-          <Plus className="h-4 w-4 mr-1" />
-          {t('files.mkdir', 'New folder')}
-        </Button>
-        <label className="inline-flex items-center gap-1 text-sm border rounded px-3 py-1 cursor-pointer hover:bg-muted">
-          <UploadIcon className="h-4 w-4" />
-          {t('files.upload', 'Upload')}
-          <input type="file" multiple onChange={handleUpload} className="hidden" />
-        </label>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex gap-2 flex-1 min-w-0">
+          <Input
+            value={pathInput}
+            onChange={(e) => setPathInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') submitPath() }}
+            placeholder="/tmp"
+            className="font-mono flex-1 min-w-0"
+          />
+          <Button size="sm" variant="outline" onClick={submitPath} title={t('files.go', 'Go')}>
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" variant="outline" onClick={() => refetch()} aria-label="refresh">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleMkdir}>
+            <Plus className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">{t('files.mkdir', 'New folder')}</span>
+          </Button>
+          <label className="inline-flex items-center gap-1 text-sm border rounded px-3 py-1 cursor-pointer hover:bg-muted">
+            <UploadIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">{t('files.upload', 'Upload')}</span>
+            <input type="file" multiple onChange={handleUpload} className="hidden" />
+          </label>
+        </div>
       </div>
       <div className="flex flex-wrap gap-1">
         {QUICK_PATHS.map((p) => (
           <button
             key={p}
             onClick={() => setCwd(p)}
-            className={`px-2 py-0.5 text-xs rounded border ${cwd === p ? 'bg-muted' : 'hover:bg-muted'}`}
+            className={`px-2 py-0.5 text-xs rounded border transition-colors ${cwd === p ? 'bg-muted' : 'hover:bg-muted'}`}
           >
             {p}
           </button>
@@ -159,60 +163,65 @@ export default function FileBrowserPage() {
           {(error as Error).message}
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('files.name', 'Name')}</TableHead>
-              <TableHead className="text-right">{t('files.size', 'Size')}</TableHead>
-              <TableHead>{t('files.mode', 'Mode')}</TableHead>
-              <TableHead>{t('files.mtime', 'Modified')}</TableHead>
-              <TableHead className="text-right">{t('admin.actions', 'Actions')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {(data ?? []).map((entry) => (
-              <TableRow key={entry.name}>
-                <TableCell className="flex items-center gap-2">
-                  {entry.is_dir ? <Folder className="h-4 w-4" /> : <FileIcon className="h-4 w-4" />}
-                  <button onClick={() => enter(entry)} className="hover:underline">
-                    {entry.name}
-                  </button>
-                </TableCell>
-                <TableCell className="text-right text-xs">
-                  {entry.is_dir ? '-' : formatSize(entry.size)}
-                </TableCell>
-                <TableCell className="font-mono text-xs">{formatMode(entry.mode)}</TableCell>
-                <TableCell className="text-xs">
-                  {new Date(entry.mtime * 1000).toLocaleString()}
-                </TableCell>
-                <TableCell className="text-right">
-                  {!entry.is_dir && (
-                    <Button size="icon" variant="ghost" asChild>
-                      <a
-                        href={downloadFileURL(
-                          sid,
-                          cwd === '/' ? `/${entry.name}` : `${cwd}/${entry.name}`,
-                        )}
-                      >
-                        <Download className="h-4 w-4" />
-                      </a>
-                    </Button>
-                  )}
-                  <Button size="icon" variant="ghost" onClick={() => handleRm(entry)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TableCell>
+        <div className="rounded-md border overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('files.name', 'Name')}</TableHead>
+                <TableHead className="text-right">{t('files.size', 'Size')}</TableHead>
+                <TableHead className="hidden sm:table-cell">{t('files.mode', 'Mode')}</TableHead>
+                <TableHead className="hidden md:table-cell">{t('files.mtime', 'Modified')}</TableHead>
+                <TableHead className="text-right">{t('admin.actions', 'Actions')}</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {(data ?? []).map((entry) => (
+                <TableRow key={entry.name}>
+                  <TableCell>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {entry.is_dir ? <Folder className="h-4 w-4 shrink-0" /> : <FileIcon className="h-4 w-4 shrink-0" />}
+                      <button onClick={() => enter(entry)} className="hover:underline truncate text-left">
+                        {entry.name}
+                      </button>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right text-xs whitespace-nowrap tabular-nums">
+                    {entry.is_dir ? '-' : formatSize(entry.size)}
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell font-mono text-xs">{formatMode(entry.mode)}</TableCell>
+                  <TableCell className="hidden md:table-cell text-xs whitespace-nowrap">
+                    {new Date(entry.mtime * 1000).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap">
+                    {!entry.is_dir && (
+                      <Button size="icon" variant="ghost" asChild>
+                        <a
+                          href={downloadFileURL(
+                            sid,
+                            cwd === '/' ? `/${entry.name}` : `${cwd}/${entry.name}`,
+                          )}
+                          aria-label="download"
+                        >
+                          <Download className="h-4 w-4" />
+                        </a>
+                      </Button>
+                    )}
+                    <Button size="icon" variant="ghost" onClick={() => handleRm(entry)} aria-label="delete">
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-4xl w-[calc(100vw-2rem)]">
           <DialogHeader>
-            <DialogTitle>{previewName}</DialogTitle>
+            <DialogTitle className="break-all">{previewName}</DialogTitle>
           </DialogHeader>
-          <pre className="font-mono text-xs whitespace-pre-wrap overflow-auto max-h-96 bg-muted p-2">
+          <pre className="font-mono text-xs whitespace-pre-wrap overflow-auto max-h-[60vh] bg-muted p-2">
             {previewText}
           </pre>
         </DialogContent>

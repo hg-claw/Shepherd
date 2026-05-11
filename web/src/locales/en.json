@@ -66,6 +66,18 @@
     "pty_max_concurrent_per_admin": "Max concurrent PTY sessions per admin",
     "file_upload_max_mb": "Max file upload size (MB)"
   },
+  "theme": {
+    "label": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "nav": {
+    "menu": "Menu",
+    "scripts": "Scripts",
+    "script_runs": "Run history",
+    "audit": "Audit log"
+  },
   "common": {
     "loading": "Loading…",
     "error": "Error",

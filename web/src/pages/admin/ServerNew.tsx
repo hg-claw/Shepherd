@@ -60,14 +60,14 @@ export default function ServerNew() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">{t('admin.add_server')}</h1>
+      <h1 className="text-xl sm:text-2xl font-semibold">{t('admin.add_server')}</h1>
       <Card>
         <CardHeader><CardTitle>SSH</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <Field id="name" label={t('admin.name')} {...register('name')} error={errors.name?.message} />
-            <div className="grid grid-cols-3 gap-3">
-              <Field id="ssh_host" label="ssh_host" {...register('ssh_host')} error={errors.ssh_host?.message} className="col-span-2" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Field id="ssh_host" label="ssh_host" {...register('ssh_host')} error={errors.ssh_host?.message} className="sm:col-span-2" />
               <Field id="ssh_port" label="port" type="number" {...register('ssh_port')} error={errors.ssh_port?.message} />
             </div>
             <Field id="ssh_user" label="ssh_user" {...register('ssh_user')} error={errors.ssh_user?.message} />
@@ -77,7 +77,7 @@ export default function ServerNew() {
               <textarea
                 id="ssh_key"
                 rows={5}
-                className="block w-full rounded border bg-background px-3 py-2 font-mono text-xs"
+                className="block w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 {...register('ssh_key')}
               />
               <p className="text-xs text-muted-foreground">
@@ -94,7 +94,7 @@ export default function ServerNew() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Field id="public_alias" label="public_alias" {...register('public_alias')} />
               <Field id="public_group" label="public_group" {...register('public_group')} />
               <Field id="country_code" label="country_code (XX)" {...register('country_code')} error={errors.country_code?.message} />
@@ -103,7 +103,7 @@ export default function ServerNew() {
               <Switch checked={show} onCheckedChange={(v) => setValue('show_on_public', v)} id="show_on_public" />
               <Label htmlFor="show_on_public">show_on_public</Label>
             </div>
-            <Button type="submit" disabled={isSubmitting}>{t('admin.add_server')}</Button>
+            <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">{t('admin.add_server')}</Button>
           </form>
         </CardContent>
       </Card>

@@ -1,9 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Card, CardContent } from './ui/card'
 import { CountryFlag } from './CountryFlag'
-import { OnlineDot } from './OnlineDot'
-import { MetricBadge, type DisplayMode } from './MetricBadge'
+import { type DisplayMode } from './MetricBadge'
 import type { PublicCard } from '@/api/public'
 import { cn } from '@/lib/utils'
 import { relativeTime } from '@/lib/time'
@@ -13,70 +11,63 @@ type Props = {
   mode: DisplayMode
 }
 
-export function MetricCard({ card, mode }: Props) {
-  const { t } = useTranslation()
-  const offline = !card.online
-  const latest = card.latest
+// Highest individual metric % decides the tile's status border.
+// Threshold matches `internal/serversvc/thresholds`: 80% warn, 92% alert.
+function tileStatus(card: PublicCard): 'ok' | 'warn' | 'err' | 'offline' {
+  if (!card.online) return 'offline'
+  const l = card.latest
+  if (!l) return 'ok'
+  const top = Math.max(l.cpu_pct ?? 0, l.mem_pct ?? 0, ...(l.disks_pct ?? []))
+  if (top >= 92) return 'err'
+  if (top >= 80) return 'warn'
+  return 'ok'
+}
 
+export function MetricCard({ card, mode: _mode }: Props) {
+  const { t } = useTranslation()
+  const latest = card.latest
   const lastSeen = relativeTime(latest?.ts)
   const lastSeenLabel = lastSeen ? t(lastSeen.key, { n: lastSeen.n }) : '-'
+  const status = tileStatus(card)
+  const cpu = latest?.cpu_pct ?? null
+  const mem = latest?.mem_pct ?? null
+  const disk = latest?.disks_pct?.[0] ?? null
 
-  const cpuPct = latest?.cpu_pct ?? null
-  const memPct = latest?.mem_pct ?? null
-  const diskPct = latest?.disks_pct?.[0] ?? null
+  // Pick the headline metric to show large — CPU when online, mute when offline.
+  const headline = status === 'offline' ? '—' : cpu != null ? `${cpu.toFixed(0)}%` : '—'
 
   return (
     <Link to={`/public/servers/${card.id}`} className="block group">
-      <Card
+      <div
         className={cn(
-          'relative overflow-hidden transition-[border-color,box-shadow] duration-200 hover:border-primary dark:group-hover:shadow-[0_0_24px_-6px_hsl(var(--glow-primary)/0.45)]',
-          offline && 'opacity-60',
+          'relative bg-elev border rounded-lg px-3 py-2.5 transition-colors hover:border-primary',
+          status === 'ok' && 'border-[hsl(var(--ok)/0.3)]',
+          status === 'warn' && 'border-[hsl(var(--warn)/0.5)]',
+          status === 'err' && 'border-[hsl(var(--err)/0.5)]',
+          status === 'offline' && 'opacity-60',
         )}
       >
-        <span
-          aria-hidden
+        <div className="flex items-center gap-2">
+          <CountryFlag code={card.country_code} />
+          <span className="font-mono text-[11.5px] text-muted-foreground truncate">{card.alias}</span>
+        </div>
+        <div
           className={cn(
-            'absolute left-0 top-0 h-full w-0.5',
-            card.online ? 'bg-level-low dark:shadow-[0_0_8px_hsl(var(--level-low)/0.7)]' : 'bg-level-alert',
+            'font-mono text-[22px] mt-0.5 tracking-tight tabular-nums leading-none',
+            status === 'warn' && 'text-warn',
+            status === 'err' && 'text-err',
           )}
-        />
-        <CardContent className="space-y-3 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CountryFlag code={card.country_code} />
-              <span className="font-medium">{card.alias}</span>
-            </div>
-            <OnlineDot online={card.online} />
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{t('metric.cpu')}</span>
-              <MetricBadge metric="cpu" mode={mode} kind="pct" value={cpuPct} />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{t('metric.mem')}</span>
-              <MetricBadge metric="mem" mode={mode} kind="pct" value={memPct} />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{t('metric.disk')}</span>
-              <MetricBadge metric="disk" mode={mode} kind="pct" value={diskPct} />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{t('metric.net')}</span>
-              <MetricBadge
-                metric="net"
-                mode={mode}
-                kind="net"
-                rxBps={latest?.net_rx_bps ?? 0}
-                txBps={latest?.net_tx_bps ?? 0}
-              />
-            </div>
-          </div>
-          {offline && latest && (
-            <div className="text-xs text-muted-foreground">{lastSeenLabel}</div>
-          )}
-        </CardContent>
-      </Card>
+        >
+          {headline}
+        </div>
+        <div className="flex gap-2 mt-1.5 font-mono text-[10.5px] text-fg-dim">
+          <span>MEM {mem != null ? `${mem.toFixed(0)}%` : '—'}</span>
+          {disk != null && <span>DSK {disk.toFixed(0)}%</span>}
+        </div>
+        {status === 'offline' && (
+          <div className="mt-1.5 text-[10.5px] text-fg-dim font-mono">{lastSeenLabel}</div>
+        )}
+      </div>
     </Link>
   )
 }

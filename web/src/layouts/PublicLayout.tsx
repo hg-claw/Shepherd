@@ -7,24 +7,22 @@ export function PublicLayout() {
   const { t } = useTranslation()
   return (
     <div className="min-h-dvh flex flex-col bg-background text-foreground">
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75">
-        <div className="container flex h-14 items-center justify-between px-4 sm:px-6">
-          <Link to="/" className="flex items-center gap-2 font-mono">
-            <span
-              className="inline-block h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--glow-primary)/0.7)]"
-              aria-hidden
-            />
-            <span className="text-muted-foreground text-sm">[</span>
-            <span className="text-sm font-semibold tracking-[0.18em] uppercase">{t('app.name')}</span>
-            <span className="text-muted-foreground text-sm">]</span>
+      <header className="sticky top-0 z-30 h-12 border-b bg-elev">
+        <div className="container flex h-full items-center justify-between px-4 sm:px-6">
+          <Link to="/" className="flex items-center gap-2.5">
+            <span className="grid place-items-center h-[22px] w-[22px] rounded-[5px] bg-foreground text-background font-mono font-bold text-[12px]">
+              Sh
+            </span>
+            <span className="font-semibold tracking-tight text-[14px]">{t('app.name')}</span>
+            <span className="text-fg-dim font-mono text-[11.5px] ml-1">/ status</span>
           </Link>
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-1 sm:gap-1.5">
             <ThemeToggle />
             <LangToggle />
           </div>
         </div>
       </header>
-      <main className="container flex-1 px-4 sm:px-6 py-4 sm:py-6">
+      <main className="container flex-1 px-4 sm:px-6 py-5 sm:py-6">
         <Outlet />
       </main>
     </div>

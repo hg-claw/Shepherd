@@ -2,67 +2,85 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tech / sci-fi palette: deep space blue base, electric cyan accent.
-   Both modes share the same hue family so the theme feels cohesive when
-   switching. Levels (low/mid/high/alert) tuned for status indicators on
-   the public wall and dashboards. */
+/* Linear / Vercel-style ops console palette. Warm-neutral light surface,
+   near-black dark surface, OKLCH blue accent. Token names map onto the
+   shadcn convention (HSL components only) so all existing utility
+   classes keep working; values shifted to match the Shepherd design. */
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 215 30% 12%;
+    --background: 60 14% 98%;          /* #fbfbfa */
+    --foreground: 240 6% 10%;           /* #18181b */
     --card: 0 0% 100%;
-    --card-foreground: 215 30% 12%;
+    --card-foreground: 240 6% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 215 30% 12%;
-    --primary: 195 90% 38%;
+    --popover-foreground: 240 6% 10%;
+    --primary: 217 89% 47%;             /* oklch(0.55 0.18 240) ≈ blue 600 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 30% 94%;
-    --secondary-foreground: 215 30% 12%;
-    --muted: 210 30% 95%;
-    --muted-foreground: 215 16% 42%;
-    --accent: 195 80% 92%;
-    --accent-foreground: 195 90% 22%;
-    --destructive: 0 75% 50%;
+    --secondary: 60 9% 95%;             /* #f4f4f2 — sunken */
+    --secondary-foreground: 240 6% 10%;
+    --muted: 60 9% 95%;
+    --muted-foreground: 0 0% 42%;       /* #6b6b6b */
+    --accent: 215 87% 95%;              /* accent-soft */
+    --accent-foreground: 217 89% 36%;
+    --destructive: 0 78% 50%;
     --destructive-foreground: 0 0% 100%;
-    --border: 210 24% 88%;
-    --input: 210 24% 88%;
-    --ring: 195 90% 38%;
-    --radius: 0.5rem;
-    --level-low: 152 64% 38%;
-    --level-mid: 38 92% 50%;
-    --level-high: 22 95% 55%;
-    --level-alert: 0 75% 50%;
-    /* Glow + grid customization */
-    --glow-primary: 195 90% 50%;
-    --grid-line: 210 30% 90%;
+    --border: 45 13% 89%;               /* #e7e6e1 */
+    --input: 45 13% 89%;
+    --ring: 217 89% 47%;
+    --radius: 0.375rem;                 /* 6px to match design --radius */
+    /* Surfaces for elevated/sunken slots not present in shadcn defaults. */
+    --bg-elev: 0 0% 100%;
+    --bg-sunken: 60 9% 95%;
+    --border-strong: 45 11% 82%;        /* #d6d4cd */
+    --fg-dim: 45 4% 58%;                /* #97978f */
+    /* Status semantic */
+    --ok: 145 53% 41%;
+    --ok-soft: 145 50% 94%;
+    --warn: 38 87% 53%;
+    --warn-soft: 38 80% 94%;
+    --err: 0 78% 50%;
+    --err-soft: 0 75% 95%;
+    /* Legacy "level" tokens kept for MetricBadge/thresholds.ts mappings */
+    --level-low: 145 53% 41%;
+    --level-mid: 38 87% 53%;
+    --level-high: 22 90% 53%;
+    --level-alert: 0 78% 50%;
   }
 
   .dark {
-    --background: 222 35% 5%;
-    --foreground: 200 25% 96%;
-    --card: 222 30% 8%;
-    --card-foreground: 200 25% 96%;
-    --popover: 222 30% 9%;
-    --popover-foreground: 200 25% 96%;
-    --primary: 188 95% 55%;
-    --primary-foreground: 222 35% 5%;
-    --secondary: 220 25% 14%;
-    --secondary-foreground: 200 25% 96%;
-    --muted: 220 25% 13%;
-    --muted-foreground: 215 16% 64%;
-    --accent: 220 30% 16%;
-    --accent-foreground: 188 95% 75%;
-    --destructive: 0 75% 55%;
+    --background: 240 4% 5%;            /* #0c0c0d */
+    --foreground: 60 3% 93%;            /* #ededec */
+    --card: 240 5% 8%;                  /* #131315 */
+    --card-foreground: 60 3% 93%;
+    --popover: 240 5% 8%;
+    --popover-foreground: 60 3% 93%;
+    --primary: 213 92% 67%;             /* oklch(0.72 0.17 240) — brighter for dark */
+    --primary-foreground: 240 6% 5%;
+    --secondary: 240 6% 10%;            /* #18181b */
+    --secondary-foreground: 60 3% 93%;
+    --muted: 240 6% 10%;
+    --muted-foreground: 0 0% 63%;       /* #a0a0a0 */
+    --accent: 217 35% 18%;
+    --accent-foreground: 213 92% 80%;
+    --destructive: 0 72% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 22% 18%;
-    --input: 220 22% 18%;
-    --ring: 188 95% 55%;
-    --level-low: 152 70% 50%;
-    --level-mid: 42 95% 60%;
-    --level-high: 22 95% 60%;
-    --level-alert: 0 80% 62%;
-    --glow-primary: 188 95% 55%;
-    --grid-line: 220 30% 14%;
+    --border: 240 6% 15%;               /* #232327 */
+    --input: 240 6% 15%;
+    --ring: 213 92% 67%;
+    --bg-elev: 240 5% 8%;
+    --bg-sunken: 240 6% 10%;
+    --border-strong: 240 6% 19%;
+    --fg-dim: 0 0% 42%;
+    --ok: 145 50% 55%;
+    --ok-soft: 145 30% 14%;
+    --warn: 38 85% 60%;
+    --warn-soft: 38 30% 14%;
+    --err: 0 75% 65%;
+    --err-soft: 0 30% 16%;
+    --level-low: 145 50% 55%;
+    --level-mid: 38 85% 60%;
+    --level-high: 22 85% 60%;
+    --level-alert: 0 75% 65%;
   }
 }
 
@@ -72,40 +90,36 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Geist', -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', Roboto, sans-serif;
+    font-size: 13.5px;
+    line-height: 1.45;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
   }
-  code, pre, kbd, samp, .font-mono {
-    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, Consolas, monospace;
-    font-feature-settings: 'calt' 1, 'liga' 1;
+  code, pre, kbd, samp, .font-mono, .num {
+    font-family: 'Geist Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-feature-settings: 'zero', 'ss01';
   }
-
-  /* Subtle blueprint-grid background — visible only in dark mode where it
-     adds depth without distracting from content. Honors reduced-motion
-     and stays crisp because it's pure CSS gradients. */
-  .dark body {
-    background-image:
-      linear-gradient(hsl(var(--grid-line) / 0.5) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(var(--grid-line) / 0.5) 1px, transparent 1px);
-    background-size: 32px 32px;
-    background-position: -1px -1px;
-    background-attachment: fixed;
+  .num {
+    font-variant-numeric: tabular-nums;
   }
 }
 
 @layer utilities {
-  .glow-primary {
-    box-shadow:
-      0 0 0 1px hsl(var(--glow-primary) / 0.35),
-      0 0 18px -2px hsl(var(--glow-primary) / 0.45);
+  /* Surface helpers tied to the new bg-elev / bg-sunken tokens. */
+  .bg-elev { background-color: hsl(var(--bg-elev)); }
+  .bg-sunken { background-color: hsl(var(--bg-sunken)); }
+  .border-strong { border-color: hsl(var(--border-strong)); }
+  .text-fg-dim { color: hsl(var(--fg-dim)); }
+
+  /* Status pill pulse — animates the dot inside .pill */
+  @keyframes shep-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
   }
-  .text-glow {
-    text-shadow: 0 0 8px hsl(var(--glow-primary) / 0.5);
-  }
-  /* Hairline border that survives 1.5x DPI without doubling. */
-  .ring-hairline {
-    box-shadow: inset 0 0 0 1px hsl(var(--border));
-  }
+  .shep-pulse { animation: shep-pulse 2.4s ease-in-out infinite; }
+  .shep-pulse-warn { animation: shep-pulse 1.8s ease-in-out infinite; }
+  .shep-pulse-err { animation: shep-pulse 1.2s ease-in-out infinite; }
   @media (prefers-reduced-motion: reduce) {
-    .glow-primary { box-shadow: 0 0 0 1px hsl(var(--border)); }
+    .shep-pulse, .shep-pulse-warn, .shep-pulse-err { animation: none; }
   }
 }

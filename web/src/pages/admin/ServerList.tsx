@@ -6,18 +6,52 @@ import { useServers, useDeleteServer, type ServerWithLatest } from '@/api/server
 import { useUI } from '@/store/ui'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
+import { Pill, type PillKind } from '@/components/Pill'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
-import { OnlineDot } from '@/components/OnlineDot'
 import { pct } from '@/lib/bytes'
 import { relativeTime } from '@/lib/time'
+import { cn } from '@/lib/utils'
 
 function isOnline(s: ServerWithLatest): boolean {
   if (!s.agent_last_seen?.Valid) return false
   return Date.now() - new Date(s.agent_last_seen.Time).getTime() <= 90 * 1000
+}
+
+function stageKind(stage: string): PillKind {
+  if (stage === 'failed') return 'err'
+  if (stage === 'installing' || stage === 'pending') return 'warn'
+  if (stage === 'installed' || stage === 'done') return 'ok'
+  return 'neutral'
+}
+
+function pctKind(v: number | null | undefined): 'ok' | 'warn' | 'err' {
+  if (v == null) return 'ok'
+  if (v >= 92) return 'err'
+  if (v >= 80) return 'warn'
+  return 'ok'
+}
+
+function Bar({ value }: { value: number | null | undefined }) {
+  if (value == null) return <span className="text-fg-dim">—</span>
+  const k = pctKind(value)
+  return (
+    <div className="flex items-center gap-2">
+      <div className="inline-block w-[78px] h-1.5 rounded-[3px] bg-sunken relative overflow-hidden align-middle">
+        <i
+          className={cn(
+            'absolute left-0 top-0 bottom-0 rounded-[3px]',
+            k === 'ok' && 'bg-primary',
+            k === 'warn' && 'bg-warn',
+            k === 'err' && 'bg-err',
+          )}
+          style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+        />
+      </div>
+      <span className="font-mono tabular-nums text-[12.5px]">{value.toFixed(0)}%</span>
+    </div>
+  )
 }
 
 export default function ServerList() {
@@ -27,7 +61,7 @@ export default function ServerList() {
   const del = useDeleteServer()
   const toast = useUI((s) => s.toast)
 
-  if (isLoading) return <div>{t('common.loading')}</div>
+  if (isLoading) return <div className="text-muted-foreground">{t('common.loading')}</div>
   const servers = (data ?? []).filter((s) => {
     if (!filter) return true
     const f = filter.toLowerCase()
@@ -36,78 +70,87 @@ export default function ServerList() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl sm:text-2xl font-semibold">{t('admin.servers')}</h1>
-        <Button asChild size="sm">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h1 className="text-[22px] font-semibold tracking-tight m-0">{t('admin.servers')}</h1>
+          <p className="text-muted-foreground text-[13px] mt-1">{servers.length} hosts</p>
+        </div>
+        <Button asChild size="sm" className="h-8">
           <Link to="/admin/servers/new">
-            <Plus className="mr-1 h-4 w-4" />
+            <Plus className="mr-1 h-3.5 w-3.5" />
             {t('admin.add_server')}
           </Link>
         </Button>
       </div>
-      <Input
-        placeholder="filter…"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        className="max-w-full sm:max-w-xs"
-      />
-      <div className="rounded-md border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('admin.name')}</TableHead>
-              <TableHead className="hidden sm:table-cell">{t('admin.host')}</TableHead>
-              <TableHead className="hidden lg:table-cell">OS</TableHead>
-              <TableHead className="hidden md:table-cell">Stage</TableHead>
-              <TableHead className="hidden lg:table-cell">{t('admin.agent_last_seen')}</TableHead>
-              <TableHead>CPU</TableHead>
-              <TableHead>MEM</TableHead>
-              <TableHead className="w-24 sm:w-32 text-right">{t('admin.actions')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+      <div className="flex items-center gap-2 flex-wrap">
+        <Input
+          placeholder={t('common.filter', 'Filter…')}
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="max-w-full sm:max-w-[260px] h-8 text-[13px]"
+        />
+      </div>
+      <div className="rounded-lg border bg-elev overflow-x-auto">
+        <table className="w-full border-collapse text-[13px]">
+          <thead>
+            <tr className="text-left">
+              <Th>{t('admin.name')}</Th>
+              <Th className="hidden md:table-cell">{t('admin.host')}</Th>
+              <Th className="hidden lg:table-cell">OS</Th>
+              <Th className="hidden md:table-cell">Stage</Th>
+              <Th className="hidden lg:table-cell">{t('admin.agent_last_seen')}</Th>
+              <Th>CPU</Th>
+              <Th className="hidden sm:table-cell">MEM</Th>
+              <Th className="text-right">{t('admin.actions')}</Th>
+            </tr>
+          </thead>
+          <tbody>
             {servers.map((s) => {
               const online = isOnline(s)
               const lastSeen = relativeTime(s.agent_last_seen?.Valid ? s.agent_last_seen.Time : null)
+              const memPct = pct(s.latest?.mem_used, s.latest?.mem_total)
               return (
-                <TableRow key={s.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <OnlineDot online={online} />
-                      <span className="truncate max-w-[10rem] sm:max-w-none">{s.name}</span>
+                <tr key={s.id} className="border-t hover:bg-sunken/60 cursor-pointer">
+                  <Td>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className={cn(
+                          'inline-block h-1.5 w-1.5 rounded-full shrink-0',
+                          online
+                            ? 'bg-ok shadow-[0_0_0_3px_hsl(var(--ok-soft))] motion-safe:shep-pulse'
+                            : 'bg-err shadow-[0_0_0_3px_hsl(var(--err-soft))]',
+                        )}
+                      />
+                      <Link
+                        to={`/admin/servers/${s.id}`}
+                        className="font-mono font-medium truncate hover:underline"
+                      >
+                        {s.name}
+                      </Link>
                     </div>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell font-mono text-xs">
-                    {s.ssh_host?.String ?? '-'}
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-xs">
-                    {s.agent_os?.String ?? '-'}/{s.agent_arch?.String ?? '-'}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <Badge variant={s.install_stage === 'failed' ? 'destructive' : 'default'}>
-                      {s.install_stage}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-xs">
-                    {lastSeen ? t(lastSeen.key, { n: lastSeen.n, lng: i18n.language }) : '-'}
-                  </TableCell>
-                  <TableCell className="font-mono tabular-nums">
-                    {s.latest?.cpu_pct != null ? `${s.latest.cpu_pct.toFixed(0)}%` : '-'}
-                  </TableCell>
-                  <TableCell className="font-mono tabular-nums">
-                    {(() => {
-                      const p = pct(s.latest?.mem_used, s.latest?.mem_total)
-                      return p == null ? '-' : `${p.toFixed(0)}%`
-                    })()}
-                  </TableCell>
-                  <TableCell className="text-right whitespace-nowrap">
-                    <Button asChild variant="ghost" size="sm" className="px-2">
+                  </Td>
+                  <Td className="hidden md:table-cell font-mono text-[12px] text-muted-foreground">
+                    {s.ssh_host?.String ?? '—'}
+                  </Td>
+                  <Td className="hidden lg:table-cell font-mono text-[12px] text-fg-dim">
+                    {s.agent_os?.String ?? '—'}/{s.agent_arch?.String ?? '—'}
+                  </Td>
+                  <Td className="hidden md:table-cell">
+                    <Pill kind={stageKind(s.install_stage)}>{s.install_stage}</Pill>
+                  </Td>
+                  <Td className="hidden lg:table-cell text-[12px] text-muted-foreground">
+                    {lastSeen ? t(lastSeen.key, { n: lastSeen.n, lng: i18n.language }) : '—'}
+                  </Td>
+                  <Td><Bar value={s.latest?.cpu_pct} /></Td>
+                  <Td className="hidden sm:table-cell"><Bar value={memPct} /></Td>
+                  <Td className="text-right whitespace-nowrap">
+                    <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-[12.5px]">
                       <Link to={`/admin/servers/${s.id}`}>{t('admin.details')}</Link>
                     </Button>
                     <Dialog>
                       <DialogTrigger asChild>
-                        <Button variant="ghost" size="sm" aria-label="delete" className="px-2">
-                          <Trash2 className="h-4 w-4 text-destructive" />
+                        <Button variant="ghost" size="sm" aria-label="delete" className="h-7 w-7 p-0">
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
@@ -134,13 +177,29 @@ export default function ServerList() {
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
-                  </TableCell>
-                </TableRow>
+                  </Td>
+                </tr>
               )
             })}
-          </TableBody>
-        </Table>
+          </tbody>
+        </table>
       </div>
     </div>
   )
+}
+
+function Th({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <th
+      className={cn(
+        'font-medium text-muted-foreground text-[11px] uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0',
+        className,
+      )}
+    >
+      {children}
+    </th>
+  )
+}
+function Td({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <td className={cn('px-3.5 py-2.5 align-middle', className)}>{children}</td>
 }

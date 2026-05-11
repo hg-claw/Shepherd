@@ -10,10 +10,14 @@
   },
   "wall": {
     "title": "Server status",
+    "subtitle": "Public health overview — identifying data redacted.",
     "online": "online",
     "offline": "offline",
     "no_servers": "No public servers",
-    "ungrouped": "Ungrouped"
+    "ungrouped": "Ungrouped",
+    "stat": {
+      "total": "Hosts"
+    }
   },
   "metric": { "cpu": "CPU", "mem": "Memory", "disk": "Disk", "net": "Network", "load": "Load", "tcp": "TCP" },
   "level": { "low": "low", "mid": "med", "high": "high", "alert": "alert" },
@@ -76,7 +80,12 @@
     "menu": "Menu",
     "scripts": "Scripts",
     "script_runs": "Run history",
-    "audit": "Audit log"
+    "audit": "Audit log",
+    "section": {
+      "workspace": "Workspace",
+      "ops": "Operations",
+      "system": "System"
+    }
   },
   "common": {
     "loading": "Loading…",

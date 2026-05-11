@@ -50,11 +50,27 @@ const config: Config = {
           high: 'hsl(var(--level-high))',
           alert: 'hsl(var(--level-alert))',
         },
+        ok: {
+          DEFAULT: 'hsl(var(--ok))',
+          soft: 'hsl(var(--ok-soft))',
+        },
+        warn: {
+          DEFAULT: 'hsl(var(--warn))',
+          soft: 'hsl(var(--warn-soft))',
+        },
+        err: {
+          DEFAULT: 'hsl(var(--err))',
+          soft: 'hsl(var(--err-soft))',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+      },
+      fontFamily: {
+        sans: ['Geist', 'system-ui', 'sans-serif'],
+        mono: ['"Geist Mono"', '"JetBrains Mono"', 'ui-monospace', 'monospace'],
       },
     },
   },

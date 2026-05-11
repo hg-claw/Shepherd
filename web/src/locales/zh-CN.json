@@ -13,10 +13,14 @@
   },
   "wall": {
     "title": "服务器状态",
+    "subtitle": "公开健康度概览 — 已脱敏",
     "online": "在线",
     "offline": "离线",
     "no_servers": "暂无公开展示的服务器",
-    "ungrouped": "未分组"
+    "ungrouped": "未分组",
+    "stat": {
+      "total": "节点"
+    }
   },
   "metric": {
     "cpu": "CPU",
@@ -95,7 +99,12 @@
     "menu": "菜单",
     "scripts": "脚本",
     "script_runs": "执行历史",
-    "audit": "审计日志"
+    "audit": "审计日志",
+    "section": {
+      "workspace": "工作区",
+      "ops": "运维",
+      "system": "系统"
+    }
   },
   "common": {
     "loading": "加载中…",

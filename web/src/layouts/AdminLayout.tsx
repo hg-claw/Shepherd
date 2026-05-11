@@ -18,6 +18,8 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { useAuth } from '@/store/auth'
 import { useLogout } from '@/api/auth'
+import { useServers } from '@/api/servers'
+import { useRecentHosts } from '@/hooks/use-recent-hosts'
 import { cn } from '@/lib/utils'
 
 type NavItem = {
@@ -45,6 +47,13 @@ export function AdminLayout() {
   const navigate = useNavigate()
   const loc = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const recentIds = useRecentHosts()
+  // useServers is already cached by react-query — sidebar adds no extra fetch
+  // beyond what ServerList / Dashboard already trigger.
+  const serversQuery = useServers({ refetchInterval: 60_000 })
+  const recents = recentIds
+    .map((id) => serversQuery.data?.find((s) => s.id === id))
+    .filter((s): s is NonNullable<typeof s> => Boolean(s))
 
   const sections: NavSection[] = [
     {
@@ -100,6 +109,39 @@ export function AdminLayout() {
           })}
         </div>
       ))}
+
+      <div className="mt-2">
+        <div className="px-2.5 pt-2 pb-1 text-[10.5px] uppercase tracking-[0.08em] text-fg-dim font-medium">
+          {t('nav.section.recent', 'Recent hosts')}
+        </div>
+        {recents.length === 0 ? (
+          <div className="px-2.5 py-1.5 text-fg-dim text-[11.5px] font-mono">
+            {t('nav.recent_empty', 'visit a host to see it here')}
+          </div>
+        ) : (
+          recents.map((s) => {
+            const online =
+              s.agent_last_seen?.Valid &&
+              Date.now() - new Date(s.agent_last_seen.Time).getTime() <= 90_000
+            return (
+              <Link
+                key={s.id}
+                to={`/admin/servers/${s.id}`}
+                onClick={onNavigate}
+                className="flex items-center gap-2.5 h-[28px] px-2.5 rounded-md text-[12.5px] font-mono text-muted-foreground hover:bg-sunken hover:text-foreground transition-colors"
+              >
+                <span
+                  className={cn(
+                    'inline-block h-1.5 w-1.5 rounded-full shrink-0',
+                    online ? 'bg-ok' : 'bg-fg-dim',
+                  )}
+                />
+                <span className="truncate">{s.name}</span>
+              </Link>
+            )
+          })
+        )}
+      </div>
     </nav>
   )
 
@@ -161,11 +203,6 @@ export function AdminLayout() {
         </div>
 
         <div className="ml-auto flex items-center gap-1.5">
-          {admin && (
-            <span className="hidden sm:inline text-[12px] text-muted-foreground truncate max-w-[8rem]">
-              {admin.username}
-            </span>
-          )}
           <Button
             asChild
             size="sm"
@@ -188,6 +225,14 @@ export function AdminLayout() {
           >
             <LogOut className="h-4 w-4" />
           </Button>
+          {admin && (
+            <span
+              title={admin.username}
+              className="grid place-items-center h-7 w-7 rounded-full bg-sunken border text-[11px] font-mono uppercase shrink-0"
+            >
+              {admin.username.slice(0, 1)}
+            </span>
+          )}
         </div>
       </header>
 

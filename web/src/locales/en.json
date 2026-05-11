@@ -62,6 +62,15 @@
     "retention_5m": "5m rollup retention",
     "retention_1h": "1h rollup retention",
     "default_telemetry_interval_seconds": "Default sampling interval (sec)",
+    "tab": {
+      "about": "About",
+      "storage": "Storage",
+      "keys": "Recovery key",
+      "security": "Security & sandbox",
+      "audit": "Audit & retention",
+      "appearance": "Appearance"
+    },
+    "appearance_hint": "Theme and language live in the top bar so you can change them on any page.",
     "phase2_header": "Remote Ops",
     "file_sandbox_enabled": "Enable file sandbox",
     "file_sandbox_paths": "Sandbox paths (one per line)",
@@ -84,8 +93,10 @@
     "section": {
       "workspace": "Workspace",
       "ops": "Operations",
-      "system": "System"
-    }
+      "system": "System",
+      "recent": "Recent hosts"
+    },
+    "recent_empty": "visit a host to see it here"
   },
   "common": {
     "loading": "Loading…",

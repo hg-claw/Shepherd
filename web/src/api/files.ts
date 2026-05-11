@@ -71,3 +71,35 @@ export async function uploadFile(serverId: number, path: string, file: File): Pr
   })
   if (!res.ok) throw new Error(`upload ${res.status}`)
 }
+
+// XHR variant exposing upload-progress events. Fetch's stream API doesn't
+// surface upload progress in any browser today, so the transfer queue uses
+// this and the queue UI cares about percent + cancellation.
+export function uploadFileWithProgress(
+  serverId: number,
+  path: string,
+  file: File,
+  onProgress: (loaded: number, total: number) => void,
+): { promise: Promise<void>; cancel: () => void } {
+  const url = `/api/admin/files/upload?server_id=${serverId}&path=${encodeURIComponent(path)}&mode=420`
+  const xhr = new XMLHttpRequest()
+  xhr.open('POST', url)
+  xhr.withCredentials = true
+  const promise = new Promise<void>((resolve, reject) => {
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded, e.total)
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress(file.size, file.size)
+        resolve()
+      } else {
+        reject(new Error(`upload ${xhr.status}`))
+      }
+    }
+    xhr.onerror = () => reject(new Error('upload network error'))
+    xhr.onabort = () => reject(new Error('upload aborted'))
+    xhr.send(file)
+  })
+  return { promise, cancel: () => xhr.abort() }
+}

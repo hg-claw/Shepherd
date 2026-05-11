@@ -19,6 +19,10 @@
       "total": "Hosts"
     }
   },
+  "public_detail": {
+    "window": "Telemetry window",
+    "redaction": "Identifying details (hostname, IP, datacenter) are intentionally redacted on the public status page."
+  },
   "metric": { "cpu": "CPU", "mem": "Memory", "disk": "Disk", "net": "Network", "load": "Load", "tcp": "TCP" },
   "level": { "low": "low", "mid": "med", "high": "high", "alert": "alert" },
   "range": { "1h": "1h", "24h": "24h", "7d": "7d" },
@@ -176,7 +180,12 @@
     "mkdir": "New folder",
     "preview": "Preview",
     "hub_sub": "Pick a host to browse its filesystem and transfer files.",
-    "hub_empty": "No hosts available"
+    "hub_empty": "No hosts available",
+    "page_sub": "Browse the remote filesystem and open a live PTY through the Shepherd agent. Every action is audit-logged.",
+    "items": "items",
+    "drop_hint": "drop files here to upload",
+    "transfers": "Transfers",
+    "no_transfers": "no transfers yet"
   },
   "plugins": {
     "subtitle": "Extend the Shepherd agent with log parsers, extra metric collectors, and alert routers.",

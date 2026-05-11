@@ -22,6 +22,10 @@
       "total": "节点"
     }
   },
+  "public_detail": {
+    "window": "遥测窗口",
+    "redaction": "主机名、IP、数据中心等标识信息在公开页面已被脱敏。"
+  },
   "metric": {
     "cpu": "CPU",
     "mem": "内存",
@@ -195,7 +199,12 @@
     "mkdir": "新建文件夹",
     "preview": "预览",
     "hub_sub": "选择一台主机以浏览文件系统并传输文件。",
-    "hub_empty": "暂无主机"
+    "hub_empty": "暂无主机",
+    "page_sub": "通过 Shepherd 代理浏览远程文件系统并打开 PTY,所有操作均记录审计。",
+    "items": "项",
+    "drop_hint": "拖拽到此区域上传",
+    "transfers": "传输队列",
+    "no_transfers": "暂无传输"
   },
   "plugins": {
     "subtitle": "通过日志解析、自定义指标采集、告警转发等插件扩展 Shepherd 代理。",

@@ -49,8 +49,10 @@ type Deps struct {
 // Defined here (not as a concrete dep on agentsvc.Hub) so plugin tests can
 // substitute a fake without booting the whole agent stack.
 type HostExec interface {
-	PushFile(ctx context.Context, serverID int64, path string, mode uint32, content []byte) error
+	PushFile(ctx context.Context, serverID int64, path string, mode uint32, content []byte) error // mode: Unix octal (0644, 0755, etc.)
 	RunCmd(ctx context.Context, serverID int64, name string, args ...string) (stdout, stderr []byte, exitCode int, err error)
+	// StreamCmd runs name with args on serverID, calling onLine for each output
+	// line as it arrives. onLine must not block — queue and return promptly.
 	StreamCmd(ctx context.Context, serverID int64, name string, args []string, onLine func(line string)) error
 }
 
@@ -79,6 +81,7 @@ type LogStreamer interface {
 }
 
 // HostStatus is the per-host snapshot returned by HostAware.HostStatus.
+// Empty State means the check has not yet run (e.g. during initial deployment).
 type HostStatus struct {
 	State     string // pending | deploying | running | failed | stopped
 	Version   string

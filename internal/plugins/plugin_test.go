@@ -21,7 +21,7 @@ func TestHostStatusZeroValueState(t *testing.T) {
 	}
 }
 
-// Compile-time check that fake implementations satisfy the interfaces.
+// fakePlain is a minimal Plugin implementation for compile-time interface verification.
 type fakePlain struct{}
 
 func (fakePlain) Meta() Meta                                       { return Meta{ID: "p"} }

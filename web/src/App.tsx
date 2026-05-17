@@ -10,6 +10,7 @@ const ServerList = lazy(() => import('./pages/admin/ServerList'))
 const ServerNew = lazy(() => import('./pages/admin/ServerNew'))
 const AdminServerDetail = lazy(() => import('./pages/admin/ServerDetail'))
 const Settings = lazy(() => import('./pages/admin/Settings'))
+const PluginDetail = lazy(() => import('./pages/admin/plugins/detail'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
 import { PublicLayout } from './layouts/PublicLayout'
@@ -59,6 +60,7 @@ export default function App() {
           <Route path="/admin/files" element={<FilesHubPage />} />
           <Route path="/admin/files/:serverId" element={<FileBrowserPage />} />
           <Route path="/admin/plugins" element={<PluginsIndex />} />
+          <Route path="/admin/plugins/:id/*" element={<PluginDetail />} />
           <Route path="/admin/audit" element={<AuditLogPage />} />
           <Route path="/admin/recordings/:id" element={<RecordingPlayerPage />} />
         </Route>

@@ -67,6 +67,31 @@ func TestVersionsEndpoint_ListsCache(t *testing.T) {
 	}
 }
 
+func TestCachedLatest_24hCached(t *testing.T) {
+	calls := 0
+	orig := latestFetcher
+	latestFetcher = func(context.Context) ([]string, error) {
+		calls++
+		return []string{"1.0.0", "1.0.1"}, nil
+	}
+	defer func() {
+		latestFetcher = orig
+		latestStamp = time.Time{}
+		latestVal = nil
+	}()
+	latestStamp = time.Time{} // force first call to miss
+	latestVal = nil
+
+	a := cachedLatest(context.Background())
+	b := cachedLatest(context.Background())
+	if calls != 1 {
+		t.Fatalf("expected 1 fetch, got %d", calls)
+	}
+	if len(a) != 2 || len(b) != 2 {
+		t.Fatalf("unexpected: %v %v", a, b)
+	}
+}
+
 // collectMux records HandleFunc calls so tests can pull the handler out.
 type collectMux struct{ handlers map[string]func(http.ResponseWriter, *http.Request) }
 

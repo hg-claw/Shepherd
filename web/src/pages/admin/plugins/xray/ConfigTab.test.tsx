@@ -11,6 +11,7 @@ const put = vi.fn().mockResolvedValue({ ok: true })
 vi.mock('@/api/plugins', () => ({
   getPluginConfig: () => Promise.resolve({ default_version: '1.8.11' }),
   putPluginConfig: (id: string, body: any) => put(id, body),
+  fetchXrayVersions: () => Promise.resolve({ cached: [], latest: [] }),
 }))
 
 describe('xray ConfigTab', () => {

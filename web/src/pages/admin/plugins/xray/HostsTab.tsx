@@ -15,6 +15,19 @@ function statusKind(s: string | undefined): PillKind {
   return 'neutral'
 }
 
+function configSummary(cfg: unknown): { protocol: string; port: string } {
+  if (!cfg || typeof cfg !== 'object') return { protocol: '—', port: '—' }
+  const inbounds = (cfg as any).inbounds
+  if (!Array.isArray(inbounds) || inbounds.length === 0) return { protocol: '—', port: '—' }
+  const first = inbounds[0]
+  const proto = String(first?.protocol ?? '—')
+  const port = first?.port != null ? String(first.port) : '—'
+  // Detect REALITY for clearer label
+  const security = first?.streamSettings?.security
+  const label = security === 'reality' ? `${proto} + REALITY` : proto
+  return { protocol: label, port }
+}
+
 export default function HostsTab() {
   const toast = useUI((s) => s.toast)
   const serversQ = useServers({ refetchInterval: 30_000 })
@@ -53,9 +66,10 @@ export default function HostsTab() {
           <thead>
             <tr className="text-left">
               <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Server</th>
+              <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Protocol</th>
+              <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Port</th>
               <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Status</th>
               <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Version</th>
-              <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Last error</th>
               <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground text-right">Actions</th>
             </tr>
           </thead>
@@ -63,6 +77,7 @@ export default function HostsTab() {
             {(serversQ.data ?? []).map((s) => {
               const h = hostsByServer.get(s.id)
               const deployed = !!h
+              const summary = h ? configSummary(h.config) : { protocol: '—', port: '—' }
               return (
                 <tr key={s.id} className="border-t">
                   <td className="px-3 py-2 font-mono">
@@ -71,13 +86,19 @@ export default function HostsTab() {
                       {s.ssh_host?.Valid ? s.ssh_host.String : '—'}
                     </div>
                   </td>
+                  <td className="px-3 py-2 font-mono text-[12.5px]">{summary.protocol}</td>
+                  <td className="px-3 py-2 font-mono text-[12.5px]">{summary.port}</td>
                   <td className="px-3 py-2">
                     {deployed
                       ? <Pill kind={statusKind(h?.status)}>{h?.status}</Pill>
                       : <Pill kind="neutral">not deployed</Pill>}
+                    {h?.last_error && (
+                      <div className="text-err text-[10.5px] mt-1 max-w-[200px] truncate" title={h.last_error}>
+                        {h.last_error}
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-2 font-mono text-[12.5px]">{h?.deployed_version ?? '—'}</td>
-                  <td className="px-3 py-2 text-[12px] text-err">{h?.last_error ?? ''}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     {deployed ? (
                       <>
@@ -102,7 +123,7 @@ export default function HostsTab() {
               )
             })}
             {(serversQ.data ?? []).length === 0 && (
-              <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground text-[13px]">
+              <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground text-[13px]">
                 No managed servers.
               </td></tr>
             )}

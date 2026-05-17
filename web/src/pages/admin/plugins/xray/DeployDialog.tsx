@@ -13,6 +13,7 @@ import {
   fetchXrayVersions,
   generateX25519,
   generateShortID,
+  getPluginConfig,
 } from '@/api/plugins'
 import { renderTemplate, randomPort, randomUUID, type Inbound } from './templates'
 
@@ -28,6 +29,12 @@ export default function DeployDialog({ open, onOpenChange, defaultServerID }: Pr
   const versionsQ = useQuery({
     queryKey: ['xray-versions'],
     queryFn: fetchXrayVersions,
+    enabled: open,
+  })
+
+  const cfgQ = useQuery({
+    queryKey: ['plugin-cfg', 'xray'],
+    queryFn: () => getPluginConfig('xray'),
     enabled: open,
   })
 
@@ -48,8 +55,13 @@ export default function DeployDialog({ open, onOpenChange, defaultServerID }: Pr
   }, [defaultServerID])
 
   useEffect(() => {
-    if (!version && versionsQ.data?.latest?.length) setVersion(versionsQ.data.latest[0])
-  }, [version, versionsQ.data])
+    if (version) return
+    if (versionsQ.data?.latest?.length) {
+      setVersion(versionsQ.data.latest[0]); return
+    }
+    const dv = cfgQ.data?.default_version
+    if (typeof dv === 'string' && dv) setVersion(dv)
+  }, [version, versionsQ.data, cfgQ.data])
 
   const selectedServer = (serversQ.data ?? []).find((s) => s.id === serverID)
 
@@ -115,6 +127,11 @@ export default function DeployDialog({ open, onOpenChange, defaultServerID }: Pr
                   placeholder="1.8.11"
                   className="h-8 font-mono mt-1"
                 />
+              )}
+              {!version && (
+                <p className="text-err text-[11.5px] mt-1">
+                  No xray version available. Set one in the Config tab or type it manually below.
+                </p>
               )}
             </div>
 
@@ -264,7 +281,7 @@ export default function DeployDialog({ open, onOpenChange, defaultServerID }: Pr
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => m.mutate()} disabled={m.isPending}>
+          <Button onClick={() => m.mutate()} disabled={m.isPending || !version || !serverID}>
             {m.isPending ? 'Deploying…' : 'Deploy'}
           </Button>
         </DialogFooter>

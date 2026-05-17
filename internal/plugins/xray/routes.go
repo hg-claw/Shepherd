@@ -4,11 +4,46 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 )
+
+// latestFetcher can be overridden in tests.
+var latestFetcher = func(ctx context.Context) ([]string, error) {
+	return (&Releaser{}).ListLatestTags(ctx, 5)
+}
+
+var (
+	latestMu    sync.Mutex
+	latestVal   []string
+	latestStamp time.Time
+)
+
+const latestTTL = 24 * time.Hour
+
+// cachedLatest returns the most recent 5 xray release tags, refreshing at most
+// once per latestTTL window. Cache miss / error falls back to whatever's
+// cached (possibly empty). The 24h cap matches "list updates daily".
+func cachedLatest(ctx context.Context) []string {
+	latestMu.Lock()
+	if time.Since(latestStamp) < latestTTL {
+		out := append([]string(nil), latestVal...)
+		latestMu.Unlock()
+		return out
+	}
+	latestMu.Unlock()
+	tags, err := latestFetcher(ctx)
+	latestMu.Lock()
+	defer latestMu.Unlock()
+	if err == nil {
+		latestVal = tags
+		latestStamp = time.Now()
+	}
+	return append([]string(nil), latestVal...)
+}
 
 func (p *Plugin) RegisterRoutes(mux plugins.Mux, deps plugins.Deps) {
 	mux.HandleFunc("GET /versions", func(w http.ResponseWriter, r *http.Request) {
@@ -17,9 +52,7 @@ func (p *Plugin) RegisterRoutes(mux plugins.Mux, deps plugins.Deps) {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		// Latest-from-github is best-effort: don't fail the call if GitHub is
-		// unreachable, just return an empty list.
-		latest, _ := (&Releaser{}).ListLatestTags(r.Context(), 5)
+		latest := cachedLatest(r.Context())
 		if latest == nil {
 			latest = []string{}
 		}

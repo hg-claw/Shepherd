@@ -3,6 +3,7 @@ package cloudflare
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/hg-claw/Shepherd/internal/plugins"
@@ -50,6 +51,35 @@ func (p *Plugin) RegisterRoutes(mux plugins.Mux, deps plugins.Deps) {
 		c, err := p.client(r)
 		if err != nil { httpJSONErr(w, 400, err); return }
 		if err := c.DeleteRecord(r.Context(), r.PathValue("id"), r.PathValue("rid")); err != nil {
+			httpJSONErr(w, 502, err); return
+		}
+		w.WriteHeader(204)
+	})
+
+	// per-host domains
+	mux.HandleFunc("GET /host-domains", func(w http.ResponseWriter, r *http.Request) {
+		rows, err := p.listHostDomains(r.Context(), r.URL.Query().Get("server_id"))
+		if err != nil { httpJSONErr(w, 500, err); return }
+		_ = json.NewEncoder(w).Encode(rows)
+	})
+
+	mux.HandleFunc("POST /host-domains", func(w http.ResponseWriter, r *http.Request) {
+		c, err := p.client(r)
+		if err != nil { httpJSONErr(w, 400, err); return }
+		var body addDomainBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			httpJSONErr(w, 400, err); return
+		}
+		out, err := p.addHostDomain(r.Context(), c, body)
+		if err != nil { httpJSONErr(w, 502, err); return }
+		_ = json.NewEncoder(w).Encode(out)
+	})
+
+	mux.HandleFunc("DELETE /host-domains/{id}", func(w http.ResponseWriter, r *http.Request) {
+		c, err := p.client(r)
+		if err != nil { httpJSONErr(w, 400, err); return }
+		id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err := p.deleteHostDomain(r.Context(), c, id); err != nil {
 			httpJSONErr(w, 502, err); return
 		}
 		w.WriteHeader(204)

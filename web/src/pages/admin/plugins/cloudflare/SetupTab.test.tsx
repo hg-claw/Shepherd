@@ -21,6 +21,6 @@ describe('cloudflare SetupTab', () => {
     )
     await screen.findByDisplayValue('***')
     fireEvent.click(screen.getByText('Save'))
-    await waitFor(() => expect(put).toHaveBeenCalledWith('cloudflare', { api_token: '***', account_id: '' }))
+    await waitFor(() => expect(put).toHaveBeenCalledWith('cloudflare', { api_token: '***', account_id: '', zone_id: '', prefix: '' }))
   })
 })

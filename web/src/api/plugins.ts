@@ -72,3 +72,25 @@ export const pluginLogsWSURL = (id: string, serverId: number) => {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
   return `${proto}://${window.location.host}/api/admin/plugins/${id}/hosts/${serverId}/logs`
 }
+
+export interface HostDomain {
+  id: number
+  server_id: number
+  zone_id: string
+  record_id: string
+  domain: string
+  type: string
+  content: string
+  created_at: string
+}
+
+export const listHostDomains = (serverID?: number) => {
+  const qs = serverID != null ? `?server_id=${serverID}` : ''
+  return api.get<HostDomain[]>(`/api/admin/plugins/cloudflare/host-domains${qs}`)
+}
+
+export const addHostDomain = (body: { server_id: number; domain?: string; content?: string; type?: string }) =>
+  api.post<HostDomain>(`/api/admin/plugins/cloudflare/host-domains`, body)
+
+export const removeHostDomain = (id: number) =>
+  api.del(`/api/admin/plugins/cloudflare/host-domains/${id}`)

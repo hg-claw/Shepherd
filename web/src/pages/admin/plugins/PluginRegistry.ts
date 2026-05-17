@@ -28,6 +28,7 @@ export const PluginRegistry: Record<string, PluginUIEntry> = {
       { key: 'setup',    label: 'Setup' },
       { key: 'zones',    label: 'Zones' },
       { key: 'dns',      label: 'DNS records' },
+      { key: 'hosts',    label: 'Hosts' },
       { key: 'activity', label: 'Activity' },
     ],
   },

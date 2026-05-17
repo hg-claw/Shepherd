@@ -18,6 +18,9 @@ import (
 	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/hg-claw/Shepherd/internal/filesvc"
 	"github.com/hg-claw/Shepherd/internal/installer"
+	"github.com/hg-claw/Shepherd/internal/plugins"
+	_ "github.com/hg-claw/Shepherd/internal/plugins/cloudflare" // registers via init()
+	_ "github.com/hg-claw/Shepherd/internal/plugins/xray"       // registers via init()
 	"github.com/hg-claw/Shepherd/internal/ptysvc"
 	"github.com/hg-claw/Shepherd/internal/scriptsvc"
 	"github.com/hg-claw/Shepherd/internal/serversvc"
@@ -159,10 +162,31 @@ func main() {
 	auditAPI := &api.AuditAPI{DB: d}
 	recAPI := &api.RecordingsAPI{DB: d}
 
+	// hubHostExec adapts agentsvc.Hub to plugins.HostExec. The body methods are
+	// stubbed for Phase 3a Task 21; Task 21b will wire them through filesvc + ptysvc.
+	hostExec := &hubHostExec{hub: hub}
+	pluginStore := &plugins.Store{DB: d, Now: time.Now}
+	pluginsDeps := plugins.Deps{
+		DB:       d,
+		DataDir:  filepath.Join(filepath.Dir(cfg.DBDSN), "plugins"),
+		HostExec: hostExec,
+		Now:      time.Now,
+	}
+	pluginsAPI := &api.PluginsAPI{
+		Store: pluginStore,
+		Deps:  pluginsDeps,
+		SecretFields: map[string][]string{
+			"cloudflare": {"api_token"},
+		},
+	}
+	eventsAPI := &api.PluginEventsAPI{DB: d}
+	logsAPI := &api.PluginLogsAPI{HostExec: hostExec}
+
 	router := api.NewRouter(authAPI, authH.RequireAdmin,
 		servers, settings, public, agentAPI,
 		consoleAPI, scriptsAPI, filesAPI, auditAPI, recAPI,
-		shepweb.Handler())
+		shepweb.Handler()).
+		WithPlugins(pluginsAPI, eventsAPI, logsAPI)
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -182,6 +206,24 @@ func main() {
 	shutdownCtx, c := context.WithTimeout(context.Background(), 10*time.Second)
 	defer c()
 	_ = srv.Shutdown(shutdownCtx)
+}
+
+// hubHostExec adapts *agentsvc.Hub to plugins.HostExec.
+// The three methods below are intentionally stubbed (Task 21b follow-up):
+// they will be wired through filesvc + ptysvc once the Hub surface grows.
+// TODO Task 21b: implement via agentsvc + filesvc
+type hubHostExec struct{ hub *agentsvc.Hub }
+
+func (h *hubHostExec) PushFile(_ context.Context, _ int64, _ string, _ uint32, _ []byte) error {
+	return errors.New("plugins.HostExec.PushFile: not yet wired to agentsvc (Task 21b)")
+}
+
+func (h *hubHostExec) RunCmd(_ context.Context, _ int64, _ string, _ ...string) ([]byte, []byte, int, error) {
+	return nil, nil, 0, errors.New("plugins.HostExec.RunCmd: not yet wired to agentsvc (Task 21b)")
+}
+
+func (h *hubHostExec) StreamCmd(_ context.Context, _ int64, _ string, _ []string, _ func(string)) error {
+	return errors.New("plugins.HostExec.StreamCmd: not yet wired to agentsvc (Task 21b)")
 }
 
 func tagOrFallback(override, build string) string {

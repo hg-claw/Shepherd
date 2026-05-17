@@ -51,3 +51,27 @@ func TestRunPluginMigrations_Idempotent(t *testing.T) {
 		t.Fatalf("second call: %v", err)
 	}
 }
+
+func TestRunPluginMigrations_AddedAfterEnable(t *testing.T) {
+	d := openTestDB(t)
+	ctx := context.Background()
+
+	// First boot: plugin has no migrations (just like cloudflare originally).
+	if err := RunPluginMigrations(ctx, d, "p", nil); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	_ = d.Get(&n, "SELECT COUNT(*) FROM plugin_migrations WHERE plugin_id='p'")
+	if n != 0 {
+		t.Fatalf("expected 0 rows, got %d", n)
+	}
+
+	// Second boot: plugin now ships a migration. It must apply.
+	migs := []Migration{{Name: "0001_foo", SQL: "CREATE TABLE foo (id INTEGER);"}}
+	if err := RunPluginMigrations(ctx, d, "p", migs); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Exec("INSERT INTO foo(id) VALUES(1)"); err != nil {
+		t.Fatalf("table foo should exist: %v", err)
+	}
+}

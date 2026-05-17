@@ -179,6 +179,20 @@ func main() {
 			"cloudflare": {"api_token"},
 		},
 	}
+	// Catch plugins whose migrations were added after the plugin was already
+	// enabled (the enable handler short-circuits on already-enabled rows and
+	// never re-runs migrations). The migration runner is idempotent via the
+	// plugin_migrations ledger, so this is safe to run unconditionally.
+	for _, p := range plugins.All() {
+		row, err := pluginStore.Get(rootCtx, p.Meta().ID)
+		if err != nil || !row.Enabled {
+			continue
+		}
+		if err := plugins.RunPluginMigrations(rootCtx, d, p.Meta().ID, p.Migrations()); err != nil {
+			log.Printf("plugin %s: boot migrate: %v", p.Meta().ID, err)
+		}
+	}
+
 	eventsAPI := &api.PluginEventsAPI{DB: d}
 	logsAPI := &api.PluginLogsAPI{HostExec: hostExec}
 

@@ -17,7 +17,7 @@ export const PluginRegistry: Record<string, PluginUIEntry> = {
     module: () => import('./xray'),
     tabs: [
       { key: 'config', label: 'Config' },
-      { key: 'hosts',  label: 'Hosts' },
+      { key: 'hosts',  label: 'Configs' },
       { key: 'events', label: 'Events' },
       { key: 'logs',   label: 'Logs' },
     ],

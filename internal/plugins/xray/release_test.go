@@ -76,6 +76,27 @@ func TestFetchAndCache(t *testing.T) {
 	}
 }
 
+func TestListLatestTags(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/XTLS/Xray-core/releases", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `[
+			{"tag_name":"v1.8.11"},
+			{"tag_name":"v1.8.10"},
+			{"tag_name":"v1.8.9"}
+		]`)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	r := &Releaser{BaseURL: srv.URL}
+	tags, err := r.ListLatestTags(context.Background(), 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tags) != 3 || tags[0] != "1.8.11" {
+		t.Fatalf("got %v", tags)
+	}
+}
+
 func TestFetchShaMismatch(t *testing.T) {
 	zipBytes := makeZip(t, "xray", "X")
 	mux := http.NewServeMux()

@@ -17,8 +17,40 @@ func (p *Plugin) RegisterRoutes(mux plugins.Mux, deps plugins.Deps) {
 			http.Error(w, err.Error(), 500)
 			return
 		}
+		// Latest-from-github is best-effort: don't fail the call if GitHub is
+		// unreachable, just return an empty list.
+		latest, _ := (&Releaser{}).ListLatestTags(r.Context(), 5)
+		if latest == nil {
+			latest = []string{}
+		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"cached": cached})
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"cached": cached,
+			"latest": latest,
+		})
+	})
+
+	mux.HandleFunc("POST /keys/x25519", func(w http.ResponseWriter, r *http.Request) {
+		priv, pub, err := GenerateX25519()
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"private_key": priv,
+			"public_key":  pub,
+		})
+	})
+
+	mux.HandleFunc("POST /keys/short-id", func(w http.ResponseWriter, r *http.Request) {
+		id, err := GenerateShortID()
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"short_id": id})
 	})
 }
 

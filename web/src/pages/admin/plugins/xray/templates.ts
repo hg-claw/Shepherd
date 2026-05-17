@@ -4,7 +4,7 @@
 // deploy endpoint; the server pushes it verbatim to the host after
 // NormaliseRaw re-pretty-prints it.
 
-export type Inbound = 'vless-reality' | 'vmess-ws' | 'shadowsocks'
+export type Inbound = 'vless-reality' | 'vmess-ws'
 
 export interface TemplateValues {
   inbound: Inbound
@@ -17,16 +17,12 @@ export interface TemplateValues {
   shortID?: string
   // VMess+WS
   wsPath?: string
-  // Shadowsocks
-  method?: string
-  password?: string
 }
 
 export function renderTemplate(v: TemplateValues): Record<string, unknown> {
   switch (v.inbound) {
     case 'vless-reality': return vlessReality(v)
     case 'vmess-ws':      return vmessWS(v)
-    case 'shadowsocks':   return shadowsocks(v)
   }
 }
 
@@ -67,17 +63,6 @@ function vmessWS(v: TemplateValues) {
         network: 'ws',
         wsSettings: { path: v.wsPath || '/ws' },
       },
-    }],
-    outbounds: [{ protocol: 'freedom' }],
-  }
-}
-
-function shadowsocks(v: TemplateValues) {
-  return {
-    inbounds: [{
-      port: v.port,
-      protocol: 'shadowsocks',
-      settings: { method: v.method, password: v.password },
     }],
     outbounds: [{ protocol: 'freedom' }],
   }

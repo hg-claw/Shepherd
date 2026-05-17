@@ -28,7 +28,7 @@ describe('PluginDetail', () => {
       </I18nextProvider>,
     )
     expect(await screen.findByText('Config')).toBeTruthy()
-    expect(screen.getByText('Hosts')).toBeTruthy()
+    expect(screen.getByText('Configs')).toBeTruthy()
     expect(screen.getByText('Events')).toBeTruthy()
     expect(screen.getByText('Logs')).toBeTruthy()
   })

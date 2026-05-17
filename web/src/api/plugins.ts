@@ -94,3 +94,14 @@ export const addHostDomain = (body: { server_id: number; domain?: string; conten
 
 export const removeHostDomain = (id: number) =>
   api.del(`/api/admin/plugins/cloudflare/host-domains/${id}`)
+
+export interface XrayVersionsResp { cached: { version: string; os: string; arch: string }[]; latest: string[] }
+export const fetchXrayVersions = () =>
+  api.get<XrayVersionsResp>('/api/admin/plugins/xray/versions')
+
+export interface X25519KeyPair { private_key: string; public_key: string }
+export const generateX25519 = () =>
+  api.post<X25519KeyPair>('/api/admin/plugins/xray/keys/x25519', {})
+
+export const generateShortID = () =>
+  api.post<{ short_id: string }>('/api/admin/plugins/xray/keys/short-id', {})

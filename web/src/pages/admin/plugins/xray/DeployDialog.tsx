@@ -1,26 +1,38 @@
 // web/src/pages/admin/plugins/xray/DeployDialog.tsx
-import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { deployPluginHost } from '@/api/plugins'
+import { useServers } from '@/api/servers'
+import {
+  deployPluginHost,
+  fetchXrayVersions,
+  generateX25519,
+  generateShortID,
+} from '@/api/plugins'
 import { renderTemplate, randomPort, randomUUID, type Inbound } from './templates'
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
-  serverID: number
-  serverName: string
-  defaultVersion: string
+  defaultServerID?: number
 }
 
-export default function DeployDialog({ open, onOpenChange, serverID, serverName, defaultVersion }: Props) {
+export default function DeployDialog({ open, onOpenChange, defaultServerID }: Props) {
   const qc = useQueryClient()
-  const [version, setVersion] = useState(defaultVersion)
+  const serversQ = useServers()
+  const versionsQ = useQuery({
+    queryKey: ['xray-versions'],
+    queryFn: fetchXrayVersions,
+    enabled: open,
+  })
+
+  const [serverID, setServerID] = useState<number | ''>(defaultServerID ?? '')
+  const [version, setVersion] = useState('')
   const [inbound, setInbound] = useState<Inbound>('vless-reality')
   const [port, setPort] = useState<number>(443)
   const [uuid, setUuid] = useState<string>(randomUUID())
@@ -29,17 +41,25 @@ export default function DeployDialog({ open, onOpenChange, serverID, serverName,
   const [privateKey, setPrivateKey] = useState('')
   const [shortID, setShortID] = useState('')
   const [wsPath, setWsPath] = useState('/ws')
-  const [method, setMethod] = useState('2022-blake3-aes-256-gcm')
-  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (defaultServerID != null) setServerID(defaultServerID)
+  }, [defaultServerID])
+
+  useEffect(() => {
+    if (!version && versionsQ.data?.latest?.length) setVersion(versionsQ.data.latest[0])
+  }, [version, versionsQ.data])
+
+  const selectedServer = (serversQ.data ?? []).find((s) => s.id === serverID)
 
   const m = useMutation({
     mutationFn: async () => {
+      if (!serverID) throw new Error('select a server')
       const config = renderTemplate({
         inbound, port, uuid,
         sni, publicKey, privateKey, shortID,
         wsPath,
-        method, password,
       })
       return deployPluginHost('xray', { server_id: serverID, version, config })
     },
@@ -54,110 +74,190 @@ export default function DeployDialog({ open, onOpenChange, serverID, serverName,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-mono">Deploy xray → {serverName}</DialogTitle>
+          <DialogTitle className="font-mono">
+            Deploy xray{selectedServer ? ` → ${selectedServer.name}` : ''}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
+          {/* Target server */}
+          <div>
+            <Label className="text-[12px]">Target server</Label>
+            <select
+              value={serverID}
+              onChange={(e) => setServerID(Number(e.target.value) || '')}
+              className="mt-1 h-8 px-2 rounded-md border bg-background text-[13px] font-mono w-full"
+            >
+              <option value="">— select —</option>
+              {(serversQ.data ?? []).map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
+            {/* Version */}
             <div>
               <Label className="text-[12px]">Version</Label>
-              <Input value={version} onChange={(e) => setVersion(e.target.value)}
-                placeholder="1.8.11"
-                className="h-8 font-mono mt-1" />
+              {(versionsQ.data?.latest?.length ?? 0) > 0 ? (
+                <select
+                  value={version}
+                  onChange={(e) => setVersion(e.target.value)}
+                  className="mt-1 h-8 px-2 rounded-md border bg-background text-[13px] font-mono w-full"
+                >
+                  {versionsQ.data!.latest.map((v) => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
+              ) : (
+                <Input
+                  value={version}
+                  onChange={(e) => setVersion(e.target.value)}
+                  placeholder="1.8.11"
+                  className="h-8 font-mono mt-1"
+                />
+              )}
             </div>
+
+            {/* Inbound protocol */}
             <div>
               <Label className="text-[12px]">Inbound protocol</Label>
-              <select value={inbound} onChange={(e) => setInbound(e.target.value as Inbound)}
-                className="mt-1 h-8 px-2 rounded-md border bg-background text-[13px] font-mono w-full">
+              <select
+                value={inbound}
+                onChange={(e) => setInbound(e.target.value as Inbound)}
+                className="mt-1 h-8 px-2 rounded-md border bg-background text-[13px] font-mono w-full"
+              >
                 <option value="vless-reality">VLESS + REALITY</option>
                 <option value="vmess-ws">VMess + WebSocket</option>
-                <option value="shadowsocks">Shadowsocks-2022</option>
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
+            {/* Port */}
             <div>
               <Label className="text-[12px]">Port</Label>
               <div className="flex gap-2 mt-1">
-                <Input type="number" value={port} onChange={(e) => setPort(Number(e.target.value))}
-                  className="h-8 font-mono" />
-                <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-[12px]"
-                  onClick={() => setPort(randomPort())}>
+                <Input
+                  type="number"
+                  value={port}
+                  onChange={(e) => setPort(Number(e.target.value))}
+                  className="h-8 font-mono"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2 text-[12px]"
+                  onClick={() => setPort(randomPort())}
+                >
                   random
                 </Button>
               </div>
             </div>
-            {inbound !== 'shadowsocks' && (
-              <div>
-                <Label className="text-[12px]">UUID</Label>
-                <div className="flex gap-2 mt-1">
-                  <Input value={uuid} onChange={(e) => setUuid(e.target.value)}
-                    className="h-8 font-mono text-[12px]" />
-                  <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-[12px]"
-                    onClick={() => setUuid(randomUUID())}>
-                    new
-                  </Button>
-                </div>
+
+            {/* UUID */}
+            <div>
+              <Label className="text-[12px]">UUID</Label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  value={uuid}
+                  onChange={(e) => setUuid(e.target.value)}
+                  className="h-8 font-mono text-[12px]"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2 text-[12px]"
+                  onClick={() => setUuid(randomUUID())}
+                >
+                  new
+                </Button>
               </div>
-            )}
+            </div>
           </div>
 
+          {/* REALITY-specific fields */}
           {inbound === 'vless-reality' && (
             <>
               <div>
                 <Label className="text-[12px]">REALITY SNI (target domain)</Label>
-                <Input value={sni} onChange={(e) => setSni(e.target.value)}
+                <Input
+                  value={sni}
+                  onChange={(e) => setSni(e.target.value)}
                   placeholder="www.microsoft.com"
-                  className="h-8 font-mono mt-1" />
+                  className="h-8 font-mono mt-1"
+                />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-[12px]">REALITY public key</Label>
-                  <Input value={publicKey} onChange={(e) => setPublicKey(e.target.value)}
-                    className="h-8 font-mono text-[12px] mt-1" />
-                </div>
-                <div>
-                  <Label className="text-[12px]">REALITY private key</Label>
-                  <Input value={privateKey} onChange={(e) => setPrivateKey(e.target.value)}
-                    className="h-8 font-mono text-[12px] mt-1" />
-                </div>
-              </div>
+
               <div>
-                <Label className="text-[12px]">Short ID (optional, hex)</Label>
-                <Input value={shortID} onChange={(e) => setShortID(e.target.value)}
-                  placeholder="00"
-                  className="h-8 font-mono mt-1" />
+                <Label className="text-[12px]">REALITY keypair</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    value={privateKey}
+                    placeholder="private"
+                    readOnly
+                    className="h-8 font-mono text-[11px]"
+                  />
+                  <Input
+                    value={publicKey}
+                    placeholder="public"
+                    readOnly
+                    className="h-8 font-mono text-[11px]"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 text-[12px]"
+                    onClick={async () => {
+                      const kp = await generateX25519()
+                      setPrivateKey(kp.private_key)
+                      setPublicKey(kp.public_key)
+                    }}
+                  >
+                    Generate
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-[12px]">Short ID (hex)</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    value={shortID}
+                    onChange={(e) => setShortID(e.target.value)}
+                    placeholder="auto"
+                    className="h-8 font-mono"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 text-[12px]"
+                    onClick={async () => {
+                      const r = await generateShortID()
+                      setShortID(r.short_id)
+                    }}
+                  >
+                    Generate
+                  </Button>
+                </div>
               </div>
             </>
           )}
 
+          {/* VMess+WS-specific fields */}
           {inbound === 'vmess-ws' && (
             <div>
               <Label className="text-[12px]">WebSocket path</Label>
-              <Input value={wsPath} onChange={(e) => setWsPath(e.target.value)}
+              <Input
+                value={wsPath}
+                onChange={(e) => setWsPath(e.target.value)}
                 placeholder="/ws"
-                className="h-8 font-mono mt-1" />
+                className="h-8 font-mono mt-1"
+              />
             </div>
-          )}
-
-          {inbound === 'shadowsocks' && (
-            <>
-              <div>
-                <Label className="text-[12px]">Encryption method</Label>
-                <select value={method} onChange={(e) => setMethod(e.target.value)}
-                  className="mt-1 h-8 px-2 rounded-md border bg-background text-[13px] font-mono w-full">
-                  <option>2022-blake3-aes-256-gcm</option>
-                  <option>2022-blake3-aes-128-gcm</option>
-                  <option>2022-blake3-chacha20-poly1305</option>
-                  <option>aes-256-gcm</option>
-                </select>
-              </div>
-              <div>
-                <Label className="text-[12px]">Password</Label>
-                <Input value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="h-8 font-mono mt-1" />
-              </div>
-            </>
           )}
 
           {error && <p className="text-err text-[12px]">{error}</p>}

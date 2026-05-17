@@ -55,10 +55,15 @@ func TestVersionsEndpoint_ListsCache(t *testing.T) {
 	}
 	var out struct {
 		Cached []map[string]any `json:"cached"`
+		Latest []string         `json:"latest"`
 	}
 	_ = json.Unmarshal(w.Body.Bytes(), &out)
 	if len(out.Cached) != 1 || out.Cached[0]["version"] != "1.8.11" {
 		t.Fatalf("cached = %v", out.Cached)
+	}
+	// latest is best-effort; httptest doesn't serve GitHub, so it may be empty but must be present.
+	if out.Latest == nil {
+		t.Fatalf("latest field missing from response")
 	}
 }
 

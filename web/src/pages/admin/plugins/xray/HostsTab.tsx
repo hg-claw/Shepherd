@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServers } from '@/api/servers'
-import { listPluginHosts, removePluginHost, getPluginConfig, type PluginHost } from '@/api/plugins'
+import { listPluginHosts, removePluginHost, type PluginHost } from '@/api/plugins'
 import { Button } from '@/components/ui/button'
 import { Pill, type PillKind } from '@/components/Pill'
 import { useUI } from '@/store/ui'
@@ -23,10 +23,6 @@ export default function HostsTab() {
     queryFn: () => listPluginHosts('xray'),
     refetchInterval: 5_000,
   })
-  const cfgQ = useQuery({
-    queryKey: ['plugin-cfg', 'xray'],
-    queryFn: () => getPluginConfig('xray'),
-  })
   const qc = useQueryClient()
   const undeploy = useMutation({
     mutationFn: (serverID: number) => removePluginHost('xray', serverID),
@@ -34,16 +30,24 @@ export default function HostsTab() {
     onError: (e: any) => toast('error', String(e?.message ?? e)),
   })
 
-  const [deployTarget, setDeployTarget] = useState<{ id: number; name: string } | null>(null)
+  // { id?: number } = deploy to specific server; {} = open dialog with no pre-selected server
+  const [deployTarget, setDeployTarget] = useState<{ id?: number } | null>(null)
 
   // Build hostsByServer map for O(1) lookup.
   const hostsByServer = new Map<number, PluginHost>()
   for (const h of hostsQ.data ?? []) hostsByServer.set(h.server_id, h)
 
-  const defaultVersion = String((cfgQ.data?.default_version as string | undefined) ?? '1.8.11')
-
   return (
     <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[12.5px] text-muted-foreground">
+          Each row is one xray deployment. Use "New configuration" to deploy to a new host.
+        </p>
+        <Button size="sm" className="h-8" onClick={() => setDeployTarget({})}>
+          + New configuration
+        </Button>
+      </div>
+
       <div className="rounded-lg border bg-elev overflow-x-auto">
         <table className="w-full text-[13px] border-collapse">
           <thead>
@@ -78,7 +82,7 @@ export default function HostsTab() {
                     {deployed ? (
                       <>
                         <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
-                          onClick={() => setDeployTarget({ id: s.id, name: s.name })}>
+                          onClick={() => setDeployTarget({ id: s.id })}>
                           Re-deploy
                         </Button>
                         <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px] text-destructive"
@@ -89,7 +93,7 @@ export default function HostsTab() {
                       </>
                     ) : (
                       <Button size="sm" className="h-7 px-2 text-[12px]"
-                        onClick={() => setDeployTarget({ id: s.id, name: s.name })}>
+                        onClick={() => setDeployTarget({ id: s.id })}>
                         Deploy
                       </Button>
                     )}
@@ -105,13 +109,12 @@ export default function HostsTab() {
           </tbody>
         </table>
       </div>
-      {deployTarget && (
+
+      {deployTarget !== null && (
         <DeployDialog
           open={true}
           onOpenChange={(open) => { if (!open) setDeployTarget(null) }}
-          serverID={deployTarget.id}
-          serverName={deployTarget.name}
-          defaultVersion={defaultVersion}
+          defaultServerID={deployTarget.id}
         />
       )}
     </div>

@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -142,6 +143,41 @@ func sha256File(path string) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+type releaseEntry struct {
+	TagName string `json:"tag_name"`
+}
+
+// ListLatestTags returns up to `limit` recent release tags (no "v" prefix).
+// Falls back to the github.com/XTLS/Xray-core API; respects r.BaseURL for tests
+// by appending "/repos/XTLS/Xray-core/releases".
+func (r *Releaser) ListLatestTags(ctx context.Context, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = 5
+	}
+	api := "https://api.github.com"
+	if r.BaseURL != "" {
+		api = strings.TrimRight(r.BaseURL, "/")
+	}
+	u := fmt.Sprintf("%s/repos/XTLS/Xray-core/releases?per_page=%d", api, limit)
+	httpc := r.HTTP
+	if httpc == nil {
+		httpc = defaultClient()
+	}
+	body, err := httpGet(ctx, httpc, u)
+	if err != nil {
+		return nil, err
+	}
+	var entries []releaseEntry
+	if err := json.Unmarshal(body, &entries); err != nil {
+		return nil, fmt.Errorf("parse releases: %w", err)
+	}
+	out := make([]string, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, strings.TrimPrefix(e.TagName, "v"))
+	}
+	return out, nil
 }
 
 func extractXray(zipBytes []byte, outPath string) error {

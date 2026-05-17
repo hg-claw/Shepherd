@@ -12,7 +12,9 @@ var ErrBadAutoRecoverKey = errors.New("bad auto recover key")
 
 // AutoRegister either rotates the machine token of an existing server
 // (matched by fingerprint) or creates a new server row and mints a fresh token.
-func (s *Service) AutoRegister(ctx context.Context, key, fingerprint, hostname, osName, arch, kernel, agentVersion string) (string, int64, error) {
+// cands (may be nil) are upserted into server_ip_candidates; the best public IP
+// is written to servers.ssh_host when it is currently empty.
+func (s *Service) AutoRegister(ctx context.Context, key, fingerprint, hostname, osName, arch, kernel, agentVersion string, cands []IPCandidate) (string, int64, error) {
 	if s.AutoRecoverKey == "" {
 		return "", 0, ErrAutoRegisterDisabled
 	}
@@ -67,5 +69,12 @@ func (s *Service) AutoRegister(ctx context.Context, key, fingerprint, hostname, 
 	if err := tx.Commit(); err != nil {
 		return "", 0, err
 	}
+
+	// Persist IP candidates and auto-pick ssh_host outside the tx (best-effort).
+	if len(cands) > 0 {
+		_ = saveCandidates(ctx, s.DB, serverID, cands)
+		_ = applyBestSSHHost(ctx, s.DB, serverID, cands)
+	}
+
 	return machine, serverID, nil
 }

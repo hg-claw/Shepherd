@@ -51,13 +51,21 @@ type Telemetry struct {
 	Disks    []Disk    `json:"disks"`
 }
 
+// IPCandidate is a single network address the agent detected at boot.
+type IPCandidate struct {
+	Addr   string `json:"addr"`
+	Kind   string `json:"kind"`   // public | private | cgnat | vpn
+	Source string `json:"source"` // interface name or "ipify"
+}
+
 type EnrollRequest struct {
-	EnrollmentToken string `json:"enrollment_token"`
-	Fingerprint     string `json:"fingerprint"`
-	OS              string `json:"os"`
-	Arch            string `json:"arch"`
-	Kernel          string `json:"kernel"`
-	AgentVersion    string `json:"agent_version"`
+	EnrollmentToken string        `json:"enrollment_token"`
+	Fingerprint     string        `json:"fingerprint"`
+	OS              string        `json:"os"`
+	Arch            string        `json:"arch"`
+	Kernel          string        `json:"kernel"`
+	AgentVersion    string        `json:"agent_version"`
+	IPCandidates    []IPCandidate `json:"ip_candidates,omitempty"`
 }
 
 type EnrollResponse struct {
@@ -66,11 +74,12 @@ type EnrollResponse struct {
 }
 
 type AutoRegisterRequest struct {
-	AutoRecoverKey string `json:"auto_recover_key"`
-	Fingerprint    string `json:"fingerprint"`
-	Hostname       string `json:"hostname"`
-	OS             string `json:"os"`
-	Arch           string `json:"arch"`
-	Kernel         string `json:"kernel"`
-	AgentVersion   string `json:"agent_version"`
+	AutoRecoverKey string        `json:"auto_recover_key"`
+	Fingerprint    string        `json:"fingerprint"`
+	Hostname       string        `json:"hostname"`
+	OS             string        `json:"os"`
+	Arch           string        `json:"arch"`
+	Kernel         string        `json:"kernel"`
+	AgentVersion   string        `json:"agent_version"`
+	IPCandidates   []IPCandidate `json:"ip_candidates,omitempty"`
 }

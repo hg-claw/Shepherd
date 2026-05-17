@@ -1,6 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './client'
 
+export interface IPCandidate {
+  server_id: number
+  addr: string
+  kind: string
+  source: string
+  detected_at: string
+}
+
+export function useServerIPCandidates(id: number) {
+  return useQuery({
+    queryKey: ['server-ip-candidates', id],
+    queryFn: () => api.get<IPCandidate[]>(`/api/servers/${id}/ip-candidates`),
+    enabled: !!id,
+  })
+}
+
 export type ServerRecord = {
   id: number
   name: string
@@ -114,6 +130,7 @@ export type PatchInput = {
   public_group?: string
   country_code?: string
   show_on_public?: boolean
+  ssh_host?: string
 }
 
 export function usePatchServer(id: number) {

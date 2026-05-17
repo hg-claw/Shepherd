@@ -19,7 +19,7 @@ type ServersAPI struct {
 	Query          *telemetrysvc.Query
 	Hub            *agentsvc.Hub
 	InstallManager *serversvc.InstallManager
-	Tokens         *agentsvc.Service // for repair
+	Tokens         *agentsvc.Service // for repair; also provides ListIPCandidates
 }
 
 func (a *ServersAPI) List(w http.ResponseWriter, r *http.Request) {
@@ -97,6 +97,7 @@ type patchReq struct {
 	PublicGroup  *string `json:"public_group"`
 	CountryCode  *string `json:"country_code"`
 	ShowOnPublic *bool   `json:"show_on_public"`
+	SSHHost      *string `json:"ssh_host"`
 }
 
 func (a *ServersAPI) Patch(w http.ResponseWriter, r *http.Request) {
@@ -112,7 +113,7 @@ func (a *ServersAPI) Patch(w http.ResponseWriter, r *http.Request) {
 	}
 	srv, err := a.Servers.Patch(r.Context(), id, serversvc.PatchInput{
 		Name: in.Name, PublicAlias: in.PublicAlias, PublicGroup: in.PublicGroup,
-		CountryCode: in.CountryCode, ShowOnPublic: in.ShowOnPublic,
+		CountryCode: in.CountryCode, ShowOnPublic: in.ShowOnPublic, SSHHost: in.SSHHost,
 	})
 	if errors.Is(err, serversvc.ErrNotFound) {
 		writeError(w, 404, "not found")
@@ -123,6 +124,23 @@ func (a *ServersAPI) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, srv)
+}
+
+// IPCandidates returns the known IP candidates for a server.
+// GET /api/servers/{id}/ip-candidates
+func (a *ServersAPI) IPCandidates(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || id <= 0 {
+		writeError(w, 400, "bad id")
+		return
+	}
+	rows, err := a.Tokens.ListIPCandidates(r.Context(), id)
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, rows)
 }
 
 func (a *ServersAPI) Delete(w http.ResponseWriter, r *http.Request) {

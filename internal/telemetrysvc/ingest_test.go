@@ -2,6 +2,7 @@ package telemetrysvc
 
 import (
 	"context"
+	"database/sql"
 	"path/filepath"
 	"testing"
 	"time"
@@ -19,6 +20,89 @@ func newIngest(t *testing.T) (*Ingest, int64) {
 	res, _ := d.Exec("INSERT INTO servers(name) VALUES ('h')")
 	id, _ := res.LastInsertId()
 	return &Ingest{DB: d}, id
+}
+
+func heartbeatFrame(t *testing.T, hb agentapi.Heartbeat) agentapi.Envelope {
+	t.Helper()
+	env, err := agentapi.Frame(agentapi.TypeHeartbeat, hb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return env
+}
+
+// TestHandleFrame_HeartbeatIPCandidates verifies that a heartbeat carrying
+// IPCandidates upserts into server_ip_candidates and auto-sets ssh_host.
+func TestHandleFrame_HeartbeatIPCandidates(t *testing.T) {
+	ing, sid := newIngest(t)
+	ctx := context.Background()
+
+	env := heartbeatFrame(t, agentapi.Heartbeat{
+		TS:           time.Now().UTC(),
+		AgentVersion: "1.0",
+		OS:           "linux",
+		Arch:         "amd64",
+		Kernel:       "6.0",
+		IPCandidates: []agentapi.IPCandidate{
+			{Addr: "203.0.113.1", Kind: "public", Source: "eth0"},
+			{Addr: "192.168.1.5", Kind: "private", Source: "eth1"},
+		},
+	})
+	ing.HandleFrame(ctx, sid, env)
+
+	// Both candidates must appear in server_ip_candidates.
+	var n int
+	if err := ing.DB.GetContext(ctx, &n, "SELECT COUNT(*) FROM server_ip_candidates WHERE server_id=?", sid); err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Fatalf("expected 2 ip candidates, got %d", n)
+	}
+
+	// The public IP should have been chosen as ssh_host (was empty before).
+	var sshHost sql.NullString
+	if err := ing.DB.GetContext(ctx, &sshHost, "SELECT ssh_host FROM servers WHERE id=?", sid); err != nil {
+		t.Fatal(err)
+	}
+	if !sshHost.Valid || sshHost.String != "203.0.113.1" {
+		t.Fatalf("expected ssh_host=203.0.113.1, got %v", sshHost)
+	}
+}
+
+// TestHandleFrame_HeartbeatNoCandidates verifies that a heartbeat with no
+// IPCandidates does not touch server_ip_candidates or ssh_host.
+func TestHandleFrame_HeartbeatNoCandidates(t *testing.T) {
+	ing, sid := newIngest(t)
+	ctx := context.Background()
+
+	// Seed a known ssh_host value.
+	if _, err := ing.DB.ExecContext(ctx, "UPDATE servers SET ssh_host='10.0.0.1' WHERE id=?", sid); err != nil {
+		t.Fatal(err)
+	}
+
+	// First heartbeat with candidates to populate the table.
+	ing.HandleFrame(ctx, sid, heartbeatFrame(t, agentapi.Heartbeat{
+		TS:           time.Now().UTC(),
+		AgentVersion: "1.0",
+		IPCandidates: []agentapi.IPCandidate{
+			{Addr: "203.0.113.2", Kind: "public", Source: "eth0"},
+		},
+	}))
+
+	// Second heartbeat without candidates — must not change ssh_host or add rows.
+	ing.HandleFrame(ctx, sid, heartbeatFrame(t, agentapi.Heartbeat{
+		TS:           time.Now().UTC(),
+		AgentVersion: "1.0",
+	}))
+
+	var sshHost sql.NullString
+	if err := ing.DB.GetContext(ctx, &sshHost, "SELECT ssh_host FROM servers WHERE id=?", sid); err != nil {
+		t.Fatal(err)
+	}
+	// ssh_host should still be admin-set value (10.0.0.1), not overwritten.
+	if !sshHost.Valid || sshHost.String != "10.0.0.1" {
+		t.Fatalf("expected ssh_host=10.0.0.1 (unchanged), got %v", sshHost)
+	}
 }
 
 func TestWriteSample_PersistsAndBumpsLastSeen(t *testing.T) {

@@ -43,8 +43,8 @@ func PickBest(cands []IPCandidate) string {
 	return cands[best].Addr
 }
 
-// saveCandidates upserts all candidates into server_ip_candidates.
-func saveCandidates(ctx context.Context, db *sqlx.DB, serverID int64, cands []IPCandidate) error {
+// SaveCandidates upserts all candidates into server_ip_candidates.
+func SaveCandidates(ctx context.Context, db *sqlx.DB, serverID int64, cands []IPCandidate) error {
 	now := time.Now().UTC()
 	for _, c := range cands {
 		if c.Addr == "" {
@@ -62,9 +62,9 @@ func saveCandidates(ctx context.Context, db *sqlx.DB, serverID int64, cands []IP
 	return nil
 }
 
-// applyBestSSHHost updates servers.ssh_host to PickBest(cands) only when the
+// ApplyBestSSHHost updates servers.ssh_host to PickBest(cands) only when the
 // existing value is empty / null. We never override an admin-chosen address.
-func applyBestSSHHost(ctx context.Context, db *sqlx.DB, serverID int64, cands []IPCandidate) error {
+func ApplyBestSSHHost(ctx context.Context, db *sqlx.DB, serverID int64, cands []IPCandidate) error {
 	best := PickBest(cands)
 	if best == "" {
 		return nil

@@ -72,8 +72,8 @@ func (s *Service) AutoRegister(ctx context.Context, key, fingerprint, hostname, 
 
 	// Persist IP candidates and auto-pick ssh_host outside the tx (best-effort).
 	if len(cands) > 0 {
-		_ = saveCandidates(ctx, s.DB, serverID, cands)
-		_ = applyBestSSHHost(ctx, s.DB, serverID, cands)
+		_ = SaveCandidates(ctx, s.DB, serverID, cands)
+		_ = ApplyBestSSHHost(ctx, s.DB, serverID, cands)
 	}
 
 	return machine, serverID, nil

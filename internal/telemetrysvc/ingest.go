@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
+	"github.com/hg-claw/Shepherd/internal/agentsvc"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -35,6 +36,14 @@ func (i *Ingest) HandleFrame(ctx context.Context, serverID int64, env agentapi.E
 			agent_last_seen=$1, agent_version=$2, agent_os=$3, agent_arch=$4, agent_kernel=$5
 			WHERE id=$6`,
 			time.Now().UTC(), h.AgentVersion, h.OS, h.Arch, h.Kernel, serverID)
+		if len(h.IPCandidates) > 0 {
+			cands := make([]agentsvc.IPCandidate, len(h.IPCandidates))
+			for j, c := range h.IPCandidates {
+				cands[j] = agentsvc.IPCandidate{Addr: c.Addr, Kind: c.Kind, Source: c.Source}
+			}
+			_ = agentsvc.SaveCandidates(ctx, i.DB, serverID, cands)
+			_ = agentsvc.ApplyBestSSHHost(ctx, i.DB, serverID, cands)
+		}
 	}
 }
 

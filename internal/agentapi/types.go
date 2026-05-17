@@ -24,11 +24,15 @@ type ConfigUpdate struct {
 }
 
 type Heartbeat struct {
-	TS           time.Time `json:"ts"`
-	AgentVersion string    `json:"agent_version"`
-	OS           string    `json:"os"`
-	Arch         string    `json:"arch"`
-	Kernel       string    `json:"kernel"`
+	TS           time.Time    `json:"ts"`
+	AgentVersion string       `json:"agent_version"`
+	OS           string       `json:"os"`
+	Arch         string       `json:"arch"`
+	Kernel       string       `json:"kernel"`
+	// IPCandidates is sent on the FIRST heartbeat after each WS connect.
+	// Server upserts into server_ip_candidates and auto-picks ssh_host when
+	// it's still empty. Periodic heartbeats omit the field to avoid DB churn.
+	IPCandidates []IPCandidate `json:"ip_candidates,omitempty"`
 }
 
 type Disk struct {

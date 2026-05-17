@@ -183,9 +183,16 @@ func (c *Client) dialAndRun(ctx context.Context) error {
 		_ = conn.Close()
 	}()
 
+	// Collect IP candidates and attach to the first heartbeat of this WS session.
+	netCands := netinfo.Collect(ctx)
+	wireCands := make([]agentapi.IPCandidate, len(netCands))
+	for i, nc := range netCands {
+		wireCands[i] = agentapi.IPCandidate{Addr: nc.Addr, Kind: nc.Kind, Source: nc.Source}
+	}
 	hb, _ := agentapi.Frame(agentapi.TypeHeartbeat, agentapi.Heartbeat{
 		TS: time.Now().UTC(), AgentVersion: c.Cfg.AgentVersion,
 		OS: runtime.GOOS, Arch: runtime.GOARCH, Kernel: kernelVersion(),
+		IPCandidates: wireCands,
 	})
 	if err := c.writeJSON(hb); err != nil {
 		return err

@@ -8,8 +8,11 @@ import (
 )
 
 type PluginsAPI struct {
-	Store *plugins.Store
-	Deps  plugins.Deps
+	Store        *plugins.Store
+	Deps         plugins.Deps
+	// SecretFields lists, per plugin ID, top-level JSON field names to redact
+	// from GET responses and preserve from PUT bodies when value equals "***".
+	SecretFields map[string][]string
 }
 
 type manifestEntry struct {
@@ -123,4 +126,65 @@ func (a *PluginsAPI) Disable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]any{"enabled": false})
+}
+
+const redactedSentinel = "***"
+
+func (a *PluginsAPI) GetConfig(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if _, ok := plugins.Get(id); !ok {
+		writeError(w, 404, "unknown plugin")
+		return
+	}
+	row, err := a.Store.Get(r.Context(), id)
+	if err != nil {
+		writeError(w, 404, "not configured")
+		return
+	}
+	out := map[string]any{}
+	if len(row.ConfigJSON) > 0 {
+		_ = json.Unmarshal(row.ConfigJSON, &out)
+	}
+	for _, k := range a.SecretFields[id] {
+		if _, ok := out[k]; ok {
+			out[k] = redactedSentinel
+		}
+	}
+	writeJSON(w, 200, out)
+}
+
+func (a *PluginsAPI) PutConfig(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if _, ok := plugins.Get(id); !ok {
+		writeError(w, 404, "unknown plugin")
+		return
+	}
+	var incoming map[string]any
+	if err := json.NewDecoder(r.Body).Decode(&incoming); err != nil {
+		writeError(w, 400, "bad json")
+		return
+	}
+	row, _ := a.Store.Get(r.Context(), id)
+	stored := map[string]any{}
+	if len(row.ConfigJSON) > 0 {
+		_ = json.Unmarshal(row.ConfigJSON, &stored)
+	}
+	secrets := map[string]bool{}
+	for _, k := range a.SecretFields[id] {
+		secrets[k] = true
+	}
+	for k, v := range incoming {
+		if secrets[k] {
+			if s, ok := v.(string); ok && s == redactedSentinel {
+				continue
+			}
+		}
+		stored[k] = v
+	}
+	merged, _ := json.Marshal(stored)
+	if err := a.Store.PutConfig(r.Context(), id, merged); err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]any{"ok": true})
 }

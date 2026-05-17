@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -126,4 +127,60 @@ func TestPluginsDisable(t *testing.T) {
 	if rec.disableCalls != 1 { t.Fatalf("disableCalls = %d", rec.disableCalls) }
 	row, _ := api.Store.Get(context.Background(), "r")
 	if row.Enabled { t.Fatal("expected enabled=false after disable") }
+}
+
+func TestPluginsConfig_RedactsSecrets(t *testing.T) {
+	plugins.ResetRegistryForTestPublic()
+	plugins.Register(plainP{id: "p"})
+	dsn := "file:" + filepath.Join(t.TempDir(), "cfg.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+	st := &plugins.Store{DB: d, Now: time.Now}
+	_ = st.UpsertEnabled(context.Background(), "p", true)
+	_ = st.PutConfig(context.Background(), "p", []byte(`{"api_token":"abc123","public":"x"}`))
+	api := &PluginsAPI{Store: st, Deps: plugins.Deps{DB: d, Now: time.Now},
+		SecretFields: map[string][]string{"p": {"api_token"}}}
+
+	r := httptest.NewRequest("GET", "/api/admin/plugins/p/config", nil)
+	r.SetPathValue("id", "p")
+	w := httptest.NewRecorder()
+	api.GetConfig(w, r)
+	if w.Code != 200 { t.Fatalf("code=%d", w.Code) }
+	var got map[string]any
+	_ = json.Unmarshal(w.Body.Bytes(), &got)
+	if got["api_token"] != "***" {
+		t.Fatalf("api_token should be redacted: %v", got)
+	}
+	if got["public"] != "x" {
+		t.Fatalf("public field should pass through: %v", got)
+	}
+}
+
+func TestPluginsConfig_PutPreservesUneditedSecrets(t *testing.T) {
+	plugins.ResetRegistryForTestPublic()
+	plugins.Register(plainP{id: "p"})
+	dsn := "file:" + filepath.Join(t.TempDir(), "put.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+	st := &plugins.Store{DB: d, Now: time.Now}
+	_ = st.UpsertEnabled(context.Background(), "p", true)
+	_ = st.PutConfig(context.Background(), "p", []byte(`{"api_token":"real-secret","other":"v"}`))
+	api := &PluginsAPI{Store: st, Deps: plugins.Deps{DB: d, Now: time.Now},
+		SecretFields: map[string][]string{"p": {"api_token"}}}
+
+	body := strings.NewReader(`{"api_token":"***","other":"new"}`)
+	r := httptest.NewRequest("PUT", "/api/admin/plugins/p/config", body)
+	r.SetPathValue("id", "p")
+	w := httptest.NewRecorder()
+	api.PutConfig(w, r)
+	if w.Code != 200 { t.Fatalf("code=%d body=%s", w.Code, w.Body.String()) }
+	row, _ := st.Get(context.Background(), "p")
+	var stored map[string]any
+	_ = json.Unmarshal(row.ConfigJSON, &stored)
+	if stored["api_token"] != "real-secret" {
+		t.Fatalf("redacted *** should NOT overwrite real secret; got %v", stored)
+	}
+	if stored["other"] != "new" {
+		t.Fatalf("other field should be updated: %v", stored)
+	}
 }

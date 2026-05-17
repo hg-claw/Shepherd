@@ -184,3 +184,54 @@ func TestPluginsConfig_PutPreservesUneditedSecrets(t *testing.T) {
 		t.Fatalf("other field should be updated: %v", stored)
 	}
 }
+
+func TestPluginsHosts_PostThenList(t *testing.T) {
+	plugins.ResetRegistryForTestPublic()
+	plugins.Register(hostP{plainP: plainP{id: "h"}})
+	dsn := "file:" + filepath.Join(t.TempDir(), "h.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+	_, _ = d.Exec(`INSERT INTO servers(name) VALUES('s1')`)
+	st := &plugins.Store{DB: d, Now: time.Now}
+	_ = st.UpsertEnabled(context.Background(), "h", true)
+	api := &PluginsAPI{Store: st, Deps: plugins.Deps{DB: d, Now: time.Now}}
+
+	body := strings.NewReader(`{"server_id":1,"config":{"port":443}}`)
+	r := httptest.NewRequest("POST", "/api/admin/plugins/h/hosts", body)
+	r.SetPathValue("id", "h")
+	w := httptest.NewRecorder()
+	api.PostHost(w, r)
+	if w.Code != 200 { t.Fatalf("post code=%d body=%s", w.Code, w.Body.String()) }
+
+	r = httptest.NewRequest("GET", "/api/admin/plugins/h/hosts", nil)
+	r.SetPathValue("id", "h")
+	w = httptest.NewRecorder()
+	api.ListHosts(w, r)
+	var out []map[string]any
+	_ = json.Unmarshal(w.Body.Bytes(), &out)
+	if len(out) != 1 || out[0]["server_id"].(float64) != 1 {
+		t.Fatalf("ListHosts = %v", out)
+	}
+}
+
+func TestPluginsHosts_DeleteCallsUndeploy(t *testing.T) {
+	plugins.ResetRegistryForTestPublic()
+	plugins.Register(hostP{plainP: plainP{id: "h"}})
+	dsn := "file:" + filepath.Join(t.TempDir(), "h2.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+	_, _ = d.Exec(`INSERT INTO servers(name) VALUES('s1')`)
+	st := &plugins.Store{DB: d, Now: time.Now}
+	_ = st.UpsertEnabled(context.Background(), "h", true)
+	_, _ = st.UpsertHost(context.Background(), "h", 1, []byte(`{}`), "running")
+	api := &PluginsAPI{Store: st, Deps: plugins.Deps{DB: d, Now: time.Now}}
+
+	r := httptest.NewRequest("DELETE", "/api/admin/plugins/h/hosts/1", nil)
+	r.SetPathValue("id", "h")
+	r.SetPathValue("server_id", "1")
+	w := httptest.NewRecorder()
+	api.DeleteHost(w, r)
+	if w.Code != 200 { t.Fatalf("code=%d", w.Code) }
+	hosts, _ := st.ListHosts(context.Background(), "h")
+	if len(hosts) != 0 { t.Fatalf("host should be deleted: %v", hosts) }
+}

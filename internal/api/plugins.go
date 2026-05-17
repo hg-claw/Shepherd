@@ -1,8 +1,11 @@
 package api
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/hg-claw/Shepherd/internal/plugins"
 )
@@ -187,4 +190,95 @@ func (a *PluginsAPI) PutConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]any{"ok": true})
+}
+
+type hostBody struct {
+	ServerID int64           `json:"server_id"`
+	Version  string          `json:"version"`
+	Config   json.RawMessage `json:"config"`
+}
+
+func (a *PluginsAPI) ListHosts(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	p, ok := plugins.Get(id)
+	if !ok { writeError(w, 404, "unknown plugin"); return }
+	if _, ok := p.(plugins.HostAware); !ok { writeError(w, 404, "not host-aware"); return }
+	hosts, err := a.Store.ListHosts(r.Context(), id)
+	if err != nil { writeError(w, 500, err.Error()); return }
+	out := make([]map[string]any, 0, len(hosts))
+	for _, h := range hosts {
+		out = append(out, hostRowToMap(h))
+	}
+	writeJSON(w, 200, out)
+}
+
+func (a *PluginsAPI) GetHost(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	sid, _ := strconv.ParseInt(r.PathValue("server_id"), 10, 64)
+	h, err := a.Store.GetHost(r.Context(), id, sid)
+	if err != nil { writeError(w, 404, "no such host row"); return }
+	writeJSON(w, 200, hostRowToMap(h))
+}
+
+func (a *PluginsAPI) PostHost(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	p, ok := plugins.Get(id)
+	if !ok { writeError(w, 404, "unknown plugin"); return }
+	ha, ok := p.(plugins.HostAware)
+	if !ok { writeError(w, 404, "not host-aware"); return }
+	row, _ := a.Store.Get(r.Context(), id)
+	if !row.Enabled { writeError(w, 400, "plugin disabled"); return }
+
+	var body hostBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, 400, "bad json"); return
+	}
+	if body.ServerID == 0 { writeError(w, 400, "server_id required"); return }
+	cfg := []byte(body.Config)
+	if len(cfg) == 0 { cfg = []byte(`{}`) }
+	host, err := a.Store.UpsertHost(r.Context(), id, body.ServerID, cfg, "deploying")
+	if err != nil { writeError(w, 500, err.Error()); return }
+
+	go func() {
+		ctx := context.Background()
+		if err := ha.DeployToHost(ctx, a.Deps, body.ServerID, cfg); err != nil {
+			_ = a.Store.SetHostStatus(ctx, id, body.ServerID, "failed", body.Version, err.Error())
+			return
+		}
+		_ = a.Store.SetHostStatus(ctx, id, body.ServerID, "running", body.Version, "")
+	}()
+	writeJSON(w, 200, hostRowToMap(host))
+}
+
+func (a *PluginsAPI) DeleteHost(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	sid, _ := strconv.ParseInt(r.PathValue("server_id"), 10, 64)
+	p, ok := plugins.Get(id)
+	if !ok { writeError(w, 404, "unknown plugin"); return }
+	if ha, ok := p.(plugins.HostAware); ok {
+		_ = ha.UndeployFromHost(r.Context(), a.Deps, sid)
+	}
+	if err := a.Store.DeleteHost(r.Context(), id, sid); err != nil {
+		writeError(w, 500, err.Error()); return
+	}
+	writeJSON(w, 200, map[string]any{"ok": true})
+}
+
+func hostRowToMap(h plugins.HostRow) map[string]any {
+	var cfg any
+	_ = json.Unmarshal(h.ConfigJSON, &cfg)
+	return map[string]any{
+		"id":               h.ID,
+		"server_id":        h.ServerID,
+		"config":           cfg,
+		"deployed_version": nullStringValue(h.DeployedVersion),
+		"status":           h.Status,
+		"last_error":       nullStringValue(h.LastError),
+		"updated_at":       h.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z"),
+	}
+}
+
+func nullStringValue(s sql.NullString) any {
+	if s.Valid { return s.String }
+	return nil
 }

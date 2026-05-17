@@ -111,6 +111,16 @@ type HostStatus struct {
     Message     string // 给 UI 显示的诊断信息
     CheckedAt   time.Time
 }
+
+// 可选能力:能从主机上拉守护进程日志的插件实现这个。
+// 详见 §11.2。
+type LogStreamer interface {
+    HostAware
+    // LogStreamCommand 返回在目标主机上执行以产生日志流的命令。
+    // 通常是 `journalctl -u <unit> -f --no-pager -n 200`。
+    // 运行时通过现有 agent PTY 通道拉起,把 stdout 流回前端 WS。
+    LogStreamCommand(serverID int64) (cmd string, args []string, err error)
+}
 ```
 
 插件在自己包的 `init()` 中注册：
@@ -389,6 +399,8 @@ POST   /api/admin/plugins/{id}/hosts            # 部署
 PUT    /api/admin/plugins/{id}/hosts/{server_id}
 DELETE /api/admin/plugins/{id}/hosts/{server_id}
 GET    /api/admin/plugins/{id}/hosts/{server_id}
+GET    /api/admin/plugins/{id}/events?since=...&limit=...   # 服务端插件事件 (审计过滤)
+WS     /api/admin/plugins/{id}/hosts/{server_id}/logs       # 主机守护进程日志流 (LogStreamer 才有)
 ```
 
 每插件特有：
@@ -431,15 +443,99 @@ GET    /api/admin/plugins/cloudflare/audit
   验证 token 转发、响应脱敏、错误映射
 - `internal/api/plugins_test.go`：用两个 fake 注册插件（一个 HostAware、一个不是）端到端
   测启用/禁用/manifest
-- 前端：插件中心首页的渲染测试（用 MSW stub `/api/admin/plugins`）
+- `internal/api/plugins_events_test.go`：events 端点按 `plugin.<id>.%` 过滤的正确性
+- `internal/api/plugins_logs_test.go`：LogStreamer WS 端点用 fake PTY 通道,
+  验证 stdout 分帧、JSON 信封序列化、断开时 SIGTERM 下发
+- 前端：插件中心首页的渲染测试 + Events tab 渲染（用 MSW stub `/api/admin/plugins` 和 `events`）
 
 不做真 xray 的端到端测试；那需要 Linux VM 和真实 systemd。手工冒烟 checklist 写在实现 plan 里。
 
-## 10. 后续 phase 推迟项
+## 11. 插件日志
+
+两类日志,分开处理。
+
+### 11.1 服务端插件事件
+
+插件所有生命周期 / 部署 / 配置变更操作已经走 audit log,只需要在插件中心的详情页加一个
+"Events" tab,后端按 `action LIKE 'plugin.<id>.%'` 过滤现有 `audit_log` 表。无需新表。
+
+`GET /api/admin/plugins/{id}/events?since=2026-05-15T00:00:00Z&limit=200` 返回:
+
+```json
+[
+  { "ts": "2026-05-16T08:14:01Z", "admin": "admin", "server_id": 7,
+    "action": "plugin.xray.host.deployed",
+    "result": "ok",
+    "details": { "version": "1.8.11" } },
+  { "ts": "2026-05-16T08:13:50Z", "admin": "admin", "server_id": null,
+    "action": "plugin.xray.binary.downloaded",
+    "result": "ok",
+    "details": { "version": "1.8.11", "os": "linux", "arch": "amd64", "size_bytes": 12345678 } }
+]
+```
+
+约定插件操作的审计 action 命名为 `plugin.<id>.<verb>`(例如 `plugin.xray.enabled`、
+`plugin.xray.host.deployed`、`plugin.cloudflare.dns.record.created`)。
+
+UI:Plugin Center 详情页 Events tab,表格列 = 时间 / 主机 / action / 结果 / 详情。
+每个 HostAware 插件的"主机详情"页也复用同一 endpoint 加 `server_id` 过滤,展示该主机的相关历史。
+
+### 11.2 主机守护进程日志(LogStreamer)
+
+新增可选接口 `LogStreamer`(见 §2.2),HostAware 插件可附带实现。xray 实现:
+
+```go
+func (p *xrayPlugin) LogStreamCommand(serverID int64) (string, []string, error) {
+    return "journalctl", []string{
+        "-u", "shepherd-xray",
+        "-f",
+        "--no-pager",
+        "-n", "200",
+        "-o", "short-iso",
+    }, nil
+}
+```
+
+**WS 协议**
+
+`WS /api/admin/plugins/{id}/hosts/{server_id}/logs`(走现有 admin auth cookie):
+
+1. 服务端拿插件的 `LogStreamCommand`,组装为一个临时 PTY 会话(`internal/ptysvc`),
+   通过 agent ws 通道拉起。会话用 `kind = "plugin_log"`(新增 audit kind,不复用 console)
+2. agent 端把命令 stdout 包成二进制帧回流(沿用 ptyrunner 的输出帧格式)
+3. 服务端把每帧拆行,作为 WS text 帧发给前端,JSON 信封:
+   ```json
+   { "ts": "2026-05-16T10:12:33+08:00", "level": "info", "line": "..." }
+   ```
+   level 默认 `info`,如果插件未来加 `ParseLogLine` 钩子可以提取
+4. 前端断开 WS → 服务端发送 SIGTERM 给 PTY 会话 → journalctl 退出 → agent 关流
+
+**前端 UI**
+
+Plugin Hosts tab 详情里加 "Logs" 子 tab。等宽字体的终端面板,自动滚到底部,
+顶部工具栏:暂停/继续滚动、清屏、按 level 过滤、下载当前缓冲为 .log。
+默认显示最近 200 行 + 接着 follow。
+
+**审计**
+
+每次开 LogStream 写一条 `plugin.<id>.logs.opened`;关闭写 `.closed`。
+保持与 console PTY 的审计粒度一致。
+
+**限流 / 滥用防护**
+
+- 单 admin 同时打开的 plugin log 流 ≤ 4(复用 `pty_max_concurrent_per_admin` 同一上限)
+- 单条日志行截断到 8 KB,避免恶意大行打爆 WS
+
+**cloudflare 不实现 LogStreamer**——它没有主机端守护进程。CF 的"活动日志"已经在
+§6.3 的 Activity tab(走 `/audit?since=...`)。
+
+## 12. 后续 phase 推迟项
 
 - relay 插件（3b）
 - xray 在 macOS 上走 launchd（3b）
 - 插件指标回写 Shepherd 遥测（如 xray 连接数）——需要 plugin → telemetrysvc 桥
 - 插件更新提醒（检测到新 xray release）
 - 单台主机多版本共存（今天只支持每台一个部署版本）
+- 日志结构化解析（`ParseLogLine` 钩子 / 按字段过滤 / 按字段聚合统计）——3a 只做原始行流
+- 跨主机日志聚合视图（同时看多台主机的同一插件日志）
 - 第三方插件的 sidecar / WASM 模型（3c，如果真有那天）

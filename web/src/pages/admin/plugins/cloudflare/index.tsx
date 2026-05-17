@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import SetupTab from './SetupTab'
 import ZonesTab from './ZonesTab'
+import DnsTab from './DnsTab'
+import ActivityTab from './ActivityTab'
 
 export default function CloudflarePlugin() {
   return (
@@ -8,7 +10,8 @@ export default function CloudflarePlugin() {
       <Route index element={<Navigate to="setup" replace />} />
       <Route path="setup" element={<SetupTab />} />
       <Route path="zones" element={<ZonesTab />} />
-      {/* dns + activity in Task 29 */}
+      <Route path="dns" element={<DnsTab />} />
+      <Route path="activity" element={<ActivityTab />} />
     </Routes>
   )
 }

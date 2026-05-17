@@ -252,94 +252,99 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-dvh grid grid-rows-[48px_1fr] md:grid-cols-[232px_1fr] bg-background text-foreground">
-      <header className="md:col-span-2 flex items-center gap-3 px-3 sm:px-4 border-b bg-elev sticky top-0 z-30">
-        <div className="hidden md:flex w-[218px] pr-3.5 border-r self-stretch items-center">
+      {/* Header uses two flush cells so the brand's right border lines up
+          with the sidebar's right border (both at exactly 232px). The cells
+          own their own padding — the outer <header> has none. */}
+      <header className="md:col-span-2 flex items-stretch border-b bg-elev sticky top-0 z-30 h-12">
+        <div className="hidden md:flex w-[232px] shrink-0 items-center px-4 border-r">
           <BrandMark />
           <span className="ml-auto text-fg-dim text-[10.5px] font-mono">v0.2.1</span>
         </div>
 
-        <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-          <SheetTrigger asChild>
+        <div className="flex flex-1 items-center gap-3 px-3 sm:px-4 min-w-0">
+          <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden -ml-1 h-8 w-8"
+                aria-label={t('nav.menu', 'Menu')}
+              >
+                <Menu className="h-4 w-4" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-64 p-0 sm:max-w-xs">
+              <div className="px-4 py-3 border-b h-12 flex items-center">
+                <BrandMark />
+              </div>
+              <NavList onNavigate={() => setDrawerOpen(false)} />
+            </SheetContent>
+          </Sheet>
+
+          <div className="md:hidden">
+            <BrandMark />
+          </div>
+
+          <div className="hidden md:flex items-center gap-2 text-muted-foreground text-[13px] whitespace-nowrap min-w-0 flex-1">
+            {crumbs.map((c, i) => {
+              const last = i === crumbs.length - 1
+              return (
+                <span key={i} className="flex items-center gap-2 min-w-0">
+                  {i > 0 && <span className="text-fg-dim shrink-0">/</span>}
+                  {c.to && !last ? (
+                    <Link
+                      to={c.to}
+                      className="hover:text-foreground transition-colors truncate"
+                    >
+                      {c.label}
+                    </Link>
+                  ) : (
+                    <span
+                      className={cn(
+                        'truncate max-w-[16rem]',
+                        last && 'text-foreground font-medium',
+                      )}
+                    >
+                      {c.label}
+                    </span>
+                  )}
+                </span>
+              )
+            })}
+          </div>
+
+          <div className="ml-auto flex items-center gap-1.5">
+            <Button
+              asChild
+              size="sm"
+              variant="default"
+              className="hidden sm:inline-flex h-7 px-2.5 text-[12.5px]"
+            >
+              <Link to="/admin/servers/new">
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                {t('admin.add_server')}
+              </Link>
+            </Button>
+            <ThemeToggle />
+            <LangToggle />
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden -ml-1 h-8 w-8"
-              aria-label={t('nav.menu', 'Menu')}
+              onClick={onLogout}
+              aria-label={t('auth.logout')}
+              className="h-8 w-8"
             >
-              <Menu className="h-4 w-4" />
+              <LogOut className="h-4 w-4" />
             </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-64 p-0 sm:max-w-xs">
-            <div className="px-4 py-3 border-b">
-              <BrandMark />
-            </div>
-            <NavList onNavigate={() => setDrawerOpen(false)} />
-          </SheetContent>
-        </Sheet>
-
-        <div className="md:hidden">
-          <BrandMark />
-        </div>
-
-        <div className="hidden md:flex items-center gap-2 text-muted-foreground text-[13px] whitespace-nowrap min-w-0 flex-1">
-          {crumbs.map((c, i) => {
-            const last = i === crumbs.length - 1
-            return (
-              <span key={i} className="flex items-center gap-2 min-w-0">
-                {i > 0 && <span className="text-fg-dim shrink-0">/</span>}
-                {c.to && !last ? (
-                  <Link
-                    to={c.to}
-                    className="hover:text-foreground transition-colors truncate"
-                  >
-                    {c.label}
-                  </Link>
-                ) : (
-                  <span
-                    className={cn(
-                      'truncate max-w-[16rem]',
-                      last && 'text-foreground font-medium',
-                    )}
-                  >
-                    {c.label}
-                  </span>
-                )}
+            {admin && (
+              <span
+                title={admin.username}
+                className="grid place-items-center h-7 w-7 rounded-full bg-sunken border text-[11px] font-mono uppercase shrink-0"
+              >
+                {admin.username.slice(0, 1)}
               </span>
-            )
-          })}
-        </div>
-
-        <div className="ml-auto flex items-center gap-1.5">
-          <Button
-            asChild
-            size="sm"
-            variant="default"
-            className="hidden sm:inline-flex h-7 px-2.5 text-[12.5px]"
-          >
-            <Link to="/admin/servers/new">
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              {t('admin.add_server')}
-            </Link>
-          </Button>
-          <ThemeToggle />
-          <LangToggle />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onLogout}
-            aria-label={t('auth.logout')}
-            className="h-8 w-8"
-          >
-            <LogOut className="h-4 w-4" />
-          </Button>
-          {admin && (
-            <span
-              title={admin.username}
-              className="grid place-items-center h-7 w-7 rounded-full bg-sunken border text-[11px] font-mono uppercase shrink-0"
-            >
-              {admin.username.slice(0, 1)}
-            </span>
-          )}
+            )}
+          </div>
         </div>
       </header>
 

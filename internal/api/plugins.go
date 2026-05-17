@@ -9,6 +9,7 @@ import (
 
 type PluginsAPI struct {
 	Store *plugins.Store
+	Deps  plugins.Deps
 }
 
 type manifestEntry struct {
@@ -57,4 +58,69 @@ func (a *PluginsAPI) List(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(out)
+}
+
+func (a *PluginsAPI) Enable(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	p, ok := plugins.Get(id)
+	if !ok {
+		writeError(w, 404, "unknown plugin")
+		return
+	}
+	ctx := r.Context()
+	row, _ := a.Store.Get(ctx, id)
+	if row.Enabled {
+		writeJSON(w, 200, map[string]any{"enabled": true})
+		return
+	}
+	if err := plugins.RunPluginMigrations(ctx, a.Deps.DB, id, p.Migrations()); err != nil {
+		writeError(w, 500, "migrations: "+err.Error())
+		return
+	}
+	if err := p.OnEnable(ctx, a.Deps); err != nil {
+		writeError(w, 500, "OnEnable: "+err.Error())
+		return
+	}
+	if err := a.Store.UpsertEnabled(ctx, id, true); err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]any{"enabled": true})
+}
+
+func (a *PluginsAPI) Disable(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	p, ok := plugins.Get(id)
+	if !ok {
+		writeError(w, 404, "unknown plugin")
+		return
+	}
+	ctx := r.Context()
+	row, _ := a.Store.Get(ctx, id)
+	if !row.Enabled {
+		writeJSON(w, 200, map[string]any{"enabled": false})
+		return
+	}
+	// HostAware: best-effort undeploy on every host with status running|failed
+	if ha, ok := p.(plugins.HostAware); ok {
+		hosts, _ := a.Store.ListHosts(ctx, id)
+		for _, h := range hosts {
+			if h.Status == "running" || h.Status == "failed" {
+				if err := ha.UndeployFromHost(ctx, a.Deps, h.ServerID); err != nil {
+					_ = a.Store.SetHostStatus(ctx, id, h.ServerID, "stopped", h.DeployedVersion.String, err.Error())
+				} else {
+					_ = a.Store.SetHostStatus(ctx, id, h.ServerID, "stopped", h.DeployedVersion.String, "")
+				}
+			}
+		}
+	}
+	if err := p.OnDisable(ctx, a.Deps); err != nil {
+		writeError(w, 500, "OnDisable: "+err.Error())
+		return
+	}
+	if err := a.Store.UpsertEnabled(ctx, id, false); err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]any{"enabled": false})
 }

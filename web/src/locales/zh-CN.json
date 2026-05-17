@@ -13,10 +13,18 @@
   },
   "wall": {
     "title": "服务器状态",
+    "subtitle": "公开健康度概览 — 已脱敏",
     "online": "在线",
     "offline": "离线",
     "no_servers": "暂无公开展示的服务器",
-    "ungrouped": "未分组"
+    "ungrouped": "未分组",
+    "stat": {
+      "total": "节点"
+    }
+  },
+  "public_detail": {
+    "window": "遥测窗口",
+    "redaction": "主机名、IP、数据中心等标识信息在公开页面已被脱敏。"
   },
   "metric": {
     "cpu": "CPU",
@@ -77,6 +85,15 @@
     "retention_5m": "5min 聚合保留期",
     "retention_1h": "1h 聚合保留期",
     "default_telemetry_interval_seconds": "默认采样间隔（秒）",
+    "tab": {
+      "about": "关于",
+      "storage": "存储",
+      "keys": "恢复密钥",
+      "security": "安全 & 沙箱",
+      "audit": "审计 & 保留",
+      "appearance": "外观"
+    },
+    "appearance_hint": "主题和语言已迁移到顶部导航栏,任意页面均可切换。",
     "phase2_header": "远程运维",
     "file_sandbox_enabled": "启用文件沙箱",
     "file_sandbox_paths": "沙箱路径（每行一个）",
@@ -93,9 +110,42 @@
   },
   "nav": {
     "menu": "菜单",
+    "overview": "总览",
+    "hosts": "主机",
+    "public_wall": "公开墙",
+    "batch": "批量执行",
+    "files": "文件",
+    "plugins": "插件",
     "scripts": "脚本",
     "script_runs": "执行历史",
-    "audit": "审计日志"
+    "audit": "审计日志",
+    "section": {
+      "workspace": "工作区",
+      "ops": "运维",
+      "system": "系统",
+      "recent": "最近访问"
+    },
+    "recent_empty": "访问任意主机即可显示"
+  },
+  "filter": {
+    "all": "全部",
+    "ok": "健康",
+    "warn": "警告",
+    "err": "严重",
+    "offline": "离线"
+  },
+  "view": {
+    "grid": "卡片",
+    "table": "表格"
+  },
+  "hosts": {
+    "of": "共",
+    "kpi": {
+      "online": "在线",
+      "cpu": "平均 CPU",
+      "mem": "平均内存",
+      "alerts": "告警"
+    }
   },
   "common": {
     "loading": "加载中…",
@@ -147,7 +197,19 @@
     "mtime": "修改时间",
     "upload": "上传",
     "mkdir": "新建文件夹",
-    "preview": "预览"
+    "preview": "预览",
+    "hub_sub": "选择一台主机以浏览文件系统并传输文件。",
+    "hub_empty": "暂无主机",
+    "page_sub": "通过 Shepherd 代理浏览远程文件系统并打开 PTY,所有操作均记录审计。",
+    "items": "项",
+    "drop_hint": "拖拽到此区域上传",
+    "transfers": "传输队列",
+    "no_transfers": "暂无传输"
+  },
+  "plugins": {
+    "subtitle": "通过日志解析、自定义指标采集、告警转发等插件扩展 Shepherd 代理。",
+    "placeholder_title": "插件运行时未启用",
+    "placeholder_body": "当前版本未内置插件主机进程。插件沙箱、签名分发与按主机启用功能仍在规划中。"
   },
   "audit": {
     "title": "审计日志",

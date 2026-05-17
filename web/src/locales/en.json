@@ -10,10 +10,18 @@
   },
   "wall": {
     "title": "Server status",
+    "subtitle": "Public health overview — identifying data redacted.",
     "online": "online",
     "offline": "offline",
     "no_servers": "No public servers",
-    "ungrouped": "Ungrouped"
+    "ungrouped": "Ungrouped",
+    "stat": {
+      "total": "Hosts"
+    }
+  },
+  "public_detail": {
+    "window": "Telemetry window",
+    "redaction": "Identifying details (hostname, IP, datacenter) are intentionally redacted on the public status page."
   },
   "metric": { "cpu": "CPU", "mem": "Memory", "disk": "Disk", "net": "Network", "load": "Load", "tcp": "TCP" },
   "level": { "low": "low", "mid": "med", "high": "high", "alert": "alert" },
@@ -58,6 +66,15 @@
     "retention_5m": "5m rollup retention",
     "retention_1h": "1h rollup retention",
     "default_telemetry_interval_seconds": "Default sampling interval (sec)",
+    "tab": {
+      "about": "About",
+      "storage": "Storage",
+      "keys": "Recovery key",
+      "security": "Security & sandbox",
+      "audit": "Audit & retention",
+      "appearance": "Appearance"
+    },
+    "appearance_hint": "Theme and language live in the top bar so you can change them on any page.",
     "phase2_header": "Remote Ops",
     "file_sandbox_enabled": "Enable file sandbox",
     "file_sandbox_paths": "Sandbox paths (one per line)",
@@ -74,9 +91,42 @@
   },
   "nav": {
     "menu": "Menu",
+    "overview": "Overview",
+    "hosts": "Hosts",
+    "public_wall": "Public wall",
+    "batch": "Batch",
+    "files": "Files",
+    "plugins": "Plugins",
     "scripts": "Scripts",
     "script_runs": "Run history",
-    "audit": "Audit log"
+    "audit": "Audit log",
+    "section": {
+      "workspace": "Workspace",
+      "ops": "Operations",
+      "system": "System",
+      "recent": "Recent hosts"
+    },
+    "recent_empty": "visit a host to see it here"
+  },
+  "filter": {
+    "all": "All",
+    "ok": "Healthy",
+    "warn": "Warn",
+    "err": "Critical",
+    "offline": "Offline"
+  },
+  "view": {
+    "grid": "Grid",
+    "table": "Table"
+  },
+  "hosts": {
+    "of": "of",
+    "kpi": {
+      "online": "Online",
+      "cpu": "Avg CPU",
+      "mem": "Avg memory",
+      "alerts": "Alerts"
+    }
   },
   "common": {
     "loading": "Loading…",
@@ -128,7 +178,19 @@
     "mtime": "Modified",
     "upload": "Upload",
     "mkdir": "New folder",
-    "preview": "Preview"
+    "preview": "Preview",
+    "hub_sub": "Pick a host to browse its filesystem and transfer files.",
+    "hub_empty": "No hosts available",
+    "page_sub": "Browse the remote filesystem and open a live PTY through the Shepherd agent. Every action is audit-logged.",
+    "items": "items",
+    "drop_hint": "drop files here to upload",
+    "transfers": "Transfers",
+    "no_transfers": "no transfers yet"
+  },
+  "plugins": {
+    "subtitle": "Extend the Shepherd agent with log parsers, extra metric collectors, and alert routers.",
+    "placeholder_title": "Plugin runtime not enabled",
+    "placeholder_body": "This release ships without a plugin host. The plugin sandbox, signed distribution, and per-host enablement are tracked separately."
   },
   "audit": {
     "title": "Audit log",

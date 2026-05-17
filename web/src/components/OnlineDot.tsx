@@ -5,19 +5,13 @@ export function OnlineDot({ online }: { online: boolean }) {
   const { t } = useTranslation()
   const label = online ? t('wall.online') : t('wall.offline')
   return (
-    <span className="relative inline-flex h-2 w-2" title={label} aria-label={label}>
-      {online && (
-        <span
-          className="absolute inset-0 inline-flex h-full w-full rounded-full bg-level-low/60 motion-safe:animate-ping"
-          aria-hidden
-        />
+    <span
+      className={cn(
+        'inline-block h-1.5 w-1.5 rounded-full',
+        online ? 'bg-ok shadow-[0_0_0_3px_hsl(var(--ok-soft))] motion-safe:shep-pulse' : 'bg-err shadow-[0_0_0_3px_hsl(var(--err-soft))]',
       )}
-      <span
-        className={cn(
-          'relative inline-flex h-2 w-2 rounded-full',
-          online ? 'bg-level-low shadow-[0_0_6px_hsl(var(--level-low)/0.7)]' : 'bg-level-alert',
-        )}
-      />
-    </span>
+      title={label}
+      aria-label={label}
+    />
   )
 }

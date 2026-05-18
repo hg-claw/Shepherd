@@ -1,0 +1,2 @@
+-- No-op: removing paths automatically would risk dropping admin
+-- customizations and isn't safely reversible.

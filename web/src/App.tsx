@@ -10,6 +10,7 @@ const ServerList = lazy(() => import('./pages/admin/ServerList'))
 const ServerNew = lazy(() => import('./pages/admin/ServerNew'))
 const AdminServerDetail = lazy(() => import('./pages/admin/ServerDetail'))
 const Settings = lazy(() => import('./pages/admin/Settings'))
+const PluginDetail = lazy(() => import('./pages/admin/plugins/detail'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
 import { PublicLayout } from './layouts/PublicLayout'
@@ -21,7 +22,7 @@ import ScriptRunsPage from './pages/admin/ScriptRunsPage'
 import ScriptRunDetailPage from './pages/admin/ScriptRunDetailPage'
 import FileBrowserPage from './pages/admin/FileBrowserPage'
 import FilesHubPage from './pages/admin/FilesHubPage'
-import PluginsPage from './pages/admin/PluginsPage'
+import PluginsIndex from './pages/admin/plugins'
 import AuditLogPage from './pages/admin/AuditLogPage'
 import RecordingPlayerPage from './pages/admin/RecordingPlayerPage'
 import { ConsoleDock } from './components/ConsoleDock'
@@ -58,7 +59,8 @@ export default function App() {
           <Route path="/admin/script-runs/:id" element={<ScriptRunDetailPage />} />
           <Route path="/admin/files" element={<FilesHubPage />} />
           <Route path="/admin/files/:serverId" element={<FileBrowserPage />} />
-          <Route path="/admin/plugins" element={<PluginsPage />} />
+          <Route path="/admin/plugins" element={<PluginsIndex />} />
+          <Route path="/admin/plugins/:id/*" element={<PluginDetail />} />
           <Route path="/admin/audit" element={<AuditLogPage />} />
           <Route path="/admin/recordings/:id" element={<RecordingPlayerPage />} />
         </Route>

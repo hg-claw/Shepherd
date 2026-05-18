@@ -123,7 +123,8 @@
       "workspace": "工作区",
       "ops": "运维",
       "system": "系统",
-      "recent": "最近访问"
+      "recent": "最近访问",
+      "active_plugins": "已启用插件"
     },
     "recent_empty": "访问任意主机即可显示"
   },

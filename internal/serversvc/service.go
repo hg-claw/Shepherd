@@ -94,6 +94,7 @@ type PatchInput struct {
 	PublicGroup  *string
 	CountryCode  *string
 	ShowOnPublic *bool
+	SSHHost      *string
 }
 
 func (s *Service) Patch(ctx context.Context, id int64, in PatchInput) (*Server, error) {
@@ -119,6 +120,11 @@ func (s *Service) Patch(ctx context.Context, id int64, in PatchInput) (*Server, 
 	}
 	if in.ShowOnPublic != nil {
 		if _, err := s.DB.ExecContext(ctx, "UPDATE servers SET show_on_public=$1 WHERE id=$2", *in.ShowOnPublic, id); err != nil {
+			return nil, err
+		}
+	}
+	if in.SSHHost != nil {
+		if _, err := s.DB.ExecContext(ctx, "UPDATE servers SET ssh_host=$1 WHERE id=$2", nullable(*in.SSHHost), id); err != nil {
 			return nil, err
 		}
 	}

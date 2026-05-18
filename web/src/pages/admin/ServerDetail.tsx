@@ -2,13 +2,16 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FolderTree, Terminal as TerminalIcon } from 'lucide-react'
-import { useServer, useTelemetry, usePatchServer, useDeleteServer, useRepair, usePushConfig } from '@/api/servers'
+import { useServer, useTelemetry, usePatchServer, useDeleteServer, useRepair, usePushConfig, useServerIPCandidates } from '@/api/servers'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
@@ -43,6 +46,7 @@ export default function AdminServerDetail() {
   const repair = useRepair(id)
   const config = usePushConfig(id)
   const del = useDeleteServer()
+  const ipCandidates = useServerIPCandidates(id)
 
   const [interval, setIntervalSecs] = useState(30)
   const [repairToken, setRepairToken] = useState<{ token: string; expires: string } | null>(null)
@@ -94,6 +98,38 @@ export default function AdminServerDetail() {
           <KV k="agent_fingerprint" v={s.agent_fingerprint?.String ?? '-'} long />
           <KV k="agent_last_seen" v={s.agent_last_seen?.Valid ? s.agent_last_seen.Time : '-'} />
           <KV k="install_stage" v={s.install_stage} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>SSH host</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <Field
+            label="ssh_host"
+            defaultValue={s.ssh_host?.String ?? ''}
+            onBlur={(v) => patch.mutate({ ssh_host: v })}
+          />
+          <div className="space-y-1">
+            <Label>Pick from detected IPs</Label>
+            {ipCandidates.data && ipCandidates.data.length > 0 ? (
+              <Select onValueChange={(v) => patch.mutate({ ssh_host: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a candidate IP…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ipCandidates.data.map((c) => (
+                    <SelectItem key={c.addr} value={c.addr}>
+                      {c.addr} — {c.kind} ({c.source})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No candidates yet — agent hasn&apos;t reported IPs.
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
 

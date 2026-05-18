@@ -39,7 +39,9 @@ func (s *Service) IssueEnrollmentToken(ctx context.Context, serverID int64) (str
 
 // RedeemEnrollment consumes an enrollment token, mints a machine token,
 // and persists the agent identity onto the bound server. Returns machine_token, server_id.
-func (s *Service) RedeemEnrollment(ctx context.Context, enrollmentToken, fingerprint, osName, arch, kernel, agentVersion string) (string, int64, error) {
+// cands (may be nil) are upserted into server_ip_candidates; the best public IP
+// is written to servers.ssh_host when it is currently empty.
+func (s *Service) RedeemEnrollment(ctx context.Context, enrollmentToken, fingerprint, osName, arch, kernel, agentVersion string, cands []IPCandidate) (string, int64, error) {
 	tx, err := s.DB.BeginTxx(ctx, nil)
 	if err != nil {
 		return "", 0, err
@@ -92,6 +94,13 @@ func (s *Service) RedeemEnrollment(ctx context.Context, enrollmentToken, fingerp
 	if err := tx.Commit(); err != nil {
 		return "", 0, err
 	}
+
+	// Persist IP candidates and auto-pick ssh_host outside the tx (best-effort).
+	if len(cands) > 0 {
+		_ = SaveCandidates(ctx, s.DB, serverID, cands)
+		_ = ApplyBestSSHHost(ctx, s.DB, serverID, cands)
+	}
+
 	return machine, serverID, nil
 }
 

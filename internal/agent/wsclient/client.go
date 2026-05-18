@@ -16,6 +16,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/hg-claw/Shepherd/internal/agent/filehandler"
+	"github.com/hg-claw/Shepherd/internal/agent/netinfo"
 	"github.com/hg-claw/Shepherd/internal/agent/ptyrunner"
 	"github.com/hg-claw/Shepherd/internal/agent/state"
 	"github.com/hg-claw/Shepherd/internal/agentapi"
@@ -86,12 +87,21 @@ func (c *Client) acquireToken(ctx context.Context, st *state.State) error {
 	if st.Fingerprint == "" {
 		return errors.New("fingerprint missing")
 	}
+
+	// Collect IP candidates once; convert to wire type.
+	netCands := netinfo.Collect(ctx)
+	wireCands := make([]agentapi.IPCandidate, len(netCands))
+	for i, nc := range netCands {
+		wireCands[i] = agentapi.IPCandidate{Addr: nc.Addr, Kind: nc.Kind, Source: nc.Source}
+	}
+
 	switch {
 	case c.Cfg.AutoRecoverKey != "":
 		req := agentapi.AutoRegisterRequest{
 			AutoRecoverKey: c.Cfg.AutoRecoverKey, Fingerprint: st.Fingerprint,
 			Hostname: c.Hostname, OS: runtime.GOOS, Arch: runtime.GOARCH,
 			Kernel: kernelVersion(), AgentVersion: c.Cfg.AgentVersion,
+			IPCandidates: wireCands,
 		}
 		var resp agentapi.EnrollResponse
 		if err := c.postJSON(ctx, "/agent/auto-register", req, &resp); err != nil {
@@ -102,6 +112,7 @@ func (c *Client) acquireToken(ctx context.Context, st *state.State) error {
 		req := agentapi.EnrollRequest{
 			EnrollmentToken: c.Cfg.EnrollmentToken, Fingerprint: st.Fingerprint,
 			OS: runtime.GOOS, Arch: runtime.GOARCH, Kernel: kernelVersion(), AgentVersion: c.Cfg.AgentVersion,
+			IPCandidates: wireCands,
 		}
 		var resp agentapi.EnrollResponse
 		if err := c.postJSON(ctx, "/agent/enroll", req, &resp); err != nil {
@@ -172,9 +183,16 @@ func (c *Client) dialAndRun(ctx context.Context) error {
 		_ = conn.Close()
 	}()
 
+	// Collect IP candidates and attach to the first heartbeat of this WS session.
+	netCands := netinfo.Collect(ctx)
+	wireCands := make([]agentapi.IPCandidate, len(netCands))
+	for i, nc := range netCands {
+		wireCands[i] = agentapi.IPCandidate{Addr: nc.Addr, Kind: nc.Kind, Source: nc.Source}
+	}
 	hb, _ := agentapi.Frame(agentapi.TypeHeartbeat, agentapi.Heartbeat{
 		TS: time.Now().UTC(), AgentVersion: c.Cfg.AgentVersion,
 		OS: runtime.GOOS, Arch: runtime.GOARCH, Kernel: kernelVersion(),
+		IPCandidates: wireCands,
 	})
 	if err := c.writeJSON(hb); err != nil {
 		return err

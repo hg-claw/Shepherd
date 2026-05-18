@@ -3,6 +3,8 @@ package api
 import (
 	"net/http"
 	"strings"
+
+	"github.com/hg-claw/Shepherd/internal/plugins"
 )
 
 type Router struct {
@@ -18,6 +20,11 @@ type Router struct {
 	Recordings *RecordingsAPI
 	Web        http.Handler
 
+	// Plugin APIs — optional; set via WithPlugins.
+	Plugins      *PluginsAPI
+	PluginEvents *PluginEventsAPI
+	PluginLogs   *PluginLogsAPI
+
 	requireAdmin func(http.Handler) http.Handler
 }
 
@@ -31,6 +38,14 @@ func NewRouter(authAPI *AuthAPI, requireAdmin func(http.Handler) http.Handler,
 		Web:          web,
 		requireAdmin: requireAdmin,
 	}
+}
+
+// WithPlugins attaches the plugin API handlers so Handler() registers plugin routes.
+func (r *Router) WithPlugins(p *PluginsAPI, ev *PluginEventsAPI, logs *PluginLogsAPI) *Router {
+	r.Plugins = p
+	r.PluginEvents = ev
+	r.PluginLogs = logs
+	return r
 }
 
 func (r *Router) Handler() http.Handler {
@@ -58,6 +73,7 @@ func (r *Router) Handler() http.Handler {
 	admin.HandleFunc("GET /api/servers/{id}/telemetry", r.Servers.Telemetry)
 	admin.HandleFunc("POST /api/servers/{id}/repair", r.Servers.Repair)
 	admin.HandleFunc("POST /api/servers/{id}/config", r.Servers.Config)
+	admin.HandleFunc("GET /api/servers/{id}/ip-candidates", r.Servers.IPCandidates)
 
 	admin.HandleFunc("GET /api/settings", r.Settings.GetAll)
 	admin.HandleFunc("PATCH /api/settings", r.Settings.Patch)
@@ -84,6 +100,32 @@ func (r *Router) Handler() http.Handler {
 
 	admin.HandleFunc("GET /api/admin/audit", r.Audit.List)
 	admin.HandleFunc("GET /api/admin/recordings/{id}/cast", r.Recordings.Cast)
+
+	// Plugin routes — only registered when WithPlugins has been called.
+	if r.Plugins != nil {
+		admin.HandleFunc("GET /api/admin/plugins", r.Plugins.List)
+		admin.HandleFunc("POST /api/admin/plugins/{id}/enable", r.Plugins.Enable)
+		admin.HandleFunc("POST /api/admin/plugins/{id}/disable", r.Plugins.Disable)
+		admin.HandleFunc("GET /api/admin/plugins/{id}/config", r.Plugins.GetConfig)
+		admin.HandleFunc("PUT /api/admin/plugins/{id}/config", r.Plugins.PutConfig)
+		admin.HandleFunc("GET /api/admin/plugins/{id}/hosts", r.Plugins.ListHosts)
+		admin.HandleFunc("POST /api/admin/plugins/{id}/hosts", r.Plugins.PostHost)
+		admin.HandleFunc("GET /api/admin/plugins/{id}/hosts/{server_id}", r.Plugins.GetHost)
+		admin.HandleFunc("DELETE /api/admin/plugins/{id}/hosts/{server_id}", r.Plugins.DeleteHost)
+
+		// Mount per-plugin routes, gated by enabled flag.
+		for _, p := range plugins.All() {
+			prefix := "/api/admin/plugins/" + p.Meta().ID
+			g := &GatedMux{Parent: admin, Prefix: prefix, Store: r.Plugins.Store, ID: p.Meta().ID}
+			p.RegisterRoutes(g, r.Plugins.Deps)
+		}
+	}
+	if r.PluginEvents != nil {
+		admin.HandleFunc("GET /api/admin/plugins/{id}/events", r.PluginEvents.List)
+	}
+	if r.PluginLogs != nil {
+		admin.HandleFunc("GET /api/admin/plugins/{id}/hosts/{server_id}/logs", r.PluginLogs.AttachWS)
+	}
 
 	gated := r.requireAdmin(admin)
 

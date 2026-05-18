@@ -6,6 +6,7 @@ import (
 	"errors"
 	"hash"
 	"os"
+	"path/filepath"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
 )
@@ -31,6 +32,14 @@ func (h *Handler) HandleUploadBegin(req agentapi.FileUploadBegin) {
 		mode = 0o644
 	}
 	temp := req.Path + ".shep-uploading-" + req.Sid
+	// Create the parent directory if missing — first-time plugin deploys
+	// often target paths like /etc/shepherd-xray/ that don't exist yet.
+	if dir := filepath.Dir(req.Path); dir != "" && dir != "/" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			h.sendUploadAck(req.Sid, err)
+			return
+		}
+	}
 	f, err := os.OpenFile(temp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 	if err != nil {
 		h.sendUploadAck(req.Sid, err)

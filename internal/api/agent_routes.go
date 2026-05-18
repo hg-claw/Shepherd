@@ -40,8 +40,9 @@ func (a *AgentAPI) Enroll(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "bad json")
 		return
 	}
+	cands := wireToServiceCandidates(req.IPCandidates)
 	machine, sid, err := a.Agents.RedeemEnrollment(r.Context(), req.EnrollmentToken,
-		req.Fingerprint, req.OS, req.Arch, req.Kernel, req.AgentVersion)
+		req.Fingerprint, req.OS, req.Arch, req.Kernel, req.AgentVersion, cands)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, err.Error())
 		return
@@ -55,8 +56,9 @@ func (a *AgentAPI) AutoRegister(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "bad json")
 		return
 	}
+	cands := wireToServiceCandidates(req.IPCandidates)
 	machine, sid, err := a.Agents.AutoRegister(r.Context(), req.AutoRecoverKey,
-		req.Fingerprint, req.Hostname, req.OS, req.Arch, req.Kernel, req.AgentVersion)
+		req.Fingerprint, req.Hostname, req.OS, req.Arch, req.Kernel, req.AgentVersion, cands)
 	if err != nil {
 		status := http.StatusUnauthorized
 		if errors.Is(err, agentsvc.ErrAutoRegisterDisabled) {
@@ -66,6 +68,18 @@ func (a *AgentAPI) AutoRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, agentapi.EnrollResponse{MachineToken: machine, ServerID: sid})
+}
+
+// wireToServiceCandidates converts the wire-type slice to the service-layer type.
+func wireToServiceCandidates(wc []agentapi.IPCandidate) []agentsvc.IPCandidate {
+	if len(wc) == 0 {
+		return nil
+	}
+	out := make([]agentsvc.IPCandidate, len(wc))
+	for i, c := range wc {
+		out[i] = agentsvc.IPCandidate{Addr: c.Addr, Kind: c.Kind, Source: c.Source}
+	}
+	return out
 }
 
 var upgrader = websocket.Upgrader{

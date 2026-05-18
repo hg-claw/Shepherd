@@ -49,7 +49,7 @@ func TestWS_RoundTrip(t *testing.T) {
 	a, svc := newAgentAPI(t)
 	res, _ := svc.DB.Exec("INSERT INTO servers(name) VALUES ('h')")
 	_ = res
-	machine, sid, _ := svc.AutoRegister(context.Background(), "k", "fp", "h", "linux", "amd64", "6.1", "v0")
+	machine, sid, _ := svc.AutoRegister(context.Background(), "k", "fp", "h", "linux", "amd64", "6.1", "v0", nil)
 
 	got := make(chan agentapi.Envelope, 1)
 	a.OnFrame = func(_ context.Context, _ int64, env agentapi.Envelope) {

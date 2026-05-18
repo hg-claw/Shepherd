@@ -104,7 +104,8 @@
       "workspace": "Workspace",
       "ops": "Operations",
       "system": "System",
-      "recent": "Recent hosts"
+      "recent": "Recent hosts",
+      "active_plugins": "Active plugins"
     },
     "recent_empty": "visit a host to see it here"
   },

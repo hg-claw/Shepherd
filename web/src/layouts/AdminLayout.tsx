@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Outlet, Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
 import {
   LayoutDashboard,
   Server as ServerIcon,
@@ -20,6 +21,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { useAuth } from '@/store/auth'
 import { useLogout } from '@/api/auth'
 import { useServers } from '@/api/servers'
+import { listPlugins } from '@/api/plugins'
 import { useRecentHosts } from '@/hooks/use-recent-hosts'
 import { cn } from '@/lib/utils'
 
@@ -53,10 +55,16 @@ export function AdminLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const recentIds = useRecentHosts()
   const serversQuery = useServers({ refetchInterval: 60_000 })
+  const pluginsQuery = useQuery({
+    queryKey: ['plugins'],
+    queryFn: listPlugins,
+    refetchInterval: 30_000,
+  })
   const recents = recentIds
     .map((id) => serversQuery.data?.find((s) => s.id === id))
     .filter((s): s is NonNullable<typeof s> => Boolean(s))
   const hostCount = serversQuery.data?.length
+  const enabledPlugins = (pluginsQuery.data ?? []).filter((p) => p.enabled)
 
   const sections: NavSection[] = [
     {
@@ -173,6 +181,28 @@ export function AdminLayout() {
           })
         )}
       </div>
+
+      {enabledPlugins.length > 0 && (
+        <div className="mt-2">
+          <div className="px-2.5 pt-2 pb-1 text-[10.5px] uppercase tracking-[0.08em] text-fg-dim font-medium">
+            {t('nav.section.active_plugins', 'Active plugins')}
+          </div>
+          {enabledPlugins.map((p) => (
+            <Link
+              key={p.id}
+              to={`/admin/plugins/${p.id}`}
+              onClick={onNavigate}
+              className={cn(
+                'flex items-center gap-2.5 h-[28px] px-2.5 rounded-md text-[12.5px] font-mono',
+                'text-muted-foreground hover:bg-sunken hover:text-foreground transition-colors',
+              )}
+            >
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-ok shrink-0" />
+              <span className="truncate">{p.meta.name}</span>
+            </Link>
+          ))}
+        </div>
+      )}
     </nav>
   )
 

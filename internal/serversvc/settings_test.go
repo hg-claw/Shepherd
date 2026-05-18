@@ -59,10 +59,16 @@ func TestGetLines_RealNewlines(t *testing.T) {
 func TestGetLines_DefaultSandboxPaths(t *testing.T) {
 	s := newSettings(t)
 	got := s.GetLines(context.Background(), "file_sandbox_paths")
-	if len(got) != 7 {
-		t.Fatalf("expected 7 default paths, got %d: %v", len(got), got)
+	// 7 baseline paths + 4 plugin-related paths added in 0002/0005.
+	want := []string{
+		"/tmp", "/var/log", "/etc/shepherd", "/home", "/Users", "/opt", "/srv",
+		// Plugin-related (xray, systemd, launchd, binary install dir).
+		"/etc/shepherd-xray", "/etc/systemd/system", "/Library/LaunchDaemons", "/usr/local/bin",
 	}
-	for _, p := range []string{"/tmp", "/var/log", "/etc/shepherd", "/home", "/Users", "/opt", "/srv"} {
+	if len(got) != len(want) {
+		t.Fatalf("expected %d default paths, got %d: %v", len(want), len(got), got)
+	}
+	for _, p := range want {
 		found := false
 		for _, g := range got {
 			if g == p {

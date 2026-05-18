@@ -18,6 +18,9 @@ import (
 	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/hg-claw/Shepherd/internal/filesvc"
 	"github.com/hg-claw/Shepherd/internal/installer"
+	"github.com/hg-claw/Shepherd/internal/plugins"
+	_ "github.com/hg-claw/Shepherd/internal/plugins/cloudflare" // registers via init()
+	_ "github.com/hg-claw/Shepherd/internal/plugins/xray"       // registers via init()
 	"github.com/hg-claw/Shepherd/internal/ptysvc"
 	"github.com/hg-claw/Shepherd/internal/scriptsvc"
 	"github.com/hg-claw/Shepherd/internal/serversvc"
@@ -159,10 +162,46 @@ func main() {
 	auditAPI := &api.AuditAPI{DB: d}
 	recAPI := &api.RecordingsAPI{DB: d}
 
+	// HubHostExec wires plugins.HostExec to the project's filesvc (file push)
+	// and the agent WS hub (one-shot PTY exec via sessionmux). No DB row is
+	// written for plugin-initiated exec; sessions are ephemeral.
+	hostExec := &plugins.HubHostExec{Hub: hub, Files: filesService, Reg: reg}
+	pluginStore := &plugins.Store{DB: d, Now: time.Now}
+	pluginsDeps := plugins.Deps{
+		DB:       d,
+		DataDir:  filepath.Join(filepath.Dir(cfg.DBDSN), "plugins"),
+		HostExec: hostExec,
+		Now:      time.Now,
+	}
+	pluginsAPI := &api.PluginsAPI{
+		Store: pluginStore,
+		Deps:  pluginsDeps,
+		SecretFields: map[string][]string{
+			"cloudflare": {"api_token"},
+		},
+	}
+	// Catch plugins whose migrations were added after the plugin was already
+	// enabled (the enable handler short-circuits on already-enabled rows and
+	// never re-runs migrations). The migration runner is idempotent via the
+	// plugin_migrations ledger, so this is safe to run unconditionally.
+	for _, p := range plugins.All() {
+		row, err := pluginStore.Get(rootCtx, p.Meta().ID)
+		if err != nil || !row.Enabled {
+			continue
+		}
+		if err := plugins.RunPluginMigrations(rootCtx, d, p.Meta().ID, p.Migrations()); err != nil {
+			log.Printf("plugin %s: boot migrate: %v", p.Meta().ID, err)
+		}
+	}
+
+	eventsAPI := &api.PluginEventsAPI{DB: d}
+	logsAPI := &api.PluginLogsAPI{HostExec: hostExec, Deps: pluginsDeps}
+
 	router := api.NewRouter(authAPI, authH.RequireAdmin,
 		servers, settings, public, agentAPI,
 		consoleAPI, scriptsAPI, filesAPI, auditAPI, recAPI,
-		shepweb.Handler())
+		shepweb.Handler()).
+		WithPlugins(pluginsAPI, eventsAPI, logsAPI)
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,

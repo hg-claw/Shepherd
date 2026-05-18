@@ -139,7 +139,7 @@ export default function BulkRelayDialog({
           inbound: 'vless-reality', port: d.port, uuid: d.uuid,
           sni: sharedSNI, publicKey: d.publicKey, privateKey: d.privateKey, shortID: d.shortID,
           role: 'relay',
-          landing: { ...landingRef, sni: sharedSNI },
+          landing: landingRef,
         })
         try {
           await deployPluginHost('xray', {

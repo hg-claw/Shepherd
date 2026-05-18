@@ -57,7 +57,10 @@ export default function HostsTab() {
   const qc = useQueryClient()
   const undeploy = useMutation({
     mutationFn: (serverID: number) => removePluginHost('xray', serverID),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['plugin-hosts', 'xray'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['plugin-hosts', 'xray'] })
+      qc.invalidateQueries({ queryKey: ['xray-topology'] })
+    },
     onError: (e: any) => toast('error', String(e?.message ?? e)),
   })
 

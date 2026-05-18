@@ -35,6 +35,21 @@ export interface PluginEvent {
   details: unknown
 }
 
+export interface XrayTopologyRow {
+  role: 'landing' | 'relay'
+  upstream_server_id: number | null
+  upstream_name: string | null
+}
+
+// Map keyed by server_id (string in JSON, number for callers).
+// Servers without an xray deployment are simply absent.
+export const fetchXrayTopology = async (): Promise<Map<number, XrayTopologyRow>> => {
+  const raw = await api.get<Record<string, XrayTopologyRow>>('/api/admin/plugins/xray/topology')
+  const out = new Map<number, XrayTopologyRow>()
+  for (const [k, v] of Object.entries(raw)) out.set(Number(k), v)
+  return out
+}
+
 export const listPlugins = () => api.get<PluginEntry[]>('/api/admin/plugins')
 
 export const enablePlugin = (id: string) =>
@@ -53,7 +68,10 @@ export const listPluginHosts = (id: string) =>
   api.get<PluginHost[]>(`/api/admin/plugins/${id}/hosts`)
 
 export const deployPluginHost = (id: string, body: {
-  server_id: number; version?: string; config?: unknown;
+  server_id: number
+  version?: string
+  config?: unknown
+  topology?: { role: 'landing' | 'relay'; upstream_server_id?: number }
 }) => api.post<PluginHost>(`/api/admin/plugins/${id}/hosts`, body)
 
 export const removePluginHost = (id: string, serverId: number) =>

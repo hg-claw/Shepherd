@@ -44,7 +44,7 @@ CREATE TABLE xray_host_topology (
   server_id           INTEGER PRIMARY KEY
                         REFERENCES servers(id) ON DELETE CASCADE,
   role                TEXT    NOT NULL CHECK (role IN ('landing', 'relay')),
-  upstream_server_id  INTEGER REFERENCES servers(id) ON DELETE RESTRICT,
+  upstream_server_id  INTEGER REFERENCES xray_host_topology(server_id) ON DELETE RESTRICT,
   updated_at          TIMESTAMP NOT NULL,
   CHECK (
     (role = 'landing' AND upstream_server_id IS NULL) OR
@@ -56,8 +56,9 @@ CREATE INDEX xray_host_topology_upstream ON xray_host_topology(upstream_server_i
 
 **约定：**
 - xray plugin_hosts 与 xray_host_topology 是 1:1 应用层约束，由 API 层维护（删除 xray host 时一并删除 topology 行）
-- `upstream_server_id` 不直接 FK 到 plugin_hosts —— SQLite 单字段 FK 不能跨复合表达式。在应用层校验 upstream 必须是已部署的 xray landing
-- `ON DELETE RESTRICT` 保证不能在还有 relay 指向它时直接删 landing。要先把对应的 relay 改成别的 landing 或先删 relay
+- `upstream_server_id` 自引用 `xray_host_topology(server_id)`，让 RESTRICT 能在删除 landing 行时直接生效；这同时强制要求应用层在创建 relay 行之前先确认 upstream 的 landing 行存在
+- 应用层 (`BeforeDeploy`) 仍要校验 upstream 是已部署的 xray 且 role=landing —— FK 只保护"有依赖时不能删"这一面
+- 删除 `servers` 行 → 通过 `server_id` 的 CASCADE 触发 topology 行删除 → 若该行是 landing 且有 relay 指向它，CASCADE 内的 RESTRICT 会阻断整个 servers 删除（提供间接保护）
 
 ### 2.2 不变更的表
 
@@ -244,23 +245,22 @@ Go 端 `RenderVLESSReality` 同步扩 `Topology *TopologyRef` 可选参数与 `L
 - 服务端**不重新渲染 config**，body 里的 config 直接作为 xray config.json 推到 host。topology 只入 `xray_host_topology` 表
 - 部署成功后再写 topology 行（事务）；topology 校验失败时整个 deploy 不发生
 
-### 4.2 Hosts 列表（既有 endpoint 增字段）
+### 4.2 Hosts 列表（不变） + Topology 副 endpoint
 
-`GET /api/admin/plugins/xray/hosts` 响应行新增：
+`GET /api/admin/plugins/xray/hosts` 响应保持不变（与所有 plugin 通用，行内字段不含 topology）。
+
+新增 `GET /api/admin/plugins/xray/topology`（xray-specific）：
 
 ```json
 {
-  "server_id":         5,
-  "status":            "running",
-  "config":            { ... },
-  "deployed_version":  "1.8.11",
-  "topology": {
-    "role":               "relay",
-    "upstream_server_id": 42,
-    "upstream_name":      "landing-us-1"   // 由 server 端 join 进来，省一次往返
-  }
+  "5": { "role": "relay", "upstream_server_id": 42, "upstream_name": "landing-us-1" },
+  "42": { "role": "landing", "upstream_server_id": null, "upstream_name": null }
 }
 ```
+
+- Key 是 server_id（字符串，方便 JSON 序列化）
+- UI 在 hosts 查询的同时并发拉这条，本地按 server_id join
+- 选择独立 endpoint 而不是塞进 /hosts 行内：保持通用 plugin API 干净，xray 自己的关系数据走 xray 自己的路由
 
 ### 4.3 Undeploy（既有 endpoint 增加约束）
 

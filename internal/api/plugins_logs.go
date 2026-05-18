@@ -14,6 +14,7 @@ import (
 
 type PluginLogsAPI struct {
 	HostExec plugins.HostExec
+	Deps     plugins.Deps
 }
 
 var logsUpgrader = websocket.Upgrader{
@@ -56,7 +57,7 @@ func (a *PluginLogsAPI) AttachWS(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 404, "no log stream")
 		return
 	}
-	cmd, args, err := ls.LogStreamCommand(serverID)
+	cmd, args, err := ls.LogStreamCommand(r.Context(), a.Deps, serverID)
 	if err != nil {
 		writeError(w, 500, err.Error())
 		return

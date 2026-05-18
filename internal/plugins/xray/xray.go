@@ -13,14 +13,19 @@ import (
 	"github.com/hg-claw/Shepherd/internal/plugins/deploy"
 )
 
-//go:embed unit.tmpl
-var unitTmpl []byte
+//go:embed unit.linux.service
+var unitLinux []byte
+
+//go:embed unit.darwin.plist
+var unitDarwin []byte
 
 const (
-	binaryRemotePath = "/usr/local/bin/shepherd-xray"
-	configRemotePath = "/etc/shepherd-xray/config.json"
-	unitRemotePath   = "/etc/systemd/system/shepherd-xray.service"
-	unitName         = "shepherd-xray"
+	binaryRemotePathUnix = "/usr/local/bin/shepherd-xray"
+	configRemotePathUnix = "/etc/shepherd-xray/config.json"
+	unitRemotePathLinux  = "/etc/systemd/system/shepherd-xray.service"
+	unitRemotePathDarwin = "/Library/LaunchDaemons/com.shepherd.xray.plist"
+	unitNameLinux        = "shepherd-xray"
+	unitNameDarwin       = "com.shepherd.xray"
 )
 
 // releaserIface lets tests inject a fake.
@@ -69,15 +74,26 @@ func (p *Plugin) DeployToHost(ctx context.Context, deps plugins.Deps, serverID i
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
+
+	unitBytes := unitLinux
+	unitPath := unitRemotePathLinux
+	unitName := unitNameLinux
+	if osName == "darwin" {
+		unitBytes = unitDarwin
+		unitPath = unitRemotePathDarwin
+		unitName = unitNameDarwin
+	}
+
 	pusher := &deploy.Pusher{Exec: deps.HostExec}
-	return pusher.DeploySystemdService(ctx, deploy.DeployParams{
+	return pusher.DeployService(ctx, deploy.DeployParams{
+		OS:          osName,
 		ServerID:    serverID,
-		BinaryPath:  binaryRemotePath,
+		BinaryPath:  binaryRemotePathUnix,
 		BinaryBytes: binBytes,
-		ConfigPath:  configRemotePath,
+		ConfigPath:  configRemotePathUnix,
 		ConfigBytes: cfgBytes,
-		UnitPath:    unitRemotePath,
-		UnitBytes:   unitTmpl,
+		UnitPath:    unitPath,
+		UnitBytes:   unitBytes,
 		UnitName:    unitName,
 	})
 }
@@ -101,20 +117,40 @@ func hostOSArch(ctx context.Context, db *sqlx.DB, serverID int64) (string, strin
 }
 
 func (p *Plugin) UndeployFromHost(ctx context.Context, deps plugins.Deps, serverID int64) error {
+	osName, _ := hostOSArch(ctx, deps.DB, serverID)
+	unitName := unitNameLinux
+	if osName == "darwin" {
+		unitName = unitNameDarwin
+	}
 	pusher := &deploy.Pusher{Exec: deps.HostExec}
-	return pusher.Stop(ctx, serverID, unitName)
+	return pusher.Stop(ctx, osName, serverID, unitName)
 }
 
 func (p *Plugin) HostStatus(ctx context.Context, deps plugins.Deps, serverID int64) (plugins.HostStatus, error) {
+	osName, _ := hostOSArch(ctx, deps.DB, serverID)
+	unitName := unitNameLinux
+	if osName == "darwin" {
+		unitName = unitNameDarwin
+	}
 	pusher := &deploy.Pusher{Exec: deps.HostExec}
-	active, _ := pusher.IsActive(ctx, serverID, unitName)
+	active, _ := pusher.IsActive(ctx, osName, serverID, unitName)
 	state := "stopped"
-	if active { state = "running" }
+	if active {
+		state = "running"
+	}
 	return plugins.HostStatus{State: state}, nil
 }
 
 // LogStreamCommand satisfies plugins.LogStreamer.
-func (p *Plugin) LogStreamCommand(_ int64) (string, []string, error) {
+func (p *Plugin) LogStreamCommand(ctx context.Context, deps plugins.Deps, serverID int64) (string, []string, error) {
+	osName, _ := hostOSArch(ctx, deps.DB, serverID)
+	if osName == "darwin" {
+		return "tail", []string{
+			"-F", "-n", "200",
+			"/var/log/shepherd-xray.out.log",
+			"/var/log/shepherd-xray.err.log",
+		}, nil
+	}
 	return "journalctl", []string{
 		"-u", "shepherd-xray",
 		"-f",

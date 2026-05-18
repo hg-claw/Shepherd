@@ -14,8 +14,15 @@ import (
 )
 
 func TestLogStreamCommand_Default(t *testing.T) {
+	// Use an in-memory DB with a linux server so hostOSArch returns "linux".
+	dsn := "file:" + filepath.Join(t.TempDir(), "lsc.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+	_, _ = d.Exec(`INSERT INTO servers(name, agent_os, agent_arch) VALUES('s', 'linux', 'amd64')`)
+
 	p := New()
-	name, args, err := p.LogStreamCommand(1)
+	deps := plugins.Deps{DB: d}
+	name, args, err := p.LogStreamCommand(context.Background(), deps, 1)
 	if err != nil {
 		t.Fatal(err)
 	}

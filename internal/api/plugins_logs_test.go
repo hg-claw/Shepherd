@@ -18,7 +18,7 @@ type fakeStreamer struct {
 	hostP
 }
 
-func (fakeStreamer) LogStreamCommand(int64) (string, []string, error) {
+func (fakeStreamer) LogStreamCommand(_ context.Context, _ plugins.Deps, _ int64) (string, []string, error) {
 	return "journalctl", []string{"-u", "shepherd-xray", "-f"}, nil
 }
 
@@ -44,7 +44,7 @@ func TestPluginLogsWS_EmitsLineEnvelopes(t *testing.T) {
 	plugins.ResetRegistryForTestPublic()
 	plugins.Register(fakeStreamer{hostP: hostP{plainP: plainP{id: "fs"}}})
 	exec := &fakeExec{lines: []string{"hello", "world"}}
-	api := &PluginLogsAPI{HostExec: exec}
+	api := &PluginLogsAPI{HostExec: exec, Deps: plugins.Deps{}}
 
 	server := httptest.NewServer(http.HandlerFunc(api.AttachWS))
 	defer server.Close()

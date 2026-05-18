@@ -77,7 +77,7 @@ type HostAware interface {
 // log stream from each host (see spec §11.2).
 type LogStreamer interface {
 	HostAware
-	LogStreamCommand(serverID int64) (name string, args []string, err error)
+	LogStreamCommand(ctx context.Context, deps Deps, serverID int64) (name string, args []string, err error)
 }
 
 // HostStatus is the per-host snapshot returned by HostAware.HostStatus.

@@ -195,7 +195,7 @@ func main() {
 	}
 
 	eventsAPI := &api.PluginEventsAPI{DB: d}
-	logsAPI := &api.PluginLogsAPI{HostExec: hostExec}
+	logsAPI := &api.PluginLogsAPI{HostExec: hostExec, Deps: pluginsDeps}
 
 	router := api.NewRouter(authAPI, authH.RequireAdmin,
 		servers, settings, public, agentAPI,

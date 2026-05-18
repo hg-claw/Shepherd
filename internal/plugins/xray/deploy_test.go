@@ -3,9 +3,11 @@ package xray
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 )
 
@@ -35,6 +37,20 @@ func (f *fakeReleaser) Fetch(_ context.Context, version, osStr, arch string) (Bi
 	return Binary{Version: version, OS: osStr, Arch: arch, Path: f.path, SizeBytes: 3, Sha256: "deadbeef"}, nil
 }
 
+func newXrayTestDB(t *testing.T) *plugins.Deps {
+	t.Helper()
+	dsn := "file:" + filepath.Join(t.TempDir(), "xray.db") + "?_fk=1"
+	d, err := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := shepdb.Migrate(d, shepdb.DriverSQLite); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = d.Exec(`INSERT INTO servers(name, agent_os, agent_arch) VALUES('s1', 'linux', 'amd64')`)
+	return &plugins.Deps{DB: d}
+}
+
 func TestDeployToHost_PushesBinaryConfigAndUnit(t *testing.T) {
 	// pre-create the fake binary file
 	tmp := t.TempDir() + "/xray-fake"
@@ -43,10 +59,12 @@ func TestDeployToHost_PushesBinaryConfigAndUnit(t *testing.T) {
 	exec := &captureExec{}
 	p := New()
 	p.releaser = &fakeReleaser{path: tmp}
-	deps := plugins.Deps{HostExec: exec}
+	baseDeps := newXrayTestDB(t)
+	baseDeps.HostExec = exec
+	deps := *baseDeps
 
-	cfg := []byte(`{"version":"1.8.11","config":{"inbounds":[],"outbounds":[]}}`)
-	if err := p.DeployToHost(context.Background(), deps, 7, cfg); err != nil {
+	cfg := []byte(`{"inbounds":[],"outbounds":[]}`)
+	if err := p.DeployToHost(context.Background(), deps, 1, "1.8.11", cfg); err != nil {
 		t.Fatal(err)
 	}
 	wantPaths := []string{

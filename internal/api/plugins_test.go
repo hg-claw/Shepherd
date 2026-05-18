@@ -24,7 +24,7 @@ func (plainP) OnDisable(_ context.Context, _ plugins.Deps) error { return nil }
 type hostP struct{ plainP }
 
 func (h hostP) Meta() plugins.Meta { m := h.plainP.Meta(); m.HostAware = true; return m }
-func (hostP) DeployToHost(context.Context, plugins.Deps, int64, []byte) error { return nil }
+func (hostP) DeployToHost(context.Context, plugins.Deps, int64, string, []byte) error { return nil }
 func (hostP) UndeployFromHost(context.Context, plugins.Deps, int64) error      { return nil }
 func (hostP) HostStatus(context.Context, plugins.Deps, int64) (plugins.HostStatus, error) {
 	return plugins.HostStatus{}, nil

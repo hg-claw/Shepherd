@@ -241,7 +241,7 @@ func (a *PluginsAPI) PostHost(w http.ResponseWriter, r *http.Request) {
 
 	go func() {
 		ctx := context.Background()
-		if err := ha.DeployToHost(ctx, a.Deps, body.ServerID, cfg); err != nil {
+		if err := ha.DeployToHost(ctx, a.Deps, body.ServerID, body.Version, cfg); err != nil {
 			_ = a.Store.SetHostStatus(ctx, id, body.ServerID, "failed", body.Version, err.Error())
 			return
 		}

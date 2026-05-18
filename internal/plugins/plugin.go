@@ -68,7 +68,7 @@ type Plugin interface {
 // HostAware is implemented by plugins that deploy something to managed hosts.
 type HostAware interface {
 	Plugin
-	DeployToHost(ctx context.Context, deps Deps, serverID int64, configJSON []byte) error
+	DeployToHost(ctx context.Context, deps Deps, serverID int64, version string, configJSON []byte) error
 	UndeployFromHost(ctx context.Context, deps Deps, serverID int64) error
 	HostStatus(ctx context.Context, deps Deps, serverID int64) (HostStatus, error)
 }

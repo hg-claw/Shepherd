@@ -6,6 +6,7 @@ import { listPluginHosts, removePluginHost, type PluginHost } from '@/api/plugin
 import { Button } from '@/components/ui/button'
 import { Pill, type PillKind } from '@/components/Pill'
 import { useUI } from '@/store/ui'
+import { copyText } from '@/lib/clipboard'
 import { parseConfig, buildShareURL } from './templates'
 import DeployDialog from './DeployDialog'
 
@@ -112,7 +113,7 @@ export default function HostsTab() {
                           onClick={async () => {
                             if (!shareURL) return
                             try {
-                              await navigator.clipboard.writeText(shareURL)
+                              await copyText(shareURL)
                               toast('success', 'Share URL copied')
                             } catch (e) {
                               toast('error', String((e as Error)?.message ?? e))

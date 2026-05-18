@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useServers } from '@/api/servers'
-import { listPluginHosts, removePluginHost, type PluginHost } from '@/api/plugins'
+import { listPluginHosts, removePluginHost, fetchXrayTopology, type PluginHost, type XrayTopologyRow } from '@/api/plugins'
 import { Button } from '@/components/ui/button'
 import { Pill, type PillKind } from '@/components/Pill'
 import { useUI } from '@/store/ui'
@@ -38,6 +38,21 @@ export default function HostsTab() {
     queryFn: () => listPluginHosts('xray'),
     refetchInterval: 5_000,
   })
+  const topoQ = useQuery({
+    queryKey: ['xray-topology'],
+    queryFn: fetchXrayTopology,
+    refetchInterval: 10_000,
+  })
+  const topo: Map<number, XrayTopologyRow> = topoQ.data ?? new Map()
+
+  // Count how many relays depend on each landing for the undeploy guard.
+  const relayCountByUpstream = new Map<number, number>()
+  for (const v of topo.values()) {
+    if (v.role === 'relay' && v.upstream_server_id != null) {
+      relayCountByUpstream.set(v.upstream_server_id, (relayCountByUpstream.get(v.upstream_server_id) ?? 0) + 1)
+    }
+  }
+
   const qc = useQueryClient()
   const undeploy = useMutation({
     mutationFn: (serverID: number) => removePluginHost('xray', serverID),
@@ -68,6 +83,7 @@ export default function HostsTab() {
           <thead>
             <tr className="text-left">
               <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Server</th>
+              <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Role</th>
               <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Protocol</th>
               <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Port</th>
               <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Status</th>
@@ -89,6 +105,19 @@ export default function HostsTab() {
                     <div className="text-fg-dim text-[11px]">
                       {s.ssh_host?.Valid ? s.ssh_host.String : '—'}
                     </div>
+                  </td>
+                  <td className="px-3 py-2 text-[12.5px]">
+                    {(() => {
+                      const t = topo.get(s.id)
+                      if (!t) return <span className="text-muted-foreground">—</span>
+                      if (t.role === 'landing') return <Pill kind="neutral">landing</Pill>
+                      return (
+                        <span className="font-mono">
+                          <Pill kind="ok">relay</Pill>
+                          <span className="text-fg-dim ml-1">→ {t.upstream_name ?? `#${t.upstream_server_id}`}</span>
+                        </span>
+                      )
+                    })()}
                   </td>
                   <td className="px-3 py-2 font-mono text-[12.5px]">{summary.protocol}</td>
                   <td className="px-3 py-2 font-mono text-[12.5px]">{summary.port}</td>
@@ -126,11 +155,21 @@ export default function HostsTab() {
                           onClick={() => setDeployTarget({ id: s.id, existing: h })}>
                           Re-deploy
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px] text-destructive"
-                          onClick={() => undeploy.mutate(s.id)}
-                          disabled={undeploy.isPending}>
-                          Undeploy
-                        </Button>
+                        {(() => {
+                          const dependents = relayCountByUpstream.get(s.id) ?? 0
+                          const disabled = undeploy.isPending || dependents > 0
+                          const title = dependents > 0
+                            ? `${dependents} relay(s) depend on this landing; undeploy them first`
+                            : undefined
+                          return (
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px] text-destructive"
+                              onClick={() => undeploy.mutate(s.id)}
+                              disabled={disabled}
+                              title={title}>
+                              Undeploy
+                            </Button>
+                          )
+                        })()}
                       </>
                     ) : (
                       <Button size="sm" className="h-7 px-2 text-[12px]"
@@ -143,7 +182,7 @@ export default function HostsTab() {
               )
             })}
             {(serversQ.data ?? []).length === 0 && (
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground text-[13px]">
+              <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground text-[13px]">
                 No managed servers.
               </td></tr>
             )}

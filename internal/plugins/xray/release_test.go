@@ -117,6 +117,40 @@ func TestXrayAssetAliases(t *testing.T) {
 	}
 }
 
+func TestFetchPicksSHA256FromMultilineDgst(t *testing.T) {
+	zipBytes := makeZip(t, "xray", "BIN")
+	dgst := sha256.Sum256(zipBytes)
+	want := hex.EncodeToString(dgst[:])
+
+	// Real xray .dgst body: MD5, SHA1, SHA2-256, SHA2-512 — four lines.
+	// The previous parser grabbed the LAST space-separated token in the whole
+	// body, which was the SHA2-512 hex. This test would have failed under that
+	// implementation.
+	body := "MD5= 00000000000000000000000000000000\n" +
+		"SHA1= 0000000000000000000000000000000000000000\n" +
+		"SHA2-256= " + want + "\n" +
+		"SHA2-512= 0000000000000000000000000000000000000000000000000000000000000000" +
+		"0000000000000000000000000000000000000000000000000000000000000000\n"
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/releases/download/v1.0.0/Xray-linux-64.zip", func(w http.ResponseWriter, r *http.Request) {
+		w.Write(zipBytes)
+	})
+	mux.HandleFunc("/releases/download/v1.0.0/Xray-linux-64.zip.dgst", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, body)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	r := &Releaser{BaseURL: srv.URL, CacheDir: t.TempDir()}
+	bin, err := r.Fetch(context.Background(), "1.0.0", "linux", "amd64")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if bin.Sha256 != want {
+		t.Fatalf("Sha256 = %s want %s", bin.Sha256, want)
+	}
+}
+
 func TestFetchShaMismatch(t *testing.T) {
 	zipBytes := makeZip(t, "xray", "X")
 	mux := http.NewServeMux()

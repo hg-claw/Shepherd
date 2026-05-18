@@ -152,13 +152,24 @@ func fetchDigest(ctx context.Context, c *http.Client, u string) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	// Format: "SHA2-256= <hex>\n"
-	line := strings.TrimSpace(string(body))
-	idx := strings.LastIndex(line, " ")
-	if idx == -1 {
-		return "", fmt.Errorf("malformed dgst line: %q", line)
+	// xray .dgst is multi-line; we want only the SHA2-256 entry. Both `=`
+	// and `= ` separators are tolerated.
+	for _, raw := range strings.Split(string(body), "\n") {
+		line := strings.TrimSpace(raw)
+		if !strings.HasPrefix(strings.ToUpper(line), "SHA2-256") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		hexStr := strings.ToLower(strings.TrimSpace(parts[1]))
+		if len(hexStr) != 64 {
+			return "", fmt.Errorf("SHA2-256 line has %d hex chars, want 64: %q", len(hexStr), line)
+		}
+		return hexStr, nil
 	}
-	return strings.ToLower(strings.TrimSpace(line[idx+1:])), nil
+	return "", fmt.Errorf("no SHA2-256 entry in dgst body")
 }
 
 func sha256File(path string) (string, error) {

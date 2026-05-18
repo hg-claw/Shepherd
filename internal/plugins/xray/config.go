@@ -53,16 +53,23 @@ func renderVLESSReality(r TemplateRequest) ([]byte, error) {
 				"network":  "tcp",
 				"security": "reality",
 				"realitySettings": map[string]any{
-					"show":         false,
-					"dest":         r.SNI + ":443",
-					"serverNames":  []any{r.SNI},
-					"privateKey":   r.PrivateKey,
-					"publicKey":    r.PublicKey,
-					"shortIds":     []any{r.ShortID},
+					"show":        false,
+					"dest":        r.SNI + ":443",
+					"serverNames": []any{r.SNI},
+					"privateKey":  r.PrivateKey,
+					"publicKey":   r.PublicKey,
+					"shortIds":    []any{r.ShortID},
 				},
 			},
+			"sniffing": map[string]any{
+				"enabled":      true,
+				"destOverride": []any{"http", "tls"},
+			},
 		}},
-		"outbounds": []any{map[string]any{"protocol": "freedom"}},
+		"outbounds": []any{map[string]any{
+			"protocol": "freedom",
+			"settings": map[string]any{"domainStrategy": "UseIP"},
+		}},
 	}
 	return json.MarshalIndent(cfg, "", "  ")
 }
@@ -78,11 +85,18 @@ func renderVMessWS(r TemplateRequest) ([]byte, error) {
 			"protocol": "vmess",
 			"settings": map[string]any{"clients": []any{map[string]any{"id": r.UUID}}},
 			"streamSettings": map[string]any{
-				"network":   "ws",
+				"network":    "ws",
 				"wsSettings": map[string]any{"path": r.WSPath},
 			},
+			"sniffing": map[string]any{
+				"enabled":      true,
+				"destOverride": []any{"http", "tls"},
+			},
 		}},
-		"outbounds": []any{map[string]any{"protocol": "freedom"}},
+		"outbounds": []any{map[string]any{
+			"protocol": "freedom",
+			"settings": map[string]any{"domainStrategy": "UseIP"},
+		}},
 	}
 	return json.MarshalIndent(cfg, "", "  ")
 }
@@ -96,8 +110,15 @@ func renderShadowsocks(r TemplateRequest) ([]byte, error) {
 			"port":     r.Port,
 			"protocol": "shadowsocks",
 			"settings": map[string]any{"method": r.Method, "password": r.Password},
+			"sniffing": map[string]any{
+				"enabled":      true,
+				"destOverride": []any{"http", "tls"},
+			},
 		}},
-		"outbounds": []any{map[string]any{"protocol": "freedom"}},
+		"outbounds": []any{map[string]any{
+			"protocol": "freedom",
+			"settings": map[string]any{"domainStrategy": "UseIP"},
+		}},
 	}
 	return json.MarshalIndent(cfg, "", "  ")
 }

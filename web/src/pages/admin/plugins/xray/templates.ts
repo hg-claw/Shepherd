@@ -48,8 +48,9 @@ function vlessReality(v: TemplateValues) {
           shortIds: [v.shortID ?? ''],
         },
       },
+      sniffing: { enabled: true, destOverride: ['http', 'tls'] },
     }],
-    outbounds: [{ protocol: 'freedom' }],
+    outbounds: [{ protocol: 'freedom', settings: { domainStrategy: 'UseIP' } }],
   }
 }
 
@@ -63,8 +64,9 @@ function vmessWS(v: TemplateValues) {
         network: 'ws',
         wsSettings: { path: v.wsPath || '/ws' },
       },
+      sniffing: { enabled: true, destOverride: ['http', 'tls'] },
     }],
-    outbounds: [{ protocol: 'freedom' }],
+    outbounds: [{ protocol: 'freedom', settings: { domainStrategy: 'UseIP' } }],
   }
 }
 

@@ -23,6 +23,22 @@ func TestRenderTemplate_VLESSReality(t *testing.T) {
 	if len(inbounds) != 1 { t.Fatalf("expected 1 inbound, got %d", len(inbounds)) }
 	first := inbounds[0].(map[string]any)
 	if first["port"].(float64) != 443 { t.Fatalf("port: %v", first["port"]) }
+	// sniffing must be enabled so xray can see SNI/host for dispatch.
+	sn, ok := first["sniffing"].(map[string]any)
+	if !ok || sn["enabled"] != true {
+		t.Fatalf("sniffing missing or disabled: %v", first["sniffing"])
+	}
+	// freedom outbound must force UseIP so IPv6-only/v6-broken VPSes don't
+	// stall on AsIs lookups.
+	outs := m["outbounds"].([]any)
+	ob := outs[0].(map[string]any)
+	if ob["protocol"] != "freedom" {
+		t.Fatalf("outbound protocol: %v", ob["protocol"])
+	}
+	settings, ok := ob["settings"].(map[string]any)
+	if !ok || settings["domainStrategy"] != "UseIP" {
+		t.Fatalf("outbound domainStrategy: %v", ob["settings"])
+	}
 }
 
 func TestRenderTemplate_RejectsUnknownInbound(t *testing.T) {

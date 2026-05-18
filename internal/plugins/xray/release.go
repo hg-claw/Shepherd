@@ -38,6 +38,35 @@ type Binary struct {
 	DownloadedAt time.Time
 }
 
+// xrayOS maps Go runtime.GOOS to xray's release-asset OS token.
+func xrayOS(o string) string {
+	if o == "darwin" {
+		return "macos"
+	}
+	return o
+}
+
+// xrayArch maps Go runtime.GOARCH to xray's release-asset arch token.
+// xray names assets like Xray-linux-64.zip (amd64 → "64"), Xray-linux-arm64-v8a.zip, etc.
+// See https://github.com/XTLS/Xray-core/releases for the full set.
+func xrayArch(a string) string {
+	switch a {
+	case "amd64", "x86_64":
+		return "64"
+	case "386", "i386":
+		return "32"
+	case "arm64", "aarch64":
+		return "arm64-v8a"
+	case "arm":
+		return "arm32-v7a"
+	case "mipsle":
+		return "mips32le"
+	default:
+		// mips64, mips64le, riscv64, s390x all match the Go name verbatim.
+		return a
+	}
+}
+
 func (r *Releaser) base() string {
 	if r.BaseURL == "" {
 		return "https://github.com/XTLS/Xray-core"
@@ -67,7 +96,7 @@ func (r *Releaser) Fetch(ctx context.Context, version, osName, arch string) (Bin
 		return Binary{}, err
 	}
 
-	zipURL := fmt.Sprintf("%s/releases/download/v%s/Xray-%s-%s.zip", r.base(), version, osName, arch)
+	zipURL := fmt.Sprintf("%s/releases/download/v%s/Xray-%s-%s.zip", r.base(), version, xrayOS(osName), xrayArch(arch))
 	dgstURL := zipURL + ".dgst"
 	httpc := r.HTTP
 	if httpc == nil {

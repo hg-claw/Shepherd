@@ -38,10 +38,10 @@ func TestFetchAndCache(t *testing.T) {
 	dgstHex := hex.EncodeToString(dgst[:])
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/releases/download/v1.2.3/Xray-linux-amd64.zip", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/releases/download/v1.2.3/Xray-linux-64.zip", func(w http.ResponseWriter, r *http.Request) {
 		w.Write(zipBytes)
 	})
-	mux.HandleFunc("/releases/download/v1.2.3/Xray-linux-amd64.zip.dgst", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/releases/download/v1.2.3/Xray-linux-64.zip.dgst", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "SHA2-256= "+dgstHex+"\n")
 	})
 	srv := httptest.NewServer(mux)
@@ -97,13 +97,33 @@ func TestListLatestTags(t *testing.T) {
 	}
 }
 
+func TestXrayAssetAliases(t *testing.T) {
+	cases := []struct{ inOS, inArch, wantOS, wantArch string }{
+		{"linux", "amd64", "linux", "64"},
+		{"linux", "arm64", "linux", "arm64-v8a"},
+		{"linux", "arm", "linux", "arm32-v7a"},
+		{"darwin", "amd64", "macos", "64"},
+		{"darwin", "arm64", "macos", "arm64-v8a"},
+		{"windows", "386", "windows", "32"},
+		{"linux", "riscv64", "linux", "riscv64"},
+	}
+	for _, c := range cases {
+		if got := xrayOS(c.inOS); got != c.wantOS {
+			t.Errorf("xrayOS(%s) = %s want %s", c.inOS, got, c.wantOS)
+		}
+		if got := xrayArch(c.inArch); got != c.wantArch {
+			t.Errorf("xrayArch(%s) = %s want %s", c.inArch, got, c.wantArch)
+		}
+	}
+}
+
 func TestFetchShaMismatch(t *testing.T) {
 	zipBytes := makeZip(t, "xray", "X")
 	mux := http.NewServeMux()
-	mux.HandleFunc("/releases/download/v9.9.9/Xray-linux-amd64.zip", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/releases/download/v9.9.9/Xray-linux-64.zip", func(w http.ResponseWriter, r *http.Request) {
 		w.Write(zipBytes)
 	})
-	mux.HandleFunc("/releases/download/v9.9.9/Xray-linux-amd64.zip.dgst", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/releases/download/v9.9.9/Xray-linux-64.zip.dgst", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "SHA2-256= 0000000000000000000000000000000000000000000000000000000000000000\n")
 	})
 	srv := httptest.NewServer(mux)

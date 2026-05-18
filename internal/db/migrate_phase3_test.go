@@ -12,7 +12,7 @@ func TestMigrate_Phase3Tables(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	if err := Migrate(d, DriverSQLite); err != nil {
 		t.Fatal(err)
 	}

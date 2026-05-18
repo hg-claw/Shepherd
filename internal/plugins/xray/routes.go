@@ -103,7 +103,7 @@ func listCached(ctx context.Context, db *sqlx.DB) ([]cachedBinary, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []cachedBinary{}
 	for rows.Next() {
 		var c cachedBinary

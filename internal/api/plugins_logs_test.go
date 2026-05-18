@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -23,7 +22,6 @@ func (fakeStreamer) LogStreamCommand(_ context.Context, _ plugins.Deps, _ int64)
 }
 
 type fakeExec struct {
-	mu    sync.Mutex
 	lines []string
 }
 
@@ -54,9 +52,9 @@ func TestPluginLogsWS_EmitsLineEnvelopes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
-	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	got := []string{}
 	for i := 0; i < 2; i++ {
 		_, msg, err := conn.ReadMessage()

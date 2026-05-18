@@ -65,7 +65,6 @@ func TestPluginsList_ReturnsAllRegistered(t *testing.T) {
 }
 
 type recordingP struct {
-	plainP
 	enableCalls  int
 	disableCalls int
 }

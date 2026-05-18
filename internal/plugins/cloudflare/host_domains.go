@@ -57,7 +57,7 @@ func (p *Plugin) listHostDomains(ctx context.Context, serverIDStr string) ([]hos
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []hostDomainRow{}
 	for rows.Next() {
 		var r hostDomainRow

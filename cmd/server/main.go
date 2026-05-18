@@ -162,9 +162,10 @@ func main() {
 	auditAPI := &api.AuditAPI{DB: d}
 	recAPI := &api.RecordingsAPI{DB: d}
 
-	// hubHostExec adapts agentsvc.Hub to plugins.HostExec. The body methods are
-	// stubbed for Phase 3a Task 21; Task 21b will wire them through filesvc + ptysvc.
-	hostExec := &hubHostExec{hub: hub}
+	// HubHostExec wires plugins.HostExec to the project's filesvc (file push)
+	// and the agent WS hub (one-shot PTY exec via sessionmux). No DB row is
+	// written for plugin-initiated exec; sessions are ephemeral.
+	hostExec := &plugins.HubHostExec{Hub: hub, Files: filesService, Reg: reg}
 	pluginStore := &plugins.Store{DB: d, Now: time.Now}
 	pluginsDeps := plugins.Deps{
 		DB:       d,
@@ -220,24 +221,6 @@ func main() {
 	shutdownCtx, c := context.WithTimeout(context.Background(), 10*time.Second)
 	defer c()
 	_ = srv.Shutdown(shutdownCtx)
-}
-
-// hubHostExec adapts *agentsvc.Hub to plugins.HostExec.
-// The three methods below are intentionally stubbed (Task 21b follow-up):
-// they will be wired through filesvc + ptysvc once the Hub surface grows.
-// TODO Task 21b: implement via agentsvc + filesvc
-type hubHostExec struct{ hub *agentsvc.Hub }
-
-func (h *hubHostExec) PushFile(_ context.Context, _ int64, _ string, _ uint32, _ []byte) error {
-	return errors.New("plugins.HostExec.PushFile: not yet wired to agentsvc (Task 21b)")
-}
-
-func (h *hubHostExec) RunCmd(_ context.Context, _ int64, _ string, _ ...string) ([]byte, []byte, int, error) {
-	return nil, nil, 0, errors.New("plugins.HostExec.RunCmd: not yet wired to agentsvc (Task 21b)")
-}
-
-func (h *hubHostExec) StreamCmd(_ context.Context, _ int64, _ string, _ []string, _ func(string)) error {
-	return errors.New("plugins.HostExec.StreamCmd: not yet wired to agentsvc (Task 21b)")
 }
 
 func tagOrFallback(override, build string) string {

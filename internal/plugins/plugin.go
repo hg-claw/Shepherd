@@ -80,6 +80,32 @@ type LogStreamer interface {
 	LogStreamCommand(ctx context.Context, deps Deps, serverID int64) (name string, args []string, err error)
 }
 
+// DeployValidator is implemented by HostAware plugins that need to run
+// sync validation (e.g. topology constraints) before the async deploy
+// starts. Returning a non-nil error causes the generic /hosts POST to
+// respond 409 and no deploy goroutine is spawned.
+type DeployValidator interface {
+	HostAware
+	BeforeDeploy(ctx context.Context, deps Deps, serverID int64, topology []byte) error
+}
+
+// DeployCommitter is implemented by HostAware plugins that need to
+// persist plugin-specific data after a successful deploy. Called inside
+// the async deploy goroutine after DeployToHost returns nil.
+type DeployCommitter interface {
+	HostAware
+	AfterDeploy(ctx context.Context, deps Deps, serverID int64, topology []byte) error
+}
+
+// UndeployValidator is implemented by HostAware plugins that block
+// undeploy under certain conditions (e.g. landing has dependent relays).
+// Returning a non-nil error causes the generic /hosts DELETE to respond
+// 409 and no UndeployFromHost call is made.
+type UndeployValidator interface {
+	HostAware
+	BeforeUndeploy(ctx context.Context, deps Deps, serverID int64) error
+}
+
 // HostStatus is the per-host snapshot returned by HostAware.HostStatus.
 // Empty State means the check has not yet run (e.g. during initial deployment).
 type HostStatus struct {

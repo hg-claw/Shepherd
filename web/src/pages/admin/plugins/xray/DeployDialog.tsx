@@ -14,8 +14,10 @@ import {
   generateX25519,
   generateShortID,
   getPluginConfig,
+  fetchXrayTopology,
+  listPluginHosts,
 } from '@/api/plugins'
-import { renderTemplate, parseConfig, randomPort, randomUUID, type Inbound } from './templates'
+import { renderTemplate, parseConfig, randomPort, randomUUID, type Inbound, type LandingRef } from './templates'
 import type { PluginHost } from '@/api/plugins'
 
 interface Props {
@@ -40,6 +42,17 @@ export default function DeployDialog({ open, onOpenChange, defaultServerID, exis
     enabled: open,
   })
 
+  const topoQ = useQuery({
+    queryKey: ['xray-topology'],
+    queryFn: fetchXrayTopology,
+    enabled: open,
+  })
+  const hostsQ = useQuery({
+    queryKey: ['plugin-hosts', 'xray'],
+    queryFn: () => listPluginHosts('xray'),
+    enabled: open,
+  })
+
   // Lazy-init every form field from `existing` on first render. Avoids the
   // bug where a useState default (e.g. randomUUID()) lands in state before
   // an async hydration useEffect runs, and a Re-deploy quietly rotates the
@@ -57,6 +70,8 @@ export default function DeployDialog({ open, onOpenChange, defaultServerID, exis
   const [privateKey, setPrivateKey] = useState(parsed.privateKey ?? '')
   const [shortID, setShortID] = useState(parsed.shortID ?? '')
   const [wsPath, setWsPath] = useState(parsed.wsPath ?? '/ws')
+  const [role, setRole] = useState<'landing' | 'relay'>(parsed.role ?? 'landing')
+  const [upstreamServerID, setUpstreamServerID] = useState<number | ''>('')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -68,20 +83,64 @@ export default function DeployDialog({ open, onOpenChange, defaultServerID, exis
     if (typeof dv === 'string' && dv) setVersion(dv)
   }, [version, versionsQ.data, cfgQ.data])
 
+  useEffect(() => {
+    if (!existing || !topoQ.data) return
+    const t = topoQ.data.get(existing.server_id)
+    if (t?.upstream_server_id != null) setUpstreamServerID(t.upstream_server_id)
+    if (t?.role) setRole(t.role)
+  }, [existing, topoQ.data])
+
   const selectedServer = (serversQ.data ?? []).find((s) => s.id === serverID)
+
+  const landings: Array<{ id: number; name: string; landing: LandingRef }> = []
+  if (topoQ.data && hostsQ.data && serversQ.data) {
+    const serversByID = new Map(serversQ.data.map((s) => [s.id, s]))
+    for (const h of hostsQ.data) {
+      const t = topoQ.data.get(h.server_id)
+      if (t?.role !== 'landing') continue
+      if (existing && h.server_id === existing.server_id) continue
+      if (!existing && h.server_id === serverID) continue
+      const s = serversByID.get(h.server_id)
+      if (!s || !s.ssh_host?.Valid) continue
+      const p = parseConfig(h.config)
+      if (!p.uuid || !p.publicKey || !p.sni || !p.port) continue
+      landings.push({
+        id: h.server_id,
+        name: s.name,
+        landing: {
+          address: s.ssh_host.String,
+          port: p.port,
+          sni: p.sni,
+          uuid: p.uuid,
+          publicKey: p.publicKey,
+          shortID: p.shortID ?? '',
+        },
+      })
+    }
+  }
+  const selectedLanding = landings.find((l) => l.id === upstreamServerID) ?? null
 
   const m = useMutation({
     mutationFn: async () => {
       if (!serverID) throw new Error('select a server')
+      if (role === 'relay' && (!upstreamServerID || !selectedLanding?.landing)) {
+        throw new Error('relay needs an upstream landing')
+      }
       const config = renderTemplate({
         inbound, port, uuid,
         sni, publicKey, privateKey, shortID,
         wsPath,
+        role,
+        landing: role === 'relay' ? selectedLanding!.landing : undefined,
       })
-      return deployPluginHost('xray', { server_id: serverID, version, config })
+      const topology = role === 'relay'
+        ? { role: 'relay' as const, upstream_server_id: Number(upstreamServerID) }
+        : { role: 'landing' as const }
+      return deployPluginHost('xray', { server_id: Number(serverID), version, config, topology })
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['plugin-hosts', 'xray'] })
+      qc.invalidateQueries({ queryKey: ['xray-topology'] })
       onOpenChange(false)
     },
     onError: (e: any) => setError(String(e?.message ?? e)),
@@ -110,6 +169,44 @@ export default function DeployDialog({ open, onOpenChange, defaultServerID, exis
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-[12px]">Role</Label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as 'landing' | 'relay')}
+                disabled={!!existing}
+                title={existing ? 'role is locked on re-deploy; undeploy first to change' : undefined}
+                className="mt-1 h-8 px-2 rounded-md border bg-background text-[13px] font-mono w-full disabled:opacity-60"
+              >
+                <option value="landing">Landing</option>
+                <option value="relay">Relay → upstream landing</option>
+              </select>
+            </div>
+            {role === 'relay' && (
+              <div>
+                <Label className="text-[12px]">Upstream landing</Label>
+                <select
+                  value={upstreamServerID}
+                  onChange={(e) => setUpstreamServerID(Number(e.target.value) || '')}
+                  disabled={!!existing}
+                  title={existing ? 'upstream is locked on re-deploy; undeploy first to change' : undefined}
+                  className="mt-1 h-8 px-2 rounded-md border bg-background text-[13px] font-mono w-full disabled:opacity-60"
+                >
+                  <option value="">— select —</option>
+                  {landings.map((l) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+                {landings.length === 0 && (
+                  <p className="text-err text-[11.5px] mt-1">
+                    No landing available. Deploy a landing first.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

@@ -43,8 +43,8 @@ export default function HostsTab() {
     onError: (e: any) => toast('error', String(e?.message ?? e)),
   })
 
-  // { id?: number } = deploy to specific server; {} = open dialog with no pre-selected server
-  const [deployTarget, setDeployTarget] = useState<{ id?: number } | null>(null)
+  // { id?: number; existing?: PluginHost } = deploy to specific server; {} = open dialog with no pre-selected server
+  const [deployTarget, setDeployTarget] = useState<{ id?: number; existing?: PluginHost } | null>(null)
 
   // Build hostsByServer map for O(1) lookup.
   const hostsByServer = new Map<number, PluginHost>()
@@ -103,7 +103,7 @@ export default function HostsTab() {
                     {deployed ? (
                       <>
                         <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
-                          onClick={() => setDeployTarget({ id: s.id })}>
+                          onClick={() => setDeployTarget({ id: s.id, existing: h })}>
                           Re-deploy
                         </Button>
                         <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px] text-destructive"
@@ -136,6 +136,7 @@ export default function HostsTab() {
           open={true}
           onOpenChange={(open) => { if (!open) setDeployTarget(null) }}
           defaultServerID={deployTarget.id}
+          existing={deployTarget.existing}
         />
       )}
     </div>

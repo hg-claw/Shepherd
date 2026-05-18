@@ -68,6 +68,49 @@ function vmessWS(v: TemplateValues) {
   }
 }
 
+export interface ParsedTemplate extends Partial<TemplateValues> {
+  inbound?: Inbound
+}
+
+// parseConfig is the inverse of renderTemplate: best-effort extraction of
+// the user-visible fields from a previously-stored xray config. Returns
+// what it can; unknown / missing fields are left undefined.
+export function parseConfig(cfg: unknown): ParsedTemplate {
+  if (!cfg || typeof cfg !== 'object') return {}
+  const inbounds = (cfg as any).inbounds
+  if (!Array.isArray(inbounds) || inbounds.length === 0) return {}
+  const ib = inbounds[0] as any
+  const proto = String(ib?.protocol ?? '')
+  const ss = ib?.streamSettings ?? {}
+  const security = String(ss?.security ?? '')
+  const port = typeof ib?.port === 'number' ? ib.port : undefined
+
+  if (proto === 'vless' && security === 'reality') {
+    const rs = ss.realitySettings ?? {}
+    const client = ib?.settings?.clients?.[0] ?? {}
+    return {
+      inbound: 'vless-reality',
+      port,
+      uuid: typeof client.id === 'string' ? client.id : undefined,
+      sni: Array.isArray(rs.serverNames) && rs.serverNames[0] ? String(rs.serverNames[0]) : undefined,
+      publicKey: typeof rs.publicKey === 'string' ? rs.publicKey : undefined,
+      privateKey: typeof rs.privateKey === 'string' ? rs.privateKey : undefined,
+      shortID: Array.isArray(rs.shortIds) && rs.shortIds[0] != null ? String(rs.shortIds[0]) : undefined,
+    }
+  }
+  if (proto === 'vmess' && ss.network === 'ws') {
+    const client = ib?.settings?.clients?.[0] ?? {}
+    const wsPath = ss?.wsSettings?.path
+    return {
+      inbound: 'vmess-ws',
+      port,
+      uuid: typeof client.id === 'string' ? client.id : undefined,
+      wsPath: typeof wsPath === 'string' ? wsPath : undefined,
+    }
+  }
+  return {}
+}
+
 // helpers
 export function randomPort(): number {
   // 10000 – 59999 to avoid trampling well-known ports.

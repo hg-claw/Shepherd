@@ -15,15 +15,17 @@ import {
   generateShortID,
   getPluginConfig,
 } from '@/api/plugins'
-import { renderTemplate, randomPort, randomUUID, type Inbound } from './templates'
+import { renderTemplate, parseConfig, randomPort, randomUUID, type Inbound } from './templates'
+import type { PluginHost } from '@/api/plugins'
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   defaultServerID?: number
+  existing?: PluginHost          // when set, the dialog opens in Re-deploy mode
 }
 
-export default function DeployDialog({ open, onOpenChange, defaultServerID }: Props) {
+export default function DeployDialog({ open, onOpenChange, defaultServerID, existing }: Props) {
   const qc = useQueryClient()
   const serversQ = useServers()
   const versionsQ = useQuery({
@@ -53,6 +55,22 @@ export default function DeployDialog({ open, onOpenChange, defaultServerID }: Pr
   useEffect(() => {
     if (defaultServerID != null) setServerID(defaultServerID)
   }, [defaultServerID])
+
+  // re-hydrate when the dialog is opened for an existing deployment
+  useEffect(() => {
+    if (!open || !existing) return
+    const parsed = parseConfig(existing.config)
+    if (parsed.inbound) setInbound(parsed.inbound)
+    if (typeof parsed.port === 'number') setPort(parsed.port)
+    if (parsed.uuid) setUuid(parsed.uuid)
+    if (parsed.sni) setSni(parsed.sni)
+    if (parsed.publicKey) setPublicKey(parsed.publicKey)
+    if (parsed.privateKey) setPrivateKey(parsed.privateKey)
+    if (parsed.shortID) setShortID(parsed.shortID)
+    if (parsed.wsPath) setWsPath(parsed.wsPath)
+    if (existing.deployed_version) setVersion(existing.deployed_version)
+    if (existing.server_id) setServerID(existing.server_id)
+  }, [open, existing])
 
   useEffect(() => {
     if (version) return
@@ -87,7 +105,8 @@ export default function DeployDialog({ open, onOpenChange, defaultServerID }: Pr
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-mono">
-            Deploy xray{selectedServer ? ` → ${selectedServer.name}` : ''}
+            {existing ? 'Re-deploy xray' : 'Deploy xray'}
+            {selectedServer ? ` → ${selectedServer.name}` : ''}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
@@ -282,7 +301,9 @@ export default function DeployDialog({ open, onOpenChange, defaultServerID }: Pr
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={() => m.mutate()} disabled={m.isPending || !version || !serverID}>
-            {m.isPending ? 'Deploying…' : 'Deploy'}
+            {m.isPending
+              ? (existing ? 'Re-deploying…' : 'Deploying…')
+              : (existing ? 'Re-deploy' : 'Deploy')}
           </Button>
         </DialogFooter>
       </DialogContent>

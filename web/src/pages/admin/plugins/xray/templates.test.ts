@@ -83,3 +83,48 @@ describe('buildShareURL', () => {
     expect(buildShareURL({ inbound: 'vless-reality', port: 443, uuid: 'u' }, '1.2.3.4', 'x')).toBeNull()
   })
 })
+
+describe('renderTemplate relay', () => {
+  it('emits vless-to-landing outbound + direct fallback + private-IP routing', () => {
+    const cfg = renderTemplate({
+      inbound: 'vless-reality', port: 443,
+      uuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      sni: 'www.icloud.com', publicKey: 'RPUB', privateKey: 'RPRIV', shortID: 'ee',
+      role: 'relay',
+      landing: {
+        address: '1.2.3.4', port: 8443, sni: 'www.icloud.com',
+        uuid: 'lll', publicKey: 'LPUB', shortID: 'll',
+      },
+    }) as any
+    expect(cfg.outbounds[0].protocol).toBe('vless')
+    expect(cfg.outbounds[0].settings.vnext[0].address).toBe('1.2.3.4')
+    expect(cfg.outbounds[0].settings.vnext[0].users[0].id).toBe('lll')
+    expect(cfg.outbounds[0].streamSettings.realitySettings.publicKey).toBe('LPUB')
+    expect(cfg.outbounds[1].protocol).toBe('freedom')
+    expect(cfg.routing.rules[0].outboundTag).toBe('direct')
+  })
+
+  it('parseConfig recognizes relay shape', () => {
+    const cfg = renderTemplate({
+      inbound: 'vless-reality', port: 443, uuid: 'u',
+      sni: 's', publicKey: 'P', privateKey: 'K', shortID: 'sid',
+      role: 'relay',
+      landing: { address: '1.2.3.4', port: 8443, sni: 'X', uuid: 'L', publicKey: 'LP', shortID: 'ls' },
+    })
+    const parsed = parseConfig(cfg)
+    expect(parsed.role).toBe('relay')
+    expect(parsed.landing?.address).toBe('1.2.3.4')
+    expect(parsed.landing?.uuid).toBe('L')
+    expect(parsed.landing?.publicKey).toBe('LP')
+  })
+
+  it('parseConfig recognizes landing shape (no role field) as landing', () => {
+    const cfg = renderTemplate({
+      inbound: 'vless-reality', port: 443, uuid: 'u',
+      sni: 's', publicKey: 'P', privateKey: 'K', shortID: 'sid',
+    })
+    const parsed = parseConfig(cfg)
+    expect(parsed.role ?? 'landing').toBe('landing')
+    expect(parsed.landing).toBeUndefined()
+  })
+})

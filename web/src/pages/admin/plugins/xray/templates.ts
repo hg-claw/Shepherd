@@ -6,6 +6,15 @@
 
 export type Inbound = 'vless-reality' | 'vmess-ws'
 
+export interface LandingRef {
+  address: string
+  port: number
+  sni: string
+  uuid: string
+  publicKey: string
+  shortID: string
+}
+
 export interface TemplateValues {
   inbound: Inbound
   port: number
@@ -17,6 +26,9 @@ export interface TemplateValues {
   shortID?: string
   // VMess+WS
   wsPath?: string
+  // Relay topology (vless-reality only)
+  role?: 'landing' | 'relay'
+  landing?: LandingRef
 }
 
 export function renderTemplate(v: TemplateValues): Record<string, unknown> {
@@ -27,29 +39,66 @@ export function renderTemplate(v: TemplateValues): Record<string, unknown> {
 }
 
 function vlessReality(v: TemplateValues) {
+  const inbound = {
+    port: v.port,
+    protocol: 'vless',
+    settings: {
+      clients: [{ id: v.uuid, flow: 'xtls-rprx-vision' }],
+      decryption: 'none',
+    },
+    streamSettings: {
+      network: 'tcp',
+      security: 'reality',
+      realitySettings: {
+        show: false,
+        dest: `${v.sni}:443`,
+        serverNames: [v.sni],
+        privateKey: v.privateKey,
+        publicKey: v.publicKey,
+        shortIds: [v.shortID ?? ''],
+      },
+    },
+    sniffing: { enabled: true, destOverride: ['http', 'tls'] },
+  }
+
+  if (v.role === 'relay' && v.landing) {
+    const l = v.landing
+    return {
+      log: { loglevel: 'warning' },
+      inbounds: [inbound],
+      outbounds: [
+        {
+          tag: 'to-landing',
+          protocol: 'vless',
+          settings: {
+            vnext: [{
+              address: l.address,
+              port: l.port,
+              users: [{ id: l.uuid, encryption: 'none', flow: 'xtls-rprx-vision' }],
+            }],
+          },
+          streamSettings: {
+            network: 'tcp',
+            security: 'reality',
+            realitySettings: {
+              fingerprint: 'chrome',
+              serverName: l.sni,
+              publicKey: l.publicKey,
+              shortId: l.shortID,
+            },
+          },
+        },
+        { tag: 'direct', protocol: 'freedom', settings: { domainStrategy: 'UseIP' } },
+      ],
+      routing: {
+        rules: [{ type: 'field', ip: ['geoip:private'], outboundTag: 'direct' }],
+      },
+    }
+  }
+
   return {
     log: { loglevel: 'warning' },
-    inbounds: [{
-      port: v.port,
-      protocol: 'vless',
-      settings: {
-        clients: [{ id: v.uuid, flow: 'xtls-rprx-vision' }],
-        decryption: 'none',
-      },
-      streamSettings: {
-        network: 'tcp',
-        security: 'reality',
-        realitySettings: {
-          show: false,
-          dest: `${v.sni}:443`,
-          serverNames: [v.sni],
-          privateKey: v.privateKey,
-          publicKey: v.publicKey,
-          shortIds: [v.shortID ?? ''],
-        },
-      },
-      sniffing: { enabled: true, destOverride: ['http', 'tls'] },
-    }],
+    inbounds: [inbound],
     outbounds: [{ protocol: 'freedom', settings: { domainStrategy: 'UseIP' } }],
   }
 }
@@ -90,7 +139,7 @@ export function parseConfig(cfg: unknown): ParsedTemplate {
   if (proto === 'vless' && security === 'reality') {
     const rs = ss.realitySettings ?? {}
     const client = ib?.settings?.clients?.[0] ?? {}
-    return {
+    const base: ParsedTemplate = {
       inbound: 'vless-reality',
       port,
       uuid: typeof client.id === 'string' ? client.id : undefined,
@@ -99,6 +148,26 @@ export function parseConfig(cfg: unknown): ParsedTemplate {
       privateKey: typeof rs.privateKey === 'string' ? rs.privateKey : undefined,
       shortID: Array.isArray(rs.shortIds) && rs.shortIds[0] != null ? String(rs.shortIds[0]) : undefined,
     }
+    // Detect relay shape by outbound[0] being vless+reality.
+    const outs = (cfg as any).outbounds
+    const o0 = Array.isArray(outs) ? outs[0] : null
+    if (o0?.protocol === 'vless' && o0?.streamSettings?.security === 'reality') {
+      const vnext = o0?.settings?.vnext?.[0]
+      const user  = vnext?.users?.[0]
+      const ors   = o0?.streamSettings?.realitySettings ?? {}
+      base.role = 'relay'
+      base.landing = {
+        address:   String(vnext?.address ?? ''),
+        port:      typeof vnext?.port === 'number' ? vnext.port : 0,
+        sni:       String(ors?.serverName ?? ''),
+        uuid:      String(user?.id ?? ''),
+        publicKey: String(ors?.publicKey ?? ''),
+        shortID:   String(ors?.shortId ?? ''),
+      }
+    } else {
+      base.role = 'landing'
+    }
+    return base
   }
   if (proto === 'vmess' && ss.network === 'ws') {
     const client = ib?.settings?.clients?.[0] ?? {}

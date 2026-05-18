@@ -111,6 +111,47 @@ export function parseConfig(cfg: unknown): ParsedTemplate {
   return {}
 }
 
+export function buildShareURL(parsed: ParsedTemplate, hostname: string, label: string): string | null {
+  if (!hostname || !parsed.port || !parsed.uuid) return null
+
+  if (parsed.inbound === 'vless-reality') {
+    if (!parsed.publicKey) return null
+    const q = new URLSearchParams({
+      encryption: 'none',
+      security: 'reality',
+      sni: parsed.sni ?? '',
+      fp: 'chrome',
+      pbk: parsed.publicKey,
+      sid: parsed.shortID ?? '',
+      type: 'tcp',
+      flow: 'xtls-rprx-vision',
+    })
+    return `vless://${parsed.uuid}@${hostname}:${parsed.port}?${q.toString()}#${encodeURIComponent(label)}`
+  }
+
+  if (parsed.inbound === 'vmess-ws') {
+    const obj = {
+      v: '2',
+      ps: label,
+      add: hostname,
+      port: String(parsed.port),
+      id: parsed.uuid,
+      aid: '0',
+      scy: 'auto',
+      net: 'ws',
+      type: 'none',
+      host: '',
+      path: parsed.wsPath ?? '/ws',
+      tls: '',
+    }
+    // btoa needs binary string; JSON is ASCII so utf8 fits.
+    const json = JSON.stringify(obj)
+    return `vmess://${btoa(json)}`
+  }
+
+  return null
+}
+
 // helpers
 export function randomPort(): number {
   // 10000 – 59999 to avoid trampling well-known ports.

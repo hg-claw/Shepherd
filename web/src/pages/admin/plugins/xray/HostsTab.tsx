@@ -6,6 +6,8 @@ import { listPluginHosts, removePluginHost, type PluginHost } from '@/api/plugin
 import { Button } from '@/components/ui/button'
 import { Pill, type PillKind } from '@/components/Pill'
 import { useUI } from '@/store/ui'
+import { Copy } from 'lucide-react'
+import { parseConfig, buildShareURL } from './templates'
 import DeployDialog from './DeployDialog'
 
 function statusKind(s: string | undefined): PillKind {
@@ -102,6 +104,29 @@ export default function HostsTab() {
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     {deployed ? (
                       <>
+                        {(() => {
+                          const hostname = s.ssh_host?.Valid ? s.ssh_host.String : ''
+                          const parsed = parseConfig(h?.config)
+                          const shareURL = buildShareURL(parsed, hostname, s.name)
+                          return (
+                            <Button
+                              size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
+                              disabled={!shareURL}
+                              title={shareURL ? 'Copy share URL' : 'config or host address incomplete'}
+                              onClick={async () => {
+                                if (!shareURL) return
+                                try {
+                                  await navigator.clipboard.writeText(shareURL)
+                                  toast('success', 'Share URL copied')
+                                } catch (e) {
+                                  toast('error', String((e as Error)?.message ?? e))
+                                }
+                              }}
+                            >
+                              <Copy className="h-3.5 w-3.5 mr-1" /> Copy URL
+                            </Button>
+                          )
+                        })()}
                         <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
                           onClick={() => setDeployTarget({ id: s.id, existing: h })}>
                           Re-deploy

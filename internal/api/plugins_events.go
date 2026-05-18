@@ -56,7 +56,7 @@ func (a *PluginEventsAPI) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 500, err.Error())
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := []eventOut{}
 	for rows.Next() {
 		var (

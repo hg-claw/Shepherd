@@ -62,7 +62,7 @@ func (h *HubHostExec) RunCmd(ctx context.Context, serverID int64, name string, a
 
 	var buf bytes.Buffer
 	var mu sync.Mutex
-	code := -1
+	var code int
 	exitCh := make(chan int, 1)
 
 	sess := &oneshotSession{

@@ -140,7 +140,7 @@ func httpGet(ctx context.Context, c *http.Client, u string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode/100 != 2 {
 		return nil, fmt.Errorf("status %d", resp.StatusCode)
 	}
@@ -177,7 +177,7 @@ func sha256File(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err
@@ -236,12 +236,14 @@ func extractXray(zipBytes []byte, outPath string) error {
 		}
 		w, err := os.OpenFile(outPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0755)
 		if err != nil {
-			rc.Close()
+			_ = rc.Close()
 			return err
 		}
 		_, err = io.Copy(w, rc)
-		rc.Close()
-		w.Close()
+		_ = rc.Close()
+		if cerr := w.Close(); err == nil {
+			err = cerr
+		}
 		return err
 	}
 	return fmt.Errorf("no xray binary found in zip")

@@ -30,7 +30,7 @@ func TestZonesEndpoint_UsesStoredToken(t *testing.T) {
 
 	cfSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer abc" {
-			http.Error(w, "bad token", 401); return
+			http.Error(w, "bad token", http.StatusUnauthorized); return
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"success": true,

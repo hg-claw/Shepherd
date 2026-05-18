@@ -39,10 +39,10 @@ func TestFetchAndCache(t *testing.T) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/releases/download/v1.2.3/Xray-linux-64.zip", func(w http.ResponseWriter, r *http.Request) {
-		w.Write(zipBytes)
+		_, _ = w.Write(zipBytes)
 	})
 	mux.HandleFunc("/releases/download/v1.2.3/Xray-linux-64.zip.dgst", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, "SHA2-256= "+dgstHex+"\n")
+		_, _ = io.WriteString(w, "SHA2-256= "+dgstHex+"\n")
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -79,7 +79,7 @@ func TestFetchAndCache(t *testing.T) {
 func TestListLatestTags(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/repos/XTLS/Xray-core/releases", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, `[
+		_, _ = io.WriteString(w, `[
 			{"tag_name":"v1.8.11"},
 			{"tag_name":"v1.8.10"},
 			{"tag_name":"v1.8.9"}
@@ -134,10 +134,10 @@ func TestFetchPicksSHA256FromMultilineDgst(t *testing.T) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/releases/download/v1.0.0/Xray-linux-64.zip", func(w http.ResponseWriter, r *http.Request) {
-		w.Write(zipBytes)
+		_, _ = w.Write(zipBytes)
 	})
 	mux.HandleFunc("/releases/download/v1.0.0/Xray-linux-64.zip.dgst", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, body)
+		_, _ = io.WriteString(w, body)
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -155,10 +155,10 @@ func TestFetchShaMismatch(t *testing.T) {
 	zipBytes := makeZip(t, "xray", "X")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/releases/download/v9.9.9/Xray-linux-64.zip", func(w http.ResponseWriter, r *http.Request) {
-		w.Write(zipBytes)
+		_, _ = w.Write(zipBytes)
 	})
 	mux.HandleFunc("/releases/download/v9.9.9/Xray-linux-64.zip.dgst", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, "SHA2-256= 0000000000000000000000000000000000000000000000000000000000000000\n")
+		_, _ = io.WriteString(w, "SHA2-256= 0000000000000000000000000000000000000000000000000000000000000000\n")
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()

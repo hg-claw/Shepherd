@@ -3,6 +3,7 @@ package xray
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -72,5 +73,74 @@ func TestMigration0002_CreatesTopologyAndBackfillsLanding(t *testing.T) {
 	_ = d.Get(&role, "SELECT role FROM xray_host_topology WHERE server_id=9")
 	if role != "landing" {
 		t.Fatalf("backfill role = %q want landing", role)
+	}
+}
+
+func TestXrayBeforeDeploy_FirstTimeLanding(t *testing.T) {
+	s := newTopoStore(t)
+	p := &Plugin{}
+	// First deploy as landing — should be accepted (no row yet).
+	err := p.BeforeDeploy(context.Background(), plugins.Deps{DB: s.DB}, 1,
+		[]byte(`{"role":"landing"}`))
+	if err != nil { t.Fatalf("first landing deploy rejected: %v", err) }
+}
+
+func TestXrayBeforeDeploy_FirstTimeRelay_NeedsUpstream(t *testing.T) {
+	s := newTopoStore(t)
+	p := &Plugin{}
+	err := p.BeforeDeploy(context.Background(), plugins.Deps{DB: s.DB}, 2,
+		[]byte(`{"role":"relay"}`))
+	if err == nil || !strings.Contains(err.Error(), "upstream") {
+		t.Fatalf("got %v, want upstream-required error", err)
+	}
+}
+
+func TestXrayBeforeDeploy_RelayUpstreamMustBeLanding(t *testing.T) {
+	s := newTopoStore(t)
+	_ = s.UpsertLanding(context.Background(), 1)
+	_ = s.UpsertRelay(context.Background(), 2, 1)
+	p := &Plugin{}
+	// Pointing a relay at another relay (server 2) → reject.
+	err := p.BeforeDeploy(context.Background(), plugins.Deps{DB: s.DB}, 3,
+		[]byte(`{"role":"relay","upstream_server_id":2}`))
+	if err == nil || !strings.Contains(err.Error(), "landing") {
+		t.Fatalf("got %v, want upstream-must-be-landing error", err)
+	}
+}
+
+func TestXrayBeforeDeploy_RoleLockOnRedeploy(t *testing.T) {
+	s := newTopoStore(t)
+	_ = s.UpsertLanding(context.Background(), 1)
+	p := &Plugin{}
+	// Re-deploying server 1 with role=relay must be rejected.
+	err := p.BeforeDeploy(context.Background(), plugins.Deps{DB: s.DB}, 1,
+		[]byte(`{"role":"relay","upstream_server_id":1}`))
+	if err == nil || !strings.Contains(err.Error(), "role") {
+		t.Fatalf("got %v, want role-lock error", err)
+	}
+}
+
+func TestXrayAfterDeploy_PersistsTopology(t *testing.T) {
+	s := newTopoStore(t)
+	_ = s.UpsertLanding(context.Background(), 1)
+	p := &Plugin{}
+	if err := p.AfterDeploy(context.Background(), plugins.Deps{DB: s.DB}, 2,
+		[]byte(`{"role":"relay","upstream_server_id":1}`)); err != nil {
+		t.Fatal(err)
+	}
+	row, _ := s.Get(context.Background(), 2)
+	if row.Role != "relay" || row.UpstreamServerID.Int64 != 1 {
+		t.Fatalf("topology row = %+v", row)
+	}
+}
+
+func TestXrayBeforeUndeploy_BlocksLandingWithRelays(t *testing.T) {
+	s := newTopoStore(t)
+	_ = s.UpsertLanding(context.Background(), 1)
+	_ = s.UpsertRelay(context.Background(), 2, 1)
+	p := &Plugin{}
+	err := p.BeforeUndeploy(context.Background(), plugins.Deps{DB: s.DB}, 1)
+	if err == nil || !strings.Contains(err.Error(), "relay") {
+		t.Fatalf("got %v, want depending-relays error", err)
 	}
 }

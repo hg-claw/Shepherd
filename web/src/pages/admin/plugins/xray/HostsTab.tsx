@@ -152,7 +152,11 @@ export default function HostsTab() {
       </div>
 
       {deployTarget !== null && (
+        // Key on identity so switching targets (e.g. Re-deploy row A → Deploy
+        // row B without closing) forces a remount; DeployDialog lazy-inits
+        // its form state from props on mount.
         <DeployDialog
+          key={`${deployTarget.id ?? 'new'}:${deployTarget.existing ? 're' : 'fresh'}`}
           open={true}
           onOpenChange={(open) => { if (!open) setDeployTarget(null) }}
           defaultServerID={deployTarget.id}

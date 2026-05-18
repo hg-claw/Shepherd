@@ -40,37 +40,24 @@ export default function DeployDialog({ open, onOpenChange, defaultServerID, exis
     enabled: open,
   })
 
-  const [serverID, setServerID] = useState<number | ''>(defaultServerID ?? '')
-  const [version, setVersion] = useState('')
-  const [inbound, setInbound] = useState<Inbound>('vless-reality')
-  const [port, setPort] = useState<number>(443)
-  const [uuid, setUuid] = useState<string>(randomUUID())
-  const [sni, setSni] = useState('www.microsoft.com')
-  const [publicKey, setPublicKey] = useState('')
-  const [privateKey, setPrivateKey] = useState('')
-  const [shortID, setShortID] = useState('')
-  const [wsPath, setWsPath] = useState('/ws')
+  // Lazy-init every form field from `existing` on first render. Avoids the
+  // bug where a useState default (e.g. randomUUID()) lands in state before
+  // an async hydration useEffect runs, and a Re-deploy quietly rotates the
+  // UUID / overwrites the SNI. Each useState initializer only runs once,
+  // and the dialog is conditionally mounted by the parent, so changing
+  // `existing` happens via remount (state is rebuilt from new props).
+  const parsed = existing ? parseConfig(existing.config) : {}
+  const [serverID, setServerID] = useState<number | ''>(existing?.server_id ?? defaultServerID ?? '')
+  const [version, setVersion] = useState(existing?.deployed_version ?? '')
+  const [inbound, setInbound] = useState<Inbound>(parsed.inbound ?? 'vless-reality')
+  const [port, setPort] = useState<number>(parsed.port ?? 443)
+  const [uuid, setUuid] = useState<string>(parsed.uuid ?? randomUUID())
+  const [sni, setSni] = useState(parsed.sni ?? 'www.microsoft.com')
+  const [publicKey, setPublicKey] = useState(parsed.publicKey ?? '')
+  const [privateKey, setPrivateKey] = useState(parsed.privateKey ?? '')
+  const [shortID, setShortID] = useState(parsed.shortID ?? '')
+  const [wsPath, setWsPath] = useState(parsed.wsPath ?? '/ws')
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (defaultServerID != null) setServerID(defaultServerID)
-  }, [defaultServerID])
-
-  // re-hydrate when the dialog is opened for an existing deployment
-  useEffect(() => {
-    if (!open || !existing) return
-    const parsed = parseConfig(existing.config)
-    if (parsed.inbound) setInbound(parsed.inbound)
-    if (typeof parsed.port === 'number') setPort(parsed.port)
-    if (parsed.uuid) setUuid(parsed.uuid)
-    if (parsed.sni) setSni(parsed.sni)
-    if (parsed.publicKey) setPublicKey(parsed.publicKey)
-    if (parsed.privateKey) setPrivateKey(parsed.privateKey)
-    if (parsed.shortID) setShortID(parsed.shortID)
-    if (parsed.wsPath) setWsPath(parsed.wsPath)
-    if (existing.deployed_version) setVersion(existing.deployed_version)
-    if (existing.server_id) setServerID(existing.server_id)
-  }, [open, existing])
 
   useEffect(() => {
     if (version) return

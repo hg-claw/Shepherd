@@ -2,7 +2,7 @@ CREATE TABLE xray_host_topology (
   server_id           INTEGER PRIMARY KEY
                         REFERENCES servers(id) ON DELETE CASCADE,
   role                TEXT    NOT NULL CHECK (role IN ('landing', 'relay')),
-  upstream_server_id  INTEGER REFERENCES servers(id) ON DELETE RESTRICT,
+  upstream_server_id  INTEGER REFERENCES xray_host_topology(server_id) ON DELETE RESTRICT,
   updated_at          TIMESTAMP NOT NULL,
   CHECK (
     (role = 'landing' AND upstream_server_id IS NULL) OR

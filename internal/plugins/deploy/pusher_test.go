@@ -52,9 +52,12 @@ func TestPushAndStart_Linux(t *testing.T) {
 	if len(exec.pushedPaths) != 3 {
 		t.Fatalf("expected 3 file pushes, got %v", exec.pushedPaths)
 	}
+	// Must include a `restart` — `enable --now` is a no-op for an
+	// already-running unit and would leave the old config in memory.
 	wantCmds := [][]string{
 		{"systemctl", "daemon-reload"},
-		{"systemctl", "enable", "--now", "foo"},
+		{"systemctl", "enable", "foo"},
+		{"systemctl", "restart", "foo"},
 	}
 	for i, want := range wantCmds {
 		if len(exec.cmds) <= i || !equalSlice(exec.cmds[i], want) {
@@ -94,26 +97,29 @@ func TestPushAndStart_Darwin(t *testing.T) {
 	if len(exec.pushedPaths) != 3 {
 		t.Fatalf("expected 3 file pushes, got %v", exec.pushedPaths)
 	}
-	// Should have called launchctl bootstrap, NOT systemctl
-	found := false
-	for _, cmd := range exec.cmds {
-		if len(cmd) >= 3 && cmd[0] == "launchctl" && cmd[1] == "bootstrap" {
-			found = true
-		}
+	// Must do bootout BEFORE bootstrap — without that, a second deploy of
+	// an already-loaded service fails ("service already loaded") and the
+	// new plist/config is never picked up.
+	var bootoutIdx, bootstrapIdx = -1, -1
+	for i, cmd := range exec.cmds {
 		if cmd[0] == "systemctl" {
 			t.Fatalf("unexpected systemctl call on darwin: %v", cmd)
 		}
-	}
-	if !found {
-		t.Fatalf("expected launchctl bootstrap, got cmds: %v", exec.cmds)
-	}
-	// bootstrap target must be "system"
-	for _, cmd := range exec.cmds {
+		if len(cmd) >= 3 && cmd[0] == "launchctl" && cmd[1] == "bootout" {
+			bootoutIdx = i
+		}
 		if len(cmd) >= 3 && cmd[0] == "launchctl" && cmd[1] == "bootstrap" {
+			bootstrapIdx = i
 			if cmd[2] != "system" {
 				t.Fatalf("launchctl bootstrap target = %q, want system", cmd[2])
 			}
 		}
+	}
+	if bootoutIdx < 0 || bootstrapIdx < 0 {
+		t.Fatalf("expected both bootout and bootstrap, got: %v", exec.cmds)
+	}
+	if bootoutIdx >= bootstrapIdx {
+		t.Fatalf("bootout must run before bootstrap; cmds: %v", exec.cmds)
 	}
 }
 

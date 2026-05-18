@@ -5,7 +5,6 @@ After=network-online.target
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/shepherd-xray run -c /etc/shepherd-xray/config.json
-ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=2
 NoNewPrivileges=true

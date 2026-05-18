@@ -50,7 +50,11 @@ func (p *Pusher) DeployService(ctx context.Context, dp DeployParams) error {
 
 	switch dp.os() {
 	case "darwin":
-		// launchctl bootstrap starts the service because RunAtLoad=true.
+		// bootout first (tolerate failure: service may not be loaded yet on
+		// first deploy). Then bootstrap, which loads the plist and starts
+		// the service because RunAtLoad=true. This pair is the only way to
+		// re-pick-up a changed plist or config on launchd.
+		_, _, _, _ = p.Exec.RunCmd(ctx, dp.ServerID, "launchctl", "bootout", "system", dp.UnitPath)
 		if _, _, _, err := p.Exec.RunCmd(ctx, dp.ServerID, "launchctl", "bootstrap", "system", dp.UnitPath); err != nil {
 			return fmt.Errorf("launchctl bootstrap system %s: %w", dp.UnitPath, err)
 		}
@@ -58,8 +62,15 @@ func (p *Pusher) DeployService(ctx context.Context, dp DeployParams) error {
 		if _, _, _, err := p.Exec.RunCmd(ctx, dp.ServerID, "systemctl", "daemon-reload"); err != nil {
 			return fmt.Errorf("systemctl daemon-reload: %w", err)
 		}
-		if _, _, _, err := p.Exec.RunCmd(ctx, dp.ServerID, "systemctl", "enable", "--now", dp.UnitName); err != nil {
-			return fmt.Errorf("systemctl enable --now %s: %w", dp.UnitName, err)
+		// `enable` is idempotent and registers the unit; we deliberately do
+		// NOT use `--now`, because for an already-running service `--now`
+		// is a no-op and would leave xray with the previous config still
+		// loaded in memory. `restart` always picks up the new config.
+		if _, _, _, err := p.Exec.RunCmd(ctx, dp.ServerID, "systemctl", "enable", dp.UnitName); err != nil {
+			return fmt.Errorf("systemctl enable %s: %w", dp.UnitName, err)
+		}
+		if _, _, _, err := p.Exec.RunCmd(ctx, dp.ServerID, "systemctl", "restart", dp.UnitName); err != nil {
+			return fmt.Errorf("systemctl restart %s: %w", dp.UnitName, err)
 		}
 	}
 	return nil

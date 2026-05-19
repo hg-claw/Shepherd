@@ -14,6 +14,7 @@ func loadMigrations() []plugins.Migration {
 		"0001_xray.up.sql",
 		"0002_topology.up.sql",
 		"0003_multi_inbound.up.sql",
+		"0004_traffic.up.sql",
 	}
 	out := make([]plugins.Migration, 0, len(names))
 	for _, n := range names {

@@ -93,6 +93,9 @@ func (p *Plugin) RegisterRoutes(mux plugins.Mux, deps plugins.Deps) {
 	mux.HandleFunc("DELETE /inbounds/{id}", deleteInboundHandler(deps))
 	mux.HandleFunc("PATCH /servers/{id}",   patchServerVersionHandler(deps))
 
+	mux.HandleFunc("GET /traffic",       trafficQueryHandler(deps.DB))
+	mux.HandleFunc("GET /traffic/batch", trafficBatchQueryHandler(deps.DB))
+
 	// Retire /topology — replaced by /inbounds (each row carries upstream_*).
 	mux.HandleFunc("GET /topology", func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "GET /topology is deprecated; use GET /inbounds instead", http.StatusGone)

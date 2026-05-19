@@ -193,3 +193,63 @@ export const deleteXrayInbound = (id: number) =>
 
 export const patchXrayServerVersion = (serverID: number, version: string) =>
   api.patch<{ ok: true; version: string }>(`/api/admin/plugins/xray/servers/${serverID}`, { version })
+
+// ── xray traffic monitoring ──────────────────────────────────────────────────
+
+export interface XrayTrafficPoint {
+  ts: string       // ISO 8601 UTC
+  bytes_up: number
+  bytes_down: number
+}
+
+export interface XrayTrafficSeries {
+  tag: string
+  kind: string
+  points: XrayTrafficPoint[]
+}
+
+export interface XrayTrafficResponse {
+  server_id: number
+  tag: string
+  kind: string
+  resolution: 'raw' | 'minute' | 'hour'
+  points: XrayTrafficPoint[]
+}
+
+export interface XrayTrafficBatchResponse {
+  resolution: 'raw' | 'minute' | 'hour'
+  series: XrayTrafficSeries[]
+}
+
+export const fetchXrayTraffic = (params: {
+  server_id: number
+  tag: string
+  kind?: string
+  from: string
+  to: string
+  resolution?: 'raw' | 'minute' | 'hour'
+}): Promise<XrayTrafficResponse> => {
+  const q = new URLSearchParams({ server_id: String(params.server_id), tag: params.tag, from: params.from, to: params.to })
+  if (params.kind)       q.set('kind', params.kind)
+  if (params.resolution) q.set('resolution', params.resolution)
+  return api.get<XrayTrafficResponse>(`/api/admin/plugins/xray/traffic?${q}`)
+}
+
+export const fetchXrayTrafficBatch = (params: {
+  server_id: number
+  tags: string[]
+  kind?: string
+  from: string
+  to: string
+  resolution?: 'raw' | 'minute' | 'hour'
+}): Promise<XrayTrafficBatchResponse> => {
+  const q = new URLSearchParams({
+    server_id: String(params.server_id),
+    tags: params.tags.join(','),
+    from: params.from,
+    to: params.to,
+  })
+  if (params.kind)       q.set('kind', params.kind)
+  if (params.resolution) q.set('resolution', params.resolution)
+  return api.get<XrayTrafficBatchResponse>(`/api/admin/plugins/xray/traffic/batch?${q}`)
+}

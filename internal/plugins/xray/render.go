@@ -1,0 +1,182 @@
+package xray
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+)
+
+// RenderServerConfig assembles a complete xray config.json for one server,
+// given all of its inbounds (with upstream JOIN fields populated for relays).
+// Output is deterministic: inbounds emitted in input order (caller should
+// sort by id), outbounds emit to-{upstream.tag} for each unique upstream then
+// freedom at the end, routing rules emit one per relay inbound then the
+// geoip:private fallback.
+func RenderServerConfig(inbounds []InboundView) ([]byte, error) {
+	if len(inbounds) == 0 {
+		return nil, errors.New("RenderServerConfig: no inbounds")
+	}
+
+	cfg := map[string]any{
+		"log": map[string]any{"loglevel": "warning"},
+	}
+
+	inboundsJSON := make([]any, 0, len(inbounds))
+	outboundsByTag := map[string]map[string]any{}
+	routingRules := make([]any, 0, len(inbounds)+1)
+	hasRelay := false
+
+	for _, in := range inbounds {
+		ib, err := renderInbound(in)
+		if err != nil {
+			return nil, fmt.Errorf("inbound %s: %w", in.Tag, err)
+		}
+		inboundsJSON = append(inboundsJSON, ib)
+
+		if in.Role == "relay" {
+			hasRelay = true
+			if !in.UpstreamTag.Valid {
+				return nil, fmt.Errorf("relay %s missing upstream JOIN fields", in.Tag)
+			}
+			upTag := in.UpstreamTag.String
+			outTag := "to-" + upTag
+			if _, exists := outboundsByTag[outTag]; !exists {
+				outboundsByTag[outTag] = renderRelayOutbound(outTag, in)
+			}
+			routingRules = append(routingRules, map[string]any{
+				"type":        "field",
+				"inboundTag":  []any{in.Tag},
+				"outboundTag": outTag,
+			})
+		}
+	}
+
+	outboundsList := make([]any, 0, len(outboundsByTag)+1)
+	for _, tag := range sortedKeys(outboundsByTag) {
+		outboundsList = append(outboundsList, outboundsByTag[tag])
+	}
+	outboundsList = append(outboundsList, map[string]any{
+		"tag":      "freedom",
+		"protocol": "freedom",
+		"settings": map[string]any{"domainStrategy": "UseIP"},
+	})
+
+	cfg["inbounds"] = inboundsJSON
+	cfg["outbounds"] = outboundsList
+
+	if hasRelay {
+		routingRules = append(routingRules, map[string]any{
+			"type":        "field",
+			"ip":          []any{"geoip:private"},
+			"outboundTag": "freedom",
+		})
+		cfg["routing"] = map[string]any{"rules": routingRules}
+	}
+	return json.MarshalIndent(cfg, "", "  ")
+}
+
+func renderInbound(in InboundView) (map[string]any, error) {
+	switch in.Protocol {
+	case "vless-reality":
+		return map[string]any{
+			"tag":      in.Tag,
+			"port":     in.Port,
+			"protocol": "vless",
+			"settings": map[string]any{
+				"clients":    []any{map[string]any{"id": in.UUID, "flow": "xtls-rprx-vision"}},
+				"decryption": "none",
+			},
+			"streamSettings": map[string]any{
+				"network":  "tcp",
+				"security": "reality",
+				"realitySettings": map[string]any{
+					"show":        false,
+					"dest":        in.SNI + ":443",
+					"serverNames": []any{in.SNI},
+					"privateKey":  in.PrivateKey,
+					"publicKey":   in.PublicKey,
+					"shortIds":    []any{in.ShortID},
+				},
+			},
+			"sniffing": map[string]any{
+				"enabled":      true,
+				"destOverride": []any{"http", "tls"},
+			},
+		}, nil
+	case "vmess-ws":
+		path := in.WSPath
+		if path == "" {
+			path = "/ws"
+		}
+		return map[string]any{
+			"tag":      in.Tag,
+			"port":     in.Port,
+			"protocol": "vmess",
+			"settings": map[string]any{
+				"clients": []any{map[string]any{"id": in.UUID}},
+			},
+			"streamSettings": map[string]any{
+				"network":    "ws",
+				"wsSettings": map[string]any{"path": path},
+			},
+			"sniffing": map[string]any{
+				"enabled":      true,
+				"destOverride": []any{"http", "tls"},
+			},
+		}, nil
+	case "shadowsocks":
+		return map[string]any{
+			"tag":      in.Tag,
+			"port":     in.Port,
+			"protocol": "shadowsocks",
+			"settings": map[string]any{"method": in.SSMethod, "password": in.SSPassword},
+			"sniffing": map[string]any{
+				"enabled":      true,
+				"destOverride": []any{"http", "tls"},
+			},
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown protocol %q", in.Protocol)
+	}
+}
+
+func renderRelayOutbound(outTag string, in InboundView) map[string]any {
+	return map[string]any{
+		"tag":      outTag,
+		"protocol": "vless",
+		"settings": map[string]any{
+			"vnext": []any{map[string]any{
+				"address": in.UpstreamAddress.String,
+				"port":    in.UpstreamPort.Int64,
+				"users": []any{map[string]any{
+					"id":         in.UpstreamUUID.String,
+					"encryption": "none",
+					"flow":       "xtls-rprx-vision",
+				}},
+			}},
+		},
+		"streamSettings": map[string]any{
+			"network":  "tcp",
+			"security": "reality",
+			"realitySettings": map[string]any{
+				"fingerprint": "chrome",
+				"serverName":  in.UpstreamSNI.String,
+				"publicKey":   in.UpstreamPublicKey.String,
+				"shortId":     in.UpstreamShortID.String,
+			},
+		},
+	}
+}
+
+func sortedKeys(m map[string]map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	for i := 1; i < len(keys); i++ {
+		for j := i; j > 0 && keys[j-1] > keys[j]; j-- {
+			keys[j-1], keys[j] = keys[j], keys[j-1]
+		}
+	}
+	return keys
+}

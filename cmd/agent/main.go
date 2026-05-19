@@ -7,11 +7,13 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/hg-claw/Shepherd/internal/agent/collector"
 	"github.com/hg-claw/Shepherd/internal/agent/fingerprint"
 	"github.com/hg-claw/Shepherd/internal/agent/state"
 	"github.com/hg-claw/Shepherd/internal/agent/wsclient"
+	"github.com/hg-claw/Shepherd/internal/agent/xraysampler"
 	"github.com/hg-claw/Shepherd/internal/agentconfig"
 )
 
@@ -50,6 +52,13 @@ func main() {
 
 	client := wsclient.New(cfg, st, func(s int) { col.SetInterval(s) }, hostname)
 	col.Sender = client
+
+	trafficSampler := &xraysampler.Sampler{
+		SocketPath: "/var/run/shepherd-xray-api.sock",
+		Interval:   30 * time.Second,
+		Send:       client.Send,
+	}
+	client.TrafficSampler = trafficSampler
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()

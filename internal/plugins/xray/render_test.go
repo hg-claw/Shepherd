@@ -48,7 +48,8 @@ func TestRenderServerConfig_OnlyLanding(t *testing.T) {
 	var m map[string]any
 	if err := json.Unmarshal(out, &m); err != nil { t.Fatal(err) }
 	inbounds := m["inbounds"].([]any)
-	if len(inbounds) != 1 { t.Fatalf("inbounds count = %d", len(inbounds)) }
+	// 1 user inbound + 1 __shepherd_api__ inbound always injected
+	if len(inbounds) != 2 { t.Fatalf("inbounds count = %d, want 2 (landing + api)", len(inbounds)) }
 	first := inbounds[0].(map[string]any)
 	if first["tag"] != "landing-aa" { t.Fatalf("tag = %v", first["tag"]) }
 	outbounds := m["outbounds"].([]any)
@@ -97,7 +98,8 @@ func TestRenderServerConfig_MixedLandingAndRelays(t *testing.T) {
 	if err != nil { t.Fatal(err) }
 	var m map[string]any
 	_ = json.Unmarshal(out, &m)
-	if len((m["inbounds"]).([]any)) != 3 { t.Fatalf("inbounds count") }
+	// 3 user inbounds (1 landing + 2 relays) + 1 __shepherd_api__ inbound always injected
+	if len((m["inbounds"]).([]any)) != 4 { t.Fatalf("inbounds count = %d, want 4 (3 user + api)", len((m["inbounds"]).([]any))) }
 	outs := m["outbounds"].([]any)
 	if len(outs) != 3 {
 		t.Fatalf("outbounds = %d, want 3 (to-landing-x + to-landing-y + freedom)", len(outs))
@@ -111,4 +113,54 @@ func TestRenderServerConfig_MixedLandingAndRelays(t *testing.T) {
 func TestRenderServerConfig_EmptyReturnsError(t *testing.T) {
 	_, err := RenderServerConfig(nil)
 	if err == nil { t.Fatalf("expected error for empty inbounds") }
+}
+
+func TestRenderServerConfig_InjectsStatsAndAPIInbound(t *testing.T) {
+	out, err := RenderServerConfig([]InboundView{
+		mkLandingView(1, "landing-aabbccdd", 443, "www.example.com",
+			"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "pubkey1", "privkey1", "aabb1122"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(out, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	// stats block present
+	if _, ok := cfg["stats"]; !ok {
+		t.Error("missing 'stats' block")
+	}
+	// api block present with correct tag
+	apiBlock, ok := cfg["api"].(map[string]any)
+	if !ok {
+		t.Fatal("missing 'api' block or wrong type")
+	}
+	if apiBlock["tag"] != "__shepherd_api__" {
+		t.Errorf("api.tag = %v, want __shepherd_api__", apiBlock["tag"])
+	}
+	// __shepherd_api__ inbound present in inbounds array
+	inbs, _ := cfg["inbounds"].([]any)
+	found := false
+	for _, ib := range inbs {
+		m, _ := ib.(map[string]any)
+		if m["tag"] == "__shepherd_api__" {
+			found = true
+			listen, _ := m["listen"].(string)
+			if listen != "unix:/var/run/shepherd-xray-api.sock" {
+				t.Errorf("api inbound listen = %q, want unix:/var/run/shepherd-xray-api.sock", listen)
+			}
+		}
+	}
+	if !found {
+		t.Error("__shepherd_api__ inbound not injected into inbounds array")
+	}
+	// policy.system block present with all four stats flags
+	policy, _ := cfg["policy"].(map[string]any)
+	system, _ := policy["system"].(map[string]any)
+	for _, key := range []string{"statsInboundUplink", "statsInboundDownlink", "statsOutboundUplink", "statsOutboundDownlink"} {
+		if v, _ := system[key].(bool); !v {
+			t.Errorf("policy.system.%s not true", key)
+		}
+	}
 }

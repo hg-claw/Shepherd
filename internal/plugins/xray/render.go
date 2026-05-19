@@ -72,6 +72,7 @@ func RenderServerConfig(inbounds []InboundView) ([]byte, error) {
 		})
 		cfg["routing"] = map[string]any{"rules": routingRules}
 	}
+	injectStatsAndAPI(cfg)
 	return json.MarshalIndent(cfg, "", "  ")
 }
 
@@ -166,6 +167,55 @@ func renderRelayOutbound(outTag string, in InboundView) map[string]any {
 			},
 		},
 	}
+}
+
+// apiInboundTag is the reserved tag for the shepherd stats API inbound.
+const apiInboundTag = "__shepherd_api__"
+
+// apiSocketPath is the unix socket xray listens on for stats CLI queries.
+const apiSocketPath = "unix:/var/run/shepherd-xray-api.sock"
+
+// injectStatsAndAPI mutates cfg in-place to add the stats, api, and
+// policy.system blocks, and appends the __shepherd_api__ dokodemo inbound.
+// It is idempotent: calling it twice does not duplicate entries.
+func injectStatsAndAPI(cfg map[string]any) {
+	// stats block
+	cfg["stats"] = map[string]any{}
+
+	// api block
+	cfg["api"] = map[string]any{
+		"tag":      apiInboundTag,
+		"services": []any{"StatsService"},
+	}
+
+	// policy.system block (merge into existing policy if any)
+	policy, _ := cfg["policy"].(map[string]any)
+	if policy == nil {
+		policy = map[string]any{}
+	}
+	policy["system"] = map[string]any{
+		"statsInboundUplink":    true,
+		"statsInboundDownlink":  true,
+		"statsOutboundUplink":   true,
+		"statsOutboundDownlink": true,
+	}
+	cfg["policy"] = policy
+
+	// append __shepherd_api__ inbound if not already present
+	inbs, _ := cfg["inbounds"].([]any)
+	for _, ib := range inbs {
+		if m, ok := ib.(map[string]any); ok && m["tag"] == apiInboundTag {
+			return // already injected
+		}
+	}
+	apiInbound := map[string]any{
+		"listen":   apiSocketPath,
+		"protocol": "dokodemo-door",
+		"settings": map[string]any{"address": "127.0.0.1"},
+		"tag":      apiInboundTag,
+		"sniffing": map[string]any{"enabled": false},
+	}
+	cfg["inbounds"] = append(inbs, apiInbound)
 }
 
 func sortedKeys(m map[string]map[string]any) []string {

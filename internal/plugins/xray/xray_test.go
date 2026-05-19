@@ -144,3 +144,75 @@ func TestXrayBeforeUndeploy_BlocksLandingWithRelays(t *testing.T) {
 		t.Fatalf("got %v, want depending-relays error", err)
 	}
 }
+
+func TestMigration0003_CreatesInboundsTable(t *testing.T) {
+	dsn := "file:" + filepath.Join(t.TempDir(), "p.db") + "?_fk=1"
+	d, err := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = d.Close() })
+	if err := shepdb.Migrate(d, shepdb.DriverSQLite); err != nil {
+		t.Fatal(err)
+	}
+	if err := plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations()); err != nil {
+		t.Fatal(err)
+	}
+
+	// xray_inbounds table exists
+	var n int
+	if err := d.Get(&n,
+		"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='xray_inbounds'"); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("xray_inbounds table not created")
+	}
+
+	// Seed two servers for the constraint test
+	d.MustExec(`INSERT INTO servers(id,name,ssh_host,ssh_user,ssh_port,created_at)
+		VALUES (1,'s1','1.1.1.1','r',22,?), (2,'s2','2.2.2.2','r',22,?)`,
+		time.Now(), time.Now())
+
+	// CHECK: landing must have NULL upstream
+	_, err = d.Exec(`INSERT INTO xray_inbounds(server_id, tag, port, role, upstream_inbound_id, updated_at)
+		VALUES (1, 'landing-aaaa', 443, 'landing', 99, ?)`, time.Now())
+	if err == nil {
+		t.Fatalf("expected CHECK violation when landing has upstream, got nil")
+	}
+
+	// CHECK: relay must have non-NULL upstream
+	_, err = d.Exec(`INSERT INTO xray_inbounds(server_id, tag, port, role, upstream_inbound_id, updated_at)
+		VALUES (1, 'relay-bbbb', 444, 'relay', NULL, ?)`, time.Now())
+	if err == nil {
+		t.Fatalf("expected CHECK violation when relay has NULL upstream, got nil")
+	}
+
+	// Valid landing + valid relay pointing at it
+	d.MustExec(`INSERT INTO xray_inbounds(server_id, tag, port, role, updated_at)
+		VALUES (1, 'landing-cccc', 443, 'landing', ?)`, time.Now())
+	var landingID int64
+	_ = d.Get(&landingID, `SELECT id FROM xray_inbounds WHERE tag='landing-cccc'`)
+	d.MustExec(`INSERT INTO xray_inbounds(server_id, tag, port, role, upstream_inbound_id, updated_at)
+		VALUES (2, 'relay-dddd', 8443, 'relay', ?, ?)`, landingID, time.Now())
+
+	// RESTRICT: deleting landing while relay depends on it must fail
+	_, err = d.Exec(`DELETE FROM xray_inbounds WHERE id=?`, landingID)
+	if err == nil {
+		t.Fatalf("expected RESTRICT to block landing delete with dependent relay")
+	}
+
+	// UNIQUE(server_id, port)
+	_, err = d.Exec(`INSERT INTO xray_inbounds(server_id, tag, port, role, updated_at)
+		VALUES (1, 'landing-eeee', 443, 'landing', ?)`, time.Now())
+	if err == nil {
+		t.Fatalf("expected UNIQUE(server_id,port) violation")
+	}
+
+	// UNIQUE(server_id, tag)
+	_, err = d.Exec(`INSERT INTO xray_inbounds(server_id, tag, port, role, updated_at)
+		VALUES (1, 'landing-cccc', 9443, 'landing', ?)`, time.Now())
+	if err == nil {
+		t.Fatalf("expected UNIQUE(server_id,tag) violation")
+	}
+}

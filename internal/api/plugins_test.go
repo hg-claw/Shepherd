@@ -306,7 +306,7 @@ func TestPostHost_XrayReturns410(t *testing.T) {
 	plugins.Register(xrayplugin.New())
 	dsn := "file:" + filepath.Join(t.TempDir(), "x.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
 	store := &plugins.Store{DB: d, Now: time.Now}
 	_ = store.UpsertEnabled(context.Background(), "xray", true)
@@ -327,7 +327,7 @@ func TestDeleteHost_XrayReturns410(t *testing.T) {
 	plugins.Register(xrayplugin.New())
 	dsn := "file:" + filepath.Join(t.TempDir(), "x.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
 	store := &plugins.Store{DB: d, Now: time.Now}
 	_ = store.UpsertEnabled(context.Background(), "xray", true)

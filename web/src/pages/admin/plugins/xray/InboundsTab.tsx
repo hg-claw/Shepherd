@@ -211,12 +211,12 @@ export default function InboundsTab() {
         />
       )}
       {dialog?.kind === 'bulk' && (
-        // TODO: Task 11 refactor — BulkRelayDialog props will be updated to accept XrayInbound-based props.
         <BulkRelayDialog
           key={`bulk-${dialog.landing.id}`}
           open={true}
           onOpenChange={(open: boolean) => { if (!open) setDialog(null) }}
-          {...{ landingInbound: dialog.landing, allInbounds: inboundsQ.data ?? [] } as any}
+          landingInbound={dialog.landing}
+          allInbounds={inboundsQ.data ?? []}
         />
       )}
     </div>

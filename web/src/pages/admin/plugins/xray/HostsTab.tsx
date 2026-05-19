@@ -9,7 +9,6 @@ import { useUI } from '@/store/ui'
 import { copyText } from '@/lib/clipboard'
 import { parseConfig, buildShareURL } from './templates'
 import DeployDialog from './DeployDialog'
-import BulkRelayDialog from './BulkRelayDialog'
 
 function statusKind(s: string | undefined): PillKind {
   if (s === 'running') return 'ok'
@@ -66,12 +65,6 @@ export default function HostsTab() {
 
   // { id?: number; existing?: PluginHost } = deploy to specific server; {} = open dialog with no pre-selected server
   const [deployTarget, setDeployTarget] = useState<{ id?: number; existing?: PluginHost } | null>(null)
-
-  const [bulkRelayFor, setBulkRelayFor] = useState<{ host: PluginHost; serverName: string; serverHost: string } | null>(null)
-
-  // Set of server IDs that already have xray deployed (passed to BulkRelayDialog
-  // so its target picker excludes them and the landing itself).
-  const xrayServerIDs = new Set<number>((hostsQ.data ?? []).map((h) => h.server_id))
 
   // Build hostsByServer map for O(1) lookup.
   const hostsByServer = new Map<number, PluginHost>()
@@ -161,20 +154,6 @@ export default function HostsTab() {
                         >
                           Copy URL
                         </Button>
-                        {(topo.get(s.id)?.role === 'landing') && (
-                          <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
-                            onClick={() => {
-                              if (!h) return
-                              const sHost = s.ssh_host?.Valid ? s.ssh_host.String : ''
-                              if (!sHost) {
-                                toast('error', `${s.name} has no ssh_host yet; cannot bulk-deploy relays to it`)
-                                return
-                              }
-                              setBulkRelayFor({ host: h, serverName: s.name, serverHost: sHost })
-                            }}>
-                            + Relays
-                          </Button>
-                        )}
                         <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
                           onClick={() => setDeployTarget({ id: s.id, existing: h })}>
                           Re-deploy
@@ -227,16 +206,6 @@ export default function HostsTab() {
         />
       )}
 
-      {bulkRelayFor && (
-        <BulkRelayDialog
-          open={true}
-          onOpenChange={(open) => { if (!open) setBulkRelayFor(null) }}
-          landing={bulkRelayFor.host}
-          landingServerHost={bulkRelayFor.serverHost}
-          landingServerName={bulkRelayFor.serverName}
-          existingXrayServerIDs={xrayServerIDs}
-        />
-      )}
     </div>
   )
 }

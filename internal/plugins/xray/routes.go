@@ -87,7 +87,15 @@ func (p *Plugin) RegisterRoutes(mux plugins.Mux, deps plugins.Deps) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"short_id": id})
 	})
 
-	mux.HandleFunc("GET /topology", topologyHandler(deps.DB))
+	mux.HandleFunc("POST /inbounds",        postInboundHandler(deps))
+	mux.HandleFunc("GET /inbounds",         getInboundsHandler(deps))
+	mux.HandleFunc("PATCH /inbounds/{id}",  patchInboundHandler(deps))
+	mux.HandleFunc("DELETE /inbounds/{id}", deleteInboundHandler(deps))
+
+	// Retire /topology — replaced by /inbounds (each row carries upstream_*).
+	mux.HandleFunc("GET /topology", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "GET /topology is deprecated; use GET /inbounds instead", http.StatusGone)
+	})
 }
 
 type cachedBinary struct {

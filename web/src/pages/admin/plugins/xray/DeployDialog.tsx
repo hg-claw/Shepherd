@@ -65,7 +65,7 @@ export default function DeployDialog({ open, onOpenChange, defaultServerID, exis
   const [inbound, setInbound] = useState<Inbound>(parsed.inbound ?? 'vless-reality')
   const [port, setPort] = useState<number>(parsed.port ?? 443)
   const [uuid, setUuid] = useState<string>(parsed.uuid ?? randomUUID())
-  const [sni, setSni] = useState(parsed.sni ?? 'www.microsoft.com')
+  const [sni, setSni] = useState(parsed.sni ?? 'www.lovelive-anime.jp')
   const [publicKey, setPublicKey] = useState(parsed.publicKey ?? '')
   const [privateKey, setPrivateKey] = useState(parsed.privateKey ?? '')
   const [shortID, setShortID] = useState(parsed.shortID ?? '')
@@ -305,9 +305,15 @@ export default function DeployDialog({ open, onOpenChange, defaultServerID, exis
                 <Input
                   value={sni}
                   onChange={(e) => setSni(e.target.value)}
-                  placeholder="www.microsoft.com"
+                  placeholder="www.lovelive-anime.jp"
                   className="h-8 font-mono mt-1"
                 />
+                <p className="text-fg-dim text-[11px] mt-1">
+                  Must be a single-tenant TLS endpoint. Do NOT use multi-tenant CDNs
+                  (Cloudflare, Azure Front Door, Fastly, GitHub Pages) — REALITY
+                  forwards unauthorized traffic to this host, which turns your VPS
+                  into an open proxy for any site that CDN serves.
+                </p>
               </div>
 
               <div>

@@ -76,7 +76,7 @@ export default function BulkRelayDialog({
   // versions query resolves. The query result will override on first render
   // where data is available.
   const [version, setVersion] = useState<string>(landing.deployed_version ?? '')
-  const [sharedSNI, setSharedSNI] = useState<string>(landingRef?.sni ?? 'www.icloud.com')
+  const [sharedSNI, setSharedSNI] = useState<string>(landingRef?.sni ?? 'www.lovelive-anime.jp')
 
   // Prefer the latest available version once the query resolves.
   if (versionsQ.data?.latest?.length && versionsQ.data.latest[0] !== version) {

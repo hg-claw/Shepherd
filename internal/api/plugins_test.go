@@ -12,6 +12,7 @@ import (
 
 	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/hg-claw/Shepherd/internal/plugins"
+	xrayplugin "github.com/hg-claw/Shepherd/internal/plugins/xray"
 )
 
 type plainP struct{ id string }
@@ -298,4 +299,44 @@ func TestDeleteHost_BeforeUndeployRejectionReturns409(t *testing.T) {
 	api.DeleteHost(w, req)
 	if w.Code != 409 { t.Fatalf("status = %d want 409", w.Code) }
 	if !v.beforeUndeployCalled { t.Fatalf("BeforeUndeploy not called") }
+}
+
+func TestPostHost_XrayReturns410(t *testing.T) {
+	plugins.ResetRegistryForTestPublic()
+	plugins.Register(xrayplugin.New())
+	dsn := "file:" + filepath.Join(t.TempDir(), "x.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	defer d.Close()
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+	store := &plugins.Store{DB: d, Now: time.Now}
+	_ = store.UpsertEnabled(context.Background(), "xray", true)
+	api := &PluginsAPI{Store: store, Deps: plugins.Deps{DB: d}}
+
+	req := httptest.NewRequest("POST", "/api/admin/plugins/xray/hosts", strings.NewReader(`{"server_id":1}`))
+	req.SetPathValue("id", "xray")
+	w := httptest.NewRecorder()
+	api.PostHost(w, req)
+	if w.Code != 410 { t.Fatalf("status=%d want 410, body=%s", w.Code, w.Body.String()) }
+	if !strings.Contains(w.Body.String(), "/inbounds") {
+		t.Fatalf("body should mention /inbounds: %s", w.Body.String())
+	}
+}
+
+func TestDeleteHost_XrayReturns410(t *testing.T) {
+	plugins.ResetRegistryForTestPublic()
+	plugins.Register(xrayplugin.New())
+	dsn := "file:" + filepath.Join(t.TempDir(), "x.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	defer d.Close()
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+	store := &plugins.Store{DB: d, Now: time.Now}
+	_ = store.UpsertEnabled(context.Background(), "xray", true)
+	api := &PluginsAPI{Store: store, Deps: plugins.Deps{DB: d}}
+
+	req := httptest.NewRequest("DELETE", "/api/admin/plugins/xray/hosts/1", nil)
+	req.SetPathValue("id", "xray")
+	req.SetPathValue("server_id", "1")
+	w := httptest.NewRecorder()
+	api.DeleteHost(w, req)
+	if w.Code != 410 { t.Fatalf("status=%d want 410", w.Code) }
 }

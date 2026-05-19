@@ -223,6 +223,10 @@ func (a *PluginsAPI) GetHost(w http.ResponseWriter, r *http.Request) {
 
 func (a *PluginsAPI) PostHost(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	if id == "xray" {
+		writeError(w, http.StatusGone, "POST /hosts is deprecated for xray; use POST /api/admin/plugins/xray/inbounds")
+		return
+	}
 	p, ok := plugins.Get(id)
 	if !ok { writeError(w, 404, "unknown plugin"); return }
 	ha, ok := p.(plugins.HostAware)
@@ -269,6 +273,10 @@ func (a *PluginsAPI) PostHost(w http.ResponseWriter, r *http.Request) {
 
 func (a *PluginsAPI) DeleteHost(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	if id == "xray" {
+		writeError(w, http.StatusGone, "DELETE /hosts is deprecated for xray; use DELETE /api/admin/plugins/xray/inbounds/{id}")
+		return
+	}
 	sid, _ := strconv.ParseInt(r.PathValue("server_id"), 10, 64)
 	p, ok := plugins.Get(id)
 	if !ok { writeError(w, 404, "unknown plugin"); return }

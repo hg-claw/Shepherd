@@ -190,3 +190,6 @@ export const patchXrayInbound = (id: number, body: PatchXrayInboundBody) =>
 
 export const deleteXrayInbound = (id: number) =>
   api.del(`/api/admin/plugins/xray/inbounds/${id}`)
+
+export const patchXrayServerVersion = (serverID: number, version: string) =>
+  api.patch<{ ok: true; version: string }>(`/api/admin/plugins/xray/servers/${serverID}`, { version })

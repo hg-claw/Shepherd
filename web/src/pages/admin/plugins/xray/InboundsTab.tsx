@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/Pill'
 import { useUI } from '@/store/ui'
 import { copyText } from '@/lib/clipboard'
@@ -8,7 +9,7 @@ import { buildShareURL } from './templates'
 import InboundDialog from './InboundDialog'
 import BulkRelayDialog from './BulkRelayDialog'
 import {
-  listXrayInbounds, deleteXrayInbound, listPluginHosts,
+  listXrayInbounds, deleteXrayInbound, listPluginHosts, patchXrayServerVersion,
   type XrayInbound, type PluginHost,
 } from '@/api/plugins'
 import { useServers } from '@/api/servers'
@@ -99,8 +100,8 @@ export default function InboundsTab() {
                 <span className="text-fg-dim ml-2">
                   {s.ssh_host?.Valid ? s.ssh_host.String : '—'}
                 </span>
-                {host?.deployed_version && (
-                  <span className="text-fg-dim ml-3">xray v{host.deployed_version}</span>
+                {host && (
+                  <span className="text-fg-dim ml-3"><VersionInline serverID={s.id} current={host?.deployed_version ?? null} /></span>
                 )}
                 {host && (
                   <span className="ml-3"><Pill kind={host.status === 'running' ? 'ok' : 'neutral'}>{host.status}</Pill></span>
@@ -220,5 +221,38 @@ export default function InboundsTab() {
         />
       )}
     </div>
+  )
+}
+
+function VersionInline({ serverID, current }: { serverID: number; current: string | null }) {
+  const qc = useQueryClient()
+  const toast = useUI((s) => s.toast)
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(current ?? '')
+  const apply = useMutation({
+    mutationFn: () => patchXrayServerVersion(serverID, value),
+    onSuccess: () => {
+      toast('success', `Upgrading to v${value}`)
+      qc.invalidateQueries({ queryKey: ['plugin-hosts', 'xray'] })
+      setEditing(false)
+    },
+    onError: (e: any) => toast('error', String(e?.message ?? e)),
+  })
+  if (!editing) {
+    return (
+      <span className="text-fg-dim">
+        xray v{current ?? '—'}{' '}
+        <button className="text-fg-dim underline" onClick={() => setEditing(true)}>change</button>
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Input value={value} onChange={(e) => setValue(e.target.value)}
+        className="h-6 w-20 font-mono text-[11px]" />
+      <Button size="sm" className="h-6 px-2 text-[11px]" disabled={apply.isPending}
+        onClick={() => apply.mutate()}>Apply</Button>
+      <button className="text-fg-dim text-[11px]" onClick={() => setEditing(false)}>cancel</button>
+    </span>
   )
 }

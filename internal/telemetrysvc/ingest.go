@@ -44,6 +44,15 @@ func (i *Ingest) HandleFrame(ctx context.Context, serverID int64, env agentapi.E
 			_ = agentsvc.SaveCandidates(ctx, i.DB, serverID, cands)
 			_ = agentsvc.ApplyBestSSHHost(ctx, i.DB, serverID, cands)
 		}
+	case agentapi.TypeXrayTraffic:
+		var batch agentapi.XrayTrafficBatch
+		if err := env.Decode(&batch); err != nil {
+			log.Printf("xray.traffic decode (server=%d): %v", serverID, err)
+			return
+		}
+		if err := i.WriteTrafficBatch(ctx, serverID, batch.Samples); err != nil {
+			log.Printf("xray.traffic write (server=%d): %v", serverID, err)
+		}
 	}
 }
 

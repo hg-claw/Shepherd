@@ -9,6 +9,10 @@ import (
 //go:embed migrations/*.sql
 var migFS embed.FS
 
+// Migrations returns the ordered list of xray plugin migrations.
+// Exported so tests in other packages can apply migrations in a test DB.
+func Migrations() []plugins.Migration { return loadMigrations() }
+
 func loadMigrations() []plugins.Migration {
 	names := []string{
 		"0001_xray.up.sql",

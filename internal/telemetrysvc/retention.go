@@ -41,6 +41,9 @@ func (r *Retention) Tick(ctx context.Context) {
 		{"retention_30s", "telemetry_samples_30s", 24 * time.Hour},
 		{"retention_5m", "telemetry_rollup_5m", 7 * 24 * time.Hour},
 		{"retention_1h", "telemetry_rollup_1h", 90 * 24 * time.Hour},
+		{"traffic_raw_24h", "xray_traffic_raw", 24 * time.Hour},
+		{"traffic_minute_7d", "xray_traffic_minute", 7 * 24 * time.Hour},
+		{"traffic_hour_90d", "xray_traffic_hour", 90 * 24 * time.Hour},
 	} {
 		dur := c.def
 		if v, err := r.Settings.Get(ctx, c.key); err == nil {

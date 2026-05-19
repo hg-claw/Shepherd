@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/hg-claw/Shepherd/internal/plugins"
 )
@@ -210,5 +211,56 @@ func deleteInboundHandler(deps plugins.Deps) http.HandlerFunc {
 		}
 		go func() { _ = AssembleAndDeploy(context.Background(), deps, row.ServerID) }()
 		writeJSONResp(w, 200, map[string]any{"ok": true})
+	}
+}
+
+type patchVersionBody struct {
+	Version string `json:"version"`
+}
+
+func patchServerVersionHandler(deps plugins.Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		sid, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if sid == 0 { writeRouteError(w, 400, "id required"); return }
+		var body patchVersionBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeRouteError(w, 400, "bad json"); return
+		}
+		if body.Version == "" { writeRouteError(w, 400, "version required"); return }
+
+		// UPSERT plugin_hosts row with new version (status=deploying)
+		_, err := deps.DB.ExecContext(r.Context(), `
+			INSERT INTO plugin_hosts(plugin_id, server_id, config_json, deployed_version, status, updated_at)
+			VALUES ('xray', ?, '{}', ?, 'deploying', ?)
+			ON CONFLICT(plugin_id, server_id) DO UPDATE
+			SET deployed_version = excluded.deployed_version,
+			    status           = 'deploying',
+			    updated_at       = excluded.updated_at`,
+			sid, body.Version, time.Now().UTC())
+		if err != nil { writeRouteError(w, 500, err.Error()); return }
+
+		// Async: push new binary + restart, then reassemble config
+		go func() {
+			ctx := context.Background()
+			p := &Plugin{}
+			// DeployToHost fetches binary + pushes binary/unit/restart.
+			// We pass {} as config; AssembleAndDeploy below puts the real config in place.
+			if err := p.DeployToHost(ctx, deps, sid, body.Version, []byte("{}")); err != nil {
+				_, _ = deps.DB.ExecContext(ctx,
+					`UPDATE plugin_hosts SET status='failed', last_error=? WHERE plugin_id='xray' AND server_id=?`,
+					err.Error(), sid)
+				return
+			}
+			if err := AssembleAndDeploy(ctx, deps, sid); err != nil {
+				_, _ = deps.DB.ExecContext(ctx,
+					`UPDATE plugin_hosts SET status='failed', last_error=? WHERE plugin_id='xray' AND server_id=?`,
+					err.Error(), sid)
+				return
+			}
+			_, _ = deps.DB.ExecContext(ctx,
+				`UPDATE plugin_hosts SET status='running', last_error='' WHERE plugin_id='xray' AND server_id=?`,
+				sid)
+		}()
+		writeJSONResp(w, 200, map[string]any{"ok": true, "version": body.Version})
 	}
 }

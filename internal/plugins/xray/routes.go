@@ -91,6 +91,7 @@ func (p *Plugin) RegisterRoutes(mux plugins.Mux, deps plugins.Deps) {
 	mux.HandleFunc("GET /inbounds",         getInboundsHandler(deps))
 	mux.HandleFunc("PATCH /inbounds/{id}",  patchInboundHandler(deps))
 	mux.HandleFunc("DELETE /inbounds/{id}", deleteInboundHandler(deps))
+	mux.HandleFunc("PATCH /servers/{id}",   patchServerVersionHandler(deps))
 
 	// Retire /topology — replaced by /inbounds (each row carries upstream_*).
 	mux.HandleFunc("GET /topology", func(w http.ResponseWriter, r *http.Request) {

@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -164,6 +165,35 @@ func TestDeleteInbound_RejectsLandingWithRelays(t *testing.T) {
 	req.SetPathValue("id", strconv.FormatInt(landingID, 10))
 	deleteInboundHandler(deps)(w, req)
 	if w.Code != 409 { t.Fatalf("status = %d, want 409", w.Code) }
+}
+
+func TestPatchServerVersion_TriggersBinaryPushAndRestart(t *testing.T) {
+	dsn := "file:" + filepath.Join(t.TempDir(), "v.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	t.Cleanup(func() { _ = d.Close() })
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations())
+
+	d.MustExec(`INSERT INTO servers(id,name,ssh_host,ssh_user,ssh_port,agent_os,agent_arch,created_at)
+		VALUES (1,'s1','1.1.1.1','r',22,'linux','amd64',?)`, time.Now())
+	// plugins row required by plugin_hosts FK
+	d.MustExec(`INSERT INTO plugins(id,enabled,created_at)
+		VALUES ('xray',1,?)`, time.Now())
+	// plugin_hosts row with old version (config_json default empty)
+	d.MustExec(`INSERT INTO plugin_hosts(plugin_id,server_id,config_json,deployed_version,status,updated_at)
+		VALUES ('xray',1,'{}','1.8.10','running',?)`, time.Now())
+
+	exec := &fakeHostExec{}
+	deps := plugins.Deps{DB: d, HostExec: exec}
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("PATCH", "/servers/1", strings.NewReader(`{"version":"1.8.11"}`))
+	req.SetPathValue("id", "1")
+	patchServerVersionHandler(deps)(w, req)
+	if w.Code != 200 { t.Fatalf("status=%d body=%s", w.Code, w.Body.String()) }
+
+	var v string
+	_ = d.Get(&v, `SELECT deployed_version FROM plugin_hosts WHERE server_id=1 AND plugin_id='xray'`)
+	if v != "1.8.11" { t.Fatalf("deployed_version=%q", v) }
 }
 
 // silence unused-import / unused-var compiler errors

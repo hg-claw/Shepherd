@@ -1,0 +1,5 @@
+inbound>>>vless-reality-8443>>>traffic>>>uplink:    1234567
+inbound>>>vless-reality-8443>>>traffic>>>downlink:  7654321
+outbound>>>direct>>>traffic>>>uplink:              111111
+outbound>>>direct>>>traffic>>>downlink:            9876543
+user>>>some-user>>>traffic>>>uplink:               999

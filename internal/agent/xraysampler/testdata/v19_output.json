@@ -1,0 +1,9 @@
+{
+  "stat": [
+    {"name": "inbound>>>vmess-ws-443>>>traffic>>>uplink",    "value": "123000"},
+    {"name": "inbound>>>vmess-ws-443>>>traffic>>>downlink",  "value": "555000"},
+    {"name": "outbound>>>direct>>>traffic>>>uplink",         "value": "99000"},
+    {"name": "outbound>>>direct>>>traffic>>>downlink",       "value": "44000"},
+    {"name": "user>>>some-user>>>traffic>>>uplink",          "value": "777"}
+  ]
+}

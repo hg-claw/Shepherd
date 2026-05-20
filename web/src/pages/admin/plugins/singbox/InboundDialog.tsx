@@ -100,7 +100,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
     queryKey: ['singbox', 'certs'],
     queryFn:  listSingboxCerts,
   })
-  const validCerts = certs.filter((c) => c.status === 'valid')
+  const validCerts = certs.filter((c) => c.status === 'active')
 
   // ── Form state ──
   const [protocol, setProtocol] = useState<SingboxProtocol>(initial?.protocol ?? 'vless-reality')

@@ -347,7 +347,7 @@ export interface PatchSingboxInboundBody {
 export interface SingboxCertificate {
   id: number
   domain: string
-  status: 'issuing' | 'valid' | 'failed' | 'revoked'
+  status: 'issuing' | 'active' | 'failed' | 'revoked'
   issuer: string
   expires_at: string | null
   challenge_type: 'dns-01-cf' | 'http-01'

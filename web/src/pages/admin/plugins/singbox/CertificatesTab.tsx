@@ -24,20 +24,20 @@ import { APIError } from '@/api/client'
 function statusVariant(
   s: SingboxCertificate['status'],
 ): 'default' | 'secondary' | 'destructive' | 'outline' {
-  if (s === 'valid')   return 'default'
+  if (s === 'active')  return 'default'
   if (s === 'issuing') return 'secondary'
   if (s === 'failed')  return 'destructive'
   return 'outline' // revoked
 }
 
 /** Color class for expires_at cell.
- *  gray   — status is not 'valid' (no meaningful expiry)
+ *  gray   — status is not 'active' (no meaningful expiry)
  *  red    — < 7 days
  *  yellow — 7–30 days
  *  green  — > 30 days
  */
 function expiryClass(expires: string | null, status: SingboxCertificate['status']): string {
-  if (status !== 'valid' || !expires) return 'text-muted-foreground'
+  if (status !== 'active' || !expires) return 'text-muted-foreground'
   const days = (new Date(expires).getTime() - Date.now()) / 86_400_000
   if (days < 7)  return 'text-destructive font-semibold'
   if (days < 30) return 'text-amber-600'

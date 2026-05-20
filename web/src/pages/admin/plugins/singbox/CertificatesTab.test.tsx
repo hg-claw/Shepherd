@@ -12,7 +12,7 @@ vi.mock('@/api/plugins', () => ({
       id: 1,
       domain: 'proxy.example.com',
       issuer: "Let's Encrypt",
-      status: 'valid',
+      status: 'active',
       expires_at: '2026-08-01T00:00:00Z',
       challenge_type: 'http-01',
       last_renew_attempt_at: null,
@@ -66,7 +66,7 @@ describe('singbox/CertificatesTab', () => {
     await waitFor(() => {
       expect(screen.getByText('proxy.example.com')).toBeTruthy()
       expect(screen.getByText('relay.example.com')).toBeTruthy()
-      expect(screen.getByText('valid')).toBeTruthy()
+      expect(screen.getByText('active')).toBeTruthy()
       expect(screen.getByText('failed')).toBeTruthy()
     })
   })

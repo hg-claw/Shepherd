@@ -8,7 +8,7 @@ vi.mock('@/api/plugins', () => ({
     {
       id: 1,
       domain: 'proxy.example.com',
-      status: 'valid',
+      status: 'active',
       issuer: 'LE',
       expires_at: null,
       challenge_type: 'http-01',

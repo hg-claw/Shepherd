@@ -21,6 +21,16 @@ var renewFunc = func(_ context.Context, _ int64, _, _, _ string) error {
 	return nil
 }
 
+// SetCertFuncs overrides issueFunc and renewFunc with production implementations.
+// Called from main.go once certmgr.Manager is configured.
+func SetCertFuncs(
+	issue func(ctx context.Context, certID int64, domain, challengeType, email string) error,
+	renew func(ctx context.Context, certID int64, domain, challengeType, email string) error,
+) {
+	issueFunc = issue
+	renewFunc = renew
+}
+
 // validChallengeType checks that the challenge string is one of the allowed values.
 func validChallengeType(s string) bool {
 	return s == "dns-01-cf" || s == "http-01"

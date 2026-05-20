@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
@@ -135,15 +136,28 @@ func (s *Sampler) tick(_ context.Context) {
 	s.prev = cur
 }
 
-// queryStatsViaCLI runs `xray api statsquery` against the xray stats TCP
-// inbound and returns a map of directional counters keyed by statKey.
+// xrayBinaryPath is the canonical install path used by the xray plugin's
+// Pusher.DeployService (see internal/plugins/xray/xray.go). Using the full
+// path avoids depending on PATH and matches the file the plugin pushes.
+const xrayBinaryPath = "/usr/local/bin/shepherd-xray"
+
+// queryStatsViaCLI runs `shepherd-xray api statsquery` against the xray
+// stats TCP inbound and returns a map of directional counters keyed by
+// statKey.
 func queryStatsViaCLI(address string) (map[statKey]int64, error) {
-	out, err := exec.Command("xray", "api", "statsquery",
+	cmd := exec.Command(xrayBinaryPath, "api", "statsquery",
 		fmt.Sprintf("--server=%s", address),
 		"--reset=false",
-		"--pattern=",
-	).Output()
+	)
+	out, err := cmd.Output()
 	if err != nil {
+		// .Output() puts stderr on ExitError.Stderr; surface it so the
+		// caller's log shows what xray actually complained about instead
+		// of just "exit status N".
+		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
+			return nil, fmt.Errorf("xray api statsquery: %w: %s",
+				err, strings.TrimSpace(string(ee.Stderr)))
+		}
 		return nil, fmt.Errorf("xray api statsquery: %w", err)
 	}
 	entries, err := ParseStats(out)

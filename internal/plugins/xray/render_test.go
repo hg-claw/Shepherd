@@ -56,8 +56,19 @@ func TestRenderServerConfig_OnlyLanding(t *testing.T) {
 	if len(outbounds) != 1 || outbounds[0].(map[string]any)["protocol"] != "freedom" {
 		t.Fatalf("expected only freedom outbound, got %v", outbounds)
 	}
-	if _, has := m["routing"]; has {
-		t.Fatalf("landing-only config must not have routing block")
+	// Landing-only config still has a routing block because the api inbound
+	// always needs an explicit rule mapping its tag → api outbound.
+	routing, ok := m["routing"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected routing block (for api inbound rule)")
+	}
+	rules := routing["rules"].([]any)
+	if len(rules) != 1 {
+		t.Fatalf("landing-only should have exactly 1 routing rule (api), got %d", len(rules))
+	}
+	apiRule := rules[0].(map[string]any)
+	if apiRule["outboundTag"] != "__shepherd_api__" {
+		t.Fatalf("api rule outboundTag = %v", apiRule["outboundTag"])
 	}
 }
 
@@ -77,8 +88,8 @@ func TestRenderServerConfig_OnlyRelay(t *testing.T) {
 		t.Fatalf("outbound[0] tag = %v", outbounds[0].(map[string]any)["tag"])
 	}
 	rules := m["routing"].(map[string]any)["rules"].([]any)
-	if len(rules) != 2 {
-		t.Fatalf("rules = %d, want 2 (relay-bb + geoip:private)", len(rules))
+	if len(rules) != 3 {
+		t.Fatalf("rules = %d, want 3 (relay-bb + api + geoip:private)", len(rules))
 	}
 	r0 := rules[0].(map[string]any)
 	tags := r0["inboundTag"].([]any)
@@ -105,8 +116,8 @@ func TestRenderServerConfig_MixedLandingAndRelays(t *testing.T) {
 		t.Fatalf("outbounds = %d, want 3 (to-landing-x + to-landing-y + freedom)", len(outs))
 	}
 	rules := m["routing"].(map[string]any)["rules"].([]any)
-	if len(rules) != 3 {
-		t.Fatalf("rules = %d, want 3 (relay-bb + relay-cc + geoip:private)", len(rules))
+	if len(rules) != 4 {
+		t.Fatalf("rules = %d, want 4 (relay-bb + relay-cc + api + geoip:private)", len(rules))
 	}
 }
 

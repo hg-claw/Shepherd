@@ -27,7 +27,7 @@ describe('PluginDetail', () => {
         </QueryClientProvider>
       </I18nextProvider>,
     )
-    expect(await screen.findByText('Config')).toBeTruthy()
+    expect(await screen.findByText('Deploy')).toBeTruthy()
     expect(screen.getByText('Inbounds')).toBeTruthy()
     expect(screen.getByText('Events')).toBeTruthy()
     expect(screen.getByText('Logs')).toBeTruthy()

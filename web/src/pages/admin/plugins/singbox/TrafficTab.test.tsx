@@ -2,7 +2,6 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import TrafficTab from './TrafficTab'
-import type { SingboxInbound } from '@/api/plugins'
 
 vi.mock('@/api/plugins', () => ({
   listSingboxInbounds:      vi.fn().mockResolvedValue([

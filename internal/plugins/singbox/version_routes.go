@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -144,10 +143,6 @@ func patchSBServerVersionHandler(deps plugins.Deps) http.HandlerFunc {
 		go func() {
 			ctx := context.Background()
 			if err := deployToHostFunc(ctx, deps, sid, body.Version); err != nil {
-				e := err.Error()
-				if strings.Contains(e, "version required") {
-					// Already validated above; shouldn't happen.
-				}
 				_, _ = deps.DB.ExecContext(ctx,
 					`UPDATE plugin_hosts SET status='failed', last_error=?
 					 WHERE plugin_id='singbox' AND server_id=?`,

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -182,15 +181,3 @@ func TestPostRenew_TriggersRenewal(t *testing.T) {
 	}
 }
 
-// collectSingboxMux records HandleFunc calls for route registration tests.
-type collectSingboxMux struct {
-	handlers map[string]http.HandlerFunc
-}
-
-func (m *collectSingboxMux) HandleFunc(pat string, h func(http.ResponseWriter, *http.Request)) {
-	if m.handlers == nil {
-		m.handlers = map[string]http.HandlerFunc{}
-	}
-	m.handlers[pat] = h
-}
-func (m *collectSingboxMux) Handle(string, http.Handler) {}

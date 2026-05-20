@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -491,12 +490,3 @@ func int64Val(i *int64) int64 {
 	return *i
 }
 
-// sortedKeys returns sorted keys of a map (used for deterministic output in callers).
-func sortedKeys(m map[string]any) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}

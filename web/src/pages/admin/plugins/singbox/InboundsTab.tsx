@@ -11,6 +11,7 @@ import {
   type SingboxInbound, type PluginHost,
 } from '@/api/plugins'
 import InboundDialog from './InboundDialog'
+import BulkRelayDialog from './BulkRelayDialog'
 import { useServers } from '@/api/servers'
 
 // Copy URL is only supported for vless-reality in v1.
@@ -131,6 +132,8 @@ export default function InboundsTab() {
     null
   >(null)
 
+  const [bulkRelayTarget, setBulkRelayTarget] = useState<SingboxInbound | null>(null)
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -242,6 +245,12 @@ export default function InboundsTab() {
                       <td className="px-3 py-2 font-mono text-[12.5px]">{i.protocol}</td>
                       <td className="px-3 py-2 font-mono text-[12.5px]">{i.port}</td>
                       <td className="px-3 py-2 text-right whitespace-nowrap">
+                        {isLanding && i.protocol === 'vless-reality' && (
+                          <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
+                            onClick={() => setBulkRelayTarget(i)}>
+                            + Bulk Relay
+                          </Button>
+                        )}
                         <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
                           disabled={!canCopyURL}
                           title={copyTitle}
@@ -287,6 +296,14 @@ export default function InboundsTab() {
           open
           onClose={() => setDialog(null)}
           onSaved={() => setDialog(null)}
+        />
+      )}
+      {bulkRelayTarget && (
+        <BulkRelayDialog
+          open
+          onOpenChange={(v) => { if (!v) setBulkRelayTarget(null) }}
+          landingInbound={bulkRelayTarget}
+          allInbounds={inboundsQ.data ?? []}
         />
       )}
     </div>

@@ -54,7 +54,7 @@ func main() {
 	col.Sender = client
 
 	trafficSampler := &xraysampler.Sampler{
-		SocketPath: "/var/run/shepherd-xray-api.sock",
+		APIAddress: "127.0.0.1:28085",
 		Interval:   30 * time.Second,
 		Send:       client.Send,
 	}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
@@ -21,26 +20,26 @@ type statKey struct {
 
 // Sampler collects xray traffic stats every Interval and emits XrayTrafficBatch envelopes.
 type Sampler struct {
-	// SocketPath is the unix socket path for the xray API.
-	// Defaults to /var/run/shepherd-xray-api.sock.
-	SocketPath string
+	// APIAddress is the TCP address of xray's stats API inbound (host:port).
+	// Defaults to 127.0.0.1:28085 — matches the renderer's injected api inbound.
+	APIAddress string
 	// Interval is the sampling interval. Defaults to 30s.
 	Interval time.Duration
 	// Send is called with each batch envelope. May be nil (batches are dropped).
 	Send func(agentapi.Envelope) error
 
 	// queryFunc is injected in tests; production uses queryStatsViaCLI.
-	queryFunc func(socketPath string) (map[statKey]int64, error)
+	queryFunc func(address string) (map[statKey]int64, error)
 
 	prev       map[statKey]int64
 	prevExists bool
 }
 
-func (s *Sampler) effectiveSocketPath() string {
-	if s.SocketPath != "" {
-		return s.SocketPath
+func (s *Sampler) effectiveAPIAddress() string {
+	if s.APIAddress != "" {
+		return s.APIAddress
 	}
-	return "/var/run/shepherd-xray-api.sock"
+	return "127.0.0.1:28085"
 }
 
 func (s *Sampler) effectiveInterval() time.Duration {
@@ -50,11 +49,11 @@ func (s *Sampler) effectiveInterval() time.Duration {
 	return 30 * time.Second
 }
 
-func (s *Sampler) query(socketPath string) (map[statKey]int64, error) {
+func (s *Sampler) query(address string) (map[statKey]int64, error) {
 	if s.queryFunc != nil {
-		return s.queryFunc(socketPath)
+		return s.queryFunc(address)
 	}
-	return queryStatsViaCLI(socketPath)
+	return queryStatsViaCLI(address)
 }
 
 // Run blocks until ctx is canceled, ticking every Interval.
@@ -73,7 +72,7 @@ func (s *Sampler) Run(ctx context.Context) {
 
 // tick is one sampling cycle. It is exported-by-lowercase so tests can call it directly.
 func (s *Sampler) tick(_ context.Context) {
-	cur, err := s.query(s.effectiveSocketPath())
+	cur, err := s.query(s.effectiveAPIAddress())
 	if err != nil {
 		log.Printf("xraysampler: query failed: %v", err)
 		return
@@ -136,15 +135,11 @@ func (s *Sampler) tick(_ context.Context) {
 	s.prev = cur
 }
 
-// queryStatsViaCLI runs `xray api statsquery` against the unix socket and
-// returns a map of directional counters keyed by statKey.
-func queryStatsViaCLI(socketPath string) (map[statKey]int64, error) {
-	server := socketPath
-	if !strings.HasPrefix(server, "unix:") {
-		server = "unix:" + socketPath
-	}
+// queryStatsViaCLI runs `xray api statsquery` against the xray stats TCP
+// inbound and returns a map of directional counters keyed by statKey.
+func queryStatsViaCLI(address string) (map[statKey]int64, error) {
 	out, err := exec.Command("xray", "api", "statsquery",
-		fmt.Sprintf("--server=%s", server),
+		fmt.Sprintf("--server=%s", address),
 		"--reset=false",
 		"--pattern=",
 	).Output()

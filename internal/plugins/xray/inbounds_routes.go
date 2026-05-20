@@ -70,6 +70,9 @@ func inboundToMap(v InboundView) map[string]any {
 func validatePostInbound(ctx context.Context, store *InboundStore, body postInboundBody) error {
 	if body.ServerID == 0 { return errors.New("server_id required") }
 	if body.Port <= 0 || body.Port > 65535 { return errors.New("port out of range") }
+	if body.Port == APIPort {
+		return fmt.Errorf("port %d is reserved for the xray stats API", APIPort)
+	}
 	if body.Role != "landing" && body.Role != "relay" {
 		return fmt.Errorf("role must be landing or relay, got %q", body.Role)
 	}

@@ -10,12 +10,12 @@ import (
 )
 
 // fakeQuery returns a queryFunc that always returns the given map.
-func fakeQuery(m map[statKey]int64) func(socketPath string) (map[statKey]int64, error) {
+func fakeQuery(m map[statKey]int64) func(address string) (map[statKey]int64, error) {
 	return func(_ string) (map[statKey]int64, error) { return m, nil }
 }
 
 // fakeErr returns a queryFunc that always returns the given error.
-func fakeErr(err error) func(socketPath string) (map[statKey]int64, error) {
+func fakeErr(err error) func(address string) (map[statKey]int64, error) {
 	return func(_ string) (map[statKey]int64, error) { return nil, err }
 }
 
@@ -37,7 +37,7 @@ func runTicks(s *Sampler, queries []map[statKey]int64) []agentapi.XrayTrafficBat
 
 // TestFirstTickNoReport verifies that the first tick stores a baseline but does not send.
 func TestFirstTickNoReport(t *testing.T) {
-	s := &Sampler{SocketPath: "/fake.sock", Interval: time.Second}
+	s := &Sampler{APIAddress: "127.0.0.1:0", Interval: time.Second}
 	key := statKey{Tag: "vless-reality-8443", Kind: "inbound", Dir: "up"}
 	sent := runTicks(s, []map[statKey]int64{{key: 1000}})
 	if len(sent) != 0 {
@@ -47,7 +47,7 @@ func TestFirstTickNoReport(t *testing.T) {
 
 // TestSecondTickDelta verifies delta computation from tick 1→2.
 func TestSecondTickDelta(t *testing.T) {
-	s := &Sampler{SocketPath: "/fake.sock", Interval: time.Second}
+	s := &Sampler{APIAddress: "127.0.0.1:0", Interval: time.Second}
 	ku := statKey{Tag: "vless-reality-8443", Kind: "inbound", Dir: "up"}
 	kd := statKey{Tag: "vless-reality-8443", Kind: "inbound", Dir: "down"}
 	sent := runTicks(s, []map[statKey]int64{
@@ -71,7 +71,7 @@ func TestSecondTickDelta(t *testing.T) {
 
 // TestThirdTickAccumulates verifies cumulative delta over three ticks.
 func TestThirdTickAccumulates(t *testing.T) {
-	s := &Sampler{SocketPath: "/fake.sock", Interval: time.Second}
+	s := &Sampler{APIAddress: "127.0.0.1:0", Interval: time.Second}
 	ku := statKey{Tag: "vless-reality-8443", Kind: "inbound", Dir: "up"}
 	sent := runTicks(s, []map[statKey]int64{
 		{ku: 1000},
@@ -88,7 +88,7 @@ func TestThirdTickAccumulates(t *testing.T) {
 
 // TestXrayRestartZeroDelta verifies that a counter reset (current < previous) emits 0, not negative.
 func TestXrayRestartZeroDelta(t *testing.T) {
-	s := &Sampler{SocketPath: "/fake.sock", Interval: time.Second}
+	s := &Sampler{APIAddress: "127.0.0.1:0", Interval: time.Second}
 	ku := statKey{Tag: "vless-reality-8443", Kind: "inbound", Dir: "up"}
 	sent := runTicks(s, []map[statKey]int64{
 		{ku: 5000},
@@ -104,7 +104,7 @@ func TestXrayRestartZeroDelta(t *testing.T) {
 
 // TestUplinkOnlyNilDownlink verifies that a tag with only uplink data emits BytesDown=0.
 func TestUplinkOnlyNilDownlink(t *testing.T) {
-	s := &Sampler{SocketPath: "/fake.sock", Interval: time.Second}
+	s := &Sampler{APIAddress: "127.0.0.1:0", Interval: time.Second}
 	ku := statKey{Tag: "vless-reality-8443", Kind: "inbound", Dir: "up"}
 	// No "down" key at all.
 	sent := runTicks(s, []map[statKey]int64{
@@ -125,7 +125,7 @@ func TestUplinkOnlyNilDownlink(t *testing.T) {
 
 // TestSocketMissingSkip verifies that a query error suppresses send without panicking.
 func TestSocketMissingSkip(t *testing.T) {
-	s := &Sampler{SocketPath: "/fake.sock", Interval: time.Second}
+	s := &Sampler{APIAddress: "127.0.0.1:0", Interval: time.Second}
 	var sendCalled bool
 	s.Send = func(_ agentapi.Envelope) error { sendCalled = true; return nil }
 	s.queryFunc = fakeErr(fmt.Errorf("socket not found"))
@@ -137,7 +137,7 @@ func TestSocketMissingSkip(t *testing.T) {
 
 // TestAllZeroDeltaStillSends verifies that an all-zero delta still emits a batch.
 func TestAllZeroDeltaStillSends(t *testing.T) {
-	s := &Sampler{SocketPath: "/fake.sock", Interval: time.Second}
+	s := &Sampler{APIAddress: "127.0.0.1:0", Interval: time.Second}
 	ku := statKey{Tag: "vless-reality-8443", Kind: "inbound", Dir: "up"}
 	sent := runTicks(s, []map[statKey]int64{
 		{ku: 1000},
@@ -153,7 +153,7 @@ func TestAllZeroDeltaStillSends(t *testing.T) {
 
 // TestSendErrorContinues verifies that Send returning an error does not panic or stop the loop.
 func TestSendErrorContinues(t *testing.T) {
-	s := &Sampler{SocketPath: "/fake.sock", Interval: time.Second}
+	s := &Sampler{APIAddress: "127.0.0.1:0", Interval: time.Second}
 	ku := statKey{Tag: "vless-reality-8443", Kind: "inbound", Dir: "up"}
 	callCount := 0
 	s.Send = func(_ agentapi.Envelope) error {

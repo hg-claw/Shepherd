@@ -147,8 +147,12 @@ func TestRenderServerConfig_InjectsStatsAndAPIInbound(t *testing.T) {
 		if m["tag"] == "__shepherd_api__" {
 			found = true
 			listen, _ := m["listen"].(string)
-			if listen != "unix:/var/run/shepherd-xray-api.sock" {
-				t.Errorf("api inbound listen = %q, want unix:/var/run/shepherd-xray-api.sock", listen)
+			if listen != "127.0.0.1" {
+				t.Errorf("api inbound listen = %q, want 127.0.0.1", listen)
+			}
+			port, _ := m["port"].(float64)
+			if port != 28085 {
+				t.Errorf("api inbound port = %v, want 28085", m["port"])
 			}
 		}
 	}

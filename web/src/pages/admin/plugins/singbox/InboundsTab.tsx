@@ -10,6 +10,7 @@ import {
   fetchSingboxTrafficBatch, patchSingboxServerVersion, listPluginHosts,
   type SingboxInbound, type PluginHost,
 } from '@/api/plugins'
+import InboundDialog from './InboundDialog'
 import { useServers } from '@/api/servers'
 
 // Copy URL is only supported for vless-reality in v1.
@@ -271,20 +272,25 @@ export default function InboundsTab() {
         )
       })}
 
-      {/* InboundDialog — Task 26 (not yet implemented). Dialogs will be wired when
-          InboundDialog.tsx is created. The state is set up now so the tab is complete. */}
-      {dialog != null && (
-        <InboundDialogPlaceholder onClose={() => setDialog(null)} />
+      {dialog?.kind === 'new' && (
+        <InboundDialog
+          serverID={dialog.serverID ?? (serversQ.data?.[0]?.id ?? 0)}
+          open
+          onClose={() => setDialog(null)}
+          onSaved={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'edit' && (
+        <InboundDialog
+          serverID={dialog.inbound.server_id}
+          initial={dialog.inbound}
+          open
+          onClose={() => setDialog(null)}
+          onSaved={() => setDialog(null)}
+        />
       )}
     </div>
   )
-}
-
-// Temporary placeholder until Task 26 ships InboundDialog.tsx.
-// Renders nothing visible; only the open-state machinery is wired.
-function InboundDialogPlaceholder({ onClose }: { onClose: () => void }) {
-  void onClose // will be used by real dialog
-  return null
 }
 
 function VersionInline({ serverID, current }: { serverID: number; current: string | null }) {

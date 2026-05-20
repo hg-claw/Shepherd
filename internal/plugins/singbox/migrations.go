@@ -18,6 +18,7 @@ func loadMigrations() []plugins.Migration {
 		"0002_singbox_binaries.up.sql",
 		"0003_singbox_traffic.up.sql",
 		"0004_singbox_certificates.up.sql",
+		"0005_singbox_cert_challenge_type.up.sql",
 	}
 	out := make([]plugins.Migration, 0, len(names))
 	for _, n := range names {

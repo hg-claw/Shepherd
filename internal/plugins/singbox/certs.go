@@ -16,6 +16,7 @@ type CertRow struct {
 	ExpiresAt           time.Time  `db:"expires_at"`
 	Issuer              string     `db:"issuer"`
 	Status              string     `db:"status"`
+	ChallengeType       string     `db:"challenge_type"`
 	LastRenewAttemptAt  *time.Time `db:"last_renew_attempt_at"`
 	LastError           *string    `db:"last_error"`
 	CreatedAt           time.Time  `db:"created_at"`
@@ -47,12 +48,15 @@ func (s *CertStore) Insert(ctx context.Context, row CertRow) (int64, error) {
 	if row.Issuer == "" {
 		row.Issuer = "Let's Encrypt"
 	}
+	if row.ChallengeType == "" {
+		row.ChallengeType = "http-01"
+	}
 	res, err := s.DB.ExecContext(ctx, `
 		INSERT INTO singbox_certificates
-		  (domain, cert_pem, key_pem, expires_at, issuer, status, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?)`,
+		  (domain, cert_pem, key_pem, expires_at, issuer, status, challenge_type, created_at, updated_at)
+		VALUES (?,?,?,?,?,?,?,?,?)`,
 		row.Domain, row.CertPEM, row.KeyPEM, row.ExpiresAt,
-		row.Issuer, row.Status, now, now)
+		row.Issuer, row.Status, row.ChallengeType, now, now)
 	if err != nil {
 		return 0, err
 	}

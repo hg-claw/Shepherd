@@ -129,6 +129,29 @@ func (r *Releaser) Fetch(ctx context.Context, version, osName, arch string) (Bin
 	}, nil
 }
 
+// ListLatestTags returns up to limit recent sing-box release tags (no "v" prefix).
+func (r *Releaser) ListLatestTags(ctx context.Context, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = 5
+	}
+	u := fmt.Sprintf("%s/repos/SagerNet/sing-box/releases?per_page=%d", r.apiBase(), limit)
+	body, err := httpGet(ctx, r.client(), u)
+	if err != nil {
+		return nil, err
+	}
+	var entries []struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.Unmarshal(body, &entries); err != nil {
+		return nil, fmt.Errorf("parse releases: %w", err)
+	}
+	out := make([]string, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, strings.TrimPrefix(e.TagName, "v"))
+	}
+	return out, nil
+}
+
 // resolveAssetURL fetches the GitHub releases list and returns the download URL
 // for the named asset in the given version's release.
 func (r *Releaser) resolveAssetURL(ctx context.Context, version, assetName string) (string, error) {

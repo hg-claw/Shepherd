@@ -13,7 +13,12 @@ var migFS embed.FS
 func Migrations() []plugins.Migration { return loadMigrations() }
 
 func loadMigrations() []plugins.Migration {
-	names := []string{}
+	names := []string{
+		"0001_singbox_inbounds.up.sql",
+		"0002_singbox_binaries.up.sql",
+		"0003_singbox_traffic.up.sql",
+		"0004_singbox_certificates.up.sql",
+	}
 	out := make([]plugins.Migration, 0, len(names))
 	for _, n := range names {
 		b, err := migFS.ReadFile("migrations/" + n)

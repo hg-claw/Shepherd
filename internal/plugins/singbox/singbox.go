@@ -34,7 +34,7 @@ func (p *Plugin) Meta() plugins.Meta              { return meta() }
 func (p *Plugin) Migrations() []plugins.Migration { return loadMigrations() }
 func (p *Plugin) OnEnable(_ context.Context, _ plugins.Deps) error  { return nil }
 func (p *Plugin) OnDisable(_ context.Context, _ plugins.Deps) error { return nil }
-func (p *Plugin) RegisterRoutes(_ plugins.Mux, _ plugins.Deps) {}
+func (p *Plugin) RegisterRoutes(mux plugins.Mux, deps plugins.Deps) { registerRoutes(mux, deps) }
 
 // DeployToHost pushes the binary and systemd/launchd unit file to the host,
 // then calls AssembleAndDeploy to render + push the real config and restart.

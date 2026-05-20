@@ -12,13 +12,15 @@
   - **landing（落地机）**：保持现状，REALITY inbound + freedom outbound，直接出网
   - **relay（中继机）**：REALITY inbound（客户端接入） + vless+REALITY outbound 指向某台 landing
 - relay → landing 的 1:1 link 关系建模与持久化
-- DeployDialog 支持 role 选择与 upstream landing 选择
+- DeployDialog 支持 role 选择与 upstream landing 选择（首次部署时生效；re-deploy 时 role 锁死）
 - HostsTab 表格新增 Role 列，relay 显示 `→ <landing.name>`
+- BulkRelayDialog：从 landing 行一键批量创建多个 relay
 - share URL 行为：landing / relay 各自生成自己 host 的 vless URL；客户端连哪台进哪台
 
 ### 1.2 明确不做
 
-- 多 landing 的 failover / 负载均衡（xray balancer / 多 vnext）—— 1:1 先做，再考虑 N:1
+- 多 landing 的 failover / 负载均衡（xray balancer / 多 vnext）—— 单个 relay 只指 1 个 landing；一个 landing 被 N 个 relay 指向是允许的（详见 5.3 批量创建）
+- Re-deploy 改 role（landing↔relay 互转）—— v1 锁死，想换先 undeploy 再 deploy（理由见 4.1）
 - relay 端的智能分流（CN 直连 / GFW geosite 等）—— relay 永远把流量整体丢给 landing，由 landing 出网；分流在客户端侧做
 - 非 xray 隧道协议（HAProxy、gost、WireGuard）—— 等出现实际多协议需求时再抽 `tunnel` 插件
 - landing 密钥旋转后自动重新 deploy 所有 relay —— v1 在 UI 给警告，不自动联动
@@ -42,7 +44,7 @@ CREATE TABLE xray_host_topology (
   server_id           INTEGER PRIMARY KEY
                         REFERENCES servers(id) ON DELETE CASCADE,
   role                TEXT    NOT NULL CHECK (role IN ('landing', 'relay')),
-  upstream_server_id  INTEGER REFERENCES servers(id) ON DELETE RESTRICT,
+  upstream_server_id  INTEGER REFERENCES xray_host_topology(server_id) ON DELETE RESTRICT,
   updated_at          TIMESTAMP NOT NULL,
   CHECK (
     (role = 'landing' AND upstream_server_id IS NULL) OR
@@ -54,8 +56,9 @@ CREATE INDEX xray_host_topology_upstream ON xray_host_topology(upstream_server_i
 
 **约定：**
 - xray plugin_hosts 与 xray_host_topology 是 1:1 应用层约束，由 API 层维护（删除 xray host 时一并删除 topology 行）
-- `upstream_server_id` 不直接 FK 到 plugin_hosts —— SQLite 单字段 FK 不能跨复合表达式。在应用层校验 upstream 必须是已部署的 xray landing
-- `ON DELETE RESTRICT` 保证不能在还有 relay 指向它时直接删 landing。要先把对应的 relay 改成别的 landing 或先删 relay
+- `upstream_server_id` 自引用 `xray_host_topology(server_id)`，让 RESTRICT 能在删除 landing 行时直接生效；这同时强制要求应用层在创建 relay 行之前先确认 upstream 的 landing 行存在
+- 应用层 (`BeforeDeploy`) 仍要校验 upstream 是已部署的 xray 且 role=landing —— FK 只保护"有依赖时不能删"这一面
+- 删除 `servers` 行 → 通过 `server_id` 的 CASCADE 触发 topology 行删除 → 若该行是 landing 且有 relay 指向它，CASCADE 内的 RESTRICT 会阻断整个 servers 删除（提供间接保护）
 
 ### 2.2 不变更的表
 
@@ -238,26 +241,26 @@ Go 端 `RenderVLESSReality` 同步扩 `Topology *TopologyRef` 可选参数与 `L
   1. upstream 必须是已存在的 xray plugin_host（不能挂到 non-xray host 或还没部署的 host）
   2. upstream 的 role 必须是 `landing`（禁止 relay→relay）
   3. upstream ≠ 自己
+  4. **Re-deploy 时 role 不可变**：如果目标 server 已经有 xray plugin_host + topology 行，传入的 `topology.role` 必须与已存 role 一致；否则返回 `409 Conflict`，提示先 undeploy。同理 `upstream_server_id` 一旦设定也不允许在 re-deploy 时改变（要换 upstream 必须先 undeploy）。理由：避免 relay↔landing 互转时的中间态（既要清 topology 又要写 topology + 部署事务、失败回滚复杂）；v1 把这层复杂度排除掉，想换就先删后建
 - 服务端**不重新渲染 config**，body 里的 config 直接作为 xray config.json 推到 host。topology 只入 `xray_host_topology` 表
 - 部署成功后再写 topology 行（事务）；topology 校验失败时整个 deploy 不发生
 
-### 4.2 Hosts 列表（既有 endpoint 增字段）
+### 4.2 Hosts 列表（不变） + Topology 副 endpoint
 
-`GET /api/admin/plugins/xray/hosts` 响应行新增：
+`GET /api/admin/plugins/xray/hosts` 响应保持不变（与所有 plugin 通用，行内字段不含 topology）。
+
+新增 `GET /api/admin/plugins/xray/topology`（xray-specific）：
 
 ```json
 {
-  "server_id":         5,
-  "status":            "running",
-  "config":            { ... },
-  "deployed_version":  "1.8.11",
-  "topology": {
-    "role":               "relay",
-    "upstream_server_id": 42,
-    "upstream_name":      "landing-us-1"   // 由 server 端 join 进来，省一次往返
-  }
+  "5": { "role": "relay", "upstream_server_id": 42, "upstream_name": "landing-us-1" },
+  "42": { "role": "landing", "upstream_server_id": null, "upstream_name": null }
 }
 ```
+
+- Key 是 server_id（字符串，方便 JSON 序列化）
+- UI 在 hosts 查询的同时并发拉这条，本地按 server_id join
+- 选择独立 endpoint 而不是塞进 /hosts 行内：保持通用 plugin API 干净，xray 自己的关系数据走 xray 自己的路由
 
 ### 4.3 Undeploy（既有 endpoint 增加约束）
 
@@ -305,7 +308,39 @@ Share URL（Copy URL 按钮）：
   - landing 行 → 客户端直连 landing 的 URL（已有行为）
   - relay 行 → 客户端连 relay 的 URL（新逻辑，自动从 relay 自己的 config 反解，与 landing 无关）
 
-### 5.3 sidebar / 其它页面
+### 5.3 批量为一个 landing 创建多个 relay
+
+**痛点：** 一个 landing 通常带多个 relay（不同地理位置 / 不同入口）。单次 deploy 一台太慢——要逐个开 DeployDialog、手动选 upstream、生成 keypair、改 port。
+
+**入口：** HostsTab 表格里每个 **landing 行**的 Actions 区新增一个按钮 **"+ Relays"**（与 Re-deploy / Undeploy 并列；只在 role=landing 时显示）。
+
+**点击后弹 BulkRelayDialog**，标题 `Add relays → <landing-name>`。表单：
+
+1. **Target servers**（必填）：多选 checkbox 列表，列出所有"还没部署过 xray 的 server"以及"不是当前 landing 自己"
+2. **Shared settings**（应用到本次批量创建的每个 relay）：
+   - Version：默认 = landing 的 deployed_version（避免版本错位带来的协议差异），可改
+   - REALITY SNI：默认 = landing 的 SNI（同一指纹群组），可改
+3. **每个选中 server 一行 inline 配置**（自动生成，可单独 override）：
+   - Port：随机端口（10000–59999），可改；冲突检测仅做最低限度（同次批量内部 port 必须唯一）
+   - UUID：`crypto.randomUUID()` 自动生成，可点 ↻ 重生成
+   - REALITY keypair：每行独立生成一对 X25519，可点 ↻ 重生成
+   - Short ID：每行独立随机 8 字节 hex，可点 ↻ 重生成
+4. 底部 **Deploy all** 按钮
+
+**提交策略：**
+
+- 前端在 React Query mutation 里 **顺序** 对选中的每一台 server 调一次现有的 `POST /api/admin/plugins/xray/hosts/:server_id`（每次 body 都带 `topology: { role: 'relay', upstream_server_id: landing.id }`）
+- 不并行：避免对同一台 landing 的 plugin_hosts 表 / xray_host_topology 表写时并发（虽然行级锁能保护，但顺序部署日志和 UI 进度更直观）
+- 进度反馈：每完成一个 toast `Deployed relay on <server>`，失败 toast `<server>: <error>` 并继续下一个（不全停）
+- 全部跑完后 invalidate `['plugin-hosts','xray']`，HostsTab 自动刷新
+
+**为什么不开新 API endpoint：**
+
+- 单台 deploy 已经支持完整 topology 字段。批量 = N 次单 deploy 的循环，前端做 orchestration 即可
+- 新 endpoint 会复制全部 deploy 逻辑（fetch binary / verify / push / restart），且要处理"部分失败"的 partial commit 语义，不值得
+- 任何对单 deploy 的修复（譬如以后加 deploy timeout）自动惠及批量
+
+### 5.4 sidebar / 其它页面
 
 不变。
 
@@ -351,6 +386,7 @@ Share URL（Copy URL 按钮）：
   - outbound[1] = freedom direct
   - routing 把 private IP 引到 direct
 - API `POST /hosts/:id` 拒绝：upstream 不存在 / upstream 是 relay / upstream 是自己 / role=relay 但 upstream_server_id 缺失
+- API `POST /hosts/:id` 在 re-deploy 时拒绝改 role 或改 upstream_server_id（返回 409）
 - API `DELETE /hosts/:id` 在 landing 有依赖 relay 时返回 409
 - Migration: 现存 xray host 升级后被自动标为 landing
 
@@ -363,6 +399,12 @@ Share URL（Copy URL 按钮）：
 - `DeployDialog`：
   - role=Landing 时不展示 Upstream landing 选项
   - role=Relay 时 Upstream landing 选项不包含 role=relay 的 host 与自己
+  - Re-deploy 模式下 Role 与 Upstream 字段为 read-only（带 lock icon + tooltip）
+- `BulkRelayDialog`：
+  - 候选 target 列表正确排除：自己（landing）、已部署 xray 的 server、未 enroll 的 server
+  - 每行 keypair / UUID / shortID 默认值非空且各行互不相同
+  - 选中 N 个 target 后点 Deploy all，触发 N 次 POST，调用顺序与 target 列表顺序一致
+  - 一台失败不阻塞其他台，最终回调汇总 success / failure 计数
 
 ### 8.3 手工 smoke
 
@@ -371,6 +413,8 @@ Share URL（Copy URL 按钮）：
 3. relay-B undeploy → 客户端连 relay-B 失败，连 landing-A 仍 OK
 4. 尝试 undeploy landing-A → 拒绝，提示有 1 个 relay 依赖
 5. landing-A 重新生成 keypair 并 re-deploy → 前端弹 Confirm 警告 → 接受 → relay-B 的客户端连接立刻全部 fail → 手动 re-deploy relay-B 后恢复
+6. 在 landing-A 行点 "+ Relays"，多选 3 台 server，Deploy all → 3 个 relay 顺序部署完成，HostsTab 立即出现 3 行 `relay → landing-A`；客户端能连任意一个进去
+7. 尝试 re-deploy 一个 relay 把 role 改成 landing → 服务端返回 409
 
 ## 9. 已确认的取舍
 
@@ -382,6 +426,8 @@ Share URL（Copy URL 按钮）：
 | Relay → landing 连接通道 | 走 landing 公网地址 | 与客户端走同一条路径，复用 REALITY 防探测；不依赖 Shepherd agent 转发，避免 agent 故障影响隧道 |
 | 密钥旋转 | 手动 + UI 警告 | 自动联动 deploy 失败处理复杂；手动可控；relay 数量初期不会很多 |
 | Relay 端分流 | 不做 | 客户端侧分流是更成熟的做法；relay 内嵌分流会显著增加 config 复杂度 |
+| Role 在 re-deploy 时是否可变 | 不可变 | landing↔relay 互转涉及清/写 topology + 配置重渲染 + 部署失败回滚，事务复杂度高；想换 role 先 undeploy 再 deploy 即可，多一次点击换来实现大幅简化 |
+| 批量创建 relay | 前端 orchestration，不开新 API | 复用单 deploy 路径，任何对单 deploy 的修复自动惠及批量；不需要处理 partial-commit 语义 |
 
 ## 10. 后续可能（不在本次范围）
 

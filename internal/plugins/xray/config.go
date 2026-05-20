@@ -6,6 +6,20 @@ import (
 	"fmt"
 )
 
+type TopologyRef struct {
+	Role    string      `json:"role"`    // "landing" | "relay"
+	Landing *LandingRef `json:"landing"` // non-nil iff Role=="relay"
+}
+
+type LandingRef struct {
+	Address   string `json:"address"`
+	Port      int    `json:"port"`
+	SNI       string `json:"sni"`
+	UUID      string `json:"uuid"`
+	PublicKey string `json:"public_key"`
+	ShortID   string `json:"short_id"`
+}
+
 type TemplateRequest struct {
 	Inbound    string `json:"inbound"` // vless-reality | vmess-ws | shadowsocks
 	Port       int    `json:"port"`
@@ -20,6 +34,8 @@ type TemplateRequest struct {
 	// Shadowsocks:
 	Method     string `json:"method"`
 	Password   string `json:"password"`
+	// Relay topology (vless-reality only). Nil or Role=="landing" → current behavior.
+	Topology   *TopologyRef `json:"topology"`
 }
 
 // RenderTemplate returns canonical xray JSON for a chosen inbound preset.
@@ -40,37 +56,86 @@ func renderVLESSReality(r TemplateRequest) ([]byte, error) {
 	if r.Port == 0 || r.UUID == "" || r.SNI == "" || r.PublicKey == "" {
 		return nil, errors.New("vless-reality: port/uuid/sni/public_key required")
 	}
-	cfg := map[string]any{
-		"log": map[string]any{"loglevel": "warning"},
-		"inbounds": []any{map[string]any{
-			"port":     r.Port,
-			"protocol": "vless",
-			"settings": map[string]any{
-				"clients":    []any{map[string]any{"id": r.UUID, "flow": "xtls-rprx-vision"}},
-				"decryption": "none",
+	inbound := map[string]any{
+		"port":     r.Port,
+		"protocol": "vless",
+		"settings": map[string]any{
+			"clients":    []any{map[string]any{"id": r.UUID, "flow": "xtls-rprx-vision"}},
+			"decryption": "none",
+		},
+		"streamSettings": map[string]any{
+			"network":  "tcp",
+			"security": "reality",
+			"realitySettings": map[string]any{
+				"show":        false,
+				"dest":        r.SNI + ":443",
+				"serverNames": []any{r.SNI},
+				"privateKey":  r.PrivateKey,
+				"publicKey":   r.PublicKey,
+				"shortIds":    []any{r.ShortID},
 			},
-			"streamSettings": map[string]any{
-				"network":  "tcp",
-				"security": "reality",
-				"realitySettings": map[string]any{
-					"show":        false,
-					"dest":        r.SNI + ":443",
-					"serverNames": []any{r.SNI},
-					"privateKey":  r.PrivateKey,
-					"publicKey":   r.PublicKey,
-					"shortIds":    []any{r.ShortID},
+		},
+		"sniffing": map[string]any{
+			"enabled":      true,
+			"destOverride": []any{"http", "tls"},
+		},
+	}
+
+	cfg := map[string]any{
+		"log":      map[string]any{"loglevel": "warning"},
+		"inbounds": []any{inbound},
+	}
+
+	if r.Topology != nil && r.Topology.Role == "relay" {
+		if r.Topology.Landing == nil {
+			return nil, errors.New("vless-reality relay: topology.landing required")
+		}
+		l := r.Topology.Landing
+		cfg["outbounds"] = []any{
+			map[string]any{
+				"tag":      "to-landing",
+				"protocol": "vless",
+				"settings": map[string]any{
+					"vnext": []any{map[string]any{
+						"address": l.Address,
+						"port":    l.Port,
+						"users": []any{map[string]any{
+							"id":         l.UUID,
+							"encryption": "none",
+							"flow":       "xtls-rprx-vision",
+						}},
+					}},
+				},
+				"streamSettings": map[string]any{
+					"network":  "tcp",
+					"security": "reality",
+					"realitySettings": map[string]any{
+						"fingerprint": "chrome",
+						"serverName":  l.SNI,
+						"publicKey":   l.PublicKey,
+						"shortId":     l.ShortID,
+					},
 				},
 			},
-			"sniffing": map[string]any{
-				"enabled":      true,
-				"destOverride": []any{"http", "tls"},
+			map[string]any{
+				"tag":      "direct",
+				"protocol": "freedom",
+				"settings": map[string]any{"domainStrategy": "UseIP"},
 			},
-		}},
-		"outbounds": []any{map[string]any{
+		}
+		cfg["routing"] = map[string]any{
+			"rules": []any{
+				map[string]any{"type": "field", "ip": []any{"geoip:private"}, "outboundTag": "direct"},
+			},
+		}
+	} else {
+		// landing (or unspecified) — current behavior.
+		cfg["outbounds"] = []any{map[string]any{
 			"protocol": "freedom",
 			"settings": map[string]any{"domainStrategy": "UseIP"},
-		}},
+		}}
 	}
+
 	return json.MarshalIndent(cfg, "", "  ")
 }
 

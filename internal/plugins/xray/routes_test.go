@@ -99,6 +99,37 @@ func TestCachedLatest_24hCached(t *testing.T) {
 	}
 }
 
+func TestTopologyHandler_ReturnsRowsWithUpstreamName(t *testing.T) {
+	dsn := "file:" + filepath.Join(t.TempDir(), "r.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	t.Cleanup(func() { _ = d.Close() })
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", New().Migrations())
+	d.MustExec(`INSERT INTO servers(id, name) VALUES (1, 'landing-a'), (2, 'relay-b')`)
+	store := &TopologyStore{DB: d, Now: time.Now}
+	_ = store.UpsertLanding(context.Background(), 1)
+	_ = store.UpsertRelay(context.Background(), 2, 1)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/topology", nil)
+	topologyHandler(d)(w, req)   // exported handler factory used by RegisterRoutes
+	if w.Code != 200 { t.Fatalf("status = %d body=%s", w.Code, w.Body.String()) }
+
+	var out map[string]struct {
+		Role             string  `json:"role"`
+		UpstreamServerID *int64  `json:"upstream_server_id"`
+		UpstreamName     *string `json:"upstream_name"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&out); err != nil { t.Fatal(err) }
+	if out["1"].Role != "landing" { t.Fatalf("server 1: %+v", out["1"]) }
+	if out["2"].Role != "relay" || out["2"].UpstreamServerID == nil || *out["2"].UpstreamServerID != 1 {
+		t.Fatalf("server 2: %+v", out["2"])
+	}
+	if out["2"].UpstreamName == nil || *out["2"].UpstreamName != "landing-a" {
+		t.Fatalf("server 2 upstream_name: %v", out["2"].UpstreamName)
+	}
+}
+
 // collectMux records HandleFunc calls so tests can pull the handler out.
 type collectMux struct{ handlers map[string]func(http.ResponseWriter, *http.Request) }
 

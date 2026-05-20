@@ -35,6 +35,21 @@ export interface PluginEvent {
   details: unknown
 }
 
+export interface XrayTopologyRow {
+  role: 'landing' | 'relay'
+  upstream_server_id: number | null
+  upstream_name: string | null
+}
+
+// Map keyed by server_id (string in JSON, number for callers).
+// Servers without an xray deployment are simply absent.
+export const fetchXrayTopology = async (): Promise<Map<number, XrayTopologyRow>> => {
+  const raw = await api.get<Record<string, XrayTopologyRow>>('/api/admin/plugins/xray/topology')
+  const out = new Map<number, XrayTopologyRow>()
+  for (const [k, v] of Object.entries(raw)) out.set(Number(k), v)
+  return out
+}
+
 export const listPlugins = () => api.get<PluginEntry[]>('/api/admin/plugins')
 
 export const enablePlugin = (id: string) =>
@@ -53,7 +68,10 @@ export const listPluginHosts = (id: string) =>
   api.get<PluginHost[]>(`/api/admin/plugins/${id}/hosts`)
 
 export const deployPluginHost = (id: string, body: {
-  server_id: number; version?: string; config?: unknown;
+  server_id: number
+  version?: string
+  config?: unknown
+  topology?: { role: 'landing' | 'relay'; upstream_server_id?: number }
 }) => api.post<PluginHost>(`/api/admin/plugins/${id}/hosts`, body)
 
 export const removePluginHost = (id: string, serverId: number) =>
@@ -105,3 +123,73 @@ export const generateX25519 = () =>
 
 export const generateShortID = () =>
   api.post<{ short_id: string }>('/api/admin/plugins/xray/keys/short-id', {})
+
+export interface XrayInbound {
+  id: number
+  server_id: number
+  server_name: string
+  tag: string
+  port: number
+  role: 'landing' | 'relay'
+  protocol: 'vless-reality' | 'vmess-ws' | 'shadowsocks'
+  uuid: string
+  sni: string
+  public_key: string
+  private_key: string  // always "[REDACTED]" in GET responses
+  short_id: string
+  ws_path: string
+  ss_method: string
+  upstream_inbound_id: number | null
+  upstream_tag: string | null
+  upstream_server_id: number | null
+  upstream_server_name: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateXrayInboundBody {
+  server_id: number
+  port: number
+  role: 'landing' | 'relay'
+  protocol: 'vless-reality' | 'vmess-ws' | 'shadowsocks'
+  uuid?: string
+  sni?: string
+  public_key?: string
+  private_key?: string
+  short_id?: string
+  ws_path?: string
+  ss_method?: string
+  ss_password?: string
+  upstream_inbound_id?: number
+}
+
+export interface PatchXrayInboundBody {
+  port?: number
+  uuid?: string
+  sni?: string
+  public_key?: string
+  private_key?: string
+  short_id?: string
+  ws_path?: string
+  ss_method?: string
+  ss_password?: string
+}
+
+export const listXrayInbounds = (params: { server_id?: number } = {}) => {
+  const q = new URLSearchParams()
+  if (params.server_id) q.set('server_id', String(params.server_id))
+  const qs = q.toString()
+  return api.get<XrayInbound[]>(`/api/admin/plugins/xray/inbounds${qs ? '?' + qs : ''}`)
+}
+
+export const createXrayInbound = (body: CreateXrayInboundBody) =>
+  api.post<XrayInbound>('/api/admin/plugins/xray/inbounds', body)
+
+export const patchXrayInbound = (id: number, body: PatchXrayInboundBody) =>
+  api.patch<XrayInbound>(`/api/admin/plugins/xray/inbounds/${id}`, body)
+
+export const deleteXrayInbound = (id: number) =>
+  api.del(`/api/admin/plugins/xray/inbounds/${id}`)
+
+export const patchXrayServerVersion = (serverID: number, version: string) =>
+  api.patch<{ ok: true; version: string }>(`/api/admin/plugins/xray/servers/${serverID}`, { version })

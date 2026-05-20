@@ -19,8 +19,8 @@ import (
 	"github.com/hg-claw/Shepherd/internal/filesvc"
 	"github.com/hg-claw/Shepherd/internal/installer"
 	"github.com/hg-claw/Shepherd/internal/plugins"
-	_ "github.com/hg-claw/Shepherd/internal/plugins/cloudflare" // registers via init()
-	_ "github.com/hg-claw/Shepherd/internal/plugins/xray"       // registers via init()
+	_ "github.com/hg-claw/Shepherd/internal/plugins/cloudflare"       // registers via init()
+	xrayplugin "github.com/hg-claw/Shepherd/internal/plugins/xray" // registers via init() + Migrate0003
 	"github.com/hg-claw/Shepherd/internal/ptysvc"
 	"github.com/hg-claw/Shepherd/internal/scriptsvc"
 	"github.com/hg-claw/Shepherd/internal/serversvc"
@@ -191,6 +191,12 @@ func main() {
 		}
 		if err := plugins.RunPluginMigrations(rootCtx, d, p.Meta().ID, p.Migrations()); err != nil {
 			log.Printf("plugin %s: boot migrate: %v", p.Meta().ID, err)
+		}
+		if p.Meta().ID == "xray" {
+			if err := xrayplugin.Migrate0003(rootCtx, d); err != nil {
+				log.Printf("xray.Migrate0003: %v", err)
+				// continue — don't crash boot
+			}
 		}
 	}
 

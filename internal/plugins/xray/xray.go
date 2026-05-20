@@ -123,7 +123,12 @@ func (p *Plugin) UndeployFromHost(ctx context.Context, deps plugins.Deps, server
 		unitName = unitNameDarwin
 	}
 	pusher := &deploy.Pusher{Exec: deps.HostExec}
-	return pusher.Stop(ctx, osName, serverID, unitName)
+	if err := pusher.Stop(ctx, osName, serverID, unitName); err != nil {
+		return err
+	}
+	store := &TopologyStore{DB: deps.DB}
+	_ = store.Delete(ctx, serverID) // best-effort; FK RESTRICT already gated by BeforeUndeploy
+	return nil
 }
 
 func (p *Plugin) HostStatus(ctx context.Context, deps plugins.Deps, serverID int64) (plugins.HostStatus, error) {
@@ -159,3 +164,4 @@ func (p *Plugin) LogStreamCommand(ctx context.Context, deps plugins.Deps, server
 		"-o", "short-iso",
 	}, nil
 }
+

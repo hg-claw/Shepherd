@@ -196,6 +196,7 @@ type hostBody struct {
 	ServerID int64           `json:"server_id"`
 	Version  string          `json:"version"`
 	Config   json.RawMessage `json:"config"`
+	Topology json.RawMessage `json:"topology"`
 }
 
 func (a *PluginsAPI) ListHosts(w http.ResponseWriter, r *http.Request) {
@@ -222,6 +223,10 @@ func (a *PluginsAPI) GetHost(w http.ResponseWriter, r *http.Request) {
 
 func (a *PluginsAPI) PostHost(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	if id == "xray" {
+		writeError(w, http.StatusGone, "POST /hosts is deprecated for xray; use POST /api/admin/plugins/xray/inbounds")
+		return
+	}
 	p, ok := plugins.Get(id)
 	if !ok { writeError(w, 404, "unknown plugin"); return }
 	ha, ok := p.(plugins.HostAware)
@@ -236,6 +241,15 @@ func (a *PluginsAPI) PostHost(w http.ResponseWriter, r *http.Request) {
 	if body.ServerID == 0 { writeError(w, 400, "server_id required"); return }
 	cfg := []byte(body.Config)
 	if len(cfg) == 0 { cfg = []byte(`{}`) }
+
+	// Sync pre-flight validation (plugin-specific).
+	if v, ok := p.(plugins.DeployValidator); ok {
+		if err := v.BeforeDeploy(r.Context(), a.Deps, body.ServerID, []byte(body.Topology)); err != nil {
+			writeError(w, 409, err.Error())
+			return
+		}
+	}
+
 	host, err := a.Store.UpsertHost(r.Context(), id, body.ServerID, cfg, "deploying")
 	if err != nil { writeError(w, 500, err.Error()); return }
 
@@ -245,6 +259,13 @@ func (a *PluginsAPI) PostHost(w http.ResponseWriter, r *http.Request) {
 			_ = a.Store.SetHostStatus(ctx, id, body.ServerID, "failed", body.Version, err.Error())
 			return
 		}
+		if c, ok := p.(plugins.DeployCommitter); ok {
+			if err := c.AfterDeploy(ctx, a.Deps, body.ServerID, []byte(body.Topology)); err != nil {
+				_ = a.Store.SetHostStatus(ctx, id, body.ServerID, "failed", body.Version,
+					"deploy ok but topology persist failed: "+err.Error())
+				return
+			}
+		}
 		_ = a.Store.SetHostStatus(ctx, id, body.ServerID, "running", body.Version, "")
 	}()
 	writeJSON(w, 200, hostRowToMap(host))
@@ -252,9 +273,19 @@ func (a *PluginsAPI) PostHost(w http.ResponseWriter, r *http.Request) {
 
 func (a *PluginsAPI) DeleteHost(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	if id == "xray" {
+		writeError(w, http.StatusGone, "DELETE /hosts is deprecated for xray; use DELETE /api/admin/plugins/xray/inbounds/{id}")
+		return
+	}
 	sid, _ := strconv.ParseInt(r.PathValue("server_id"), 10, 64)
 	p, ok := plugins.Get(id)
 	if !ok { writeError(w, 404, "unknown plugin"); return }
+	if v, ok := p.(plugins.UndeployValidator); ok {
+		if err := v.BeforeUndeploy(r.Context(), a.Deps, sid); err != nil {
+			writeError(w, 409, err.Error())
+			return
+		}
+	}
 	if ha, ok := p.(plugins.HostAware); ok {
 		_ = ha.UndeployFromHost(r.Context(), a.Deps, sid)
 	}

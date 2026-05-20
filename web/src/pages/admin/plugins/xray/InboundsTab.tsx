@@ -1,0 +1,258 @@
+import { useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Pill } from '@/components/Pill'
+import { useUI } from '@/store/ui'
+import { copyText } from '@/lib/clipboard'
+import { buildShareURL } from './templates'
+import InboundDialog from './InboundDialog'
+import BulkRelayDialog from './BulkRelayDialog'
+import {
+  listXrayInbounds, deleteXrayInbound, listPluginHosts, patchXrayServerVersion,
+  type XrayInbound, type PluginHost,
+} from '@/api/plugins'
+import { useServers } from '@/api/servers'
+
+export default function InboundsTab() {
+  const qc = useQueryClient()
+  const toast = useUI((s) => s.toast)
+  const serversQ = useServers({ refetchInterval: 30_000 })
+  const inboundsQ = useQuery({
+    queryKey: ['xray-inbounds'],
+    queryFn: () => listXrayInbounds(),
+    refetchInterval: 5_000,
+  })
+  const hostsQ = useQuery({
+    queryKey: ['plugin-hosts', 'xray'],
+    queryFn: () => listPluginHosts('xray'),
+    refetchInterval: 5_000,
+  })
+
+  // Group inbounds by server_id; one section per server.
+  const groups = useMemo(() => {
+    const m = new Map<number, XrayInbound[]>()
+    for (const i of inboundsQ.data ?? []) {
+      const arr = m.get(i.server_id) ?? []
+      arr.push(i)
+      m.set(i.server_id, arr)
+    }
+    return m
+  }, [inboundsQ.data])
+
+  // Count relay dependents per landing-inbound id
+  const dependentsByLandingID = useMemo(() => {
+    const m = new Map<number, number>()
+    for (const i of inboundsQ.data ?? []) {
+      if (i.role === 'relay' && i.upstream_inbound_id != null) {
+        m.set(i.upstream_inbound_id, (m.get(i.upstream_inbound_id) ?? 0) + 1)
+      }
+    }
+    return m
+  }, [inboundsQ.data])
+
+  // PluginHost lookup for xray version + process status
+  const hostByServer = useMemo(() => {
+    const m = new Map<number, PluginHost>()
+    for (const h of hostsQ.data ?? []) m.set(h.server_id, h)
+    return m
+  }, [hostsQ.data])
+
+  const del = useMutation({
+    mutationFn: (id: number) => deleteXrayInbound(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['xray-inbounds'] })
+      qc.invalidateQueries({ queryKey: ['plugin-hosts', 'xray'] })
+    },
+    onError: (e: any) => toast('error', String(e?.message ?? e)),
+  })
+
+  const [dialog, setDialog] = useState<
+    { kind: 'new'; serverID?: number } |
+    { kind: 'edit'; inbound: XrayInbound } |
+    { kind: 'bulk'; landing: XrayInbound } |
+    null
+  >(null)
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-[12.5px] text-muted-foreground">
+          Each row is one xray inbound. A single server can host multiple inbounds.
+        </p>
+        <Button size="sm" className="h-8" onClick={() => setDialog({ kind: 'new' })}>
+          + New inbound
+        </Button>
+      </div>
+
+      {inboundsQ.isLoading && (
+        <p className="text-[12.5px] text-muted-foreground px-1">Loading…</p>
+      )}
+
+      {!inboundsQ.isLoading && (serversQ.data ?? []).map((s) => {
+        const inbounds = groups.get(s.id) ?? []
+        const host = hostByServer.get(s.id)
+        return (
+          <div key={s.id} className="rounded-lg border bg-elev overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b bg-background/40">
+              <div className="text-[13px] font-mono">
+                <span className="font-medium">{s.name}</span>
+                <span className="text-fg-dim ml-2">
+                  {s.ssh_host?.Valid ? s.ssh_host.String : '—'}
+                </span>
+                {host && (
+                  <span className="text-fg-dim ml-3"><VersionInline serverID={s.id} current={host?.deployed_version ?? null} /></span>
+                )}
+                {host && (
+                  <span className="ml-3"><Pill kind={host.status === 'running' ? 'ok' : 'neutral'}>{host.status}</Pill></span>
+                )}
+              </div>
+              <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
+                onClick={() => setDialog({ kind: 'new', serverID: s.id })}>
+                + Add inbound
+              </Button>
+            </div>
+            <table className="w-full text-[13px] border-collapse">
+              <thead>
+                <tr className="text-left">
+                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Tag</th>
+                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Role</th>
+                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Protocol</th>
+                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Port</th>
+                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inbounds.length === 0 && (
+                  <tr><td colSpan={5} className="px-3 py-4 text-center text-muted-foreground text-[12.5px]">
+                    No inbounds on this server.
+                  </td></tr>
+                )}
+                {inbounds.map((i) => {
+                  const dep = dependentsByLandingID.get(i.id) ?? 0
+                  const isLanding = i.role === 'landing'
+                  const hostname = s.ssh_host?.Valid ? s.ssh_host.String : ''
+                  const shareURL = hostname && i.uuid && i.public_key && i.sni
+                    ? buildShareURL({
+                        inbound: 'vless-reality',
+                        port: i.port, uuid: i.uuid, sni: i.sni,
+                        publicKey: i.public_key, shortID: i.short_id,
+                      }, hostname, `${s.name}/${i.tag}`)
+                    : null
+                  return (
+                    <tr key={i.id} className="border-t">
+                      <td className="px-3 py-2 font-mono">{i.tag}</td>
+                      <td className="px-3 py-2">
+                        {isLanding
+                          ? <Pill kind="neutral">landing</Pill>
+                          : (
+                            <span className="font-mono">
+                              <Pill kind="ok">relay</Pill>
+                              <span className="text-fg-dim ml-1">→ {i.upstream_tag} @ {i.upstream_server_name}</span>
+                            </span>
+                          )}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-[12.5px]">{i.protocol}</td>
+                      <td className="px-3 py-2 font-mono text-[12.5px]">{i.port}</td>
+                      <td className="px-3 py-2 text-right whitespace-nowrap">
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
+                          disabled={!shareURL}
+                          title={shareURL ? 'Copy share URL' : 'cannot build URL'}
+                          onClick={async () => {
+                            if (!shareURL) return
+                            try { await copyText(shareURL); toast('success', 'Share URL copied') }
+                            catch (e) { toast('error', String((e as Error)?.message ?? e)) }
+                          }}>
+                          Copy URL
+                        </Button>
+                        {isLanding && (
+                          <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
+                            onClick={() => setDialog({ kind: 'bulk', landing: i })}>
+                            + Bulk Relay
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
+                          onClick={() => setDialog({ kind: 'edit', inbound: i })}>
+                          Edit
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px] text-destructive"
+                          disabled={del.isPending || dep > 0}
+                          title={dep > 0 ? `${dep} relay(s) depend on this landing; delete them first` : undefined}
+                          onClick={() => del.mutate(i.id)}>
+                          Delete
+                        </Button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      })}
+
+      {dialog?.kind === 'new' && (
+        <InboundDialog
+          key={`new-${dialog.serverID ?? 'any'}`}
+          open={true}
+          onOpenChange={(open: boolean) => { if (!open) setDialog(null) }}
+          mode="create"
+          defaultServerID={dialog.serverID}
+          allInbounds={inboundsQ.data ?? []}
+        />
+      )}
+      {dialog?.kind === 'edit' && (
+        <InboundDialog
+          key={`edit-${dialog.inbound.id}`}
+          open={true}
+          onOpenChange={(open: boolean) => { if (!open) setDialog(null) }}
+          mode="edit"
+          inbound={dialog.inbound}
+          allInbounds={inboundsQ.data ?? []}
+        />
+      )}
+      {dialog?.kind === 'bulk' && (
+        <BulkRelayDialog
+          key={`bulk-${dialog.landing.id}`}
+          open={true}
+          onOpenChange={(open: boolean) => { if (!open) setDialog(null) }}
+          landingInbound={dialog.landing}
+          allInbounds={inboundsQ.data ?? []}
+        />
+      )}
+    </div>
+  )
+}
+
+function VersionInline({ serverID, current }: { serverID: number; current: string | null }) {
+  const qc = useQueryClient()
+  const toast = useUI((s) => s.toast)
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(current ?? '')
+  const apply = useMutation({
+    mutationFn: () => patchXrayServerVersion(serverID, value),
+    onSuccess: () => {
+      toast('success', `Upgrading to v${value}`)
+      qc.invalidateQueries({ queryKey: ['plugin-hosts', 'xray'] })
+      setEditing(false)
+    },
+    onError: (e: any) => toast('error', String(e?.message ?? e)),
+  })
+  if (!editing) {
+    return (
+      <span className="text-fg-dim">
+        xray v{current ?? '—'}{' '}
+        <button className="text-fg-dim underline" onClick={() => setEditing(true)}>change</button>
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Input value={value} onChange={(e) => setValue(e.target.value)}
+        className="h-6 w-20 font-mono text-[11px]" />
+      <Button size="sm" className="h-6 px-2 text-[11px]" disabled={apply.isPending}
+        onClick={() => apply.mutate()}>Apply</Button>
+      <button className="text-fg-dim text-[11px]" onClick={() => setEditing(false)}>cancel</button>
+    </span>
+  )
+}

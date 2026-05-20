@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/hg-claw/Shepherd/internal/plugins"
+	xrayplugin "github.com/hg-claw/Shepherd/internal/plugins/xray"
 )
 
 type plainP struct{ id string }
@@ -233,4 +235,108 @@ func TestPluginsHosts_DeleteCallsUndeploy(t *testing.T) {
 	if w.Code != 200 { t.Fatalf("code=%d", w.Code) }
 	hosts, _ := st.ListHosts(context.Background(), "h")
 	if len(hosts) != 0 { t.Fatalf("host should be deleted: %v", hosts) }
+}
+
+type validatorP struct {
+	plainP
+	beforeDeployErr      error
+	beforeUndeployErr    error
+	beforeDeployTopology string
+	afterDeployTopology  string
+	beforeUndeployCalled bool
+}
+
+func (v *validatorP) Meta() plugins.Meta { return plugins.Meta{ID: "v", Name: "V", HostAware: true} }
+func (v *validatorP) DeployToHost(context.Context, plugins.Deps, int64, string, []byte) error { return nil }
+func (v *validatorP) UndeployFromHost(context.Context, plugins.Deps, int64) error              { return nil }
+func (v *validatorP) HostStatus(context.Context, plugins.Deps, int64) (plugins.HostStatus, error) {
+	return plugins.HostStatus{}, nil
+}
+func (v *validatorP) BeforeDeploy(_ context.Context, _ plugins.Deps, _ int64, topology []byte) error {
+	v.beforeDeployTopology = string(topology); return v.beforeDeployErr
+}
+func (v *validatorP) AfterDeploy(_ context.Context, _ plugins.Deps, _ int64, topology []byte) error {
+	v.afterDeployTopology = string(topology); return nil
+}
+func (v *validatorP) BeforeUndeploy(_ context.Context, _ plugins.Deps, _ int64) error {
+	v.beforeUndeployCalled = true; return v.beforeUndeployErr
+}
+
+// setupValidatorAPI returns a PluginsAPI with plugin "v" registered & enabled.
+func setupValidatorAPI(t *testing.T, v *validatorP) *PluginsAPI {
+	t.Helper()
+	plugins.ResetRegistryForTestPublic()
+	plugins.Register(v)
+	dsn := "file:" + filepath.Join(t.TempDir(), "vapi.db") + "?_fk=1"
+	d, err := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	if err != nil { t.Fatal(err) }
+	if err := shepdb.Migrate(d, shepdb.DriverSQLite); err != nil { t.Fatal(err) }
+	store := &plugins.Store{DB: d, Now: time.Now}
+	_ = store.UpsertEnabled(context.Background(), "v", true) // bypass /enable
+	return &PluginsAPI{Store: store, Deps: plugins.Deps{DB: d}}
+}
+
+func TestPostHost_BeforeDeployRejectionReturns409(t *testing.T) {
+	v := &validatorP{beforeDeployErr: errors.New("role mismatch on re-deploy")}
+	api := setupValidatorAPI(t, v)
+	body := `{"server_id":7,"topology":{"role":"relay"}}`
+	req := httptest.NewRequest("POST", "/api/admin/plugins/v/hosts", strings.NewReader(body))
+	req.SetPathValue("id", "v")
+	w := httptest.NewRecorder()
+	api.PostHost(w, req)
+	if w.Code != 409 { t.Fatalf("status = %d want 409 (body: %s)", w.Code, w.Body.String()) }
+	if v.beforeDeployTopology != `{"role":"relay"}` {
+		t.Fatalf("BeforeDeploy got topology %q", v.beforeDeployTopology)
+	}
+}
+
+func TestDeleteHost_BeforeUndeployRejectionReturns409(t *testing.T) {
+	v := &validatorP{beforeUndeployErr: errors.New("landing has 2 relays")}
+	api := setupValidatorAPI(t, v)
+	req := httptest.NewRequest("DELETE", "/api/admin/plugins/v/hosts/5", nil)
+	req.SetPathValue("id", "v"); req.SetPathValue("server_id", "5")
+	w := httptest.NewRecorder()
+	api.DeleteHost(w, req)
+	if w.Code != 409 { t.Fatalf("status = %d want 409", w.Code) }
+	if !v.beforeUndeployCalled { t.Fatalf("BeforeUndeploy not called") }
+}
+
+func TestPostHost_XrayReturns410(t *testing.T) {
+	plugins.ResetRegistryForTestPublic()
+	plugins.Register(xrayplugin.New())
+	dsn := "file:" + filepath.Join(t.TempDir(), "x.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	defer func() { _ = d.Close() }()
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+	store := &plugins.Store{DB: d, Now: time.Now}
+	_ = store.UpsertEnabled(context.Background(), "xray", true)
+	api := &PluginsAPI{Store: store, Deps: plugins.Deps{DB: d}}
+
+	req := httptest.NewRequest("POST", "/api/admin/plugins/xray/hosts", strings.NewReader(`{"server_id":1}`))
+	req.SetPathValue("id", "xray")
+	w := httptest.NewRecorder()
+	api.PostHost(w, req)
+	if w.Code != 410 { t.Fatalf("status=%d want 410, body=%s", w.Code, w.Body.String()) }
+	if !strings.Contains(w.Body.String(), "/inbounds") {
+		t.Fatalf("body should mention /inbounds: %s", w.Body.String())
+	}
+}
+
+func TestDeleteHost_XrayReturns410(t *testing.T) {
+	plugins.ResetRegistryForTestPublic()
+	plugins.Register(xrayplugin.New())
+	dsn := "file:" + filepath.Join(t.TempDir(), "x.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	defer func() { _ = d.Close() }()
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+	store := &plugins.Store{DB: d, Now: time.Now}
+	_ = store.UpsertEnabled(context.Background(), "xray", true)
+	api := &PluginsAPI{Store: store, Deps: plugins.Deps{DB: d}}
+
+	req := httptest.NewRequest("DELETE", "/api/admin/plugins/xray/hosts/1", nil)
+	req.SetPathValue("id", "xray")
+	req.SetPathValue("server_id", "1")
+	w := httptest.NewRecorder()
+	api.DeleteHost(w, req)
+	if w.Code != 410 { t.Fatalf("status=%d want 410", w.Code) }
 }

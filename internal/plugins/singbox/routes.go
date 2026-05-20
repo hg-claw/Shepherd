@@ -20,4 +20,8 @@ func registerRoutes(mux plugins.Mux, deps plugins.Deps) {
 	// Version management + server-level deploy.
 	mux.HandleFunc("GET /versions",       getVersionsHandler(deps))
 	mux.HandleFunc("PATCH /servers/{id}", patchSBServerVersionHandler(deps))
+
+	// Traffic queries.
+	mux.HandleFunc("GET /traffic",       trafficQueryHandler(deps.DB))
+	mux.HandleFunc("GET /traffic/batch", trafficBatchQueryHandler(deps.DB))
 }

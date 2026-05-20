@@ -106,11 +106,18 @@ func NewManager(cfg Config) *Manager {
 // must already exist in singbox_certificates (the route handler creates it
 // with status='issuing' before kicking off async Issue).
 //
+// email is the ACME account contact address; empty falls back to cfg.Email.
+// Let's Encrypt rejects contacts whose host part has no dot (i.e. localhost),
+// so callers must pass a real address or set cfg.Email accordingly.
+//
 // On any failure path Issue calls UpsertStatus(certID, "failed", &errMsg)
 // so the UI can surface the reason — this is what makes the "no info"
 // case visible. Pre-fix, certID was hardcoded to 0 and the row was
 // never updated.
-func (m *Manager) Issue(ctx context.Context, certID int64, domain string, challenge ChallengeType) error {
+func (m *Manager) Issue(ctx context.Context, certID int64, domain string, challenge ChallengeType, email string) error {
+	if email == "" {
+		email = m.cfg.Email
+	}
 	// Validate CF token before touching the issuer. Pre-issuer failures
 	// (missing token, bad provider) get reflected to the DB row too.
 	var cfToken string
@@ -128,7 +135,7 @@ func (m *Manager) Issue(ctx context.Context, certID int64, domain string, challe
 		cfToken = tok
 	}
 
-	certPEM, keyPEM, expiresAt, err := m.issuer.Obtain(ctx, domain, challenge, cfToken, m.cfg.Email)
+	certPEM, keyPEM, expiresAt, err := m.issuer.Obtain(ctx, domain, challenge, cfToken, email)
 	if err != nil {
 		return m.fail(ctx, certID, domain, fmt.Errorf("obtain: %w", err))
 	}
@@ -148,9 +155,11 @@ func (m *Manager) fail(ctx context.Context, certID int64, domain string, err err
 }
 
 // Renew re-issues the certificate identified by certID / domain.
-// It delegates to Issue which updates the existing DB row.
+// It delegates to Issue which updates the existing DB row. Renewal currently
+// uses cfg.Email since the cert row does not store the original contact
+// (TODO: persist per-cert email on issuance so renewals match).
 func (m *Manager) Renew(ctx context.Context, certID int64, domain string, challenge ChallengeType) error {
-	return m.Issue(ctx, certID, domain, challenge)
+	return m.Issue(ctx, certID, domain, challenge, "")
 }
 
 // RunRenewalLoop starts a blocking renewal loop that ticks every interval.

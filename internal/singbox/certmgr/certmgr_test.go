@@ -46,14 +46,17 @@ func (f *fakeStore) ListExpiringSoon(_ context.Context, within time.Duration) ([
 	return f.expiring, nil
 }
 
-// fakeIssuer returns canned cert PEMs.
+// fakeIssuer returns canned cert PEMs and records the email passed to Obtain
+// so tests can assert the per-call contact made it through.
 type fakeIssuer struct {
-	err       error
-	callCount atomic.Int64
+	err        error
+	callCount  atomic.Int64
+	lastEmail  string
 }
 
-func (fi *fakeIssuer) Obtain(_ context.Context, domain string, _ certmgr.ChallengeType, _ string, _ string) (certPEM []byte, keyPEM []byte, expiresAt time.Time, err error) {
+func (fi *fakeIssuer) Obtain(_ context.Context, domain string, _ certmgr.ChallengeType, _ string, email string) (certPEM []byte, keyPEM []byte, expiresAt time.Time, err error) {
 	fi.callCount.Add(1)
+	fi.lastEmail = email
 	if fi.err != nil {
 		return nil, nil, time.Time{}, fi.err
 	}
@@ -115,7 +118,7 @@ func TestManager_Issue_Success(t *testing.T) {
 	mgr := newMgr(store, issuer, &stubCFToken{token: "tok"})
 
 	const certID = int64(42)
-	if err := mgr.Issue(context.Background(), certID, "example.local", certmgr.HTTP01); err != nil {
+	if err := mgr.Issue(context.Background(), certID, "example.local", certmgr.HTTP01, ""); err != nil {
 		t.Fatalf("Issue: %v", err)
 	}
 
@@ -153,7 +156,7 @@ func TestManager_Issue_Failure(t *testing.T) {
 	mgr := newMgr(store, issuer, &stubCFToken{token: "tok"})
 
 	const certID = int64(99)
-	err := mgr.Issue(context.Background(), certID, "bad.local", certmgr.HTTP01)
+	err := mgr.Issue(context.Background(), certID, "bad.local", certmgr.HTTP01, "")
 	if err == nil {
 		t.Fatal("expected error from Issue, got nil")
 	}
@@ -193,7 +196,7 @@ func TestManager_Renew(t *testing.T) {
 
 	const domain = "renew.local"
 	// First issue to get cert ID baseline.
-	if err := mgr.Issue(context.Background(), 7, domain, certmgr.DNS01CF); err != nil {
+	if err := mgr.Issue(context.Background(), 7, domain, certmgr.DNS01CF, ""); err != nil {
 		t.Fatalf("Issue: %v", err)
 	}
 	initialCalls := int64(issuer.callCount.Load())
@@ -256,7 +259,7 @@ func TestManager_Issue_RequiresCFTokenForDNS01(t *testing.T) {
 	mgr := newMgr(store, issuer, &emptyCFToken{})
 
 	const certID = int64(13)
-	err := mgr.Issue(context.Background(), certID, "dns.local", certmgr.DNS01CF)
+	err := mgr.Issue(context.Background(), certID, "dns.local", certmgr.DNS01CF, "")
 	if err == nil {
 		t.Fatal("expected error when CF token is empty for DNS01CF, got nil")
 	}
@@ -283,5 +286,31 @@ func TestManager_Issue_RequiresCFTokenForDNS01(t *testing.T) {
 	}
 	if failed.LastErr == nil || *failed.LastErr == "" {
 		t.Fatalf("last_error not set: %+v", failed)
+	}
+}
+
+// TestManager_Issue_EmailOverride verifies that a per-call email overrides
+// cfg.Email. Regression for the LE 400 "contact email has invalid domain"
+// bug where the UI email was dropped and the hardcoded "shepherd@localhost"
+// reached the ACME registration call.
+func TestManager_Issue_EmailOverride(t *testing.T) {
+	store := &fakeStore{}
+	issuer := &fakeIssuer{}
+	mgr := newMgr(store, issuer, &stubCFToken{token: "tok"})
+
+	if err := mgr.Issue(context.Background(), 5, "ex.local", certmgr.HTTP01, "alice@example.com"); err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	if issuer.lastEmail != "alice@example.com" {
+		t.Fatalf("issuer received email %q, want %q (caller email was dropped)",
+			issuer.lastEmail, "alice@example.com")
+	}
+
+	// Empty caller email falls back to cfg.Email.
+	if err := mgr.Issue(context.Background(), 5, "ex2.local", certmgr.HTTP01, ""); err != nil {
+		t.Fatalf("Issue: %v", err)
+	}
+	if issuer.lastEmail != "test@shepherd.local" {
+		t.Fatalf("fallback email = %q, want cfg.Email", issuer.lastEmail)
 	}
 }

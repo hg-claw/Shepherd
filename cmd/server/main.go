@@ -214,9 +214,13 @@ func main() {
 	// issuance time so it always sees the current value without a restart.
 	sbCertStore := &singboxplugin.CertStore{DB: d, Now: time.Now}
 	sbCertMgr := certmgr.NewManager(certmgr.Config{
-		Store:            &certStoreAdapter{store: sbCertStore},
-		CFTokenProvider:  &cfTokenProvider{store: pluginStore},
-		Email:            "shepherd@localhost",
+		Store:           &certStoreAdapter{store: sbCertStore},
+		CFTokenProvider: &cfTokenProvider{store: pluginStore},
+		// Default contact used only when the caller (renewal loop) does
+		// not supply one. Must be a syntactically valid address — LE
+		// rejects host parts with no dot, which the old
+		// "shepherd@localhost" tripped on.
+		Email:            "shepherd-acme@example.invalid",
 		HTTP01ListenAddr: ":80",
 		CADirectoryURL:   "", // empty = Let's Encrypt production
 	})
@@ -227,12 +231,12 @@ func main() {
 	// dropping it (the pre-fix behaviour) left every cert stuck at
 	// status='issuing' with empty last_error.
 	singboxplugin.SetCertFuncs(
-		func(ctx context.Context, certID int64, domain, challengeType, _ string) error {
+		func(ctx context.Context, certID int64, domain, challengeType, email string) error {
 			ch := certmgr.HTTP01
 			if challengeType == "dns-01-cf" {
 				ch = certmgr.DNS01CF
 			}
-			return sbCertMgr.Issue(ctx, certID, domain, ch)
+			return sbCertMgr.Issue(ctx, certID, domain, ch, email)
 		},
 		func(ctx context.Context, certID int64, domain, challengeType, _ string) error {
 			ch := certmgr.HTTP01

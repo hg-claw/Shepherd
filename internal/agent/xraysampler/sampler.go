@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
@@ -144,12 +145,19 @@ const xrayBinaryPath = "/usr/local/bin/shepherd-xray"
 // stats TCP inbound and returns a map of directional counters keyed by
 // statKey.
 func queryStatsViaCLI(address string) (map[statKey]int64, error) {
-	out, err := exec.Command(xrayBinaryPath, "api", "statsquery",
+	cmd := exec.Command(xrayBinaryPath, "api", "statsquery",
 		fmt.Sprintf("--server=%s", address),
 		"--reset=false",
-		"--pattern=",
-	).Output()
+	)
+	out, err := cmd.Output()
 	if err != nil {
+		// .Output() puts stderr on ExitError.Stderr; surface it so the
+		// caller's log shows what xray actually complained about instead
+		// of just "exit status N".
+		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
+			return nil, fmt.Errorf("xray api statsquery: %w: %s",
+				err, strings.TrimSpace(string(ee.Stderr)))
+		}
 		return nil, fmt.Errorf("xray api statsquery: %w", err)
 	}
 	entries, err := ParseStats(out)

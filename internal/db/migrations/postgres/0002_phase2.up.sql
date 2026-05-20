@@ -64,7 +64,7 @@ CREATE INDEX audit_log_action_ts ON audit_log(action, ts);
 
 INSERT INTO settings(key, value) VALUES
  ('file_sandbox_enabled',          'true'),
- ('file_sandbox_paths',             E'/tmp\n/var/log\n/etc/shepherd\n/etc/shepherd-xray\n/etc/systemd/system\n/Library/LaunchDaemons\n/usr/local/bin\n/home\n/Users\n/opt\n/srv'),
+ ('file_sandbox_paths',             E'/tmp\n/var/log\n/etc/shepherd\n/etc/shepherd-xray\n/etc/shepherd-singbox\n/etc/systemd/system\n/Library/LaunchDaemons\n/usr/local/bin\n/home\n/Users\n/opt\n/srv'),
  ('audit_retention_days',           '30'),
  ('pty_recording_enabled',          'true'),
  ('pty_max_concurrent_per_admin',   '5'),

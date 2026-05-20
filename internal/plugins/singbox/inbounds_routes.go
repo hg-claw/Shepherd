@@ -13,6 +13,14 @@ import (
 
 const clashAPIPort = 29090
 
+// asyncDeploy is the seam used by POST/PATCH/DELETE handlers to kick off
+// AssembleAndDeploy without blocking the HTTP response. Tests override it
+// with a no-op so they don't race against t.Cleanup closing the DB while
+// the background goroutine is mid-query (caught by `go test -race` in CI).
+var asyncDeploy = func(deps plugins.Deps, serverID int64) {
+	go func() { _ = AssembleAndDeploy(context.Background(), deps, serverID) }()
+}
+
 func isValidProtocol(p string) bool {
 	for _, v := range []string{
 		"vless-reality", "vless-ws-tls", "vless-h2-tls", "vless-httpupgrade-tls",
@@ -181,7 +189,7 @@ func postInboundHandler(deps plugins.Deps) http.HandlerFunc {
 			writeErr(w, 500, err.Error())
 			return
 		}
-		go func() { _ = AssembleAndDeploy(context.Background(), deps, body.ServerID) }()
+		asyncDeploy(deps, body.ServerID)
 		views, _ := store.ListAllWithUpstream(r.Context())
 		for _, v := range views {
 			if v.ID == id {
@@ -289,7 +297,7 @@ func patchInboundHandler(deps plugins.Deps) http.HandlerFunc {
 			writeErr(w, 500, err.Error())
 			return
 		}
-		go func() { _ = AssembleAndDeploy(context.Background(), deps, row.ServerID) }()
+		asyncDeploy(deps, row.ServerID)
 		views, _ := store.ListAllWithUpstream(r.Context())
 		for _, v := range views {
 			if v.ID == id {
@@ -333,7 +341,7 @@ func deleteInboundHandler(deps plugins.Deps) http.HandlerFunc {
 			writeErr(w, 500, err.Error())
 			return
 		}
-		go func() { _ = AssembleAndDeploy(context.Background(), deps, row.ServerID) }()
+		asyncDeploy(deps, row.ServerID)
 		w.WriteHeader(204)
 	}
 }

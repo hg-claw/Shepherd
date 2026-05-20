@@ -101,8 +101,13 @@ func postCertHandler(deps plugins.Deps) http.HandlerFunc {
 		// stderr so launchd / journalctl picks up the reason without
 		// having to query the DB. Pre-fix this swallowed errors
 		// silently and the row was never updated either.
+		//
+		// Capture issueFunc into a local before spawning so the
+		// goroutine doesn't race with tests that swap the package var
+		// via defer (caught by `go test -race`).
+		issue := issueFunc
 		go func() {
-			if err := issueFunc(context.Background(), certID, body.Domain, body.ChallengeType, body.Email); err != nil {
+			if err := issue(context.Background(), certID, body.Domain, body.ChallengeType, body.Email); err != nil {
 				log.Printf("singbox cert issue id=%d domain=%s challenge=%s: %v",
 					certID, body.Domain, body.ChallengeType, err)
 			} else {
@@ -182,8 +187,9 @@ func postCertRenewHandler(deps plugins.Deps) http.HandlerFunc {
 			writeErr(w, 404, "certificate not found")
 			return
 		}
+		renew := renewFunc // race-safe local copy; see postCertHandler note.
 		go func() {
-			if err := renewFunc(context.Background(), row.ID, row.Domain, row.ChallengeType, ""); err != nil {
+			if err := renew(context.Background(), row.ID, row.Domain, row.ChallengeType, ""); err != nil {
 				log.Printf("singbox cert renew id=%d domain=%s challenge=%s: %v",
 					row.ID, row.Domain, row.ChallengeType, err)
 			} else {

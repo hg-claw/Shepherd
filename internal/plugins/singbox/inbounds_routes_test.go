@@ -15,6 +15,12 @@ import (
 func newRouteDeps(t *testing.T) plugins.Deps {
 	t.Helper()
 	d := newDeployTestDB(t)
+	// Disable the production fire-and-forget AssembleAndDeploy goroutine
+	// for the duration of the test. The real one races against t.Cleanup
+	// closing the in-memory DB (caught by `go test -race`).
+	prev := asyncDeploy
+	asyncDeploy = func(_ plugins.Deps, _ int64) {}
+	t.Cleanup(func() { asyncDeploy = prev })
 	return plugins.Deps{DB: d, HostExec: &fakeSBHostExec{}}
 }
 

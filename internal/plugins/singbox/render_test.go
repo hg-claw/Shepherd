@@ -79,6 +79,12 @@ func TestRenderServerConfig_VlessRealityLanding(t *testing.T) {
 	if clashAPI["external_controller"] != "127.0.0.1:29090" {
 		t.Errorf("clash_api port: got %v", clashAPI["external_controller"])
 	}
+	// sing-box 1.12+ requires experimental.cache_file alongside clash_api
+	// for the HTTP server to actually bind.
+	cacheFile, ok := exp["cache_file"].(map[string]any)
+	if !ok || cacheFile["enabled"] != true {
+		t.Errorf("experimental.cache_file.enabled not true: got %v", exp["cache_file"])
+	}
 	route := out["route"].(map[string]any)
 	rules := route["rules"].([]any)
 	hasGeoIP := false

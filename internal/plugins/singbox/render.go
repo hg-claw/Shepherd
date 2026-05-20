@@ -79,10 +79,21 @@ func RenderServerConfig(inbounds []InboundView, certs []CertView) ([]byte, error
 
 	cfg := map[string]any{
 		"log": map[string]any{"level": "warn", "timestamp": true},
+		// DNS schema migrated to sing-box 1.12+ format (type+server fields).
+		// Legacy {address: "tls://..."} shape was deprecated and will be
+		// removed in 1.14.0. See https://sing-box.sagernet.org/migration/#migrate-to-new-dns-server-formats
 		"dns": map[string]any{
 			"servers": []any{
-				map[string]any{"tag": "dns-remote", "address": "tls://1.1.1.1", "detour": "direct"},
-				map[string]any{"tag": "dns-local", "address": "local", "detour": "direct"},
+				map[string]any{
+					"type":   "tls",
+					"tag":    "dns-remote",
+					"server": "1.1.1.1",
+					"detour": "direct",
+				},
+				map[string]any{
+					"type": "local",
+					"tag":  "dns-local",
+				},
 			},
 			"rules": []any{},
 			"final": "dns-remote",
@@ -94,7 +105,15 @@ func RenderServerConfig(inbounds []InboundView, certs []CertView) ([]byte, error
 			"final":                 "direct",
 			"auto_detect_interface": true,
 		},
+		// sing-box 1.12+ requires the experimental.cache_file block alongside
+		// clash_api for the HTTP server to actually bind external_controller.
+		// Without it the daemon parses the config cleanly but never listens,
+		// leaving the agent sampler with "connection refused" on 29090.
 		"experimental": map[string]any{
+			"cache_file": map[string]any{
+				"enabled": true,
+				"path":    "/etc/shepherd-singbox/cache.db",
+			},
 			"clash_api": map[string]any{
 				"external_controller": clashAPIAddr,
 				"secret":              "",

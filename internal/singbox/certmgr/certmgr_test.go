@@ -114,15 +114,20 @@ func TestManager_Issue_Success(t *testing.T) {
 	issuer := &fakeIssuer{}
 	mgr := newMgr(store, issuer, &stubCFToken{token: "tok"})
 
-	if err := mgr.Issue(context.Background(), "example.local", certmgr.HTTP01); err != nil {
+	const certID = int64(42)
+	if err := mgr.Issue(context.Background(), certID, "example.local", certmgr.HTTP01); err != nil {
 		t.Fatalf("Issue: %v", err)
 	}
 
-	// UpsertCert must have been called once with non-empty PEMs
+	// UpsertCert must have been called once with non-empty PEMs and the
+	// correct cert ID (regression: pre-fix this was hardcoded to 0).
 	if len(store.certCalls) != 1 {
 		t.Fatalf("expected 1 UpsertCert, got %d", len(store.certCalls))
 	}
 	c := store.certCalls[0]
+	if c.ID != certID {
+		t.Fatalf("UpsertCert ID = %d, want %d", c.ID, certID)
+	}
 	if c.CertPEM == "" || c.KeyPEM == "" {
 		t.Fatalf("PEMs not written: %+v", c)
 	}
@@ -147,12 +152,15 @@ func TestManager_Issue_Failure(t *testing.T) {
 	issuer := &fakeIssuer{err: errors.New("acme: connection refused")}
 	mgr := newMgr(store, issuer, &stubCFToken{token: "tok"})
 
-	err := mgr.Issue(context.Background(), "bad.local", certmgr.HTTP01)
+	const certID = int64(99)
+	err := mgr.Issue(context.Background(), certID, "bad.local", certmgr.HTTP01)
 	if err == nil {
 		t.Fatal("expected error from Issue, got nil")
 	}
 
-	// Must have a 'failed' status call with last_error set
+	// Must have a 'failed' status call with last_error set AND the
+	// correct cert ID (regression: pre-fix this was hardcoded to 0,
+	// so the row never got the error message).
 	var failedCall *certmgr.UpsertStatusCall
 	for i := range store.statusCalls {
 		if store.statusCalls[i].Status == "failed" {
@@ -162,6 +170,9 @@ func TestManager_Issue_Failure(t *testing.T) {
 	}
 	if failedCall == nil {
 		t.Fatalf("no 'failed' UpsertStatus call; got: %+v", store.statusCalls)
+	}
+	if failedCall.ID != certID {
+		t.Fatalf("failed UpsertStatus ID = %d, want %d", failedCall.ID, certID)
 	}
 	if failedCall.LastErr == nil || *failedCall.LastErr == "" {
 		t.Fatalf("last_error not set in failed call: %+v", failedCall)
@@ -182,7 +193,7 @@ func TestManager_Renew(t *testing.T) {
 
 	const domain = "renew.local"
 	// First issue to get cert ID baseline.
-	if err := mgr.Issue(context.Background(), domain, certmgr.DNS01CF); err != nil {
+	if err := mgr.Issue(context.Background(), 7, domain, certmgr.DNS01CF); err != nil {
 		t.Fatalf("Issue: %v", err)
 	}
 	initialCalls := int64(issuer.callCount.Load())
@@ -244,7 +255,8 @@ func TestManager_Issue_RequiresCFTokenForDNS01(t *testing.T) {
 	issuer := &fakeIssuer{}
 	mgr := newMgr(store, issuer, &emptyCFToken{})
 
-	err := mgr.Issue(context.Background(), "dns.local", certmgr.DNS01CF)
+	const certID = int64(13)
+	err := mgr.Issue(context.Background(), certID, "dns.local", certmgr.DNS01CF)
 	if err == nil {
 		t.Fatal("expected error when CF token is empty for DNS01CF, got nil")
 	}
@@ -252,5 +264,24 @@ func TestManager_Issue_RequiresCFTokenForDNS01(t *testing.T) {
 	// No cert should have been written.
 	if len(store.certCalls) != 0 {
 		t.Fatalf("expected 0 UpsertCert calls, got %d", len(store.certCalls))
+	}
+
+	// But last_error must be populated against certID so the UI
+	// surfaces "missing Cloudflare token" instead of a stuck 'issuing'.
+	var failed *certmgr.UpsertStatusCall
+	for i := range store.statusCalls {
+		if store.statusCalls[i].Status == "failed" {
+			failed = &store.statusCalls[i]
+			break
+		}
+	}
+	if failed == nil {
+		t.Fatalf("expected a 'failed' UpsertStatus call; got: %+v", store.statusCalls)
+	}
+	if failed.ID != certID {
+		t.Fatalf("failed UpsertStatus ID = %d, want %d", failed.ID, certID)
+	}
+	if failed.LastErr == nil || *failed.LastErr == "" {
+		t.Fatalf("last_error not set: %+v", failed)
 	}
 }

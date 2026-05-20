@@ -102,44 +102,55 @@ func NewManager(cfg Config) *Manager {
 }
 
 // Issue requests a new certificate for domain using the given challenge type
-// and stores the PEM pair via the Store interface.
-// The domain row must already exist in singbox_certificates before calling
-// Issue (the caller is responsible for inserting the row first).
-func (m *Manager) Issue(ctx context.Context, domain string, challenge ChallengeType) error {
-	// Validate CF token before touching the issuer.
+// and stores the PEM pair via the Store interface against certID. The row
+// must already exist in singbox_certificates (the route handler creates it
+// with status='issuing' before kicking off async Issue).
+//
+// On any failure path Issue calls UpsertStatus(certID, "failed", &errMsg)
+// so the UI can surface the reason — this is what makes the "no info"
+// case visible. Pre-fix, certID was hardcoded to 0 and the row was
+// never updated.
+func (m *Manager) Issue(ctx context.Context, certID int64, domain string, challenge ChallengeType) error {
+	// Validate CF token before touching the issuer. Pre-issuer failures
+	// (missing token, bad provider) get reflected to the DB row too.
 	var cfToken string
 	if challenge == DNS01CF {
 		if m.cfg.CFTokenProvider == nil {
-			return fmt.Errorf("certmgr: DNS01CF challenge requires a CFTokenProvider")
+			return m.fail(ctx, certID, domain, fmt.Errorf("DNS01CF challenge requires a CFTokenProvider"))
 		}
 		tok, err := m.cfg.CFTokenProvider.Token(ctx)
 		if err != nil {
-			return fmt.Errorf("certmgr: fetch CF token: %w", err)
+			return m.fail(ctx, certID, domain, fmt.Errorf("fetch CF token: %w", err))
 		}
 		if tok == "" {
-			return fmt.Errorf("certmgr: DNS01CF challenge requires a non-empty Cloudflare API token")
+			return m.fail(ctx, certID, domain, fmt.Errorf("DNS01CF challenge requires a non-empty Cloudflare API token (enable & configure the cloudflare plugin)"))
 		}
 		cfToken = tok
 	}
 
 	certPEM, keyPEM, expiresAt, err := m.issuer.Obtain(ctx, domain, challenge, cfToken, m.cfg.Email)
 	if err != nil {
-		msg := err.Error()
-		// Best-effort status update — ignore secondary error.
-		_ = m.cfg.Store.UpsertStatus(ctx, 0, "failed", &msg)
-		return fmt.Errorf("certmgr: issue %s: %w", domain, err)
+		return m.fail(ctx, certID, domain, fmt.Errorf("obtain: %w", err))
 	}
 
-	if err := m.cfg.Store.UpsertCert(ctx, 0, string(certPEM), string(keyPEM), expiresAt); err != nil {
-		return fmt.Errorf("certmgr: store cert for %s: %w", domain, err)
+	if err := m.cfg.Store.UpsertCert(ctx, certID, string(certPEM), string(keyPEM), expiresAt); err != nil {
+		return m.fail(ctx, certID, domain, fmt.Errorf("store cert: %w", err))
 	}
 	return nil
+}
+
+// fail records a failure against the cert row and returns the wrapped error.
+// Used by every error path in Issue so last_error is always populated.
+func (m *Manager) fail(ctx context.Context, certID int64, domain string, err error) error {
+	msg := err.Error()
+	_ = m.cfg.Store.UpsertStatus(ctx, certID, "failed", &msg)
+	return fmt.Errorf("certmgr: issue %s: %w", domain, err)
 }
 
 // Renew re-issues the certificate identified by certID / domain.
 // It delegates to Issue which updates the existing DB row.
 func (m *Manager) Renew(ctx context.Context, certID int64, domain string, challenge ChallengeType) error {
-	return m.Issue(ctx, domain, challenge)
+	return m.Issue(ctx, certID, domain, challenge)
 }
 
 // RunRenewalLoop starts a blocking renewal loop that ticks every interval.

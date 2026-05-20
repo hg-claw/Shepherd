@@ -223,13 +223,16 @@ func main() {
 	go sbCertMgr.RunRenewalLoop(rootCtx, 24*time.Hour)
 
 	// Wire real issue / renew implementations into the cert HTTP handlers.
+	// certID must reach Manager so it can write back to the right row —
+	// dropping it (the pre-fix behaviour) left every cert stuck at
+	// status='issuing' with empty last_error.
 	singboxplugin.SetCertFuncs(
-		func(ctx context.Context, certID int64, domain, challengeType, email string) error {
+		func(ctx context.Context, certID int64, domain, challengeType, _ string) error {
 			ch := certmgr.HTTP01
 			if challengeType == "dns-01-cf" {
 				ch = certmgr.DNS01CF
 			}
-			return sbCertMgr.Issue(ctx, domain, ch)
+			return sbCertMgr.Issue(ctx, certID, domain, ch)
 		},
 		func(ctx context.Context, certID int64, domain, challengeType, _ string) error {
 			ch := certmgr.HTTP01

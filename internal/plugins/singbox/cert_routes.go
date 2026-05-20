@@ -3,6 +3,7 @@ package singbox
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -95,9 +96,18 @@ func postCertHandler(deps plugins.Deps) http.HandlerFunc {
 			return
 		}
 
-		// Async ACME issuance.
+		// Async ACME issuance. issueFunc updates the DB row's status/
+		// last_error on its own; we additionally log to the server's
+		// stderr so launchd / journalctl picks up the reason without
+		// having to query the DB. Pre-fix this swallowed errors
+		// silently and the row was never updated either.
 		go func() {
-			_ = issueFunc(context.Background(), certID, body.Domain, body.ChallengeType, body.Email)
+			if err := issueFunc(context.Background(), certID, body.Domain, body.ChallengeType, body.Email); err != nil {
+				log.Printf("singbox cert issue id=%d domain=%s challenge=%s: %v",
+					certID, body.Domain, body.ChallengeType, err)
+			} else {
+				log.Printf("singbox cert issued id=%d domain=%s", certID, body.Domain)
+			}
 		}()
 
 		writeJSON(w, 202, map[string]any{"id": certID})
@@ -173,7 +183,12 @@ func postCertRenewHandler(deps plugins.Deps) http.HandlerFunc {
 			return
 		}
 		go func() {
-			_ = renewFunc(context.Background(), row.ID, row.Domain, row.ChallengeType, "")
+			if err := renewFunc(context.Background(), row.ID, row.Domain, row.ChallengeType, ""); err != nil {
+				log.Printf("singbox cert renew id=%d domain=%s challenge=%s: %v",
+					row.ID, row.Domain, row.ChallengeType, err)
+			} else {
+				log.Printf("singbox cert renewed id=%d domain=%s", row.ID, row.Domain)
+			}
 		}()
 		writeJSON(w, 202, map[string]any{"ok": true})
 	}

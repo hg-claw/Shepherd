@@ -9,6 +9,7 @@ const (
 	TypePong         = "pong"
 	TypeHeartbeat    = "heartbeat"
 	TypeTelemetry    = "telemetry"
+	TypeXrayTraffic  = "xray.traffic"
 )
 
 // ConfigUpdate is a full snapshot pushed by the server to an agent. Each field
@@ -86,4 +87,19 @@ type AutoRegisterRequest struct {
 	Kernel         string        `json:"kernel"`
 	AgentVersion   string        `json:"agent_version"`
 	IPCandidates   []IPCandidate `json:"ip_candidates,omitempty"`
+}
+
+// XrayTrafficSample is a single (tag, kind) traffic delta for one 30s window.
+type XrayTrafficSample struct {
+	Tag       string    `json:"tag"`        // e.g. "vless-reality-8443"
+	Kind      string    `json:"kind"`       // "inbound" | "outbound"
+	TS        time.Time `json:"ts"`         // sample timestamp, UTC
+	BytesUp   int64     `json:"bytes_up"`   // uplink delta bytes
+	BytesDown int64     `json:"bytes_down"` // downlink delta bytes
+}
+
+// XrayTrafficBatch is the payload of a TypeXrayTraffic envelope.
+// One batch is sent per 30s tick and covers all observed tags.
+type XrayTrafficBatch struct {
+	Samples []XrayTrafficSample `json:"samples"`
 }

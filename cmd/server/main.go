@@ -67,6 +67,8 @@ func main() {
 	hub := agentsvc.NewHub()
 	tQuery := &telemetrysvc.Query{DB: d}
 	tIngest := &telemetrysvc.Ingest{DB: d}
+	trafficRollup := &telemetrysvc.TrafficRollup{DB: d}
+	go trafficRollup.Run(rootCtx)
 
 	reg := sessionmux.New()
 	auditW := &audit.Writer{DB: d, Now: time.Now}

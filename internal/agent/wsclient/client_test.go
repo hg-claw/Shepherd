@@ -46,6 +46,13 @@ func TestAcquireToken_AutoRegisterFlow(t *testing.T) {
 	}
 }
 
+func TestClient_TrafficSamplerField_Compiles(t *testing.T) {
+	c := &Client{}
+	// Just verify the field exists and accepts a *xraysampler.Sampler
+	// (compilation test — no runtime assertions needed here)
+	_ = c.TrafficSampler
+}
+
 func TestPostJSON_PermanentOn401(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no", http.StatusUnauthorized)

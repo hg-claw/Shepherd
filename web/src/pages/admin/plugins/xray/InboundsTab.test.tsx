@@ -46,6 +46,7 @@ vi.mock('@/api/plugins', async () => {
       { id: 1, server_id: 10, config: {}, deployed_version: '1.8.11', status: 'running', last_error: null, updated_at: '' },
       { id: 2, server_id: 20, config: {}, deployed_version: '1.8.11', status: 'running', last_error: null, updated_at: '' },
     ]),
+    fetchXrayTrafficBatch: vi.fn().mockResolvedValue({ resolution: 'raw', series: [] }),
   }
 })
 
@@ -64,6 +65,8 @@ describe('InboundsTab', () => {
     expect(screen.getByText('relay-cc')).toBeInTheDocument()
     // Relay row shows upstream tag@server
     expect(screen.getByText(/landing-aa.*tokyo-1|tokyo-1.*landing-aa/)).toBeInTheDocument()
+    // Traffic column header is rendered
+    expect(screen.getAllByText(/traffic/i).length).toBeGreaterThan(0)
   })
 
   it('disables Delete on landing-aa because relay-cc depends on it', async () => {

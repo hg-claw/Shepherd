@@ -19,6 +19,7 @@ import (
 	"github.com/hg-claw/Shepherd/internal/agent/netinfo"
 	"github.com/hg-claw/Shepherd/internal/agent/ptyrunner"
 	"github.com/hg-claw/Shepherd/internal/agent/state"
+	"github.com/hg-claw/Shepherd/internal/agent/xraysampler"
 	"github.com/hg-claw/Shepherd/internal/agentapi"
 	"github.com/hg-claw/Shepherd/internal/agentconfig"
 )
@@ -31,6 +32,9 @@ type Client struct {
 	HTTPClient *http.Client
 	OnConfig   func(int) // called when server pushes config.update
 	Hostname   string
+
+	// TrafficSampler, if non-nil, is started as a goroutine after each WS connect.
+	TrafficSampler *xraysampler.Sampler
 
 	mu      sync.Mutex
 	conn    *websocket.Conn
@@ -201,6 +205,18 @@ func (c *Client) dialAndRun(ctx context.Context) error {
 	stop := make(chan struct{})
 	defer close(stop)
 	go c.heartbeatLoop(stop)
+	if c.TrafficSampler != nil {
+		samplerCtx, samplerCancel := context.WithCancel(ctx)
+		go func() {
+			select {
+			case <-stop:
+				samplerCancel()
+			case <-ctx.Done():
+				samplerCancel()
+			}
+		}()
+		go c.TrafficSampler.Run(samplerCtx)
+	}
 	// Close the connection when ctx is done so ReadMessage unblocks immediately.
 	go func() {
 		select {

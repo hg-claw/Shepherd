@@ -33,6 +33,17 @@ export const PluginRegistry: Record<string, PluginUIEntry> = {
       { key: 'activity', label: 'Activity' },
     ],
   },
+  singbox: {
+    module: () => import('./singbox'),
+    tabs: [
+      { key: 'config',       label: 'Config' },
+      { key: 'inbounds',     label: 'Inbounds' },
+      { key: 'certificates', label: 'Certificates' },
+      { key: 'traffic',      label: 'Traffic' },
+      { key: 'events',       label: 'Events' },
+      { key: 'logs',         label: 'Logs' },
+    ],
+  },
 }
 
 export const lazyPluginPage = (id: string) => {

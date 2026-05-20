@@ -30,3 +30,29 @@ func TestXrayTrafficBatch_RoundTrip(t *testing.T) {
 		t.Errorf("BytesUp = %d, want 102400", got.Samples[0].BytesUp)
 	}
 }
+
+func TestSingboxTrafficBatch_RoundTrip(t *testing.T) {
+	batch := SingboxTrafficBatch{
+		Samples: []SingboxTrafficSample{
+			{Tag: "landing-aabb1122", Kind: "landing", TS: time.Date(2026, 5, 20, 10, 0, 30, 0, time.UTC), BytesUp: 204800, BytesDown: 1048576},
+			{Tag: "relay-ccdd3344", Kind: "relay", TS: time.Date(2026, 5, 20, 10, 0, 30, 0, time.UTC), BytesUp: 1024, BytesDown: 512},
+		},
+	}
+	env, err := Frame(TypeSingboxTraffic, batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if env.Type != TypeSingboxTraffic {
+		t.Errorf("type = %q, want %q", env.Type, TypeSingboxTraffic)
+	}
+	var got SingboxTrafficBatch
+	if err := env.Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Samples) != 2 {
+		t.Fatalf("samples = %d, want 2", len(got.Samples))
+	}
+	if got.Samples[0].BytesUp != 204800 {
+		t.Errorf("BytesUp = %d, want 204800", got.Samples[0].BytesUp)
+	}
+}

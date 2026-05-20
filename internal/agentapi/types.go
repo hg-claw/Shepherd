@@ -10,6 +10,7 @@ const (
 	TypeHeartbeat    = "heartbeat"
 	TypeTelemetry    = "telemetry"
 	TypeXrayTraffic  = "xray.traffic"
+	TypeSingboxTraffic = "singbox.traffic"
 )
 
 // ConfigUpdate is a full snapshot pushed by the server to an agent. Each field
@@ -102,4 +103,19 @@ type XrayTrafficSample struct {
 // One batch is sent per 30s tick and covers all observed tags.
 type XrayTrafficBatch struct {
 	Samples []XrayTrafficSample `json:"samples"`
+}
+
+// SingboxTrafficSample is a per-inbound-tag traffic delta for one 30s window.
+// Kind mirrors the inbound role: "landing" or "relay".
+type SingboxTrafficSample struct {
+	Tag       string    `json:"tag"`        // e.g. "landing-aabb1122"
+	Kind      string    `json:"kind"`       // "landing" | "relay"
+	TS        time.Time `json:"ts"`         // sample timestamp, UTC
+	BytesUp   int64     `json:"bytes_up"`
+	BytesDown int64     `json:"bytes_down"`
+}
+
+// SingboxTrafficBatch is the payload of a TypeSingboxTraffic envelope.
+type SingboxTrafficBatch struct {
+	Samples []SingboxTrafficSample `json:"samples"`
 }

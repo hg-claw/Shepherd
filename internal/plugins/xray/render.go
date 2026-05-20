@@ -64,14 +64,25 @@ func RenderServerConfig(inbounds []InboundView) ([]byte, error) {
 	cfg["inbounds"] = inboundsJSON
 	cfg["outbounds"] = outboundsList
 
+	// The api inbound (injected by injectStatsAndAPI below) requires an
+	// explicit routing rule that maps its tag to the api outbound the xray
+	// `api` block creates internally. Without this rule xray rejects the
+	// config at startup → the daemon never binds APIPort → the sampler's
+	// gRPC call fails with "failed to dial 127.0.0.1:28085". Always emit
+	// this rule, even when there are no relay rules.
+	routingRules = append(routingRules, map[string]any{
+		"type":        "field",
+		"inboundTag":  []any{apiInboundTag},
+		"outboundTag": apiInboundTag,
+	})
 	if hasRelay {
 		routingRules = append(routingRules, map[string]any{
 			"type":        "field",
 			"ip":          []any{"geoip:private"},
 			"outboundTag": "freedom",
 		})
-		cfg["routing"] = map[string]any{"rules": routingRules}
 	}
+	cfg["routing"] = map[string]any{"rules": routingRules}
 	injectStatsAndAPI(cfg)
 	return json.MarshalIndent(cfg, "", "  ")
 }

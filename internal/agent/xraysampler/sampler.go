@@ -135,10 +135,16 @@ func (s *Sampler) tick(_ context.Context) {
 	s.prev = cur
 }
 
-// queryStatsViaCLI runs `xray api statsquery` against the xray stats TCP
-// inbound and returns a map of directional counters keyed by statKey.
+// xrayBinaryPath is the canonical install path used by the xray plugin's
+// Pusher.DeployService (see internal/plugins/xray/xray.go). Using the full
+// path avoids depending on PATH and matches the file the plugin pushes.
+const xrayBinaryPath = "/usr/local/bin/shepherd-xray"
+
+// queryStatsViaCLI runs `shepherd-xray api statsquery` against the xray
+// stats TCP inbound and returns a map of directional counters keyed by
+// statKey.
 func queryStatsViaCLI(address string) (map[statKey]int64, error) {
-	out, err := exec.Command("xray", "api", "statsquery",
+	out, err := exec.Command(xrayBinaryPath, "api", "statsquery",
 		fmt.Sprintf("--server=%s", address),
 		"--reset=false",
 		"--pattern=",

@@ -86,6 +86,10 @@ func TestRenderServerConfig_VlessRealityLanding(t *testing.T) {
 		t.Errorf("experimental.cache_file.enabled not true: got %v", exp["cache_file"])
 	}
 	route := out["route"].(map[string]any)
+	// sing-box 1.13 FATAL-rejects configs missing route.default_domain_resolver.
+	if route["default_domain_resolver"] != "dns-remote" {
+		t.Errorf("route.default_domain_resolver = %v, want \"dns-remote\"", route["default_domain_resolver"])
+	}
 	rules := route["rules"].([]any)
 	hasGeoIP := false
 	for _, r := range rules {

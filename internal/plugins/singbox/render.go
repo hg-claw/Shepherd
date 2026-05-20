@@ -100,10 +100,14 @@ func RenderServerConfig(inbounds []InboundView, certs []CertView) ([]byte, error
 		},
 		"inbounds":  inboundsJSON,
 		"outbounds": outbounds,
+		// sing-box 1.13 made the missing route.default_domain_resolver a
+		// FATAL startup error (was a deprecation warning in 1.12). Point
+		// to our dns-remote tag so outbound dial() can resolve hostnames.
 		"route": map[string]any{
-			"rules":                 routeRules,
-			"final":                 "direct",
-			"auto_detect_interface": true,
+			"rules":                   routeRules,
+			"final":                   "direct",
+			"auto_detect_interface":   true,
+			"default_domain_resolver": "dns-remote",
 		},
 		// sing-box 1.12+ requires the experimental.cache_file block alongside
 		// clash_api for the HTTP server to actually bind external_controller.

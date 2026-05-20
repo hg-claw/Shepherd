@@ -65,8 +65,10 @@ describe('InboundsTab', () => {
     expect(screen.getByText('relay-cc')).toBeInTheDocument()
     // Relay row shows upstream tag@server
     expect(screen.getByText(/landing-aa.*tokyo-1|tokyo-1.*landing-aa/)).toBeInTheDocument()
-    // Traffic column header is rendered
-    expect(screen.getAllByText(/traffic/i).length).toBeGreaterThan(0)
+    // Traffic now lives in its own tab — InboundsTab has no traffic column.
+    // Active/idle dot is rendered per-row (title attribute carries the label).
+    const landingRow = screen.getByText('landing-aa').closest('tr')!
+    expect(landingRow.querySelector('span[title*="active"], span[title*="idle"]')).toBeTruthy()
   })
 
   it('disables Delete on landing-aa because relay-cc depends on it', async () => {

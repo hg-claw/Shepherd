@@ -18,6 +18,7 @@ export const PluginRegistry: Record<string, PluginUIEntry> = {
     tabs: [
       { key: 'config',   label: 'Config' },
       { key: 'inbounds', label: 'Inbounds' },
+      { key: 'traffic',  label: 'Traffic' },
       { key: 'events',   label: 'Events' },
       { key: 'logs',   label: 'Logs' },
     ],

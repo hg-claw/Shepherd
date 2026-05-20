@@ -8,8 +8,6 @@ import { copyText } from '@/lib/clipboard'
 import { buildShareURL } from './templates'
 import InboundDialog from './InboundDialog'
 import BulkRelayDialog from './BulkRelayDialog'
-import TrafficDrawer from './TrafficDrawer'
-import { Sparkline } from '@/components/Sparkline'
 import {
   listXrayInbounds, deleteXrayInbound, listPluginHosts, patchXrayServerVersion,
   fetchXrayTrafficBatch,
@@ -85,35 +83,35 @@ export default function InboundsTab() {
     return m
   }, [inboundsQ.data])
 
-  // Use first server's batch query as a representative (traffic is per-server).
-  // We issue one query per server section inside the render; instead, we aggregate
-  // across all servers into a single map keyed by tag (tags are unique across servers).
-  const trafficQueries = useQuery({
-    queryKey: ['xray-traffic-batch-all', allTags.join(',')],
+  // Active/idle detection: an inbound is "active" when at least one sample in
+  // the last ~2 minutes has bytes > 0. We only need a binary signal here, not
+  // a full sparkline (the Traffic tab handles that). Small window keeps the
+  // query cheap and the indicator responsive.
+  const activeByTag = useQuery({
+    queryKey: ['xray-traffic-active', allTags.join(',')],
     queryFn: async () => {
       const now = new Date()
-      const from = new Date(now.getTime() - 60 * 60 * 1000).toISOString()
+      const from = new Date(now.getTime() - 2 * 60 * 1000).toISOString()
       const to = now.toISOString()
       const results = await Promise.all(
         Array.from(tagsByServer.entries()).map(([serverID, tags]) =>
           fetchXrayTrafficBatch({ server_id: serverID, tags, kind: 'inbound', from, to, resolution: 'raw' })
         )
       )
-      const sparklineByTag = new Map<string, number[]>()
+      const active = new Map<string, boolean>()
       for (const res of results) {
         for (const series of res.series ?? []) {
-          sparklineByTag.set(series.tag, series.points.map((p) => p.bytes_up + p.bytes_down))
+          const hasTraffic = series.points.some((p) => p.bytes_up + p.bytes_down > 0)
+          active.set(series.tag, hasTraffic)
         }
       }
-      return sparklineByTag
+      return active
     },
     enabled: allTags.length > 0,
     refetchInterval: 30_000,
   })
 
-  const sparklineByTag: Map<string, number[]> = trafficQueries.data ?? new Map()
-
-  const [trafficFor, setTrafficFor] = useState<{ serverID: number; tag: string } | null>(null)
+  const activeMap: Map<string, boolean> = activeByTag.data ?? new Map()
 
   const [dialog, setDialog] = useState<
     { kind: 'new'; serverID?: number } |
@@ -167,13 +165,12 @@ export default function InboundsTab() {
                   <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Role</th>
                   <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Protocol</th>
                   <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Port</th>
-                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Traffic</th>
                   <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {inbounds.length === 0 && (
-                  <tr><td colSpan={6} className="px-3 py-4 text-center text-muted-foreground text-[12.5px]">
+                  <tr><td colSpan={5} className="px-3 py-4 text-center text-muted-foreground text-[12.5px]">
                     No inbounds on this server.
                   </td></tr>
                 )}
@@ -190,7 +187,20 @@ export default function InboundsTab() {
                     : null
                   return (
                     <tr key={i.id} className="border-t">
-                      <td className="px-3 py-2 font-mono">{i.tag}</td>
+                      <td className="px-3 py-2 font-mono">
+                        {(() => {
+                          const isActive = activeMap.get(i.tag) === true
+                          return (
+                            <span
+                              className={`inline-block w-1.5 h-1.5 rounded-full mr-2 align-middle ${
+                                isActive ? 'bg-emerald-500' : 'bg-fg-dim/40'
+                              }`}
+                              title={isActive ? 'active (traffic in last 2 min)' : 'idle (no recent traffic)'}
+                            />
+                          )
+                        })()}
+                        {i.tag}
+                      </td>
                       <td className="px-3 py-2">
                         {isLanding
                           ? <Pill kind="neutral">landing</Pill>
@@ -203,25 +213,6 @@ export default function InboundsTab() {
                       </td>
                       <td className="px-3 py-2 font-mono text-[12.5px]">{i.protocol}</td>
                       <td className="px-3 py-2 font-mono text-[12.5px]">{i.port}</td>
-                      <td className="px-3 py-2">
-                        {(() => {
-                          const values = sparklineByTag.get(i.tag) ?? []
-                          return (
-                            <button
-                              className="flex items-center gap-2 hover:opacity-70 transition-opacity text-fg-dim hover:text-fg text-[11.5px]"
-                              title="查看流量详情"
-                              onClick={() => setTrafficFor({ serverID: s.id, tag: i.tag })}
-                            >
-                              {values.length >= 2 ? (
-                                <Sparkline values={values} width={80} height={24} className="text-primary" />
-                              ) : (
-                                <span className="font-mono inline-block w-[80px] text-center">—</span>
-                              )}
-                              <span className="underline">view</span>
-                            </button>
-                          )
-                        })()}
-                      </td>
                       <td className="px-3 py-2 text-right whitespace-nowrap">
                         <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
                           disabled={!shareURL}
@@ -286,15 +277,6 @@ export default function InboundsTab() {
           onOpenChange={(open: boolean) => { if (!open) setDialog(null) }}
           landingInbound={dialog.landing}
           allInbounds={inboundsQ.data ?? []}
-        />
-      )}
-      {trafficFor && (
-        <TrafficDrawer
-          open={true}
-          onOpenChange={(open) => { if (!open) setTrafficFor(null) }}
-          serverID={trafficFor.serverID}
-          tag={trafficFor.tag}
-          kind="inbound"
         />
       )}
     </div>

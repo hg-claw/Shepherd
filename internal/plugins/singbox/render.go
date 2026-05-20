@@ -82,13 +82,17 @@ func RenderServerConfig(inbounds []InboundView, certs []CertView) ([]byte, error
 		// DNS schema migrated to sing-box 1.12+ format (type+server fields).
 		// Legacy {address: "tls://..."} shape was deprecated and will be
 		// removed in 1.14.0. See https://sing-box.sagernet.org/migration/#migrate-to-new-dns-server-formats
+		// No detour: in sing-box 1.13 a `detour` pointing at the empty
+		// {type:"direct", tag:"direct"} outbound is rejected ("makes no
+		// sense"). Omitting detour lets the DoT connection use the
+		// system's default network — exactly what we want for the
+		// resolver itself (otherwise we'd risk DNS-via-proxy loops).
 		"dns": map[string]any{
 			"servers": []any{
 				map[string]any{
 					"type":   "tls",
 					"tag":    "dns-remote",
 					"server": "1.1.1.1",
-					"detour": "direct",
 				},
 				map[string]any{
 					"type": "local",

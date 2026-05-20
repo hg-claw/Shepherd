@@ -204,18 +204,23 @@ export default function InboundsTab() {
                       <td className="px-3 py-2 font-mono text-[12.5px]">{i.protocol}</td>
                       <td className="px-3 py-2 font-mono text-[12.5px]">{i.port}</td>
                       <td className="px-3 py-2">
-                        <button
-                          className="flex items-center gap-1 hover:opacity-70 transition-opacity"
-                          title="查看流量详情"
-                          onClick={() => setTrafficFor({ serverID: s.id, tag: i.tag })}
-                        >
-                          <Sparkline
-                            values={sparklineByTag.get(i.tag) ?? []}
-                            width={80}
-                            height={24}
-                            className="text-primary"
-                          />
-                        </button>
+                        {(() => {
+                          const values = sparklineByTag.get(i.tag) ?? []
+                          return (
+                            <button
+                              className="flex items-center gap-2 hover:opacity-70 transition-opacity text-fg-dim hover:text-fg text-[11.5px]"
+                              title="查看流量详情"
+                              onClick={() => setTrafficFor({ serverID: s.id, tag: i.tag })}
+                            >
+                              {values.length >= 2 ? (
+                                <Sparkline values={values} width={80} height={24} className="text-primary" />
+                              ) : (
+                                <span className="font-mono inline-block w-[80px] text-center">—</span>
+                              )}
+                              <span className="underline">view</span>
+                            </button>
+                          )
+                        })()}
                       </td>
                       <td className="px-3 py-2 text-right whitespace-nowrap">
                         <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"

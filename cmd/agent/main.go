@@ -11,6 +11,7 @@ import (
 
 	"github.com/hg-claw/Shepherd/internal/agent/collector"
 	"github.com/hg-claw/Shepherd/internal/agent/fingerprint"
+	"github.com/hg-claw/Shepherd/internal/agent/singboxsampler"
 	"github.com/hg-claw/Shepherd/internal/agent/state"
 	"github.com/hg-claw/Shepherd/internal/agent/wsclient"
 	"github.com/hg-claw/Shepherd/internal/agent/xraysampler"
@@ -59,6 +60,13 @@ func main() {
 		Send:       client.Send,
 	}
 	client.TrafficSampler = trafficSampler
+
+	singboxSampler := &singboxsampler.Sampler{
+		APIAddress: "127.0.0.1:29090",
+		Interval:   30 * time.Second,
+		Send:       client.Send,
+	}
+	client.SingboxTrafficSampler = singboxSampler
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()

@@ -18,6 +18,7 @@ import (
 	"github.com/hg-claw/Shepherd/internal/agent/filehandler"
 	"github.com/hg-claw/Shepherd/internal/agent/netinfo"
 	"github.com/hg-claw/Shepherd/internal/agent/ptyrunner"
+	"github.com/hg-claw/Shepherd/internal/agent/singboxsampler"
 	"github.com/hg-claw/Shepherd/internal/agent/state"
 	"github.com/hg-claw/Shepherd/internal/agent/xraysampler"
 	"github.com/hg-claw/Shepherd/internal/agentapi"
@@ -35,6 +36,9 @@ type Client struct {
 
 	// TrafficSampler, if non-nil, is started as a goroutine after each WS connect.
 	TrafficSampler *xraysampler.Sampler
+
+	// SingboxTrafficSampler, if non-nil, is started as a goroutine after each WS connect.
+	SingboxTrafficSampler *singboxsampler.Sampler
 
 	mu      sync.Mutex
 	conn    *websocket.Conn
@@ -216,6 +220,18 @@ func (c *Client) dialAndRun(ctx context.Context) error {
 			}
 		}()
 		go c.TrafficSampler.Run(samplerCtx)
+	}
+	if c.SingboxTrafficSampler != nil {
+		sbCtx, sbCancel := context.WithCancel(ctx)
+		go func() {
+			select {
+			case <-stop:
+				sbCancel()
+			case <-ctx.Done():
+				sbCancel()
+			}
+		}()
+		go c.SingboxTrafficSampler.Run(sbCtx)
 	}
 	// Close the connection when ctx is done so ReadMessage unblocks immediately.
 	go func() {

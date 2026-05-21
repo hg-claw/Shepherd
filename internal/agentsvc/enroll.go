@@ -104,6 +104,35 @@ func (s *Service) RedeemEnrollment(ctx context.Context, enrollmentToken, fingerp
 	return machine, serverID, nil
 }
 
+// LookupEnrollment resolves a token to a server_id without consuming it.
+// Tolerates tokens that have been consumed up to 24h ago so the install
+// script can poll /api/agent/status after the agent has already enrolled.
+// Returns ErrInvalidEnrollment for unknown / expired / older-than-24h-consumed tokens.
+func (s *Service) LookupEnrollment(ctx context.Context, token string) (int64, error) {
+	var (
+		serverID   int64
+		expiresAt  time.Time
+		consumedAt sql.NullTime
+	)
+	err := s.DB.QueryRowContext(ctx,
+		"SELECT server_id, expires_at, consumed_at FROM enrollment_tokens WHERE token=$1",
+		token).Scan(&serverID, &expiresAt, &consumedAt)
+	if err == sql.ErrNoRows {
+		return 0, ErrInvalidEnrollment
+	}
+	if err != nil {
+		return 0, err
+	}
+	now := time.Now().UTC()
+	if !consumedAt.Valid && now.After(expiresAt) {
+		return 0, ErrInvalidEnrollment
+	}
+	if consumedAt.Valid && now.Sub(consumedAt.Time.UTC()) > 24*time.Hour {
+		return 0, ErrInvalidEnrollment
+	}
+	return serverID, nil
+}
+
 // AuthenticateMachineToken returns server_id for a valid machine_token, or error.
 func (s *Service) AuthenticateMachineToken(ctx context.Context, token string) (int64, error) {
 	var sid int64

@@ -222,6 +222,62 @@ if [ "${1:-}" = "--source" ]; then
 	return 0 2>/dev/null || exit 0
 fi
 
-# --- Main (placeholder until later tasks) ---------------------------------
-err "install body not implemented yet"
-exit 99
+# --- Healthcheck -----------------------------------------------------------
+
+await_online() {
+	local end=$(($(date +%s) + HEALTHCHECK_TIMEOUT))
+	while [ "$(date +%s)" -lt "$end" ]; do
+		local body
+		body=$(curl -fsSL "${SERVER_URL}/api/agent/status?token=${TOKEN}" 2>/dev/null || true)
+		case "$body" in
+			*'"online":true'*) return 0 ;;
+		esac
+		sleep "$HEALTHCHECK_INTERVAL"
+	done
+	err "agent did not connect within ${HEALTHCHECK_TIMEOUT}s"
+	echo "--- last 20 lines of $LOG_FILE ---"
+	tail -n 20 "$LOG_FILE" 2>/dev/null || echo "(no log yet)"
+	return 6
+}
+
+# --- Main ------------------------------------------------------------------
+
+main() {
+	[ "$(id -u)" -eq 0 ] || { err "must run as root"; exit 1; }
+
+	parse_args "$@"
+	local os arch tag tmp
+	os=$(detect_os) || exit 2
+	arch=$(detect_arch) || exit 2
+
+	if [ "$MODE" = "uninstall" ]; then
+		if [ "$os" = linux ]; then uninstall_linux; else uninstall_darwin; fi
+		echo "uninstalled."
+		exit 0
+	fi
+
+	tag=$(release_tag)
+	tmp=$(mktemp -d)
+	trap 'rm -rf "$tmp"' EXIT
+
+	local url tar agent_bin
+	url=$(asset_url "$os" "$arch" "$tag")
+	tar="$tmp/asset.tar.gz"
+	echo "downloading $url"
+	download_with_retry "$url"           "$tar"           || exit 3
+	download_with_retry "${url}.sha256"  "${tar}.sha256"  || exit 3
+	verify_sha256 "$tar" "${tar}.sha256" || exit 4
+
+	echo "extracting agent"
+	tar -xzf "$tar" -C "$tmp"
+	agent_bin=$(find "$tmp" -maxdepth 2 -name 'shepherd-agent*' -type f | head -n1)
+	[ -n "$agent_bin" ] || { err "agent binary not found in tarball"; exit 3; }
+
+	if [ "$os" = linux ]; then install_linux "$agent_bin"; else install_darwin "$agent_bin"; fi
+
+	echo "service started; waiting for agent to connect"
+	await_online || exit 6
+	echo "OK — agent connected. log: $LOG_FILE"
+}
+
+main "$@"

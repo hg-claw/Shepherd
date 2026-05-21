@@ -44,6 +44,31 @@ detect_arch() {
 	esac
 }
 
+# --- CLI globals -----------------------------------------------------------
+
+# Globals set by parse_args.
+MODE=""        # install | uninstall
+TOKEN=""
+SERVER_URL=""
+VERSION=""     # optional override; empty → derived from script URL pinning
+
+parse_args() {
+	MODE="install"
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			--token)     TOKEN="$2";      shift 2 ;;
+			--server)    SERVER_URL="$2"; shift 2 ;;
+			--version)   VERSION="$2";    shift 2 ;;
+			--uninstall) MODE="uninstall"; shift   ;;
+			*) err "unknown arg: $1"; return 1 ;;
+		esac
+	done
+	if [ "$MODE" = "install" ]; then
+		[ -n "$TOKEN" ]      || { err "--token required"; return 1; }
+		[ -n "$SERVER_URL" ] || { err "--server required"; return 1; }
+	fi
+}
+
 # --- Source-only short-circuit (for BATS tests) ---------------------------
 #
 # When sourced with `--source` as the first arg, define the helpers but

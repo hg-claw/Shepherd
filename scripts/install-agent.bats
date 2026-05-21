@@ -43,3 +43,31 @@ setup() {
   run bash -c "source '$SCRIPT' --source && uname() { echo i386; }; detect_arch"
   [ "$status" -ne 0 ]
 }
+
+@test "parse_args: install" {
+  run bash -c "source '$SCRIPT' --source && parse_args --token T --server https://x && echo \$MODE \$TOKEN \$SERVER_URL"
+  [ "$status" -eq 0 ]
+  [ "$output" = "install T https://x" ]
+}
+
+@test "parse_args: uninstall" {
+  run bash -c "source '$SCRIPT' --source && parse_args --uninstall && echo \$MODE"
+  [ "$status" -eq 0 ]
+  [ "$output" = "uninstall" ]
+}
+
+@test "parse_args: install missing token" {
+  run bash -c "source '$SCRIPT' --source && parse_args --server https://x"
+  [ "$status" -ne 0 ]
+}
+
+@test "parse_args: install missing server" {
+  run bash -c "source '$SCRIPT' --source && parse_args --token T"
+  [ "$status" -ne 0 ]
+}
+
+@test "parse_args: optional --version" {
+  run bash -c "source '$SCRIPT' --source && parse_args --token T --server https://x --version v0.5.0 && echo \$VERSION"
+  [ "$status" -eq 0 ]
+  [ "$output" = "v0.5.0" ]
+}

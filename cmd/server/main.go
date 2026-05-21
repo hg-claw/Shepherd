@@ -141,6 +141,8 @@ func main() {
 	servers := &api.ServersAPI{
 		Servers: serverSvc, Settings: settingsStore, Query: tQuery, Hub: hub,
 		InstallManager: installMgr, Tokens: agentSvc,
+		BuildVersion: cfg.BuildVersion,
+		PublicURL:    deriveServerURL(cfg),
 	}
 	settings := &api.SettingsAPI{
 		Settings:        settingsStore,

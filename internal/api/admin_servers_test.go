@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
+	"github.com/hg-claw/Shepherd/internal/agentsvc"
 	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/hg-claw/Shepherd/internal/serversvc"
 	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
@@ -126,6 +127,67 @@ func TestServersList_NoLatestByDefault(t *testing.T) {
 	_ = json.Unmarshal(w.Body.Bytes(), &out)
 	if _, has := out[0]["latest"]; has {
 		t.Error("plain /api/servers should not include latest")
+	}
+}
+
+// newServersAPIForTest returns a ServersAPI wired with both Servers and
+// Tokens (agentsvc.Service) backed by an in-memory SQLite DB.
+func newServersAPIForTest(t *testing.T) *ServersAPI {
+	t.Helper()
+	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	t.Cleanup(func() { _ = d.Close() })
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+	return &ServersAPI{
+		Servers: &serversvc.Service{DB: d},
+		Tokens:  &agentsvc.Service{DB: d},
+	}
+}
+
+func TestServersAPI_ScriptInstall(t *testing.T) {
+	a := newServersAPIForTest(t)
+	a.BuildVersion = "v0.5.0"
+	a.PublicURL = "https://shepherd.example.com"
+
+	body := strings.NewReader(`{"name":"vps-1","public_alias":"hk-01","show_on_public":true}`)
+	req := httptest.NewRequest("POST", "/api/servers/script", body)
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	a.ScriptInstall(rr, req)
+
+	if rr.Code != 201 {
+		t.Fatalf("status %d: %s", rr.Code, rr.Body)
+	}
+	var got struct {
+		ServerID  int64  `json:"server_id"`
+		Token     string `json:"token"`
+		Command   string `json:"command"`
+		ExpiresAt string `json:"expires_at"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.ServerID == 0 || got.Token == "" {
+		t.Fatalf("missing fields: %+v", got)
+	}
+	if !strings.Contains(got.Command, "--token "+got.Token) {
+		t.Errorf("command does not embed token: %s", got.Command)
+	}
+	if !strings.Contains(got.Command, "v0.5.0") {
+		t.Errorf("command not pinned to BuildVersion: %s", got.Command)
+	}
+}
+
+func TestServersAPI_ScriptInstall_NameRequired(t *testing.T) {
+	a := newServersAPIForTest(t)
+	a.BuildVersion = "v0.5.0"
+	a.PublicURL = "https://x"
+	req := httptest.NewRequest("POST", "/api/servers/script", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	a.ScriptInstall(rr, req)
+	if rr.Code != 400 {
+		t.Fatalf("want 400, got %d", rr.Code)
 	}
 }
 

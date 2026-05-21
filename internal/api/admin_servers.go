@@ -20,6 +20,10 @@ type ServersAPI struct {
 	Hub            *agentsvc.Hub
 	InstallManager *serversvc.InstallManager
 	Tokens         *agentsvc.Service // for repair; also provides ListIPCandidates
+	// BuildVersion and PublicURL are used by ScriptInstall to embed the
+	// pinned script URL and server address in the returned curl|bash command.
+	BuildVersion string
+	PublicURL    string
 }
 
 func (a *ServersAPI) List(w http.ResponseWriter, r *http.Request) {
@@ -319,6 +323,52 @@ func (a *ServersAPI) Config(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type scriptInstallReq struct {
+	Name         string `json:"name"`
+	PublicAlias  string `json:"public_alias"`
+	PublicGroup  string `json:"public_group"`
+	CountryCode  string `json:"country_code"`
+	ShowOnPublic bool   `json:"show_on_public"`
+}
+
+// ScriptInstall creates a server row with no SSH credentials (the agent
+// will fill in connection metadata via auto-register on first WS connect)
+// and returns the one-shot curl|bash install command.
+func (a *ServersAPI) ScriptInstall(w http.ResponseWriter, r *http.Request) {
+	var in scriptInstallReq
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, 400, "bad json")
+		return
+	}
+	if strings.TrimSpace(in.Name) == "" {
+		writeError(w, 400, "name required")
+		return
+	}
+	srv, err := a.Servers.Create(r.Context(), serversvc.CreateInput{
+		Name:         in.Name,
+		PublicAlias:  in.PublicAlias,
+		PublicGroup:  in.PublicGroup,
+		CountryCode:  in.CountryCode,
+		ShowOnPublic: in.ShowOnPublic,
+		// No SSH fields — script flow doesn't need them.
+	})
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	tok, exp, err := a.Tokens.IssueEnrollmentToken(r.Context(), srv.ID)
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 201, map[string]any{
+		"server_id":  srv.ID,
+		"token":      tok,
+		"expires_at": exp,
+		"command":    buildInstallCommand(a.BuildVersion, a.PublicURL, tok),
+	})
 }
 
 // buildInstallCommand renders the single-line curl|bash an admin pastes

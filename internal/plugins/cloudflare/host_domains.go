@@ -49,7 +49,7 @@ func (p *Plugin) listHostDomains(ctx context.Context, serverIDStr string) ([]hos
 	q := "SELECT id, server_id, zone_id, COALESCE(record_id,''), domain, type, content, created_at FROM cf_host_domains"
 	args := []any{}
 	if serverIDStr != "" {
-		q += " WHERE server_id=?"
+		q += " WHERE server_id=$1"
 		args = append(args, serverIDStr)
 	}
 	q += " ORDER BY server_id, domain"
@@ -128,18 +128,17 @@ func (p *Plugin) addHostDomain(ctx context.Context, c *Client, body addDomainBod
 	recID, _ := cfOut["id"].(string)
 
 	now := p.store.Now().UTC()
-	res, err := p.store.DB.ExecContext(ctx,
+	var id int64
+	if err := p.store.DB.QueryRowxContext(ctx,
 		`INSERT INTO cf_host_domains(server_id, zone_id, record_id, domain, type, content, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		body.ServerID, cfg.ZoneID, recID, domain, rtype, content, now)
-	if err != nil {
+		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+		body.ServerID, cfg.ZoneID, recID, domain, rtype, content, now).Scan(&id); err != nil {
 		// best-effort rollback of the CF record we just created
 		if recID != "" {
 			_ = c.DeleteRecord(ctx, cfg.ZoneID, recID)
 		}
 		return hostDomainRow{}, err
 	}
-	id, _ := res.LastInsertId()
 	return hostDomainRow{
 		ID: id, ServerID: body.ServerID, ZoneID: cfg.ZoneID, RecordID: recID,
 		Domain: domain, Type: rtype, Content: content,
@@ -150,16 +149,16 @@ func (p *Plugin) addHostDomain(ctx context.Context, c *Client, body addDomainBod
 func (p *Plugin) deleteHostDomain(ctx context.Context, c *Client, id int64) error {
 	var zoneID, recordID string
 	err := p.store.DB.GetContext(ctx, &recordID,
-		"SELECT COALESCE(record_id,'') FROM cf_host_domains WHERE id=?", id)
+		"SELECT COALESCE(record_id,'') FROM cf_host_domains WHERE id=$1", id)
 	if err != nil {
 		return err
 	}
 	_ = p.store.DB.GetContext(ctx, &zoneID,
-		"SELECT zone_id FROM cf_host_domains WHERE id=?", id)
+		"SELECT zone_id FROM cf_host_domains WHERE id=$1", id)
 	if recordID != "" && zoneID != "" {
 		_ = c.DeleteRecord(ctx, zoneID, recordID) // best-effort; if CF record is already gone we still want the local row to vanish
 	}
-	_, err = p.store.DB.ExecContext(ctx, "DELETE FROM cf_host_domains WHERE id=?", id)
+	_, err = p.store.DB.ExecContext(ctx, "DELETE FROM cf_host_domains WHERE id=$1", id)
 	return err
 }
 
@@ -174,7 +173,7 @@ func (p *Plugin) fetchServer(ctx context.Context, id int64) (serverInfo, error) 
 	var s serverInfo
 	var sshHost sql.NullString
 	row := p.store.DB.QueryRowxContext(ctx,
-		"SELECT id, name, ssh_host FROM servers WHERE id=?", id)
+		"SELECT id, name, ssh_host FROM servers WHERE id=$1", id)
 	if err := row.Scan(&s.ID, &s.Name, &sshHost); err != nil {
 		return serverInfo{}, err
 	}

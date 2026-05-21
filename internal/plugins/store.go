@@ -35,7 +35,7 @@ type HostRow struct {
 func (s *Store) Get(ctx context.Context, id string) (Row, error) {
 	var r Row
 	err := s.DB.GetContext(ctx, &r,
-		"SELECT id, enabled, config_json, enabled_at, created_at FROM plugins WHERE id=?", id)
+		"SELECT id, enabled, config_json, enabled_at, created_at FROM plugins WHERE id=$1", id)
 	return r, err
 }
 
@@ -45,7 +45,7 @@ func (s *Store) UpsertEnabled(ctx context.Context, id string, enabled bool) erro
 	now := s.Now().UTC()
 	_, err := s.DB.ExecContext(ctx,
 		`INSERT INTO plugins(id, enabled, config_json, enabled_at, created_at)
-		 VALUES (?, ?, '{}', ?, ?)
+		 VALUES ($1, $2, '{}', $3, $4)
 		 ON CONFLICT(id) DO UPDATE SET enabled=excluded.enabled,
 		   enabled_at=CASE WHEN excluded.enabled=1 THEN excluded.enabled_at ELSE NULL END`,
 		id, enabled, nullableTime(enabled, now), now)
@@ -60,7 +60,7 @@ func nullableTime(enabled bool, t time.Time) any {
 }
 
 func (s *Store) PutConfig(ctx context.Context, id string, configJSON []byte) error {
-	_, err := s.DB.ExecContext(ctx, "UPDATE plugins SET config_json=? WHERE id=?", string(configJSON), id)
+	_, err := s.DB.ExecContext(ctx, "UPDATE plugins SET config_json=$1 WHERE id=$2", string(configJSON), id)
 	return err
 }
 
@@ -68,7 +68,7 @@ func (s *Store) UpsertHost(ctx context.Context, pluginID string, serverID int64,
 	now := s.Now().UTC()
 	_, err := s.DB.ExecContext(ctx,
 		`INSERT INTO plugin_hosts(plugin_id, server_id, config_json, status, updated_at)
-		 VALUES (?, ?, ?, ?, ?)
+		 VALUES ($1, $2, $3, $4, $5)
 		 ON CONFLICT(plugin_id, server_id) DO UPDATE SET
 		   config_json=excluded.config_json,
 		   status=excluded.status,
@@ -85,7 +85,7 @@ func (s *Store) GetHost(ctx context.Context, pluginID string, serverID int64) (H
 	var r HostRow
 	err := s.DB.GetContext(ctx, &r,
 		`SELECT id, plugin_id, server_id, config_json, deployed_version, status, last_error, updated_at
-		 FROM plugin_hosts WHERE plugin_id=? AND server_id=?`, pluginID, serverID)
+		 FROM plugin_hosts WHERE plugin_id=$1 AND server_id=$2`, pluginID, serverID)
 	return r, err
 }
 
@@ -93,13 +93,13 @@ func (s *Store) ListHosts(ctx context.Context, pluginID string) ([]HostRow, erro
 	var rows []HostRow
 	err := s.DB.SelectContext(ctx, &rows,
 		`SELECT id, plugin_id, server_id, config_json, deployed_version, status, last_error, updated_at
-		 FROM plugin_hosts WHERE plugin_id=? ORDER BY server_id`, pluginID)
+		 FROM plugin_hosts WHERE plugin_id=$1 ORDER BY server_id`, pluginID)
 	return rows, err
 }
 
 func (s *Store) DeleteHost(ctx context.Context, pluginID string, serverID int64) error {
 	_, err := s.DB.ExecContext(ctx,
-		"DELETE FROM plugin_hosts WHERE plugin_id=? AND server_id=?", pluginID, serverID)
+		"DELETE FROM plugin_hosts WHERE plugin_id=$1 AND server_id=$2", pluginID, serverID)
 	return err
 }
 
@@ -107,8 +107,8 @@ func (s *Store) SetHostStatus(ctx context.Context, pluginID string, serverID int
 	now := s.Now().UTC()
 	_, err := s.DB.ExecContext(ctx,
 		`UPDATE plugin_hosts
-		 SET status=?, deployed_version=NULLIF(?, ''), last_error=NULLIF(?, ''), updated_at=?
-		 WHERE plugin_id=? AND server_id=?`,
+		 SET status=$1, deployed_version=NULLIF($2, ''), last_error=NULLIF($3, ''), updated_at=$4
+		 WHERE plugin_id=$5 AND server_id=$6`,
 		status, version, lastErr, now, pluginID, serverID)
 	return err
 }

@@ -100,7 +100,7 @@ func (p *Plugin) UndeployFromHost(ctx context.Context, deps plugins.Deps, server
 		return err
 	}
 	// Best-effort: clean up inbounds so a future re-deploy starts fresh.
-	_, _ = deps.DB.ExecContext(ctx, `DELETE FROM singbox_inbounds WHERE server_id=?`, serverID)
+	_, _ = deps.DB.ExecContext(ctx, `DELETE FROM singbox_inbounds WHERE server_id=$1`, serverID)
 	return nil
 }
 

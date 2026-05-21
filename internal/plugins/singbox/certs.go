@@ -51,28 +51,28 @@ func (s *CertStore) Insert(ctx context.Context, row CertRow) (int64, error) {
 	if row.ChallengeType == "" {
 		row.ChallengeType = "http-01"
 	}
-	res, err := s.DB.ExecContext(ctx, `
+	var id int64
+	if err := s.DB.QueryRowxContext(ctx, `
 		INSERT INTO singbox_certificates
 		  (domain, cert_pem, key_pem, expires_at, issuer, status, challenge_type, created_at, updated_at)
-		VALUES (?,?,?,?,?,?,?,?,?)`,
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
 		row.Domain, row.CertPEM, row.KeyPEM, row.ExpiresAt,
-		row.Issuer, row.Status, row.ChallengeType, now, now)
-	if err != nil {
+		row.Issuer, row.Status, row.ChallengeType, now, now).Scan(&id); err != nil {
 		return 0, err
 	}
-	return res.LastInsertId()
+	return id, nil
 }
 
 func (s *CertStore) Get(ctx context.Context, id int64) (CertRow, error) {
 	var row CertRow
-	err := s.DB.GetContext(ctx, &row, `SELECT * FROM singbox_certificates WHERE id=?`, id)
+	err := s.DB.GetContext(ctx, &row, `SELECT * FROM singbox_certificates WHERE id=$1`, id)
 	return row, err
 }
 
 func (s *CertStore) GetByDomain(ctx context.Context, domain string) (CertRow, error) {
 	var row CertRow
 	err := s.DB.GetContext(ctx, &row,
-		`SELECT * FROM singbox_certificates WHERE domain=?`, domain)
+		`SELECT * FROM singbox_certificates WHERE domain=$1`, domain)
 	return row, err
 }
 
@@ -88,8 +88,8 @@ func (s *CertStore) UpsertStatus(ctx context.Context, id int64, status string, l
 	now := s.now()
 	_, err := s.DB.ExecContext(ctx,
 		`UPDATE singbox_certificates
-		 SET status=?, last_error=?, last_renew_attempt_at=?, updated_at=?
-		 WHERE id=?`,
+		 SET status=$1, last_error=$2, last_renew_attempt_at=$3, updated_at=$4
+		 WHERE id=$5`,
 		status, lastErr, now, now, id)
 	return err
 }
@@ -99,9 +99,9 @@ func (s *CertStore) UpsertCert(ctx context.Context, id int64, certPEM, keyPEM st
 	now := s.now()
 	_, err := s.DB.ExecContext(ctx,
 		`UPDATE singbox_certificates
-		 SET cert_pem=?, key_pem=?, expires_at=?, status='active',
-		     last_renew_attempt_at=?, last_error=NULL, updated_at=?
-		 WHERE id=?`,
+		 SET cert_pem=$1, key_pem=$2, expires_at=$3, status='active',
+		     last_renew_attempt_at=$4, last_error=NULL, updated_at=$5
+		 WHERE id=$6`,
 		certPEM, keyPEM, expiresAt, now, now, id)
 	return err
 }
@@ -109,7 +109,7 @@ func (s *CertStore) UpsertCert(ctx context.Context, id int64, certPEM, keyPEM st
 // Delete removes the cert row. FK RESTRICT on singbox_inbounds.cert_id will
 // surface as an error if any inbound references this cert.
 func (s *CertStore) Delete(ctx context.Context, id int64) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM singbox_certificates WHERE id=?`, id)
+	_, err := s.DB.ExecContext(ctx, `DELETE FROM singbox_certificates WHERE id=$1`, id)
 	return err
 }
 
@@ -120,7 +120,7 @@ func (s *CertStore) ListExpiringSoon(ctx context.Context, withinDays int) ([]Cer
 	deadline := now.AddDate(0, 0, withinDays)
 	err := s.DB.SelectContext(ctx, &rows,
 		`SELECT * FROM singbox_certificates
-		 WHERE expires_at <= ? AND status='active'
+		 WHERE expires_at <= $1 AND status='active'
 		 ORDER BY expires_at ASC`, deadline)
 	return rows, err
 }

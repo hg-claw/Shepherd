@@ -45,11 +45,10 @@ func (s *Store) CreateAdmin(ctx context.Context, username, plainPassword string)
 	if err != nil {
 		return nil, err
 	}
-	res, err := s.DB.ExecContext(ctx, "INSERT INTO admins(username, password_hash) VALUES ($1, $2)", username, hash)
-	if err != nil {
+	var id int64
+	if err := s.DB.QueryRowxContext(ctx, "INSERT INTO admins(username, password_hash) VALUES ($1, $2) RETURNING id", username, hash).Scan(&id); err != nil {
 		return nil, err
 	}
-	id, _ := res.LastInsertId()
 	return &Admin{ID: id, Username: username, PasswordHash: hash, CreatedAt: time.Now()}, nil
 }
 

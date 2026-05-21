@@ -87,34 +87,35 @@ func (s *InboundStore) Insert(ctx context.Context, in Inbound) (int64, error) {
 		in.Tag = s.GenerateTag(in.Role)
 	}
 	now := s.now()
-	res, err := s.DB.ExecContext(ctx, `
+	var id int64
+	if err := s.DB.QueryRowxContext(ctx, `
 		INSERT INTO xray_inbounds (
 		  server_id, tag, port, role, protocol,
 		  uuid, sni, public_key, private_key, short_id,
 		  ws_path, ss_method, ss_password,
 		  upstream_inbound_id, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		RETURNING id`,
 		in.ServerID, in.Tag, in.Port, in.Role, in.Protocol,
 		in.UUID, in.SNI, in.PublicKey, in.PrivateKey, in.ShortID,
 		in.WSPath, in.SSMethod, in.SSPassword,
-		in.UpstreamInboundID, now, now)
-	if err != nil {
+		in.UpstreamInboundID, now, now).Scan(&id); err != nil {
 		return 0, err
 	}
-	return res.LastInsertId()
+	return id, nil
 }
 
 func (s *InboundStore) GetByID(ctx context.Context, id int64) (Inbound, error) {
 	var row Inbound
 	err := s.DB.GetContext(ctx, &row,
-		`SELECT * FROM xray_inbounds WHERE id=?`, id)
+		`SELECT * FROM xray_inbounds WHERE id=$1`, id)
 	return row, err
 }
 
 func (s *InboundStore) ListByServer(ctx context.Context, serverID int64) ([]Inbound, error) {
 	rows := []Inbound{}
 	err := s.DB.SelectContext(ctx, &rows,
-		`SELECT * FROM xray_inbounds WHERE server_id=? ORDER BY id`, serverID)
+		`SELECT * FROM xray_inbounds WHERE server_id=$1 ORDER BY id`, serverID)
 	return rows, err
 }
 
@@ -147,7 +148,7 @@ func (s *InboundStore) ListAllWithUpstream(ctx context.Context) ([]InboundView, 
 func (s *InboundStore) ListByUpstream(ctx context.Context, landingID int64) ([]Inbound, error) {
 	rows := []Inbound{}
 	err := s.DB.SelectContext(ctx, &rows,
-		`SELECT * FROM xray_inbounds WHERE upstream_inbound_id=? ORDER BY id`, landingID)
+		`SELECT * FROM xray_inbounds WHERE upstream_inbound_id=$1 ORDER BY id`, landingID)
 	return rows, err
 }
 
@@ -196,12 +197,12 @@ func (s *InboundStore) Update(ctx context.Context, id int64, patch InboundPatch)
 	set = append(set, "updated_at=?")
 	args = append(args, s.now())
 	args = append(args, id)
-	q := fmt.Sprintf("UPDATE xray_inbounds SET %s WHERE id=?", strings.Join(set, ", "))
+	q := s.DB.Rebind(fmt.Sprintf("UPDATE xray_inbounds SET %s WHERE id=?", strings.Join(set, ", ")))
 	_, err := s.DB.ExecContext(ctx, q, args...)
 	return err
 }
 
 func (s *InboundStore) Delete(ctx context.Context, id int64) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM xray_inbounds WHERE id=?`, id)
+	_, err := s.DB.ExecContext(ctx, `DELETE FROM xray_inbounds WHERE id=$1`, id)
 	return err
 }

@@ -26,11 +26,18 @@ docker compose logs shepherd | grep -A2 'Generated password'
 Open `http://<host>:8080` and log in with the user `admin` and the
 password printed in the logs.
 
-To use Postgres instead of the default sqlite:
+To use Postgres instead of the default sqlite, **edit `.env` first**
+— `--profile pg` only adds the postgres service, it does not flip
+shepherd's `DATABASE_DRIVER`. Uncomment the postgres block in
+`.env.example` (set `DATABASE_DRIVER=postgres` and the matching DSN),
+then:
 
 ```bash
 docker compose --profile pg up -d
 ```
+
+The shepherd service is set to wait for postgres to report healthy
+before starting, so first-boot races are handled automatically.
 
 Set `SERVER_PUBLIC_URL` in `.env` if your server is behind a reverse
 proxy or accessed via a domain different from the docker host's IP —

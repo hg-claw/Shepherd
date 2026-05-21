@@ -4,6 +4,14 @@ services:
     restart: unless-stopped
     volumes:
       - shepherd_data:/data
+    # required:false keeps this a no-op when --profile pg is NOT active
+    # (postgres is itself profile-gated). With --profile pg, shepherd
+    # waits for postgres to report healthy before starting — otherwise
+    # it races the DB and dies on first connect.
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
     environment:
       SERVER_HTTP_ADDR: ":8080"
       DATABASE_DRIVER: ${DATABASE_DRIVER:-sqlite}
@@ -32,6 +40,11 @@ services:
       POSTGRES_PASSWORD: ${PG_PASSWORD:-shepherd}
     volumes:
       - shepherd_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shepherd -d shepherd"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
 volumes:
   shepherd_data:

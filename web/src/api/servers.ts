@@ -54,7 +54,10 @@ export type Latest = {
 
 export type ServerWithLatest = ServerRecord & { latest: Latest | null }
 
-export function useServers(opts?: { withLatest?: boolean; refetchInterval?: number }) {
+export function useServers(opts?: {
+  withLatest?: boolean
+  refetchInterval?: number | ((q: any) => number | false)
+}) {
   const path = opts?.withLatest ? '/api/servers?with=latest' : '/api/servers'
   return useQuery({
     queryKey: opts?.withLatest ? ['servers', 'with-latest'] : ['servers'],

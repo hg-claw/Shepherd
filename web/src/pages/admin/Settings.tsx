@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Pill } from '@/components/Pill'
 import { useSettings, usePatchSettings } from '@/api/settings'
+import { useVersion } from '@/api/version'
 import { useUI } from '@/store/ui'
 import { cn } from '@/lib/utils'
 
@@ -174,11 +175,12 @@ function SectionTitle({ children, sub }: { children: React.ReactNode; sub?: stri
 }
 
 function AboutTab() {
+  const versionQ = useVersion()
   return (
     <div>
       <SectionTitle>About this install</SectionTitle>
       <div className="border rounded-lg bg-elev px-4 py-1">
-        <KV k="Version" v="v0.2.1" />
+        <KV k="Version" v={versionQ.data?.version ?? '…'} />
         <KV
           k="Admin"
           v={<span>admin (single-user)</span>}

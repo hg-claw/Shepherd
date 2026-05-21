@@ -91,7 +91,21 @@ export default function ServerList() {
       return 'table'
     }
   })
-  const { data, isLoading } = useServers({ withLatest: true, refetchInterval: 30_000 })
+  // refetchInterval is dynamic: poll fast (1.5s) when ANY server is in a
+  // transient stage (pending/installing) so the UI tracks state changes
+  // promptly during a script install. Drops back to 30s once everything
+  // settles. Pre-fix a fresh agent enrolling could sit on stale 'pending'
+  // for up to half a minute despite the server-side flip being instant.
+  const { data, isLoading } = useServers({
+    withLatest: true,
+    refetchInterval: (q: any) => {
+      const rows = (q?.state?.data ?? []) as Array<{ install_stage?: string }>
+      const transient = rows.some(
+        (r) => r.install_stage === 'pending' || r.install_stage === 'installing',
+      )
+      return transient ? 1500 : 30_000
+    },
+  })
   const del = useDeleteServer()
   const toast = useUI((s) => s.toast)
 

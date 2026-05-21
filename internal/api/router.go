@@ -53,6 +53,7 @@ func (r *Router) Handler() http.Handler {
 
 	// health
 	mux.HandleFunc("GET /healthz", r.Public.Healthz)
+	mux.HandleFunc("GET /api/version", r.Public.Version)
 
 	// public
 	mux.HandleFunc("GET /api/public/servers", r.Public.Servers_ListPublic)

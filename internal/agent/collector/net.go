@@ -41,6 +41,15 @@ func (m *NetMeter) Sample() (rxBps, txBps int64, ok bool) {
 	if dt <= 0 {
 		return 0, 0, false
 	}
+	// Guard against counter reset (interface bounce, container restart,
+	// or 32-bit counter wraparound). uint64 subtraction wraps around to
+	// near-max when rx < prevRx, which we'd then cast to float64/int64 and
+	// emit as nonsensical readings like 558921 TB/s.
+	// On reset: re-prime from the new baseline and skip this sample.
+	if rx < m.prevRx || tx < m.prevTx {
+		m.prevRx, m.prevTx, m.prevTS = rx, tx, now
+		return 0, 0, false
+	}
 	rxBps = int64(float64(rx-m.prevRx) / dt)
 	txBps = int64(float64(tx-m.prevTx) / dt)
 	m.prevRx, m.prevTx, m.prevTS = rx, tx, now

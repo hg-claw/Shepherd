@@ -117,14 +117,14 @@ func (s *Service) LookupEnrollment(ctx context.Context, token string) (int64, er
 	err := s.DB.QueryRowContext(ctx,
 		"SELECT server_id, expires_at, consumed_at FROM enrollment_tokens WHERE token=$1",
 		token).Scan(&serverID, &expiresAt, &consumedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrInvalidEnrollment
 	}
 	if err != nil {
 		return 0, err
 	}
 	now := time.Now().UTC()
-	if !consumedAt.Valid && now.After(expiresAt) {
+	if !consumedAt.Valid && now.After(expiresAt.UTC()) {
 		return 0, ErrInvalidEnrollment
 	}
 	if consumedAt.Valid && now.Sub(consumedAt.Time.UTC()) > 24*time.Hour {

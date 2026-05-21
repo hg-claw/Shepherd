@@ -57,6 +57,25 @@ func TestService_LookupEnrollment_StaleConsumed(t *testing.T) {
 	}
 }
 
+func TestService_LookupEnrollment_Expired(t *testing.T) {
+	svc := newSvc(t)
+	ctx := context.Background()
+	sid := mustCreateServer(t, svc, "lookup-expired")
+	tok, _, err := svc.IssueEnrollmentToken(ctx, sid)
+	if err != nil {
+		t.Fatalf("issue: %v", err)
+	}
+	// Force expires_at into the past, leave consumed_at NULL.
+	if _, err := svc.DB.Exec(
+		`UPDATE enrollment_tokens SET expires_at=$1 WHERE token=$2`,
+		time.Now().Add(-time.Minute), tok); err != nil {
+		t.Fatalf("update expires_at: %v", err)
+	}
+	if _, err := svc.LookupEnrollment(ctx, tok); err != ErrInvalidEnrollment {
+		t.Fatalf("expected ErrInvalidEnrollment, got %v", err)
+	}
+}
+
 func TestService_LookupEnrollment_Unknown(t *testing.T) {
 	svc := newSvc(t)
 	ctx := context.Background()

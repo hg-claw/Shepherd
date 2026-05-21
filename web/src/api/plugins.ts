@@ -253,3 +253,187 @@ export const fetchXrayTrafficBatch = (params: {
   if (params.resolution) q.set('resolution', params.resolution)
   return api.get<XrayTrafficBatchResponse>(`/api/admin/plugins/xray/traffic/batch?${q}`)
 }
+
+// ── singbox plugin ────────────────────────────────────────────────────────────
+
+export type SingboxProtocol =
+  | 'vless-reality'
+  | 'vless-ws-tls' | 'vless-h2-tls' | 'vless-httpupgrade-tls'
+  | 'vmess-tcp'    | 'vmess-http'    | 'vmess-quic'
+  | 'vmess-ws-tls' | 'vmess-h2-tls' | 'vmess-httpupgrade-tls'
+  | 'trojan-tls'   | 'trojan-ws-tls' | 'trojan-h2-tls' | 'trojan-httpupgrade-tls'
+  | 'hysteria2' | 'tuic-v5' | 'anytls' | 'shadowsocks-2022'
+
+export interface SingboxInbound {
+  id: number
+  server_id: number
+  server_name: string
+  tag: string
+  port: number
+  role: 'landing' | 'relay'
+  protocol: SingboxProtocol
+  uuid?: string
+  password?: string
+  sni?: string
+  reality_private_key?: string    // "[REDACTED]" in GET responses
+  reality_public_key?: string
+  reality_short_id?: string
+  reality_handshake_server?: string
+  reality_handshake_port?: number
+  flow?: string
+  transport_type?: string
+  transport_path?: string
+  transport_host?: string
+  alter_id?: number
+  ss_method?: string
+  ss_password?: string
+  cert_id?: number | null
+  extra_json?: string | null
+  // upstream JOIN fields (relay rows only)
+  upstream_inbound_id?: number | null
+  upstream_tag?: string | null
+  upstream_server_id?: number | null
+  upstream_server_name?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateSingboxInboundBody {
+  server_id: number
+  port: number
+  role: 'landing' | 'relay'
+  protocol: SingboxProtocol
+  uuid?: string
+  password?: string
+  sni?: string
+  reality_private_key?: string
+  reality_public_key?: string
+  reality_short_id?: string
+  reality_handshake_server?: string
+  reality_handshake_port?: number
+  flow?: string
+  transport_type?: string
+  transport_path?: string
+  transport_host?: string
+  alter_id?: number
+  ss_method?: string
+  ss_password?: string
+  cert_id?: number
+  extra_json?: string
+  upstream_inbound_id?: number
+}
+
+export interface PatchSingboxInboundBody {
+  port?: number
+  uuid?: string
+  password?: string
+  sni?: string
+  reality_private_key?: string
+  reality_public_key?: string
+  reality_short_id?: string
+  reality_handshake_server?: string
+  reality_handshake_port?: number
+  flow?: string
+  transport_type?: string
+  transport_path?: string
+  transport_host?: string
+  alter_id?: number
+  ss_method?: string
+  ss_password?: string
+  cert_id?: number | null
+  extra_json?: string | null
+}
+
+export interface SingboxCertificate {
+  id: number
+  domain: string
+  status: 'issuing' | 'active' | 'failed' | 'revoked'
+  issuer: string
+  expires_at: string | null
+  challenge_type: 'dns-01-cf' | 'http-01'
+  last_renew_attempt_at: string | null
+  last_error: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface IssueSingboxCertBody {
+  domain: string
+  challenge_type: 'dns-01-cf' | 'http-01'
+  email: string
+}
+
+// Traffic response shapes are identical to xray's — alias for clarity
+export type SingboxTrafficPoint = XrayTrafficPoint
+export type SingboxTrafficSeries = XrayTrafficSeries
+export type SingboxTrafficResponse = XrayTrafficResponse
+export type SingboxTrafficBatchResponse = XrayTrafficBatchResponse
+
+const SINGBOX = '/api/admin/plugins/singbox'
+
+export const listSingboxInbounds = (params: { server_id?: number } = {}): Promise<SingboxInbound[]> => {
+  const q = new URLSearchParams()
+  if (params.server_id) q.set('server_id', String(params.server_id))
+  const qs = q.toString()
+  return api.get<SingboxInbound[]>(`${SINGBOX}/inbounds${qs ? '?' + qs : ''}`)
+}
+
+export const createSingboxInbound = (body: CreateSingboxInboundBody): Promise<SingboxInbound> =>
+  api.post<SingboxInbound>(`${SINGBOX}/inbounds`, body)
+
+export const patchSingboxInbound = (id: number, body: PatchSingboxInboundBody): Promise<SingboxInbound> =>
+  api.patch<SingboxInbound>(`${SINGBOX}/inbounds/${id}`, body)
+
+export const deleteSingboxInbound = (id: number): Promise<void> =>
+  api.del(`${SINGBOX}/inbounds/${id}`)
+
+export const patchSingboxServerVersion = (serverID: number, version: string) =>
+  api.patch<{ ok: true; version: string }>(`${SINGBOX}/servers/${serverID}`, { version })
+
+export const fetchSingboxVersions = () =>
+  api.get<{ cached: { version: string; os: string; arch: string }[]; latest: string[] }>(`${SINGBOX}/versions`)
+
+export const listSingboxCerts = (): Promise<SingboxCertificate[]> =>
+  api.get<SingboxCertificate[]>(`${SINGBOX}/certificates`)
+
+export const issueSingboxCert = (body: IssueSingboxCertBody): Promise<SingboxCertificate> =>
+  api.post<SingboxCertificate>(`${SINGBOX}/certificates`, body)
+
+export const deleteSingboxCert = (id: number): Promise<void> =>
+  api.del(`${SINGBOX}/certificates/${id}`)
+
+export const renewSingboxCert = (id: number): Promise<{ id: number; status: string }> =>
+  api.post<{ id: number; status: string }>(`${SINGBOX}/certificates/${id}/renew`, {})
+
+export const fetchSingboxTraffic = (params: {
+  server_id: number
+  tag: string
+  kind?: string
+  from: string
+  to: string
+  resolution?: 'raw' | 'minute' | 'hour'
+}): Promise<SingboxTrafficResponse> => {
+  const q = new URLSearchParams({ server_id: String(params.server_id), tag: params.tag, from: params.from, to: params.to })
+  if (params.kind)       q.set('kind', params.kind)
+  if (params.resolution) q.set('resolution', params.resolution)
+  return api.get<SingboxTrafficResponse>(`${SINGBOX}/traffic?${q}`)
+}
+
+export const fetchSingboxTrafficBatch = (params: {
+  server_id: number
+  tags: string[]
+  kind?: string
+  from: string
+  to: string
+  resolution?: 'raw' | 'minute' | 'hour'
+}): Promise<SingboxTrafficBatchResponse> => {
+  const q = new URLSearchParams({
+    server_id: String(params.server_id),
+    tags: params.tags.join(','),
+    from: params.from,
+    to: params.to,
+  })
+  if (params.kind)       q.set('kind', params.kind)
+  if (params.resolution) q.set('resolution', params.resolution)
+  return api.get<SingboxTrafficBatchResponse>(`${SINGBOX}/traffic/batch?${q}`)
+}

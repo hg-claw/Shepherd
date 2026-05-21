@@ -16,7 +16,7 @@ export const PluginRegistry: Record<string, PluginUIEntry> = {
   xray: {
     module: () => import('./xray'),
     tabs: [
-      { key: 'config',   label: 'Config' },
+      { key: 'deploy',   label: 'Deploy' },
       { key: 'inbounds', label: 'Inbounds' },
       { key: 'traffic',  label: 'Traffic' },
       { key: 'events',   label: 'Events' },
@@ -31,6 +31,17 @@ export const PluginRegistry: Record<string, PluginUIEntry> = {
       { key: 'dns',      label: 'DNS records' },
       { key: 'hosts',    label: 'Hosts' },
       { key: 'activity', label: 'Activity' },
+    ],
+  },
+  singbox: {
+    module: () => import('./singbox'),
+    tabs: [
+      { key: 'deploy',       label: 'Deploy' },
+      { key: 'inbounds',     label: 'Inbounds' },
+      { key: 'certificates', label: 'Certificates' },
+      { key: 'traffic',      label: 'Traffic' },
+      { key: 'events',       label: 'Events' },
+      { key: 'logs',         label: 'Logs' },
     ],
   },
 }

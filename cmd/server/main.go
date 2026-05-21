@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -19,12 +20,14 @@ import (
 	"github.com/hg-claw/Shepherd/internal/filesvc"
 	"github.com/hg-claw/Shepherd/internal/installer"
 	"github.com/hg-claw/Shepherd/internal/plugins"
-	_ "github.com/hg-claw/Shepherd/internal/plugins/cloudflare"       // registers via init()
-	xrayplugin "github.com/hg-claw/Shepherd/internal/plugins/xray" // registers via init() + Migrate0003
+	_ "github.com/hg-claw/Shepherd/internal/plugins/cloudflare"          // registers via init()
+	singboxplugin "github.com/hg-claw/Shepherd/internal/plugins/singbox" // registers via init()
+	xrayplugin "github.com/hg-claw/Shepherd/internal/plugins/xray"       // registers via init() + Migrate0003
 	"github.com/hg-claw/Shepherd/internal/ptysvc"
 	"github.com/hg-claw/Shepherd/internal/scriptsvc"
 	"github.com/hg-claw/Shepherd/internal/serversvc"
 	"github.com/hg-claw/Shepherd/internal/sessionmux"
+	"github.com/hg-claw/Shepherd/internal/singbox/certmgr"
 	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
 	shepweb "github.com/hg-claw/Shepherd/internal/web"
 )
@@ -69,6 +72,10 @@ func main() {
 	tIngest := &telemetrysvc.Ingest{DB: d}
 	trafficRollup := &telemetrysvc.TrafficRollup{DB: d}
 	go trafficRollup.Run(rootCtx)
+
+	// sing-box traffic rollup (mirrors xray TrafficRollup).
+	sbRollup := &telemetrysvc.SingboxTrafficRollup{DB: d}
+	go sbRollup.Run(rootCtx)
 
 	reg := sessionmux.New()
 	auditW := &audit.Writer{DB: d, Now: time.Now}
@@ -202,6 +209,44 @@ func main() {
 		}
 	}
 
+	// sing-box cert renewal loop.
+	// The cfTokenProvider reads the Cloudflare API token from the plugins table at
+	// issuance time so it always sees the current value without a restart.
+	sbCertStore := &singboxplugin.CertStore{DB: d, Now: time.Now}
+	sbCertMgr := certmgr.NewManager(certmgr.Config{
+		Store:           &certStoreAdapter{store: sbCertStore},
+		CFTokenProvider: &cfTokenProvider{store: pluginStore},
+		// Default contact used only when the caller (renewal loop) does
+		// not supply one. Must be a syntactically valid address — LE
+		// rejects host parts with no dot, which the old
+		// "shepherd@localhost" tripped on.
+		Email:            "shepherd-acme@example.invalid",
+		HTTP01ListenAddr: ":80",
+		CADirectoryURL:   "", // empty = Let's Encrypt production
+	})
+	go sbCertMgr.RunRenewalLoop(rootCtx, 24*time.Hour)
+
+	// Wire real issue / renew implementations into the cert HTTP handlers.
+	// certID must reach Manager so it can write back to the right row —
+	// dropping it (the pre-fix behaviour) left every cert stuck at
+	// status='issuing' with empty last_error.
+	singboxplugin.SetCertFuncs(
+		func(ctx context.Context, certID int64, domain, challengeType, email string) error {
+			ch := certmgr.HTTP01
+			if challengeType == "dns-01-cf" {
+				ch = certmgr.DNS01CF
+			}
+			return sbCertMgr.Issue(ctx, certID, domain, ch, email)
+		},
+		func(ctx context.Context, certID int64, domain, challengeType, _ string) error {
+			ch := certmgr.HTTP01
+			if challengeType == "dns-01-cf" {
+				ch = certmgr.DNS01CF
+			}
+			return sbCertMgr.Renew(ctx, certID, domain, ch)
+		},
+	)
+
 	eventsAPI := &api.PluginEventsAPI{DB: d}
 	logsAPI := &api.PluginLogsAPI{HostExec: hostExec, Deps: pluginsDeps}
 
@@ -229,6 +274,66 @@ func main() {
 	shutdownCtx, c := context.WithTimeout(context.Background(), 10*time.Second)
 	defer c()
 	_ = srv.Shutdown(shutdownCtx)
+}
+
+// cfTokenProvider implements certmgr.CFTokenProvider.
+// It reads the Cloudflare API token from the plugins table on every call so
+// that token rotations take effect without restarting the server.
+type cfTokenProvider struct {
+	store *plugins.Store
+}
+
+func (p *cfTokenProvider) Token(ctx context.Context) (string, error) {
+	row, err := p.store.Get(ctx, "cloudflare")
+	if err != nil || !row.Enabled || len(row.ConfigJSON) == 0 {
+		return "", nil // cloudflare plugin not enabled — DNS-01 unavailable
+	}
+	var cfg struct {
+		APIToken string `json:"api_token"`
+	}
+	if err := json.Unmarshal(row.ConfigJSON, &cfg); err != nil {
+		return "", nil
+	}
+	return cfg.APIToken, nil
+}
+
+// certStoreAdapter bridges singboxplugin.CertStore to certmgr.Store.
+// certmgr.Store.ListExpiringSoon takes a time.Duration, while CertStore takes
+// an int (days). This adapter converts between the two representations.
+type certStoreAdapter struct {
+	store *singboxplugin.CertStore
+}
+
+func (a *certStoreAdapter) UpsertCert(ctx context.Context, id int64, certPEM, keyPEM string, expiresAt time.Time) error {
+	return a.store.UpsertCert(ctx, id, certPEM, keyPEM, expiresAt)
+}
+
+func (a *certStoreAdapter) UpsertStatus(ctx context.Context, id int64, status string, lastErr *string) error {
+	return a.store.UpsertStatus(ctx, id, status, lastErr)
+}
+
+func (a *certStoreAdapter) ListExpiringSoon(ctx context.Context, within time.Duration) ([]certmgr.RenewalTarget, error) {
+	days := int(within.Hours() / 24)
+	if days < 1 {
+		days = 1
+	}
+	rows, err := a.store.ListExpiringSoon(ctx, days)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]certmgr.RenewalTarget, 0, len(rows))
+	for _, r := range rows {
+		ch := certmgr.HTTP01
+		if r.ChallengeType == "dns-01-cf" {
+			ch = certmgr.DNS01CF
+		}
+		out = append(out, certmgr.RenewalTarget{
+			ID:        r.ID,
+			Domain:    r.Domain,
+			Challenge: ch,
+		})
+	}
+	return out, nil
 }
 
 func tagOrFallback(override, build string) string {

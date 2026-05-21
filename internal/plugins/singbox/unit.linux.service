@@ -1,0 +1,15 @@
+[Unit]
+Description=Shepherd-managed sing-box
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/shepherd-singbox run -c /etc/shepherd-singbox/config.json
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

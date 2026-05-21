@@ -69,6 +69,55 @@ parse_args() {
 	fi
 }
 
+# --- Release URL + checksum helpers ----------------------------------------
+
+# BUILD_TAG: substituted by `make release` at build time. Default lets
+# the script run from a `git clone` checkout against the latest release.
+BUILD_TAG="${BUILD_TAG:-v0.5.0}"
+
+release_tag() {
+	if [ -n "${VERSION:-}" ]; then echo "$VERSION"; else echo "$BUILD_TAG"; fi
+}
+
+asset_url() {
+	local os="$1" arch="$2" tag="$3"
+	if [ "$os" = "linux" ]; then
+		# Linux release ships server+agent in one tarball.
+		echo "https://github.com/${REPO}/releases/download/${tag}/shepherd-linux-${arch}.tar.gz"
+	else
+		# Darwin release ships agent-only.
+		echo "https://github.com/${REPO}/releases/download/${tag}/shepherd-agent-${os}-${arch}.tar.gz"
+	fi
+}
+
+sha256sum_cmd() {
+	if command -v sha256sum >/dev/null 2>&1; then
+		sha256sum "$1" | awk '{print $1}'
+	else
+		shasum -a 256 "$1" | awk '{print $1}'
+	fi
+}
+
+verify_sha256() {
+	local file="$1" sumfile="$2"
+	local got want
+	got=$(sha256sum_cmd "$file")
+	want=$(awk '{print $1}' "$sumfile")
+	[ "$got" = "$want" ] || { err "sha256 mismatch: got $got want $want"; return 1; }
+}
+
+download_with_retry() {
+	local url="$1" out="$2" attempt
+	for attempt in 1 2 3; do
+		if curl -fsSL --connect-timeout 10 -o "$out" "$url"; then
+			return 0
+		fi
+		err "download attempt $attempt failed: $url"
+		sleep $((attempt * 2))
+	done
+	return 3
+}
+
 # --- Source-only short-circuit (for BATS tests) ---------------------------
 #
 # When sourced with `--source` as the first arg, define the helpers but

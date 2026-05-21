@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"log"
@@ -23,6 +25,8 @@ import (
 	_ "github.com/hg-claw/Shepherd/internal/plugins/cloudflare"          // registers via init()
 	singboxplugin "github.com/hg-claw/Shepherd/internal/plugins/singbox" // registers via init()
 	xrayplugin "github.com/hg-claw/Shepherd/internal/plugins/xray"       // registers via init() + Migrate0003
+
+	"github.com/jmoiron/sqlx"
 	"github.com/hg-claw/Shepherd/internal/ptysvc"
 	"github.com/hg-claw/Shepherd/internal/scriptsvc"
 	"github.com/hg-claw/Shepherd/internal/serversvc"
@@ -53,16 +57,7 @@ func main() {
 	authStore := &auth.Store{DB: d}
 	authH := &auth.Handler{Store: authStore, Secure: cfg.CookieSecure}
 
-	if cfg.InitialAdminUsername != "" && cfg.InitialAdminPassword != "" {
-		var n int
-		_ = d.Get(&n, "SELECT COUNT(*) FROM admins")
-		if n == 0 {
-			if _, err := authStore.CreateAdmin(rootCtx, cfg.InitialAdminUsername, cfg.InitialAdminPassword); err != nil {
-				log.Fatalf("create initial admin: %v", err)
-			}
-			log.Printf("created initial admin %q", cfg.InitialAdminUsername)
-		}
-	}
+	bootstrapInitialAdmin(rootCtx, d, authStore, cfg.InitialAdminUsername, cfg.InitialAdminPassword)
 
 	serverSvc := &serversvc.Service{DB: d}
 	settingsStore := &serversvc.SettingsStore{DB: d}
@@ -355,4 +350,62 @@ func deriveServerURL(cfg config.Config) string {
 		addr = ":8080"
 	}
 	return "http://localhost" + addr
+}
+
+// bootstrapInitialAdmin ensures the admins table has at least one entry on
+// startup. Pre-fix this was a no-op when both INITIAL_ADMIN_* envs were
+// empty, so a default `docker compose up` left the install with no way
+// to log in. Now we always create an admin when the table is empty:
+//
+//   - both envs set         → use them (deterministic, useful for IaC)
+//   - either env missing    → fall back to username "admin" and a random
+//                             24-byte URL-safe password, logged ONCE in a
+//                             loud banner that users can grep from
+//                             `docker compose logs`.
+//
+// If the admins table already has rows, this is a no-op.
+func bootstrapInitialAdmin(ctx context.Context, d *sqlx.DB, store *auth.Store, envUser, envPass string) {
+	var n int
+	if err := d.Get(&n, "SELECT COUNT(*) FROM admins"); err != nil {
+		log.Fatalf("count admins: %v", err)
+	}
+	if n > 0 {
+		return
+	}
+	user := envUser
+	if user == "" {
+		user = "admin"
+	}
+	pass := envPass
+	generated := false
+	if pass == "" {
+		p, err := randomPassword(24)
+		if err != nil {
+			log.Fatalf("generate initial admin password: %v", err)
+		}
+		pass = p
+		generated = true
+	}
+	if _, err := store.CreateAdmin(ctx, user, pass); err != nil {
+		log.Fatalf("create initial admin: %v", err)
+	}
+	if generated {
+		log.Printf("================================================================")
+		log.Printf("  Created initial admin: %s", user)
+		log.Printf("  Generated password:    %s", pass)
+		log.Printf("  Shown only once. Save it now, or recreate via DB.")
+		log.Printf("================================================================")
+		return
+	}
+	log.Printf("created initial admin %q (password from INITIAL_ADMIN_PASSWORD)", user)
+}
+
+// randomPassword returns a URL-safe base64 string of nBytes entropy
+// (output length ≈ ceil(4n/3)). 24 bytes → 32 chars, ~192 bits entropy.
+func randomPassword(nBytes int) (string, error) {
+	b := make([]byte, nBytes)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }

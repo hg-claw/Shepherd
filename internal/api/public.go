@@ -162,6 +162,14 @@ func (a *PublicAPI) GetSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]string{"public_display_mode": mode})
 }
 
+// Healthz is a liveness probe used by docker compose's healthcheck.
+// Returns 200 immediately as long as the HTTP server can answer.
+// Does not touch the DB; if you want a readiness probe that does, add a
+// separate /readyz.
+func (a *PublicAPI) Healthz(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, 200, map[string]any{"ok": true})
+}
+
 // AgentStatus is a public, token-authenticated endpoint used by the
 // install script to verify the agent has connected. Returns 404 for
 // unknown / expired tokens, 429 when the per-token rate limit is hit,

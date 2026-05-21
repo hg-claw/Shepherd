@@ -51,6 +51,9 @@ func (r *Router) WithPlugins(p *PluginsAPI, ev *PluginEventsAPI, logs *PluginLog
 func (r *Router) Handler() http.Handler {
 	mux := http.NewServeMux()
 
+	// health
+	mux.HandleFunc("GET /healthz", r.Public.Healthz)
+
 	// public
 	mux.HandleFunc("GET /api/public/servers", r.Public.Servers_ListPublic)
 	mux.HandleFunc("GET /api/public/servers/{id}/telemetry", r.Public.Telemetry)

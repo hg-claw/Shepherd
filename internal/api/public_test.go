@@ -129,6 +129,19 @@ func TestPublicAPI_AgentStatus_RateLimit(t *testing.T) {
 	}
 }
 
+func TestHealthz(t *testing.T) {
+	a, _ := newPublicAPIForTest(t)
+	req := httptest.NewRequest("GET", "/healthz", nil)
+	rr := httptest.NewRecorder()
+	a.Healthz(rr, req)
+	if rr.Code != 200 {
+		t.Fatalf("want 200, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), `"ok":true`) {
+		t.Errorf("body = %s", rr.Body)
+	}
+}
+
 func TestPublic_HidesPrivateAndExposesAlias(t *testing.T) {
 	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})

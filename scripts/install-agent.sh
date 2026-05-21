@@ -128,10 +128,13 @@ install_linux() {
 	chmod 0755 "${BIN_PATH}.new"
 	mv -f "${BIN_PATH}.new" "$BIN_PATH"
 
+	# Names MUST match what cmd/agent reads from os.Getenv — currently
+	# bare SERVER_URL / ENROLLMENT_TOKEN (no SHEPHERD_ prefix). Pre-fix
+	# the agent started then immediately died: "config: SERVER_URL required".
 	mkdir -p "$ENV_DIR"
 	cat > "$ENV_FILE" <<EOF
-SHEPHERD_SERVER_URL=${SERVER_URL}
-SHEPHERD_ENROLLMENT_TOKEN=${TOKEN}
+SERVER_URL=${SERVER_URL}
+ENROLLMENT_TOKEN=${TOKEN}
 EOF
 	chmod 0600 "$ENV_FILE"
 
@@ -175,10 +178,11 @@ install_darwin() {
 	chmod 0755 "${BIN_PATH}.new"
 	mv -f "${BIN_PATH}.new" "$BIN_PATH"
 
+	# Names match cmd/agent's os.Getenv keys (bare, no SHEPHERD_ prefix).
 	mkdir -p "$ENV_DIR"
 	cat > "$ENV_FILE" <<EOF
-SHEPHERD_SERVER_URL=${SERVER_URL}
-SHEPHERD_ENROLLMENT_TOKEN=${TOKEN}
+SERVER_URL=${SERVER_URL}
+ENROLLMENT_TOKEN=${TOKEN}
 EOF
 	chmod 0600 "$ENV_FILE"
 
@@ -191,8 +195,8 @@ EOF
     <key>Label</key>                <string>${LAUNCHD_LABEL}</string>
     <key>ProgramArguments</key>     <array><string>${BIN_PATH}</string></array>
     <key>EnvironmentVariables</key> <dict>
-        <key>SHEPHERD_SERVER_URL</key>        <string>${SERVER_URL}</string>
-        <key>SHEPHERD_ENROLLMENT_TOKEN</key>  <string>${TOKEN}</string>
+        <key>SERVER_URL</key>        <string>${SERVER_URL}</string>
+        <key>ENROLLMENT_TOKEN</key>  <string>${TOKEN}</string>
     </dict>
     <key>RunAtLoad</key>            <true/>
     <key>KeepAlive</key>            <true/>

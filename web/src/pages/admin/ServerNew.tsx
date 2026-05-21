@@ -138,8 +138,30 @@ function ScriptInstallForm() {
 
   const copy = async () => {
     if (!result) return
-    await navigator.clipboard.writeText(result.command)
-    toast('success', 'copied')
+    // navigator.clipboard requires a Secure Context (HTTPS or localhost).
+    // LAN demos served over plain HTTP get a TypeError / SecurityError and
+    // the click silently does nothing — pre-fix, no toast either because
+    // there was no try/catch around the await. Fall back to the textarea +
+    // execCommand pattern which works on any context.
+    try {
+      if (window.isSecureContext && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(result.command)
+      } else {
+        const ta = document.createElement('textarea')
+        ta.value = result.command
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.focus()
+        ta.select()
+        const ok = document.execCommand('copy')
+        document.body.removeChild(ta)
+        if (!ok) throw new Error('execCommand copy returned false')
+      }
+      toast('success', 'copied')
+    } catch (e) {
+      toast('error', `copy failed: ${(e as Error).message ?? e}`)
+    }
   }
 
   if (result) {

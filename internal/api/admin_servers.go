@@ -372,9 +372,16 @@ func (a *ServersAPI) ScriptInstall(w http.ResponseWriter, r *http.Request) {
 }
 
 // buildInstallCommand renders the single-line curl|bash an admin pastes
-// onto a target machine. The script URL is pinned to the running
-// server's BuildVersion so script + binary + server stay in lockstep;
-// for dev builds we point at `main` (raw URLs have no `latest` symlink).
+// onto a target machine. The script URL AND the --version flag are both
+// pinned to the running server's BuildVersion so script + binary + server
+// stay in lockstep. For dev builds we point the script URL at `main`
+// (raw URLs have no `latest` symlink) and pass --version=main so the
+// script's release_tag helper picks `main` over the hardcoded BUILD_TAG
+// fallback baked into the .sh.
+//
+// Pre-fix the script always re-installed the v0.5.0 agent regardless of
+// server version because the .sh's BUILD_TAG was a hardcoded constant
+// and we passed no --version override; upgrades were silently a no-op.
 func buildInstallCommand(buildVersion, publicURL, token string) string {
 	tag := buildVersion
 	if tag == "" || tag == "dev" {
@@ -383,5 +390,6 @@ func buildInstallCommand(buildVersion, publicURL, token string) string {
 	scriptURL := "https://raw.githubusercontent.com/hg-claw/Shepherd/" + tag + "/scripts/install-agent.sh"
 	return "curl -fsSL " + scriptURL +
 		" | sudo bash -s -- --token " + token +
-		" --server " + publicURL
+		" --server " + publicURL +
+		" --version " + tag
 }

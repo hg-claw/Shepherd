@@ -201,7 +201,7 @@ func TestBuildInstallCommand(t *testing.T) {
 		wantNotContain []string
 	}{
 		{
-			name:         "release version → versioned raw URL",
+			name:         "release version → versioned raw URL + matching --version",
 			buildVersion: "v0.5.0",
 			publicURL:    "https://shepherd.example.com",
 			token:        "T_abc",
@@ -209,18 +209,20 @@ func TestBuildInstallCommand(t *testing.T) {
 				"raw.githubusercontent.com/hg-claw/Shepherd/v0.5.0/scripts/install-agent.sh",
 				"--token T_abc",
 				"--server https://shepherd.example.com",
+				"--version v0.5.0",
 				"sudo bash -s --",
 			},
 			wantNotContain: []string{"main"},
 		},
 		{
-			name:         "dev build → main branch",
+			name:         "dev build → main branch + --version main",
 			buildVersion: "dev",
 			publicURL:    "https://shepherd.example.com",
 			token:        "T_xyz",
 			wantContains: []string{
 				"raw.githubusercontent.com/hg-claw/Shepherd/main/scripts/install-agent.sh",
 				"--token T_xyz",
+				"--version main",
 			},
 			wantNotContain: []string{"v0.5.0", "dev"},
 		},

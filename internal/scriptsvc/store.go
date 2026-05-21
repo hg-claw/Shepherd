@@ -38,14 +38,14 @@ func (s *Store) Create(ctx context.Context, sc *Script) (int64, error) {
 	if sc.ParamsJSON == "" {
 		sc.ParamsJSON = "[]"
 	}
-	res, err := s.DB.ExecContext(ctx,
+	var id int64
+	if err := s.DB.QueryRowxContext(ctx,
 		`INSERT INTO scripts(name, description, content, params_json, default_timeout_s, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		sc.Name, sc.Description, sc.Content, sc.ParamsJSON, sc.DefaultTimeoutS, now, now)
-	if err != nil {
+		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+		sc.Name, sc.Description, sc.Content, sc.ParamsJSON, sc.DefaultTimeoutS, now, now).Scan(&id); err != nil {
 		return 0, err
 	}
-	return res.LastInsertId()
+	return id, nil
 }
 
 func (s *Store) Update(ctx context.Context, sc *Script) error {
@@ -57,19 +57,19 @@ func (s *Store) Update(ctx context.Context, sc *Script) error {
 	}
 	now := s.Now().UTC()
 	_, err := s.DB.ExecContext(ctx,
-		`UPDATE scripts SET name=?, description=?, content=?, params_json=?, default_timeout_s=?, updated_at=? WHERE id=?`,
+		`UPDATE scripts SET name=$1, description=$2, content=$3, params_json=$4, default_timeout_s=$5, updated_at=$6 WHERE id=$7`,
 		sc.Name, sc.Description, sc.Content, sc.ParamsJSON, sc.DefaultTimeoutS, now, sc.ID)
 	return err
 }
 
 func (s *Store) Delete(ctx context.Context, id int64) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM scripts WHERE id=?`, id)
+	_, err := s.DB.ExecContext(ctx, `DELETE FROM scripts WHERE id=$1`, id)
 	return err
 }
 
 func (s *Store) Get(ctx context.Context, id int64) (*Script, error) {
 	var sc Script
-	if err := s.DB.GetContext(ctx, &sc, `SELECT * FROM scripts WHERE id=?`, id); err != nil {
+	if err := s.DB.GetContext(ctx, &sc, `SELECT * FROM scripts WHERE id=$1`, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New("not found")
 		}

@@ -85,8 +85,14 @@ func (s *Service) RedeemEnrollment(ctx context.Context, enrollmentToken, fingerp
 		"UPDATE enrollment_tokens SET consumed_at=CURRENT_TIMESTAMP WHERE token=$1", enrollmentToken); err != nil {
 		return "", 0, err
 	}
+	// install_stage='done': script-install rows are created with the
+	// default 'pending' and have no SSH installer to flip them. The
+	// agent successfully redeeming the token IS the completion signal
+	// for that path. (SSH installer's own state machine still owns
+	// 'installing' → 'done' transitions for the SSH path.)
 	if _, err := tx.ExecContext(ctx, `UPDATE servers SET
-			agent_fingerprint=$1, agent_os=$2, agent_arch=$3, agent_kernel=$4, agent_version=$5
+			agent_fingerprint=$1, agent_os=$2, agent_arch=$3, agent_kernel=$4, agent_version=$5,
+			install_stage='done'
 			WHERE id=$6`,
 		fingerprint, osName, arch, kernel, agentVersion, serverID); err != nil {
 		return "", 0, err

@@ -26,7 +26,7 @@ func (r *Retention) Once(ctx context.Context) error {
 		days = 30
 	}
 	cutoff := r.Now().Add(-time.Duration(days) * 24 * time.Hour).UTC()
-	_, err := r.DB.ExecContext(ctx, `DELETE FROM audit_log WHERE ts < ?`, cutoff)
+	_, err := r.DB.ExecContext(ctx, `DELETE FROM audit_log WHERE ts < $1`, cutoff)
 	return err
 }
 

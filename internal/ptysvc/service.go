@@ -114,19 +114,22 @@ func (s *Service) Open(ctx context.Context, o OpenOpts) (*Session, error) {
 	sid := agentapi.NewSID()
 	now := s.Now().UTC()
 
-	res, err := s.DB.ExecContext(ctx, `INSERT INTO pty_sessions
+	// $N placeholders + RETURNING id — portable across sqlite and pg.
+	// Pre-fix opening a console on postgres reported
+	// `pq: syntax error at or near ","` because pq rejects ? placeholders.
+	var id int64
+	if err := s.DB.QueryRowxContext(ctx, `INSERT INTO pty_sessions
 		(server_id, admin_id, kind, exec_user, rows, cols, exec, started_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		o.ServerID, o.AdminID, o.Kind, ifEmpty(o.User, "root"), o.Rows, o.Cols, o.Exec, now)
-	if err != nil {
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+		o.ServerID, o.AdminID, o.Kind, ifEmpty(o.User, "root"), o.Rows, o.Cols, o.Exec, now,
+	).Scan(&id); err != nil {
 		return nil, err
 	}
-	id, _ := res.LastInsertId()
 
 	recPath := filepath.Join(s.RecordingsDir, fmt.Sprintf("%d", o.ServerID), fmt.Sprintf("%d.cast", id))
 	rec, recErr := NewCastWriter(recPath, o.Cols, o.Rows, now, "shepherd-pty", fmt.Sprintf("kind=%s", o.Kind))
 	if recErr == nil {
-		_, _ = s.DB.ExecContext(ctx, `UPDATE pty_sessions SET recording_path=? WHERE id=?`, recPath, id)
+		_, _ = s.DB.ExecContext(ctx, `UPDATE pty_sessions SET recording_path=$1 WHERE id=$2`, recPath, id)
 	}
 
 	sess := &Session{
@@ -163,7 +166,7 @@ func (s *Service) Open(ctx context.Context, o OpenOpts) (*Session, error) {
 		if sess.Recorder != nil {
 			_ = sess.Recorder.Close()
 		}
-		_, _ = s.DB.ExecContext(ctx, `UPDATE pty_sessions SET ended_at=?, ended_reason='agent_offline' WHERE id=?`, s.Now().UTC(), id)
+		_, _ = s.DB.ExecContext(ctx, `UPDATE pty_sessions SET ended_at=$1, ended_reason='agent_offline' WHERE id=$2`, s.Now().UTC(), id)
 		s.mu.Lock()
 		delete(s.sessions, sid)
 		s.mu.Unlock()
@@ -218,7 +221,7 @@ func (s *Service) finalize(sess *Session, code int, reason string) {
 		_ = sess.Recorder.Close()
 	}
 	now := s.Now().UTC()
-	_, _ = s.DB.Exec(`UPDATE pty_sessions SET ended_at=?, exit_code=?, ended_reason=? WHERE id=?`,
+	_, _ = s.DB.Exec(`UPDATE pty_sessions SET ended_at=$1, exit_code=$2, ended_reason=$3 WHERE id=$4`,
 		now, code, reason, sess.PTYRowID)
 	if v := sess.browser.Load(); v != nil {
 		if b, ok := v.(BrowserConn); ok && b != nil {
@@ -255,7 +258,7 @@ func (s *Service) AgentDisconnected(serverID int64) {
 func (s *Service) Sweep(ctx context.Context) error {
 	now := s.Now().UTC()
 	_, err := s.DB.ExecContext(ctx,
-		`UPDATE pty_sessions SET ended_at=?, exit_code=-4, ended_reason='server_restart' WHERE ended_at IS NULL`, now)
+		`UPDATE pty_sessions SET ended_at=$1, exit_code=-4, ended_reason='server_restart' WHERE ended_at IS NULL`, now)
 	return err
 }
 

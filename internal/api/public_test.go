@@ -14,7 +14,133 @@ import (
 	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/hg-claw/Shepherd/internal/serversvc"
 	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
+	"github.com/jmoiron/sqlx"
 )
+
+// newPublicAPIForTest creates a fresh in-memory SQLite DB, runs migrations,
+// and returns a PublicAPI (with Servers + Tokens wired) plus the raw *sqlx.DB
+// for direct SQL seeding.
+func newPublicAPIForTest(t *testing.T) (*PublicAPI, *sqlx.DB) {
+	t.Helper()
+	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	t.Cleanup(func() { _ = d.Close() })
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+	svc := &serversvc.Service{DB: d}
+	settings := &serversvc.SettingsStore{DB: d}
+	q := &telemetrysvc.Query{DB: d}
+	hub := agentsvc.NewHub()
+	agentSvc := &agentsvc.Service{DB: d}
+	a := &PublicAPI{
+		Servers:  svc,
+		Settings: settings,
+		Query:    q,
+		Hub:      hub,
+		Tokens:   agentSvc,
+	}
+	a.InitRateLimit(30, time.Minute)
+	return a, d
+}
+
+func TestPublicAPI_AgentStatus_Online(t *testing.T) {
+	a, db := newPublicAPIForTest(t)
+	// Seed a server row + enrollment token + recent last_seen.
+	res, _ := db.Exec(`INSERT INTO servers (name, agent_last_seen) VALUES (?, ?)`,
+		"s1", time.Now().Add(-5*time.Second))
+	serverID, _ := res.LastInsertId()
+	tok := "tok_online"
+	if _, err := db.Exec(
+		`INSERT INTO enrollment_tokens (token, server_id, expires_at) VALUES (?, ?, ?)`,
+		tok, serverID, time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	req := httptest.NewRequest("GET", "/api/agent/status?token="+tok, nil)
+	rr := httptest.NewRecorder()
+	a.AgentStatus(rr, req)
+	if rr.Code != 200 {
+		t.Fatalf("status %d", rr.Code)
+	}
+	var got struct {
+		Online     bool    `json:"online"`
+		LastSeenAt *string `json:"last_seen_at"`
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &got)
+	if !got.Online {
+		t.Errorf("expected online=true; body=%s", rr.Body)
+	}
+}
+
+func TestPublicAPI_AgentStatus_Offline(t *testing.T) {
+	a, db := newPublicAPIForTest(t)
+	res, _ := db.Exec(`INSERT INTO servers (name, agent_last_seen) VALUES (?, ?)`,
+		"s2", time.Now().Add(-10*time.Minute))
+	serverID, _ := res.LastInsertId()
+	tok := "tok_offline"
+	_, _ = db.Exec(
+		`INSERT INTO enrollment_tokens (token, server_id, expires_at) VALUES (?, ?, ?)`,
+		tok, serverID, time.Now().Add(time.Hour))
+	req := httptest.NewRequest("GET", "/api/agent/status?token="+tok, nil)
+	rr := httptest.NewRecorder()
+	a.AgentStatus(rr, req)
+	if rr.Code != 200 {
+		t.Fatalf("status %d", rr.Code)
+	}
+	var got struct {
+		Online bool `json:"online"`
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &got)
+	if got.Online {
+		t.Errorf("expected online=false")
+	}
+}
+
+func TestPublicAPI_AgentStatus_UnknownToken(t *testing.T) {
+	a, _ := newPublicAPIForTest(t)
+	req := httptest.NewRequest("GET", "/api/agent/status?token=nope", nil)
+	rr := httptest.NewRecorder()
+	a.AgentStatus(rr, req)
+	if rr.Code != 404 {
+		t.Fatalf("want 404, got %d", rr.Code)
+	}
+}
+
+func TestPublicAPI_AgentStatus_RateLimit(t *testing.T) {
+	a, db := newPublicAPIForTest(t)
+	res, _ := db.Exec(`INSERT INTO servers (name) VALUES (?)`, "s3")
+	serverID, _ := res.LastInsertId()
+	tok := "tok_rl"
+	_, _ = db.Exec(
+		`INSERT INTO enrollment_tokens (token, server_id, expires_at) VALUES (?, ?, ?)`,
+		tok, serverID, time.Now().Add(time.Hour))
+	for i := 0; i < 30; i++ {
+		req := httptest.NewRequest("GET", "/api/agent/status?token="+tok, nil)
+		rr := httptest.NewRecorder()
+		a.AgentStatus(rr, req)
+		if rr.Code != 200 {
+			t.Fatalf("hit %d: status %d", i, rr.Code)
+		}
+	}
+	// 31st should be 429.
+	req := httptest.NewRequest("GET", "/api/agent/status?token="+tok, nil)
+	rr := httptest.NewRecorder()
+	a.AgentStatus(rr, req)
+	if rr.Code != 429 {
+		t.Fatalf("want 429, got %d", rr.Code)
+	}
+}
+
+func TestHealthz(t *testing.T) {
+	a, _ := newPublicAPIForTest(t)
+	req := httptest.NewRequest("GET", "/healthz", nil)
+	rr := httptest.NewRecorder()
+	a.Healthz(rr, req)
+	if rr.Code != 200 {
+		t.Fatalf("want 200, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), `"ok":true`) {
+		t.Errorf("body = %s", rr.Body)
+	}
+}
 
 func TestPublic_HidesPrivateAndExposesAlias(t *testing.T) {
 	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"

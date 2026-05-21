@@ -11,6 +11,68 @@ alerting are landing in subsequent phases.
 **Status:** Phase 1 alpha — backend + frontend + e2e smoke pass; first
 release `v0.1.0` available on GitHub Releases.
 
+## Quickstart
+
+### Server (docker compose)
+
+```bash
+git clone https://github.com/hg-claw/Shepherd.git
+cd Shepherd
+cp .env.example .env
+docker compose up -d
+docker compose logs shepherd | grep -A2 'Generated password'
+```
+
+Open `http://<host>:8080` and log in with the user `admin` and the
+password printed in the logs.
+
+To use Postgres instead of the default sqlite:
+
+```bash
+docker compose --profile pg up -d
+```
+
+Set `SERVER_PUBLIC_URL` in `.env` if your server is behind a reverse
+proxy or accessed via a domain different from the docker host's IP —
+the UI uses it to build the agent install command.
+
+### Agents
+
+Once the server is running, add a managed host:
+
+1. In the admin UI, click **+ Add server → Script install**.
+2. Fill in the name + optional metadata, click **Generate install command**.
+3. Copy the displayed `curl … | sudo bash` line and run it as root on
+   the target machine. The script auto-installs the agent under systemd
+   (linux) or launchd (macOS) and waits for it to connect.
+
+The script also supports `--uninstall` to reverse the install. Logs
+go to `/var/log/shepherd-agent.log` on both OSes.
+
+## Other install methods
+
+### Single binary (Linux)
+
+Download from [the latest release](https://github.com/hg-claw/Shepherd/releases/latest):
+
+```bash
+ARCH=amd64   # or arm64
+curl -fsSLO "https://github.com/hg-claw/Shepherd/releases/latest/download/shepherd-linux-${ARCH}.tar.gz"
+tar -xzf "shepherd-linux-${ARCH}.tar.gz"
+sudo install -m 0755 "shepherd-server-linux-${ARCH}" /usr/local/bin/shepherd-server
+sudo install -m 0755 "shepherd-agent-linux-${ARCH}" /usr/local/bin/shepherd-agent
+```
+
+Full systemd unit + env-file walkthrough in
+[`deploy/README.md`](deploy/README.md).
+
+### Build from source
+
+```bash
+make web && make server
+./bin/shepherd-server
+```
+
 ## Features
 
 - Browser-based admin panel (React 19) and a public, desensitized monitoring
@@ -43,53 +105,6 @@ release `v0.1.0` available on GitHub Releases.
                                                                    └─────┬─────┘
                                                                          ▼
                                                                   gopsutil collector
-```
-
-## Quick start
-
-### Docker Compose (recommended)
-
-```bash
-git clone https://github.com/hg-claw/Shepherd.git
-cd Shepherd
-cp .env.example .env
-$EDITOR .env   # set INITIAL_ADMIN_USERNAME / INITIAL_ADMIN_PASSWORD / AUTO_RECOVER_KEY
-docker compose up -d
-# open http://localhost:8080
-```
-
-Add a TLS reverse proxy in front (Caddy / Nginx). See
-[`deploy/caddy/Caddyfile.example`](deploy/caddy/Caddyfile.example).
-
-### Use Postgres
-
-```bash
-# In .env, set:
-#   DATABASE_DRIVER=postgres
-#   DATABASE_DSN=postgres://shepherd:shepherd@postgres:5432/shepherd?sslmode=disable
-docker compose --profile pg up -d
-```
-
-### Single binary (Linux)
-
-Download from [the latest release](https://github.com/hg-claw/Shepherd/releases/latest):
-
-```bash
-ARCH=amd64   # or arm64
-curl -fsSLO "https://github.com/hg-claw/Shepherd/releases/latest/download/shepherd-linux-${ARCH}.tar.gz"
-tar -xzf "shepherd-linux-${ARCH}.tar.gz"
-sudo install -m 0755 "shepherd-server-linux-${ARCH}" /usr/local/bin/shepherd-server
-sudo install -m 0755 "shepherd-agent-linux-${ARCH}" /usr/local/bin/shepherd-agent
-```
-
-Full systemd unit + env-file walkthrough in
-[`deploy/README.md`](deploy/README.md).
-
-### Build from source
-
-```bash
-make web && make server
-./bin/shepherd-server
 ```
 
 ## Remote Ops (Phase 2, since v0.2.0)

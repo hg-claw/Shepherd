@@ -13,6 +13,12 @@ services:
       AUTO_RECOVER_KEY: ${AUTO_RECOVER_KEY:-}
       SERVER_PUBLIC_URL: ${SERVER_PUBLIC_URL:-}
       AGENT_DISTRIBUTION: ${AGENT_DISTRIBUTION:-embedded}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     ports:
       - "${SHEPHERD_PORT:-8080}:8080"
 

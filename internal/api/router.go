@@ -51,10 +51,14 @@ func (r *Router) WithPlugins(p *PluginsAPI, ev *PluginEventsAPI, logs *PluginLog
 func (r *Router) Handler() http.Handler {
 	mux := http.NewServeMux()
 
+	// health
+	mux.HandleFunc("GET /healthz", r.Public.Healthz)
+
 	// public
 	mux.HandleFunc("GET /api/public/servers", r.Public.Servers_ListPublic)
 	mux.HandleFunc("GET /api/public/servers/{id}/telemetry", r.Public.Telemetry)
 	mux.HandleFunc("GET /api/public/settings", r.Public.GetSettings)
+	mux.HandleFunc("GET /api/agent/status", r.Public.AgentStatus)
 
 	// auth (login/logout — no admin guard yet, login is the gate)
 	mux.HandleFunc("POST /api/login", r.Auth.Login)
@@ -67,6 +71,7 @@ func (r *Router) Handler() http.Handler {
 	admin.HandleFunc("GET /api/servers", r.Servers.List)
 	admin.HandleFunc("POST /api/servers", r.Servers.Create)
 	admin.HandleFunc("POST /api/servers/install", r.Servers.Install)
+	admin.HandleFunc("POST /api/servers/script", r.Servers.ScriptInstall)
 	admin.HandleFunc("GET /api/servers/{id}", r.Servers.Get)
 	admin.HandleFunc("PATCH /api/servers/{id}", r.Servers.Patch)
 	admin.HandleFunc("DELETE /api/servers/{id}", r.Servers.Delete)

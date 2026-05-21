@@ -124,6 +124,30 @@ export function useInstall() {
   })
 }
 
+export interface ScriptInstallInput {
+  name: string
+  public_alias?: string
+  public_group?: string
+  country_code?: string
+  show_on_public: boolean
+}
+
+export interface ScriptInstallResult {
+  server_id: number
+  token: string
+  expires_at: string
+  command: string
+}
+
+export function useScriptInstall() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: ScriptInstallInput) =>
+      api.post<ScriptInstallResult>('/api/servers/script', input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['servers'] }),
+  })
+}
+
 export type PatchInput = {
   name?: string
   public_alias?: string

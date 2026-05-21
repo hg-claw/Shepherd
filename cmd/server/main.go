@@ -141,12 +141,15 @@ func main() {
 	servers := &api.ServersAPI{
 		Servers: serverSvc, Settings: settingsStore, Query: tQuery, Hub: hub,
 		InstallManager: installMgr, Tokens: agentSvc,
+		BuildVersion: cfg.BuildVersion,
+		PublicURL:    deriveServerURL(cfg),
 	}
 	settings := &api.SettingsAPI{
 		Settings:        settingsStore,
 		OnSandboxChange: sandboxPusher.PushAll,
 	}
-	public := &api.PublicAPI{Servers: serverSvc, Settings: settingsStore, Query: tQuery, Hub: hub}
+	public := &api.PublicAPI{Servers: serverSvc, Settings: settingsStore, Query: tQuery, Hub: hub, Tokens: agentSvc}
+	public.InitRateLimit(30, time.Minute)
 	agentAPI := &api.AgentAPI{
 		Agents:            agentSvc,
 		Hub:               hub,

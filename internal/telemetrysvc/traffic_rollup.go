@@ -16,6 +16,18 @@ type TrafficRollup struct {
 	MinuteInterval time.Duration // default 1 min
 	HourInterval   time.Duration // default 1 h
 	CleanupInterval time.Duration // default 10 min
+	// Enabled is called each tick to gate work on plugin enabled state.
+	// nil → always on. When non-nil and returning false, every tick is
+	// a no-op — prevents "no such table" log spam on hosts that never
+	// enabled the xray plugin.
+	Enabled func() bool
+}
+
+func (r *TrafficRollup) shouldRun() bool {
+	if r.Enabled == nil {
+		return true
+	}
+	return r.Enabled()
 }
 
 // Run blocks until ctx is canceled, running rollups and cleanup on their
@@ -44,14 +56,23 @@ func (r *TrafficRollup) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-minuteTicker.C:
+			if !r.shouldRun() {
+				continue
+			}
 			if err := r.rollupRawToMinute(ctx); err != nil {
 				log.Printf("traffic rollup raw->minute: %v", err)
 			}
 		case <-hourTicker.C:
+			if !r.shouldRun() {
+				continue
+			}
 			if err := r.rollupMinuteToHour(ctx); err != nil {
 				log.Printf("traffic rollup minute->hour: %v", err)
 			}
 		case <-cleanupTicker.C:
+			if !r.shouldRun() {
+				continue
+			}
 			if err := r.Cleanup(ctx); err != nil {
 				log.Printf("traffic rollup cleanup: %v", err)
 			}
@@ -67,6 +88,11 @@ func (r *TrafficRollup) Run(ctx context.Context) {
 // Both sides of the WHERE comparison use strftime to normalise the timestamp
 // format — Go inserts RFC3339 ("T"/"Z") while SQLite datetime() uses
 // space-separated format; strftime handles both correctly.
+//
+// TODO(postgres): strftime() is sqlite-only. On postgres this query will
+// fail when the xray plugin gets enabled. Replace with a driver-branched
+// or date_trunc('minute', ts)-based query once we add postgres
+// integration tests for the rollup loop.
 func (r *TrafficRollup) rollupRawToMinute(ctx context.Context) error {
 	_, err := r.DB.ExecContext(ctx, `
 		INSERT INTO xray_traffic_minute (server_id, tag, kind, ts, bytes_up, bytes_down)

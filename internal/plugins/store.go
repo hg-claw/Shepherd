@@ -43,11 +43,15 @@ func (s *Store) Get(ctx context.Context, id string) (Row, error) {
 // enabled_at is set on transitions to enabled.
 func (s *Store) UpsertEnabled(ctx context.Context, id string, enabled bool) error {
 	now := s.Now().UTC()
+	// Portability: `excluded.enabled=1` worked on sqlite (INTEGER 0/1) but
+	// postgres rejects it as a type mismatch (the column is BOOLEAN there).
+	// Bare `excluded.enabled` is truthy on both — POST /api/admin/plugins/
+	// {id}/enable was 500ing on postgres deployments because of this.
 	_, err := s.DB.ExecContext(ctx,
 		`INSERT INTO plugins(id, enabled, config_json, enabled_at, created_at)
 		 VALUES ($1, $2, '{}', $3, $4)
 		 ON CONFLICT(id) DO UPDATE SET enabled=excluded.enabled,
-		   enabled_at=CASE WHEN excluded.enabled=1 THEN excluded.enabled_at ELSE NULL END`,
+		   enabled_at=CASE WHEN excluded.enabled THEN excluded.enabled_at ELSE NULL END`,
 		id, enabled, nullableTime(enabled, now), now)
 	return err
 }

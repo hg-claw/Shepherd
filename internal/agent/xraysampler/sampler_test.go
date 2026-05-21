@@ -9,6 +9,33 @@ import (
 	"github.com/hg-claw/Shepherd/internal/agentapi"
 )
 
+// Pretend the xray plugin binary is installed in every test by default.
+// TestSkipsWhenPluginAbsent re-flips this locally to verify the guard.
+func init() { pluginInstalledFn = func() bool { return true } }
+
+func TestSkipsWhenPluginAbsent(t *testing.T) {
+	orig := pluginInstalledFn
+	pluginInstalledFn = func() bool { return false }
+	t.Cleanup(func() { pluginInstalledFn = orig })
+
+	sent := 0
+	queryCalled := false
+	s := &Sampler{
+		Send:      func(_ agentapi.Envelope) error { sent++; return nil },
+		queryFunc: func(_ string) (map[statKey]int64, error) {
+			queryCalled = true
+			return map[statKey]int64{}, nil
+		},
+	}
+	s.tick(context.Background())
+	if queryCalled {
+		t.Error("query should not run when plugin is absent")
+	}
+	if sent != 0 {
+		t.Errorf("expected 0 sends when plugin absent, got %d", sent)
+	}
+}
+
 // fakeQuery returns a queryFunc that always returns the given map.
 func fakeQuery(m map[statKey]int64) func(address string) (map[statKey]int64, error) {
 	return func(_ string) (map[statKey]int64, error) { return m, nil }

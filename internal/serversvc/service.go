@@ -60,16 +60,22 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (*Server, error) {
 	if in.SSHPort == 0 {
 		in.SSHPort = 22
 	}
-	res, err := s.DB.ExecContext(ctx, `INSERT INTO servers
+	// RETURNING works on both SQLite 3.35+ (modernc/mattn) and Postgres.
+	// LastInsertId is unsupported by lib/pq and would return 0, making the
+	// subsequent Get(0) fail with ErrNotFound — surfaced to the UI as a
+	// confusing "server not found" right after a successful create.
+	var id int64
+	err := s.DB.QueryRowxContext(ctx, `INSERT INTO servers
 		(name, public_alias, public_group, country_code, show_on_public,
 		 ssh_host, ssh_port, ssh_user, install_stage, install_log)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending','')`,
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending','')
+		RETURNING id`,
 		in.Name, nullable(in.PublicAlias), nullable(in.PublicGroup), nullable(in.CountryCode),
-		in.ShowOnPublic, nullable(in.SSHHost), in.SSHPort, nullable(in.SSHUser))
+		in.ShowOnPublic, nullable(in.SSHHost), in.SSHPort, nullable(in.SSHUser),
+	).Scan(&id)
 	if err != nil {
 		return nil, err
 	}
-	id, _ := res.LastInsertId()
 	return s.Get(ctx, id)
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -71,8 +72,23 @@ func (s *Sampler) Run(ctx context.Context) {
 	}
 }
 
+// pluginInstalledFn is the deploy-presence check. Overridden in tests so
+// they don't depend on the binary actually being on disk at xrayBinaryPath.
+var pluginInstalledFn = func() bool {
+	_, err := os.Stat(xrayBinaryPath)
+	return err == nil
+}
+
 // tick is one sampling cycle. It is exported-by-lowercase so tests can call it directly.
 func (s *Sampler) tick(_ context.Context) {
+	// Skip silently when xray isn't deployed on this host. The binary at
+	// xrayBinaryPath is what shepherd's xray plugin pushes when a host
+	// gets the plugin enabled — absence ≡ "this host has no xray".
+	// Pre-fix, query() failed every interval with "no such file or
+	// directory" and spammed agent logs.
+	if !pluginInstalledFn() {
+		return
+	}
 	cur, err := s.query(s.effectiveAPIAddress())
 	if err != nil {
 		log.Printf("xraysampler: query failed: %v", err)

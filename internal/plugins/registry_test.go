@@ -3,6 +3,8 @@ package plugins
 import (
 	"context"
 	"testing"
+
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
 )
 
 func TestRegisterAndGet(t *testing.T) {
@@ -46,7 +48,7 @@ func TestAllReturnsStableOrder(t *testing.T) {
 type namedFake struct{ id string }
 
 func (n namedFake) Meta() Meta                                       { return Meta{ID: n.id} }
-func (namedFake) Migrations() []Migration                            { return nil }
+func (namedFake) Migrations(_ shepdb.Driver) []Migration             { return nil }
 func (namedFake) RegisterRoutes(_ Mux, _ Deps)                       {}
 func (namedFake) OnEnable(_ context.Context, _ Deps) error           { return nil }
 func (namedFake) OnDisable(_ context.Context, _ Deps) error          { return nil }

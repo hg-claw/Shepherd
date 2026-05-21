@@ -25,7 +25,7 @@ func TestMigration0004_CreatesTrafficTables(t *testing.T) {
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,ssh_user,ssh_port,created_at) VALUES (?,?,?,?,?,?)`,
 		1, "s1", "1.1.1.1", "root", 22, time.Now())
 
-	migs := loadMigrations()
+	migs := loadMigrations(shepdb.DriverSQLite)
 	if err := plugins.RunPluginMigrations(context.Background(), d, "xray", migs); err != nil {
 		t.Fatal(err)
 	}

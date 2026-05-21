@@ -21,7 +21,7 @@ func newTrafficDB(t *testing.T) (*sqlx.DB, int64) {
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
 	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
-	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations())
+	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations(shepdb.DriverSQLite))
 	res, _ := d.Exec("INSERT INTO servers(name) VALUES ('h')")
 	sid, _ := res.LastInsertId()
 	// Seed one raw row 10 min ago

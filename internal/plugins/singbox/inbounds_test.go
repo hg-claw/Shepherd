@@ -25,7 +25,7 @@ func newInboundStore(t *testing.T) *InboundStore {
 	// Run all 4 migrations: 0001 (inbounds) references singbox_certificates (0004),
 	// so all must run to satisfy the FK constraint with _fk=1 enabled.
 	if err := plugins.RunPluginMigrations(context.Background(), d, "singbox",
-		loadMigrations()); err != nil {
+		loadMigrations(shepdb.DriverSQLite)); err != nil {
 		t.Fatal(err)
 	}
 	for _, id := range []int64{1, 2, 3} {

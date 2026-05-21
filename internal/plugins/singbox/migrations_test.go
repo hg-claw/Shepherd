@@ -38,7 +38,7 @@ func seedSingboxServers(t *testing.T, d *sqlx.DB, ids ...int64) {
 // runSingboxMigrations applies all 4 singbox migrations.
 func runSingboxMigrations(t *testing.T, d *sqlx.DB) {
 	t.Helper()
-	if err := plugins.RunPluginMigrations(context.Background(), d, "singbox", loadMigrations()); err != nil {
+	if err := plugins.RunPluginMigrations(context.Background(), d, "singbox", loadMigrations(shepdb.DriverSQLite)); err != nil {
 		t.Fatal(err)
 	}
 }

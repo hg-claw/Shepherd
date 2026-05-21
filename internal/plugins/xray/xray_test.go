@@ -27,7 +27,7 @@ func TestXraySatisfiesHostAware(t *testing.T) {
 
 func TestXrayMigrationsHaveContent(t *testing.T) {
 	p := New()
-	migs := p.Migrations()
+	migs := p.Migrations(shepdb.DriverSQLite)
 	if len(migs) == 0 {
 		t.Fatal("expected at least one migration")
 	}
@@ -56,7 +56,7 @@ func TestMigration0002_CreatesTopologyAndBackfillsLanding(t *testing.T) {
 		VALUES (?,?,?,?,?)`, "xray", 9, "{}", "running", time.Now())
 
 	// Apply ONLY the xray plugin migrations (0001 + 0002).
-	migs := loadMigrations()
+	migs := loadMigrations(shepdb.DriverSQLite)
 	if err := plugins.RunPluginMigrations(context.Background(), d, "xray", migs); err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestMigration0003_CreatesInboundsTable(t *testing.T) {
 	if err := shepdb.Migrate(d, shepdb.DriverSQLite); err != nil {
 		t.Fatal(err)
 	}
-	if err := plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations()); err != nil {
+	if err := plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations(shepdb.DriverSQLite)); err != nil {
 		t.Fatal(err)
 	}
 

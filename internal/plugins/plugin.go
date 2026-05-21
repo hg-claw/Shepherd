@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -59,7 +60,11 @@ type HostExec interface {
 // Plugin is the contract every compile-time plugin satisfies.
 type Plugin interface {
 	Meta() Meta
-	Migrations() []Migration
+	// Migrations returns the migrations for the given driver. Plugins ship
+	// per-driver SQL because the dialects diverge in ways that can't be
+	// hidden behind a placeholder swap (e.g. INTEGER PRIMARY KEY
+	// AUTOINCREMENT vs BIGSERIAL, TIMESTAMP vs TIMESTAMPTZ).
+	Migrations(driver shepdb.Driver) []Migration
 	RegisterRoutes(mux Mux, deps Deps)
 	OnEnable(ctx context.Context, deps Deps) error
 	OnDisable(ctx context.Context, deps Deps) error

@@ -22,7 +22,7 @@ func newCertStore(t *testing.T) *CertStore {
 		t.Fatal(err)
 	}
 	// Run all 4 migrations so cert_id FK in singbox_inbounds is valid
-	if err := plugins.RunPluginMigrations(context.Background(), d, "singbox", loadMigrations()); err != nil {
+	if err := plugins.RunPluginMigrations(context.Background(), d, "singbox", loadMigrations(shepdb.DriverSQLite)); err != nil {
 		t.Fatal(err)
 	}
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,ssh_user,ssh_port,created_at)

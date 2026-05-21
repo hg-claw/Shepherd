@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 	sbplugin "github.com/hg-claw/Shepherd/internal/plugins/singbox"
 )
@@ -14,7 +15,7 @@ func newIngestWithSingboxTraffic(t *testing.T) (*Ingest, int64) {
 	t.Helper()
 	ing, sid := newIngest(t)
 	if err := plugins.RunPluginMigrations(context.Background(), ing.DB, "singbox",
-		sbplugin.Migrations()); err != nil {
+		sbplugin.Migrations(shepdb.DriverSQLite)); err != nil {
 		t.Fatal(err)
 	}
 	return ing, sid

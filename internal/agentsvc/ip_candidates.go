@@ -70,13 +70,13 @@ func ApplyBestSSHHost(ctx context.Context, db *sqlx.DB, serverID int64, cands []
 		return nil
 	}
 	var current sql.NullString
-	if err := db.GetContext(ctx, &current, "SELECT ssh_host FROM servers WHERE id=?", serverID); err != nil {
+	if err := db.GetContext(ctx, &current, "SELECT ssh_host FROM servers WHERE id=$1", serverID); err != nil {
 		return err
 	}
 	if current.Valid && current.String != "" {
 		return nil
 	}
-	_, err := db.ExecContext(ctx, "UPDATE servers SET ssh_host=? WHERE id=?", best, serverID)
+	_, err := db.ExecContext(ctx, "UPDATE servers SET ssh_host=$1 WHERE id=$2", best, serverID)
 	return err
 }
 

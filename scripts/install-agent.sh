@@ -262,7 +262,12 @@ main() {
 
 	tag=$(release_tag)
 	tmp=$(mktemp -d)
-	trap 'rm -rf "$tmp"' EXIT
+	# Defensive: $tmp is `local` to main(), but the EXIT trap fires after
+	# main() has returned (at script-global scope) where $tmp is out of
+	# scope and `set -u` would otherwise trip with "unbound variable".
+	# The ${tmp-} fallback lets the trap no-op cleanly if tmp was never
+	# assigned (e.g. uninstall path returned early before reaching here).
+	trap '[ -n "${tmp-}" ] && rm -rf "$tmp"' EXIT
 
 	local url tar agent_bin
 	url=$(asset_url "$os" "$arch" "$tag")

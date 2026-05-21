@@ -25,7 +25,7 @@ func newRoutesDB(t *testing.T) (interface {
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
 	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
-	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations())
+	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations(shepdb.DriverSQLite))
 	for _, id := range []int64{1, 2, 3} {
 		d.MustExec(`INSERT INTO servers(id,name,ssh_host,ssh_user,ssh_port,agent_os,agent_arch,created_at)
 			VALUES (?,?,?,?,?,?,?,?)`,
@@ -172,7 +172,7 @@ func TestPatchServerVersion_TriggersBinaryPushAndRestart(t *testing.T) {
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
 	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
-	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations())
+	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations(shepdb.DriverSQLite))
 
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,ssh_user,ssh_port,agent_os,agent_arch,created_at)
 		VALUES (1,'s1','1.1.1.1','r',22,'linux','amd64',?)`, time.Now())

@@ -45,7 +45,7 @@ func newDeployTestDB(t *testing.T) *sqlx.DB {
 	if err := shepdb.Migrate(d, shepdb.DriverSQLite); err != nil {
 		t.Fatal(err)
 	}
-	if err := plugins.RunPluginMigrations(context.Background(), d, "singbox", loadMigrations()); err != nil {
+	if err := plugins.RunPluginMigrations(context.Background(), d, "singbox", loadMigrations(shepdb.DriverSQLite)); err != nil {
 		t.Fatal(err)
 	}
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,ssh_user,ssh_port,agent_os,agent_arch,created_at)

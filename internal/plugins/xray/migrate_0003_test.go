@@ -22,7 +22,7 @@ func setupLegacyDB(t *testing.T) (*sqlx.DB, *InboundStore) {
 	if err := shepdb.Migrate(d, shepdb.DriverSQLite); err != nil {
 		t.Fatal(err)
 	}
-	if err := plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations()); err != nil {
+	if err := plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations(shepdb.DriverSQLite)); err != nil {
 		t.Fatal(err)
 	}
 	// Register the xray plugin row (required by plugin_hosts FK).

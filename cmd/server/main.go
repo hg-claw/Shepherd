@@ -204,8 +204,9 @@ func main() {
 		Now:      time.Now,
 	}
 	pluginsAPI := &api.PluginsAPI{
-		Store: pluginStore,
-		Deps:  pluginsDeps,
+		Store:  pluginStore,
+		Deps:   pluginsDeps,
+		Driver: cfg.DBDriver,
 		SecretFields: map[string][]string{
 			"cloudflare": {"api_token"},
 		},
@@ -219,7 +220,7 @@ func main() {
 		if err != nil || !row.Enabled {
 			continue
 		}
-		if err := plugins.RunPluginMigrations(rootCtx, d, p.Meta().ID, p.Migrations()); err != nil {
+		if err := plugins.RunPluginMigrations(rootCtx, d, p.Meta().ID, p.Migrations(cfg.DBDriver)); err != nil {
 			log.Printf("plugin %s: boot migrate: %v", p.Meta().ID, err)
 		}
 		if p.Meta().ID == "xray" {

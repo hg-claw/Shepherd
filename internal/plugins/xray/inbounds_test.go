@@ -21,7 +21,7 @@ func newInboundStore(t *testing.T) *InboundStore {
 	if err := shepdb.Migrate(d, shepdb.DriverSQLite); err != nil {
 		t.Fatal(err)
 	}
-	if err := plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations()); err != nil {
+	if err := plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations(shepdb.DriverSQLite)); err != nil {
 		t.Fatal(err)
 	}
 	for _, id := range []int64{1, 2, 3} {

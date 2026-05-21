@@ -17,7 +17,7 @@ func newRollupDB(t *testing.T) (*Ingest, int64) {
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
 	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
-	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", xrayplugin.Migrations())
+	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", xrayplugin.Migrations(shepdb.DriverSQLite))
 	res, _ := d.Exec("INSERT INTO servers(name) VALUES ('h')")
 	sid, _ := res.LastInsertId()
 	return &Ingest{DB: d}, sid

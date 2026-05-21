@@ -18,7 +18,7 @@ import (
 type plainP struct{ id string }
 
 func (p plainP) Meta() plugins.Meta              { return plugins.Meta{ID: p.id, Name: p.id, Category: "x"} }
-func (plainP) Migrations() []plugins.Migration   { return nil }
+func (plainP) Migrations(_ shepdb.Driver) []plugins.Migration { return nil }
 func (plainP) RegisterRoutes(_ plugins.Mux, _ plugins.Deps) {}
 func (plainP) OnEnable(_ context.Context, _ plugins.Deps) error  { return nil }
 func (plainP) OnDisable(_ context.Context, _ plugins.Deps) error { return nil }
@@ -74,7 +74,7 @@ type recordingP struct {
 func (r *recordingP) Meta() plugins.Meta { return plugins.Meta{ID: "r", Name: "R"} }
 func (r *recordingP) OnEnable(_ context.Context, _ plugins.Deps) error  { r.enableCalls++; return nil }
 func (r *recordingP) OnDisable(_ context.Context, _ plugins.Deps) error { r.disableCalls++; return nil }
-func (r *recordingP) Migrations() []plugins.Migration {
+func (r *recordingP) Migrations(_ shepdb.Driver) []plugins.Migration {
 	return []plugins.Migration{{Name: "0001_r", SQL: "CREATE TABLE r_t (id INTEGER);"}}
 }
 func (*recordingP) RegisterRoutes(_ plugins.Mux, _ plugins.Deps) {}

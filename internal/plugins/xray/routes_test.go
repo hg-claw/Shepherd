@@ -41,7 +41,7 @@ func TestVersionsEndpoint_ListsCache(t *testing.T) {
 	dsn := "file:" + filepath.Join(t.TempDir(), "v.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
-	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", New().Migrations())
+	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", New().Migrations(shepdb.DriverSQLite))
 	_, _ = d.Exec(`INSERT INTO xray_binaries(version, os, arch, size_bytes, sha256, path, downloaded_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`, "1.8.11", "linux", "amd64", 1, "x", "/p", time.Now())
 
@@ -104,7 +104,7 @@ func TestTopologyHandler_ReturnsRowsWithUpstreamName(t *testing.T) {
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
 	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
-	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", New().Migrations())
+	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", New().Migrations(shepdb.DriverSQLite))
 	d.MustExec(`INSERT INTO servers(id, name) VALUES (1, 'landing-a'), (2, 'relay-b')`)
 	store := &TopologyStore{DB: d, Now: time.Now}
 	_ = store.UpsertLanding(context.Background(), 1)

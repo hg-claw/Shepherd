@@ -26,7 +26,7 @@ func newTrafficDB(t *testing.T) (*sqlx.DB, int64) {
 	if err := shepdb.Migrate(d, shepdb.DriverSQLite); err != nil {
 		t.Fatal(err)
 	}
-	if err := plugins.RunPluginMigrations(context.Background(), d, "singbox", loadMigrations()); err != nil {
+	if err := plugins.RunPluginMigrations(context.Background(), d, "singbox", loadMigrations(shepdb.DriverSQLite)); err != nil {
 		t.Fatal(err)
 	}
 	res, _ := d.Exec("INSERT INTO servers(name) VALUES ('h')")

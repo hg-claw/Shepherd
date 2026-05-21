@@ -118,6 +118,53 @@ download_with_retry() {
 	return 3
 }
 
+# --- Linux install / uninstall ---------------------------------------------
+
+install_linux() {
+	command -v systemctl >/dev/null 2>&1 || { err "systemctl not found"; return 5; }
+	systemctl stop shepherd-agent 2>/dev/null || true
+
+	mv -f "$1" "${BIN_PATH}.new"
+	chmod 0755 "${BIN_PATH}.new"
+	mv -f "${BIN_PATH}.new" "$BIN_PATH"
+
+	mkdir -p "$ENV_DIR"
+	cat > "$ENV_FILE" <<EOF
+SHEPHERD_SERVER_URL=${SERVER_URL}
+SHEPHERD_ENROLLMENT_TOKEN=${TOKEN}
+EOF
+	chmod 0600 "$ENV_FILE"
+
+	cat > "$LINUX_UNIT" <<'EOF'
+[Unit]
+Description=Shepherd Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/shepherd-agent/env
+ExecStart=/usr/local/bin/shepherd-agent
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/shepherd-agent.log
+StandardError=append:/var/log/shepherd-agent.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+	systemctl daemon-reload
+	systemctl enable --now shepherd-agent
+}
+
+uninstall_linux() {
+	systemctl disable --now shepherd-agent 2>/dev/null || true
+	rm -f "$LINUX_UNIT"
+	rm -f "$BIN_PATH"
+	systemctl daemon-reload || true
+	echo "Config dir $ENV_DIR preserved. To remove: sudo rm -rf $ENV_DIR"
+}
+
 # --- Source-only short-circuit (for BATS tests) ---------------------------
 #
 # When sourced with `--source` as the first arg, define the helpers but

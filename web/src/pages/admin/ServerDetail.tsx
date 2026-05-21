@@ -2,7 +2,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FolderTree, Terminal as TerminalIcon } from 'lucide-react'
-import { useServer, useTelemetry, usePatchServer, useDeleteServer, useRepair, usePushConfig, useServerIPCandidates } from '@/api/servers'
+import { useServer, useTelemetry, usePatchServer, useDeleteServer, useRepair, usePushConfig, useServerIPCandidates, useServerInstallCommand } from '@/api/servers'
+import { InstallCommandPanel } from '@/components/admin/InstallCommandPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,9 +48,11 @@ export default function AdminServerDetail() {
   const config = usePushConfig(id)
   const del = useDeleteServer()
   const ipCandidates = useServerIPCandidates(id)
+  const installCmd = useServerInstallCommand(id)
 
   const [interval, setIntervalSecs] = useState(30)
   const [repairToken, setRepairToken] = useState<{ token: string; expires: string } | null>(null)
+  const [installPanel, setInstallPanel] = useState<{ command: string; expires_at: string } | null>(null)
 
   if (!s) return <div>{t('common.loading')}</div>
 
@@ -157,7 +160,30 @@ export default function AdminServerDetail() {
           <TerminalIcon className="h-4 w-4 mr-1" />
           {t('console.open', 'Console')}
         </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={installCmd.isPending}
+          onClick={async () => {
+            try {
+              const r = await installCmd.mutateAsync()
+              setInstallPanel({ command: r.command, expires_at: r.expires_at })
+            } catch (e) {
+              toast('error', (e as Error).message ?? 'failed')
+            }
+          }}
+        >
+          {installCmd.isPending ? 'Issuing…' : 'Install command'}
+        </Button>
       </div>
+
+      {installPanel && (
+        <InstallCommandPanel
+          command={installPanel.command}
+          expiresAt={installPanel.expires_at}
+          title="Re-install / upgrade this host"
+        />
+      )}
 
       {(s.install_stage === 'installing' || s.install_stage === 'failed') && (
         <Card>

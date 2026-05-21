@@ -371,6 +371,33 @@ func (a *ServersAPI) ScriptInstall(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// InstallCommand returns a fresh install command for an existing server,
+// for re-running install on a new target machine or upgrading the agent
+// to the current server's release. Mints a new enrollment token (60min
+// TTL, single-use); does not invalidate previous tokens.
+func (a *ServersAPI) InstallCommand(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID2(r, "/api/servers/", "/install-command")
+	if !ok {
+		writeError(w, 400, "bad path")
+		return
+	}
+	if _, err := a.Servers.Get(r.Context(), id); err != nil {
+		writeError(w, 404, "server not found")
+		return
+	}
+	tok, exp, err := a.Tokens.IssueEnrollmentToken(r.Context(), id)
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]any{
+		"server_id":  id,
+		"token":      tok,
+		"expires_at": exp,
+		"command":    buildInstallCommand(a.BuildVersion, a.PublicURL, tok),
+	})
+}
+
 // buildInstallCommand renders the single-line curl|bash an admin pastes
 // onto a target machine. The script URL AND the --version flag are both
 // pinned to the running server's BuildVersion so script + binary + server

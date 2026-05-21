@@ -182,6 +182,13 @@ export function useRepair(id: number) {
   })
 }
 
+export function useServerInstallCommand(id: number) {
+  return useMutation({
+    mutationFn: () =>
+      api.post<ScriptInstallResult>(`/api/servers/${id}/install-command`, {}),
+  })
+}
+
 export function usePushConfig(id: number) {
   return useMutation({
     mutationFn: (input: { telemetry_interval_seconds: number }) =>

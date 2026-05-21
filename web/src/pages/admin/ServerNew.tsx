@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useInstall, useScriptInstall } from '@/api/servers'
 import { useUI } from '@/store/ui'
+import { InstallCommandPanel } from '@/components/admin/InstallCommandPanel'
 
 const schema = z.object({
   name: z.string().min(1),
@@ -136,49 +137,8 @@ function ScriptInstallForm() {
     }
   }
 
-  const copy = async () => {
-    if (!result) return
-    // navigator.clipboard requires a Secure Context (HTTPS or localhost).
-    // LAN demos served over plain HTTP get a TypeError / SecurityError and
-    // the click silently does nothing — pre-fix, no toast either because
-    // there was no try/catch around the await. Fall back to the textarea +
-    // execCommand pattern which works on any context.
-    try {
-      if (window.isSecureContext && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(result.command)
-      } else {
-        const ta = document.createElement('textarea')
-        ta.value = result.command
-        ta.style.position = 'fixed'
-        ta.style.opacity = '0'
-        document.body.appendChild(ta)
-        ta.focus()
-        ta.select()
-        const ok = document.execCommand('copy')
-        document.body.removeChild(ta)
-        if (!ok) throw new Error('execCommand copy returned false')
-      }
-      toast('success', 'copied')
-    } catch (e) {
-      toast('error', `copy failed: ${(e as Error).message ?? e}`)
-    }
-  }
-
   if (result) {
-    return (
-      <Card>
-        <CardHeader><CardTitle>Run this on the target host</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">{result.command}</pre>
-          <div className="flex items-center gap-2">
-            <Button onClick={copy}>Copy</Button>
-            <span className="text-xs text-muted-foreground">
-              Token expires {new Date(result.expires_at).toLocaleString()}
-            </span>
-          </div>
-        </CardContent>
-      </Card>
-    )
+    return <InstallCommandPanel command={result.command} expiresAt={result.expires_at} />
   }
 
   return (

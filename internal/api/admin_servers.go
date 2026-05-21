@@ -320,3 +320,18 @@ func (a *ServersAPI) Config(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// buildInstallCommand renders the single-line curl|bash an admin pastes
+// onto a target machine. The script URL is pinned to the running
+// server's BuildVersion so script + binary + server stay in lockstep;
+// for dev builds we point at `main` (raw URLs have no `latest` symlink).
+func buildInstallCommand(buildVersion, publicURL, token string) string {
+	tag := buildVersion
+	if tag == "" || tag == "dev" {
+		tag = "main"
+	}
+	scriptURL := "https://raw.githubusercontent.com/hg-claw/Shepherd/" + tag + "/scripts/install-agent.sh"
+	return "curl -fsSL " + scriptURL +
+		" | sudo bash -s -- --token " + token +
+		" --server " + publicURL
+}

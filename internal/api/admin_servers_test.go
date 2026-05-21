@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -125,5 +126,56 @@ func TestServersList_NoLatestByDefault(t *testing.T) {
 	_ = json.Unmarshal(w.Body.Bytes(), &out)
 	if _, has := out[0]["latest"]; has {
 		t.Error("plain /api/servers should not include latest")
+	}
+}
+
+func TestBuildInstallCommand(t *testing.T) {
+	cases := []struct {
+		name           string
+		buildVersion   string
+		publicURL      string
+		token          string
+		wantContains   []string
+		wantNotContain []string
+	}{
+		{
+			name:         "release version → versioned raw URL",
+			buildVersion: "v0.5.0",
+			publicURL:    "https://shepherd.example.com",
+			token:        "T_abc",
+			wantContains: []string{
+				"raw.githubusercontent.com/hg-claw/Shepherd/v0.5.0/scripts/install-agent.sh",
+				"--token T_abc",
+				"--server https://shepherd.example.com",
+				"sudo bash -s --",
+			},
+			wantNotContain: []string{"main"},
+		},
+		{
+			name:         "dev build → main branch",
+			buildVersion: "dev",
+			publicURL:    "https://shepherd.example.com",
+			token:        "T_xyz",
+			wantContains: []string{
+				"raw.githubusercontent.com/hg-claw/Shepherd/main/scripts/install-agent.sh",
+				"--token T_xyz",
+			},
+			wantNotContain: []string{"v0.5.0", "dev"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := buildInstallCommand(c.buildVersion, c.publicURL, c.token)
+			for _, sub := range c.wantContains {
+				if !strings.Contains(got, sub) {
+					t.Errorf("missing %q in: %s", sub, got)
+				}
+			}
+			for _, sub := range c.wantNotContain {
+				if strings.Contains(got, sub) {
+					t.Errorf("unwanted %q in: %s", sub, got)
+				}
+			}
+		})
 	}
 }

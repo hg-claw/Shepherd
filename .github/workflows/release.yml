@@ -16,15 +16,20 @@ permissions:
 
 jobs:
   binaries:
-    runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
+          cache: true
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -43,15 +48,10 @@ jobs:
                 -o internal/installer/bin/shepherd-agent-${goos}-${goarch} ./cmd/agent
             done
           done
-      - name: Cross-compile server for ${{ matrix.arch }}
+      - name: Native server build for ${{ matrix.arch }}
         run: |
-          if [ "${{ matrix.arch }}" = "arm64" ]; then
-            sudo apt-get update
-            sudo apt-get install -y gcc-aarch64-linux-gnu
-            export CC=aarch64-linux-gnu-gcc
-          fi
           mkdir -p dist
-          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=1 \
+          CGO_ENABLED=1 \
             go build \
             -ldflags "-X github.com/hg-claw/Shepherd/internal/config.BuildVersion=${VERSION}" \
             -o dist/shepherd-server-linux-${{ matrix.arch }} \
@@ -79,11 +79,23 @@ jobs:
             dist/shepherd-agent-darwin-${{ matrix.arch }}.tar.gz
             dist/shepherd-agent-darwin-${{ matrix.arch }}.tar.gz.sha256
 
+  # Each arch builds the image natively on its own runner — pre-fix this was
+  # one job using QEMU emulation, which made the arm64 leg take ~25 minutes
+  # because CGO + sqlite under QEMU is brutal. Each leg pushes by digest;
+  # image-manifest below combines the two digests into the multi-arch tag.
   image:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            platform: linux/amd64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -92,20 +104,59 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Resolve version
         run: echo "VERSION=${{ github.event.inputs.tag || github.ref_name }}" >> $GITHUB_ENV
-      - name: Build + push multi-arch image
+      - name: Build + push by digest
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ghcr.io/hg-claw/shepherd:${{ env.VERSION }}
-            ghcr.io/hg-claw/shepherd:latest
+          platforms: ${{ matrix.platform }}
           build-args: |
             VERSION=${{ env.VERSION }}
+          cache-from: type=gha,scope=image-${{ matrix.arch }}
+          cache-to: type=gha,scope=image-${{ matrix.arch }},mode=max
+          outputs: type=image,name=ghcr.io/hg-claw/shepherd,push-by-digest=true,name-canonical=true,push=true
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          echo -n "${{ steps.build.outputs.digest }}" > /tmp/digests/${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.arch }}
+          path: /tmp/digests/${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 1
+
+  image-manifest:
+    needs: image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve version
+        run: echo "VERSION=${{ github.event.inputs.tag || github.ref_name }}" >> $GITHUB_ENV
+      - name: Combine per-arch digests into multi-arch tags
+        working-directory: /tmp/digests
+        run: |
+          # Each digest file already contains "sha256:abc...", so we just
+          # concatenate it onto the repo ref.
+          docker buildx imagetools create \
+            --tag ghcr.io/hg-claw/shepherd:${VERSION} \
+            --tag ghcr.io/hg-claw/shepherd:latest \
+            $(for f in *; do echo "ghcr.io/hg-claw/shepherd@$(cat $f)"; done)
+      - name: Verify manifest
+        run: docker buildx imagetools inspect ghcr.io/hg-claw/shepherd:${VERSION}
 
   release:
-    needs: [binaries, image]
+    needs: [binaries, image-manifest]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

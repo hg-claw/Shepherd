@@ -6,11 +6,24 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
 )
+
+// singboxBinaryPath is where the sing-box plugin's Pusher.DeployService
+// drops the binary. Presence ≡ "this host has sing-box managed by
+// shepherd" — the sampler short-circuits when absent.
+const singboxBinaryPath = "/usr/local/bin/shepherd-singbox"
+
+// pluginInstalledFn is the deploy-presence check. Overridden in tests so
+// they don't depend on the binary actually being on disk.
+var pluginInstalledFn = func() bool {
+	_, err := os.Stat(singboxBinaryPath)
+	return err == nil
+}
 
 // Sampler polls the sing-box clash-api GET /connections endpoint every Interval,
 // aggregates per-inbound-tag byte counters into a ConnSnapshot, computes deltas
@@ -82,6 +95,12 @@ func (s *Sampler) Run(ctx context.Context) {
 
 // tick is one sampling cycle. Exported-by-lowercase so tests can call it directly.
 func (s *Sampler) tick(ctx context.Context) {
+	// Skip silently when sing-box isn't deployed on this host. Pre-fix,
+	// the clash-api fetch failed every interval with "connection
+	// refused" on hosts that never had the singbox plugin enabled.
+	if !pluginInstalledFn() {
+		return
+	}
 	cur, err := s.fetch(ctx)
 	if err != nil {
 		log.Printf("singboxsampler: fetch failed: %v", err)

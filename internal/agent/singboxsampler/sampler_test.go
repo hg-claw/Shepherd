@@ -9,6 +9,33 @@ import (
 	"github.com/hg-claw/Shepherd/internal/agentapi"
 )
 
+// Pretend the singbox plugin binary is installed in every test by default.
+// TestSkipsWhenPluginAbsent re-flips this locally to verify the guard.
+func init() { pluginInstalledFn = func() bool { return true } }
+
+func TestSkipsWhenPluginAbsent(t *testing.T) {
+	orig := pluginInstalledFn
+	pluginInstalledFn = func() bool { return false }
+	t.Cleanup(func() { pluginInstalledFn = orig })
+
+	sent := 0
+	fetchCalled := false
+	s := &Sampler{
+		Send: func(_ agentapi.Envelope) error { sent++; return nil },
+		fetchFunc: func(_, _ string) (ConnSnapshot, error) {
+			fetchCalled = true
+			return ConnSnapshot{}, nil
+		},
+	}
+	s.tick(context.Background())
+	if fetchCalled {
+		t.Error("fetch should not run when plugin is absent")
+	}
+	if sent != 0 {
+		t.Errorf("expected 0 sends when plugin absent, got %d", sent)
+	}
+}
+
 // runTicks drives the sampler through a sequence of snapshots and collects sent batches.
 // Each snapshot is fed to the sampler via a fresh fetchFunc before calling tick.
 func runTicks(s *Sampler, snapshots []ConnSnapshot) []agentapi.SingboxTrafficBatch {

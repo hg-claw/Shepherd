@@ -34,14 +34,15 @@ func (s *Service) AutoRegister(ctx context.Context, key, fingerprint, hostname, 
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		// Create new server. Use hostname for name; fingerprint stays unique.
-		res, err := tx.ExecContext(ctx, `INSERT INTO servers
+		// RETURNING id keeps this path working on both sqlite and postgres
+		// (lib/pq has no LastInsertId support).
+		if err := tx.QueryRowContext(ctx, `INSERT INTO servers
 			(name, agent_fingerprint, agent_os, agent_arch, agent_kernel, agent_version, install_stage)
-			VALUES ($1, $2, $3, $4, $5, $6, 'done')`,
-			hostname, fingerprint, osName, arch, kernel, agentVersion)
-		if err != nil {
+			VALUES ($1, $2, $3, $4, $5, $6, 'done') RETURNING id`,
+			hostname, fingerprint, osName, arch, kernel, agentVersion,
+		).Scan(&serverID); err != nil {
 			return "", 0, err
 		}
-		serverID, _ = res.LastInsertId()
 	case err != nil:
 		return "", 0, err
 	default:

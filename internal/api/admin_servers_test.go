@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"path/filepath"
 	"strconv"
@@ -175,6 +176,63 @@ func TestServersAPI_ScriptInstall(t *testing.T) {
 	}
 	if !strings.Contains(got.Command, "v0.5.0") {
 		t.Errorf("command not pinned to BuildVersion: %s", got.Command)
+	}
+}
+
+func TestServersAPI_InstallCommand(t *testing.T) {
+	a := newServersAPIForTest(t)
+	a.BuildVersion = "v0.5.0"
+	a.PublicURL = "https://shepherd.example.com"
+
+	// Seed a server row first via ScriptInstall (so the row exists).
+	req := httptest.NewRequest("POST", "/api/servers/script",
+		strings.NewReader(`{"name":"vps-2","show_on_public":false}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	a.ScriptInstall(rr, req)
+	var seeded struct {
+		ServerID int64 `json:"server_id"`
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &seeded)
+
+	// Now ask for a fresh install command on that existing server.
+	icReq := httptest.NewRequest("POST", fmt.Sprintf("/api/servers/%d/install-command", seeded.ServerID), nil)
+	icReq.SetPathValue("id", fmt.Sprintf("%d", seeded.ServerID))
+	icRR := httptest.NewRecorder()
+	a.InstallCommand(icRR, icReq)
+	if icRR.Code != 200 {
+		t.Fatalf("status %d: %s", icRR.Code, icRR.Body)
+	}
+	var got struct {
+		ServerID int64  `json:"server_id"`
+		Token    string `json:"token"`
+		Command  string `json:"command"`
+	}
+	if err := json.Unmarshal(icRR.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.ServerID != seeded.ServerID {
+		t.Errorf("server_id = %d, want %d", got.ServerID, seeded.ServerID)
+	}
+	if got.Token == "" {
+		t.Error("token empty")
+	}
+	if !strings.Contains(got.Command, "--token "+got.Token) {
+		t.Errorf("command missing token: %s", got.Command)
+	}
+}
+
+func TestServersAPI_InstallCommand_NotFound(t *testing.T) {
+	a := newServersAPIForTest(t)
+	a.BuildVersion = "v0.5.0"
+	a.PublicURL = "https://x"
+
+	req := httptest.NewRequest("POST", "/api/servers/9999/install-command", nil)
+	req.SetPathValue("id", "9999")
+	rr := httptest.NewRecorder()
+	a.InstallCommand(rr, req)
+	if rr.Code != 404 {
+		t.Fatalf("want 404, got %d", rr.Code)
 	}
 }
 

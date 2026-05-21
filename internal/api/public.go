@@ -17,6 +17,14 @@ type PublicAPI struct {
 	Settings *serversvc.SettingsStore
 	Query    *telemetrysvc.Query
 	Hub      *agentsvc.Hub
+	Tokens   *agentsvc.Service // for AgentStatus token lookup
+	statusLimit *tokenRateLimiter
+}
+
+// InitRateLimit configures the per-token rate limit for AgentStatus.
+// Called once at startup; tests set their own via direct field access.
+func (a *PublicAPI) InitRateLimit(max int, window time.Duration) {
+	a.statusLimit = newTokenRateLimiter(max, window)
 }
 
 type publicCard struct {
@@ -152,4 +160,43 @@ func (a *PublicAPI) GetSettings(w http.ResponseWriter, r *http.Request) {
 		mode = "both"
 	}
 	writeJSON(w, 200, map[string]string{"public_display_mode": mode})
+}
+
+// AgentStatus is a public, token-authenticated endpoint used by the
+// install script to verify the agent has connected. Returns 404 for
+// unknown / expired tokens, 429 when the per-token rate limit is hit,
+// and 200 with {online, last_seen_at} otherwise.
+//
+// `online` is true if agent_last_seen is non-null and within the last 60s.
+func (a *PublicAPI) AgentStatus(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		writeError(w, 400, "token required")
+		return
+	}
+	if a.statusLimit != nil && !a.statusLimit.allow(token) {
+		writeError(w, 429, "rate limit exceeded")
+		return
+	}
+	serverID, err := a.Tokens.LookupEnrollment(r.Context(), token)
+	if err != nil {
+		writeError(w, 404, "unknown or expired token")
+		return
+	}
+	srv, err := a.Servers.Get(r.Context(), serverID)
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	online := srv.AgentLastSeen.Valid &&
+		time.Since(srv.AgentLastSeen.Time) <= 60*time.Second
+	var lastSeenAt *string
+	if srv.AgentLastSeen.Valid {
+		s := srv.AgentLastSeen.Time.UTC().Format(time.RFC3339)
+		lastSeenAt = &s
+	}
+	writeJSON(w, 200, map[string]any{
+		"online":       online,
+		"last_seen_at": lastSeenAt,
+	})
 }

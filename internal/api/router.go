@@ -55,6 +55,7 @@ func (r *Router) Handler() http.Handler {
 	mux.HandleFunc("GET /api/public/servers", r.Public.Servers_ListPublic)
 	mux.HandleFunc("GET /api/public/servers/{id}/telemetry", r.Public.Telemetry)
 	mux.HandleFunc("GET /api/public/settings", r.Public.GetSettings)
+	mux.HandleFunc("GET /api/agent/status", r.Public.AgentStatus)
 
 	// auth (login/logout — no admin guard yet, login is the gate)
 	mux.HandleFunc("POST /api/login", r.Auth.Login)

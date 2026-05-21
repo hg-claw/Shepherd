@@ -165,6 +165,54 @@ uninstall_linux() {
 	echo "Config dir $ENV_DIR preserved. To remove: sudo rm -rf $ENV_DIR"
 }
 
+# --- Darwin install / uninstall --------------------------------------------
+
+install_darwin() {
+	command -v launchctl >/dev/null 2>&1 || { err "launchctl not found"; return 5; }
+	launchctl bootout "system/${LAUNCHD_LABEL}" 2>/dev/null || true
+
+	mv -f "$1" "${BIN_PATH}.new"
+	chmod 0755 "${BIN_PATH}.new"
+	mv -f "${BIN_PATH}.new" "$BIN_PATH"
+
+	mkdir -p "$ENV_DIR"
+	cat > "$ENV_FILE" <<EOF
+SHEPHERD_SERVER_URL=${SERVER_URL}
+SHEPHERD_ENROLLMENT_TOKEN=${TOKEN}
+EOF
+	chmod 0600 "$ENV_FILE"
+
+	cat > "$DARWIN_PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>                <string>${LAUNCHD_LABEL}</string>
+    <key>ProgramArguments</key>     <array><string>${BIN_PATH}</string></array>
+    <key>EnvironmentVariables</key> <dict>
+        <key>SHEPHERD_SERVER_URL</key>        <string>${SERVER_URL}</string>
+        <key>SHEPHERD_ENROLLMENT_TOKEN</key>  <string>${TOKEN}</string>
+    </dict>
+    <key>RunAtLoad</key>            <true/>
+    <key>KeepAlive</key>            <true/>
+    <key>StandardOutPath</key>      <string>${LOG_FILE}</string>
+    <key>StandardErrorPath</key>    <string>${LOG_FILE}</string>
+</dict>
+</plist>
+EOF
+	chmod 0644 "$DARWIN_PLIST"
+	launchctl bootstrap system "$DARWIN_PLIST"
+	launchctl kickstart -k "system/${LAUNCHD_LABEL}"
+}
+
+uninstall_darwin() {
+	launchctl bootout "system/${LAUNCHD_LABEL}" 2>/dev/null || true
+	rm -f "$DARWIN_PLIST"
+	rm -f "$BIN_PATH"
+	echo "Config dir $ENV_DIR preserved. To remove: sudo rm -rf $ENV_DIR"
+}
+
 # --- Source-only short-circuit (for BATS tests) ---------------------------
 #
 # When sourced with `--source` as the first arg, define the helpers but

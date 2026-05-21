@@ -15,6 +15,20 @@ type SingboxTrafficRollup struct {
 	MinuteInterval  time.Duration // default 1 min
 	HourInterval    time.Duration // default 1 h
 	CleanupInterval time.Duration // default 10 min
+	// Enabled is called each tick to gate work on plugin enabled state.
+	// nil → always on (legacy behaviour). When non-nil and returning
+	// false, every tick is a no-op — keeps the goroutine alive but
+	// stops touching the singbox_* tables, which prevents log spam
+	// like "no such table: singbox_traffic_raw" on hosts that never
+	// enabled the plugin.
+	Enabled func() bool
+}
+
+func (r *SingboxTrafficRollup) shouldRun() bool {
+	if r.Enabled == nil {
+		return true
+	}
+	return r.Enabled()
 }
 
 // Run blocks until ctx is canceled, running rollups and cleanup on their
@@ -43,14 +57,23 @@ func (r *SingboxTrafficRollup) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-minuteTicker.C:
+			if !r.shouldRun() {
+				continue
+			}
 			if err := r.rollupRawToMinute(ctx); err != nil {
 				log.Printf("singbox traffic rollup raw->minute: %v", err)
 			}
 		case <-hourTicker.C:
+			if !r.shouldRun() {
+				continue
+			}
 			if err := r.rollupMinuteToHour(ctx); err != nil {
 				log.Printf("singbox traffic rollup minute->hour: %v", err)
 			}
 		case <-cleanupTicker.C:
+			if !r.shouldRun() {
+				continue
+			}
 			if err := r.Cleanup(ctx); err != nil {
 				log.Printf("singbox traffic rollup cleanup: %v", err)
 			}

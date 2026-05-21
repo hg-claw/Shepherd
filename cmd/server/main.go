@@ -65,11 +65,24 @@ func main() {
 	hub := agentsvc.NewHub()
 	tQuery := &telemetrysvc.Query{DB: d}
 	tIngest := &telemetrysvc.Ingest{DB: d}
-	trafficRollup := &telemetrysvc.TrafficRollup{DB: d}
+	// pluginStore is constructed early so the per-plugin rollups can
+	// poll the enabled flag and short-circuit when the plugin isn't
+	// in use on this deployment. Pre-fix these goroutines ran 24/7
+	// against tables that may not even exist (sqlite default install),
+	// flooding the log with "no such table" errors.
+	pluginStore := &plugins.Store{DB: d, Now: time.Now}
+
+	trafficRollup := &telemetrysvc.TrafficRollup{
+		DB:      d,
+		Enabled: pluginEnabledChecker(rootCtx, pluginStore, "xray"),
+	}
 	go trafficRollup.Run(rootCtx)
 
 	// sing-box traffic rollup (mirrors xray TrafficRollup).
-	sbRollup := &telemetrysvc.SingboxTrafficRollup{DB: d}
+	sbRollup := &telemetrysvc.SingboxTrafficRollup{
+		DB:      d,
+		Enabled: pluginEnabledChecker(rootCtx, pluginStore, "singbox"),
+	}
 	go sbRollup.Run(rootCtx)
 
 	reg := sessionmux.New()
@@ -135,7 +148,18 @@ func main() {
 	}
 
 	go (&telemetrysvc.Rollup{DB: d}).Run(rootCtx)
-	go (&telemetrysvc.Retention{DB: d, Settings: settingsStore}).Run(rootCtx)
+	go (&telemetrysvc.Retention{
+		DB:       d,
+		Settings: settingsStore,
+		// Plugin-owned tables: skip retention when the row is absent
+		// (plugin never enabled → tables don't exist), when enabled=false,
+		// OR on a transient lookup error (skipping is cheap; the loop
+		// will succeed next interval and stop spamming "no such table").
+		PluginEnabled: func(id string) bool {
+			row, err := pluginStore.Get(rootCtx, id)
+			return err == nil && row.Enabled
+		},
+	}).Run(rootCtx)
 
 	authAPI := &api.AuthAPI{Auth: authH}
 	servers := &api.ServersAPI{
@@ -173,7 +197,6 @@ func main() {
 	// and the agent WS hub (one-shot PTY exec via sessionmux). No DB row is
 	// written for plugin-initiated exec; sessions are ephemeral.
 	hostExec := &plugins.HubHostExec{Hub: hub, Files: filesService, Reg: reg}
-	pluginStore := &plugins.Store{DB: d, Now: time.Now}
 	pluginsDeps := plugins.Deps{
 		DB:       d,
 		DataDir:  filepath.Join(filepath.Dir(cfg.DBDSN), "plugins"),
@@ -401,6 +424,18 @@ func bootstrapInitialAdmin(ctx context.Context, d *sqlx.DB, store *auth.Store, e
 		return
 	}
 	log.Printf("created initial admin %q (password from INITIAL_ADMIN_PASSWORD)", user)
+}
+
+// pluginEnabledChecker returns an `Enabled func() bool` closure that gates
+// per-plugin rollup work on the plugin row's enabled flag. Skips when the
+// row is missing (plugin never enabled → migrations never ran → tables
+// don't exist) or on a transient lookup error — both cases would otherwise
+// surface as "no such table" log spam every tick.
+func pluginEnabledChecker(ctx context.Context, store *plugins.Store, id string) func() bool {
+	return func() bool {
+		row, err := store.Get(ctx, id)
+		return err == nil && row.Enabled
+	}
 }
 
 // randomPassword returns a URL-safe base64 string of nBytes entropy

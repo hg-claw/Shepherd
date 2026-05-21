@@ -49,6 +49,30 @@ Once the server is running, add a managed host:
 The script also supports `--uninstall` to reverse the install. Logs
 go to `/var/log/shepherd-agent.log` on both OSes.
 
+## Other install methods
+
+### Single binary (Linux)
+
+Download from [the latest release](https://github.com/hg-claw/Shepherd/releases/latest):
+
+```bash
+ARCH=amd64   # or arm64
+curl -fsSLO "https://github.com/hg-claw/Shepherd/releases/latest/download/shepherd-linux-${ARCH}.tar.gz"
+tar -xzf "shepherd-linux-${ARCH}.tar.gz"
+sudo install -m 0755 "shepherd-server-linux-${ARCH}" /usr/local/bin/shepherd-server
+sudo install -m 0755 "shepherd-agent-linux-${ARCH}" /usr/local/bin/shepherd-agent
+```
+
+Full systemd unit + env-file walkthrough in
+[`deploy/README.md`](deploy/README.md).
+
+### Build from source
+
+```bash
+make web && make server
+./bin/shepherd-server
+```
+
 ## Features
 
 - Browser-based admin panel (React 19) and a public, desensitized monitoring

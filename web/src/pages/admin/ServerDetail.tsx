@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog'
 import { TimeSeriesChart } from '@/components/TimeSeriesChart'
 import { InstallProgress } from '@/components/InstallProgress'
+import { KpiCard } from '@/components/KpiCard'
 import { useUI } from '@/store/ui'
 import { bps, bytes, pct } from '@/lib/bytes'
 import type { Range } from '@/api/servers'
@@ -62,6 +63,11 @@ export default function AdminServerDetail() {
   const netRx = points.map((p) => ({ ts: p.ts, v: p.net_rx_bps ?? 0 }))
   const netTx = points.map((p) => ({ ts: p.ts, v: p.net_tx_bps ?? 0 }))
 
+  // Hero metric values (from server record, not telemetry)
+  const isOnline = s.agent_last_seen?.Valid
+    ? Date.now() - new Date(s.agent_last_seen.Time).getTime() <= 90_000
+    : false
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -88,6 +94,26 @@ export default function AdminServerDetail() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      </div>
+
+      {/* Hero metric strip — 4-up KPI cards showing current live values */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <KpiCard
+          label={t('metric.cpu', 'CPU')}
+          value={isOnline && points.length > 0 ? `${(points[points.length - 1].cpu_pct ?? 0).toFixed(0)}%` : '—'}
+        />
+        <KpiCard
+          label={t('metric.mem', 'MEM')}
+          value={isOnline && points.length > 0 ? `${(pct(points[points.length - 1].mem_used, points[points.length - 1].mem_total) ?? 0).toFixed(0)}%` : '—'}
+        />
+        <KpiCard
+          label={t('metric.load1', 'LOAD-1')}
+          value={isOnline && points.length > 0 ? (points[points.length - 1].load_1 ?? 0).toFixed(2) : '—'}
+        />
+        <KpiCard
+          label={t('metric.tcp_conn', 'TCP conn')}
+          value={isOnline && points.length > 0 ? (points[points.length - 1].tcp_conn ?? 0).toString() : '—'}
+        />
       </div>
 
       <Card>
@@ -288,19 +314,19 @@ export default function AdminServerDetail() {
       </div>
       <Card>
         <CardHeader><CardTitle>{t('metric.cpu')}</CardTitle></CardHeader>
-        <CardContent>
+        <CardContent className="min-w-0">
           <TimeSeriesChart series={[{ name: 'CPU%', values: cpu }]} yMin={0} yMax={100} yFormat={(v) => `${v.toFixed(0)}%`} />
         </CardContent>
       </Card>
       <Card>
         <CardHeader><CardTitle>{t('metric.mem')}</CardTitle></CardHeader>
-        <CardContent>
+        <CardContent className="min-w-0">
           <TimeSeriesChart series={[{ name: 'MEM%', values: memPctSeries }]} yMin={0} yMax={100} yFormat={(v) => `${v.toFixed(0)}%`} />
         </CardContent>
       </Card>
       <Card>
         <CardHeader><CardTitle>{t('metric.net')}</CardTitle></CardHeader>
-        <CardContent>
+        <CardContent className="min-w-0">
           <TimeSeriesChart
             series={[
               { name: 'rx', values: netRx },

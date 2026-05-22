@@ -18,11 +18,28 @@ import (
 )
 
 // Releaser downloads and caches sing-box release binaries from GitHub.
+//
+// Shepherd ships its own sing-box build (with the with_v2ray_api tag so the
+// agent's gRPC stats sampler has counters to read — upstream's release
+// binaries are compiled without it). The build pipeline lives in
+// .github/workflows/sing-box-build.yml; binaries are published as releases
+// on this repo with tag pattern `singbox-vX.Y.Z-v2rayapi` and asset names
+// `shepherd-singbox-vX.Y.Z-v2rayapi-linux-{arch}.tar.gz`.
 type Releaser struct {
 	BaseURL  string       // override for tests; default https://api.github.com
+	Repo     string       // override for tests; default "hg-claw/Shepherd"
 	CacheDir string       // directory to cache extracted binaries
 	HTTP     *http.Client // override for tests; default 120s-timeout client
 }
+
+const (
+	defaultSingboxRepo = "hg-claw/Shepherd"
+	// releaseTagPrefix / releaseTagSuffix bracket the version inside a release
+	// tag. We need both to round-trip: list → strip → version, and
+	// version → wrap → tag for asset lookup.
+	releaseTagPrefix = "singbox-"
+	releaseTagSuffix = "-v2rayapi"
+)
 
 // Binary describes one cached sing-box binary on disk.
 type Binary struct {
@@ -49,15 +66,40 @@ func (r *Releaser) apiBase() string {
 	return "https://api.github.com"
 }
 
+func (r *Releaser) repo() string {
+	if r.Repo != "" {
+		return r.Repo
+	}
+	return defaultSingboxRepo
+}
+
+// releaseTag wraps a version string ("1.13.10") into the GitHub release tag
+// our build pipeline uses ("singbox-v1.13.10-v2rayapi"). Inverse of
+// stripReleaseTag.
+func releaseTag(version string) string {
+	return releaseTagPrefix + "v" + version + releaseTagSuffix
+}
+
+// stripReleaseTag is the inverse of releaseTag — returns "" when the tag
+// doesn't match our prefix/suffix, so callers can filter unrelated
+// releases (Shepherd's own v0.7.x tags etc.) out of the list endpoint.
+func stripReleaseTag(tag string) string {
+	if !strings.HasPrefix(tag, releaseTagPrefix) || !strings.HasSuffix(tag, releaseTagSuffix) {
+		return ""
+	}
+	mid := strings.TrimSuffix(strings.TrimPrefix(tag, releaseTagPrefix), releaseTagSuffix)
+	return strings.TrimPrefix(mid, "v")
+}
+
 // singboxAssetName maps (version, os, arch) to the tar.gz asset filename.
-// sing-box uses: sing-box-{version}-{os}-{arch}.tar.gz
-// arch mapping: arm → armv7; everything else is passed through unchanged.
+// Format: shepherd-singbox-vX.Y.Z-v2rayapi-{os}-{arch}.tar.gz
+// arch mapping: arm → armv7; everything else passes through unchanged.
 func singboxAssetName(version, osName, arch string) string {
 	a := arch
 	if arch == "arm" {
 		a = "armv7"
 	}
-	return fmt.Sprintf("sing-box-%s-%s-%s.tar.gz", version, osName, a)
+	return fmt.Sprintf("shepherd-singbox-v%s-v2rayapi-%s-%s.tar.gz", version, osName, a)
 }
 
 // cachedPath returns the path where the extracted binary is stored.
@@ -129,12 +171,21 @@ func (r *Releaser) Fetch(ctx context.Context, version, osName, arch string) (Bin
 	}, nil
 }
 
-// ListLatestTags returns up to limit recent sing-box release tags (no "v" prefix).
+// ListLatestTags returns up to limit recent shepherd-singbox release versions
+// (no "v" prefix, no "singbox-…-v2rayapi" wrapper). Releases that don't match
+// our tag pattern (e.g. the Shepherd server's own vX.Y.Z tags) are filtered
+// out — both flavours live in the same GitHub repo.
 func (r *Releaser) ListLatestTags(ctx context.Context, limit int) ([]string, error) {
 	if limit <= 0 {
 		limit = 5
 	}
-	u := fmt.Sprintf("%s/repos/SagerNet/sing-box/releases?per_page=%d", r.apiBase(), limit)
+	// Over-fetch a little so the filter doesn't starve us — every Shepherd
+	// release pushes a non-singbox tag we'll drop here.
+	perPage := limit * 4
+	if perPage < 20 {
+		perPage = 20
+	}
+	u := fmt.Sprintf("%s/repos/%s/releases?per_page=%d", r.apiBase(), r.repo(), perPage)
 	body, err := httpGet(ctx, r.client(), u)
 	if err != nil {
 		return nil, err
@@ -145,9 +196,16 @@ func (r *Releaser) ListLatestTags(ctx context.Context, limit int) ([]string, err
 	if err := json.Unmarshal(body, &entries); err != nil {
 		return nil, fmt.Errorf("parse releases: %w", err)
 	}
-	out := make([]string, 0, len(entries))
+	out := make([]string, 0, limit)
 	for _, e := range entries {
-		out = append(out, strings.TrimPrefix(e.TagName, "v"))
+		v := stripReleaseTag(e.TagName)
+		if v == "" {
+			continue
+		}
+		out = append(out, v)
+		if len(out) >= limit {
+			break
+		}
 	}
 	return out, nil
 }
@@ -155,7 +213,7 @@ func (r *Releaser) ListLatestTags(ctx context.Context, limit int) ([]string, err
 // resolveAssetURL fetches the GitHub releases list and returns the download URL
 // for the named asset in the given version's release.
 func (r *Releaser) resolveAssetURL(ctx context.Context, version, assetName string) (string, error) {
-	u := r.apiBase() + "/repos/SagerNet/sing-box/releases"
+	u := fmt.Sprintf("%s/repos/%s/releases", r.apiBase(), r.repo())
 	body, err := httpGet(ctx, r.client(), u)
 	if err != nil {
 		return "", fmt.Errorf("fetch releases: %w", err)
@@ -170,7 +228,7 @@ func (r *Releaser) resolveAssetURL(ctx context.Context, version, assetName strin
 	if err := json.Unmarshal(body, &releases); err != nil {
 		return "", fmt.Errorf("parse releases JSON: %w", err)
 	}
-	want := "v" + version
+	want := releaseTag(version)
 	for _, rel := range releases {
 		if rel.TagName != want {
 			continue

@@ -93,7 +93,7 @@ export default function AdminServerDetail() {
       <Card>
         <CardHeader><CardTitle>Identity</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
-          <KV k="name" v={s.name} />
+          <Field label="name" defaultValue={s.name} onBlur={(v) => patch.mutate({ name: v })} />
           <KV k="ssh_host" v={s.ssh_host?.String ?? '-'} />
           <KV k="agent_version" v={s.agent_version?.String ?? '-'} />
           <KV k="agent_os" v={`${s.agent_os?.String ?? '-'}/${s.agent_arch?.String ?? '-'}`} />

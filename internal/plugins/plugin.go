@@ -111,6 +111,15 @@ type UndeployValidator interface {
 	BeforeUndeploy(ctx context.Context, deps Deps, serverID int64) error
 }
 
+// LifecycleManager is implemented by HostAware plugins that support
+// start/stop/restart of the running service (separate from deploy).
+type LifecycleManager interface {
+	HostAware
+	StartHost(ctx context.Context, deps Deps, serverID int64) error
+	StopHost(ctx context.Context, deps Deps, serverID int64) error
+	RestartHost(ctx context.Context, deps Deps, serverID int64) error
+}
+
 // HostStatus is the per-host snapshot returned by HostAware.HostStatus.
 // Empty State means the check has not yet run (e.g. during initial deployment).
 type HostStatus struct {

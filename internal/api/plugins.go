@@ -297,6 +297,126 @@ func (a *PluginsAPI) DeleteHost(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"ok": true})
 }
 
+// PostHostLifecycle handles POST /api/admin/plugins/{id}/hosts/{server_id}/{action}
+// where action is start|stop|restart. Dispatches to plugin's LifecycleManager.
+func (a *PluginsAPI) PostHostLifecycle(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	sid, _ := strconv.ParseInt(r.PathValue("server_id"), 10, 64)
+	if sid == 0 {
+		writeError(w, 400, "bad server_id")
+		return
+	}
+
+	p, ok := plugins.Get(id)
+	if !ok {
+		writeError(w, 404, "unknown plugin")
+		return
+	}
+	lm, ok := p.(plugins.LifecycleManager)
+	if !ok {
+		writeError(w, 400, "plugin does not support lifecycle")
+		return
+	}
+
+	// Host row must exist.
+	_, err := a.Store.GetHost(r.Context(), id, sid)
+	if err != nil {
+		writeError(w, 404, "no such host row")
+		return
+	}
+
+	// Infer action from the last path segment.
+	path := r.URL.Path
+	var action string
+	switch {
+	case len(path) >= 6 && path[len(path)-6:] == "/start":
+		action = "start"
+	case len(path) >= 5 && path[len(path)-5:] == "/stop":
+		action = "stop"
+	case len(path) >= 8 && path[len(path)-8:] == "/restart":
+		action = "restart"
+	default:
+		writeError(w, 400, "unknown action")
+		return
+	}
+
+	ctx := r.Context()
+	var actionErr error
+	switch action {
+	case "start":
+		actionErr = lm.StartHost(ctx, a.Deps, sid)
+	case "stop":
+		actionErr = lm.StopHost(ctx, a.Deps, sid)
+	case "restart":
+		actionErr = lm.RestartHost(ctx, a.Deps, sid)
+	}
+	if actionErr != nil {
+		writeError(w, 500, actionErr.Error())
+		return
+	}
+
+	// Sync status after the action.
+	status, _ := lm.HostStatus(ctx, a.Deps, sid)
+	statusStr := status.State
+	if statusStr == "" {
+		statusStr = "stopped"
+	}
+	_ = a.Store.SetHostStatus(ctx, id, sid, statusStr, status.Version, "")
+
+	writeJSON(w, 200, map[string]any{"status": statusStr})
+}
+
+// GetHostRefreshStatus handles GET /api/admin/plugins/{id}/hosts/{server_id}/refresh-status.
+// Calls HostStatus() on the plugin, persists to plugin_hosts.status, returns the updated record.
+func (a *PluginsAPI) GetHostRefreshStatus(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	sid, _ := strconv.ParseInt(r.PathValue("server_id"), 10, 64)
+	if sid == 0 {
+		writeError(w, 400, "bad server_id")
+		return
+	}
+
+	p, ok := plugins.Get(id)
+	if !ok {
+		writeError(w, 404, "unknown plugin")
+		return
+	}
+	ha, ok := p.(plugins.HostAware)
+	if !ok {
+		writeError(w, 404, "not host-aware")
+		return
+	}
+
+	// Host row must exist.
+	_, err := a.Store.GetHost(r.Context(), id, sid)
+	if err != nil {
+		writeError(w, 404, "no such host row")
+		return
+	}
+
+	ctx := r.Context()
+	hs, err := ha.HostStatus(ctx, a.Deps, sid)
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	statusStr := hs.State
+	if statusStr == "" {
+		statusStr = "stopped"
+	}
+	if err := a.Store.SetHostStatus(ctx, id, sid, statusStr, hs.Version, ""); err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+
+	updated, err := a.Store.GetHost(ctx, id, sid)
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, hostRowToMap(updated))
+}
+
 func hostRowToMap(h plugins.HostRow) map[string]any {
 	var cfg any
 	_ = json.Unmarshal(h.ConfigJSON, &cfg)

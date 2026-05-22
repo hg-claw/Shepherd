@@ -119,6 +119,10 @@ func (r *Router) Handler() http.Handler {
 		admin.HandleFunc("POST /api/admin/plugins/{id}/hosts", r.Plugins.PostHost)
 		admin.HandleFunc("GET /api/admin/plugins/{id}/hosts/{server_id}", r.Plugins.GetHost)
 		admin.HandleFunc("DELETE /api/admin/plugins/{id}/hosts/{server_id}", r.Plugins.DeleteHost)
+		admin.HandleFunc("POST /api/admin/plugins/{id}/hosts/{server_id}/start", r.Plugins.PostHostLifecycle)
+		admin.HandleFunc("POST /api/admin/plugins/{id}/hosts/{server_id}/stop", r.Plugins.PostHostLifecycle)
+		admin.HandleFunc("POST /api/admin/plugins/{id}/hosts/{server_id}/restart", r.Plugins.PostHostLifecycle)
+		admin.HandleFunc("GET /api/admin/plugins/{id}/hosts/{server_id}/refresh-status", r.Plugins.GetHostRefreshStatus)
 
 		// Mount per-plugin routes, gated by enabled flag.
 		for _, p := range plugins.All() {

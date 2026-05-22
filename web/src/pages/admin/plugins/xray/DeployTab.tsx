@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Play, Square, RotateCw, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Pill, type PillKind } from '@/components/Pill'
@@ -7,6 +8,7 @@ import {
   listPluginHosts,
   fetchXrayVersions,
   patchXrayServerVersion,
+  useHostLifecycle,
   type PluginHost,
 } from '@/api/plugins'
 import { useServers, type ServerRecord } from '@/api/servers'
@@ -82,16 +84,103 @@ function RedeployButton({ serverID, deployedVersion }: { serverID: number; deplo
   )
 }
 
+function DeployButton({ serverID, latestVersion }: { serverID: number; latestVersion: string | null }) {
+  const qc = useQueryClient()
+  const toast = useUI((s) => s.toast)
+  const deploy = useMutation({
+    mutationFn: () => patchXrayServerVersion(serverID, latestVersion ?? ''),
+    onSuccess: () => {
+      toast('success', `Deploying v${latestVersion}`)
+      qc.invalidateQueries({ queryKey: ['plugin-hosts', 'xray'] })
+    },
+    onError: (e: any) => toast('error', String(e?.message ?? e)),
+  })
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="h-6 px-2 text-[11px]"
+      disabled={!latestVersion || deploy.isPending}
+      onClick={() => deploy.mutate()}
+    >
+      {deploy.isPending ? 'Deploying…' : 'Deploy'}
+    </Button>
+  )
+}
+
+function LifecycleButtons({ serverID, status }: { serverID: number; status: XrayStatus }) {
+  const toast = useUI((s) => s.toast)
+  const lc = useHostLifecycle('xray', serverID)
+  const busy = lc.start.isPending || lc.stop.isPending || lc.restart.isPending || lc.refreshStatus.isPending
+
+  const wrap = (fn: () => Promise<any>) => () => fn().catch((e: any) => toast('error', String(e?.message ?? e)))
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      {status !== 'running' && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 w-6 p-0"
+          disabled={busy}
+          title="Start"
+          onClick={wrap(() => lc.start.mutateAsync())}
+        >
+          <Play className="h-3 w-3" />
+        </Button>
+      )}
+      {status === 'running' && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 w-6 p-0"
+          disabled={busy}
+          title="Stop"
+          onClick={wrap(() => lc.stop.mutateAsync())}
+        >
+          <Square className="h-3 w-3" />
+        </Button>
+      )}
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-6 w-6 p-0"
+        disabled={busy}
+        title="Restart"
+        onClick={wrap(() => lc.restart.mutateAsync())}
+      >
+        <RotateCw className="h-3 w-3" />
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-6 w-6 p-0"
+        disabled={busy}
+        title="Refresh status"
+        onClick={wrap(() => lc.refreshStatus.mutateAsync())}
+      >
+        <RefreshCw className="h-3 w-3" />
+      </Button>
+    </span>
+  )
+}
+
 export default function DeployTab() {
   const { data: servers = [] } = useServers()
   const hostsQ = useQuery({
     queryKey: ['plugin-hosts', 'xray'],
     queryFn: () => listPluginHosts('xray'),
   })
-  useQuery({ queryKey: ['xray-versions'], queryFn: fetchXrayVersions })
+  const versionsQ = useQuery({ queryKey: ['xray-versions'], queryFn: fetchXrayVersions })
 
   const hosts = hostsQ.data ?? []
   const hostByServerID = new Map(hosts.map((h) => [h.server_id, h]))
+
+  // Resolve latest version: prefer versions API latest[0], fallback to cached[0].version
+  const versionsData = versionsQ.data
+  const latestVersion: string | null = versionsData
+    ? (versionsData.latest[0] ?? versionsData.cached[0]?.version ?? null)
+    : null
 
   const rows: Array<{ server: ServerRecord; host: PluginHost | undefined }> =
     servers.map((s) => ({ server: s, host: hostByServerID.get(s.id) }))
@@ -156,12 +245,19 @@ export default function DeployTab() {
                   {host?.updated_at ?? '—'}
                 </td>
                 <td className="py-2">
-                  {host && (
-                    <RedeployButton
-                      serverID={server.id}
-                      deployedVersion={host.deployed_version}
-                    />
-                  )}
+                  <span className="inline-flex items-center gap-1">
+                    {host ? (
+                      <>
+                        <LifecycleButtons serverID={server.id} status={host.status} />
+                        <RedeployButton
+                          serverID={server.id}
+                          deployedVersion={host.deployed_version}
+                        />
+                      </>
+                    ) : (
+                      <DeployButton serverID={server.id} latestVersion={latestVersion} />
+                    )}
+                  </span>
                 </td>
               </tr>
             )

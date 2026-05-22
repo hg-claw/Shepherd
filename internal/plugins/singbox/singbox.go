@@ -121,6 +121,43 @@ func (p *Plugin) HostStatus(ctx context.Context, deps plugins.Deps, serverID int
 	return plugins.HostStatus{State: state}, nil
 }
 
+// StartHost enables and starts sing-box on the given host.
+func (p *Plugin) StartHost(ctx context.Context, deps plugins.Deps, serverID int64) error {
+	osName, _ := sbHostOSArch(ctx, deps.DB, serverID)
+	unitName := singboxUnitNameLinux
+	unitPath := singboxUnitRemotePathLinux
+	if osName == "darwin" {
+		unitName = singboxUnitNameDarwin
+		unitPath = singboxUnitRemotePathDarwin
+	}
+	pusher := &deploy.Pusher{Exec: deps.HostExec}
+	return pusher.Start(ctx, osName, serverID, unitName, unitPath)
+}
+
+// StopHost disables and stops sing-box on the given host.
+func (p *Plugin) StopHost(ctx context.Context, deps plugins.Deps, serverID int64) error {
+	osName, _ := sbHostOSArch(ctx, deps.DB, serverID)
+	unitName := singboxUnitNameLinux
+	if osName == "darwin" {
+		unitName = singboxUnitNameDarwin
+	}
+	pusher := &deploy.Pusher{Exec: deps.HostExec}
+	return pusher.Stop(ctx, osName, serverID, unitName)
+}
+
+// RestartHost restarts sing-box on the given host.
+func (p *Plugin) RestartHost(ctx context.Context, deps plugins.Deps, serverID int64) error {
+	osName, _ := sbHostOSArch(ctx, deps.DB, serverID)
+	unitName := singboxUnitNameLinux
+	unitPath := singboxUnitRemotePathLinux
+	if osName == "darwin" {
+		unitName = singboxUnitNameDarwin
+		unitPath = singboxUnitRemotePathDarwin
+	}
+	pusher := &deploy.Pusher{Exec: deps.HostExec}
+	return pusher.Reload(ctx, osName, serverID, unitName, unitPath)
+}
+
 // LogStreamCommand satisfies plugins.LogStreamer.
 // Linux:  journalctl -u shepherd-singbox -f --no-pager -n 200 -o short-iso
 // Darwin: tail -F -n 200 /var/log/shepherd-singbox.{out,err}.log

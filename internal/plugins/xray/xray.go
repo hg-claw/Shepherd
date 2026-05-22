@@ -147,6 +147,43 @@ func (p *Plugin) HostStatus(ctx context.Context, deps plugins.Deps, serverID int
 	return plugins.HostStatus{State: state}, nil
 }
 
+// StartHost enables and starts xray on the given host.
+func (p *Plugin) StartHost(ctx context.Context, deps plugins.Deps, serverID int64) error {
+	osName, _ := hostOSArch(ctx, deps.DB, serverID)
+	unitName := unitNameLinux
+	unitPath := unitRemotePathLinux
+	if osName == "darwin" {
+		unitName = unitNameDarwin
+		unitPath = unitRemotePathDarwin
+	}
+	pusher := &deploy.Pusher{Exec: deps.HostExec}
+	return pusher.Start(ctx, osName, serverID, unitName, unitPath)
+}
+
+// StopHost disables and stops xray on the given host.
+func (p *Plugin) StopHost(ctx context.Context, deps plugins.Deps, serverID int64) error {
+	osName, _ := hostOSArch(ctx, deps.DB, serverID)
+	unitName := unitNameLinux
+	if osName == "darwin" {
+		unitName = unitNameDarwin
+	}
+	pusher := &deploy.Pusher{Exec: deps.HostExec}
+	return pusher.Stop(ctx, osName, serverID, unitName)
+}
+
+// RestartHost restarts xray on the given host.
+func (p *Plugin) RestartHost(ctx context.Context, deps plugins.Deps, serverID int64) error {
+	osName, _ := hostOSArch(ctx, deps.DB, serverID)
+	unitName := unitNameLinux
+	unitPath := unitRemotePathLinux
+	if osName == "darwin" {
+		unitName = unitNameDarwin
+		unitPath = unitRemotePathDarwin
+	}
+	pusher := &deploy.Pusher{Exec: deps.HostExec}
+	return pusher.Reload(ctx, osName, serverID, unitName, unitPath)
+}
+
 // LogStreamCommand satisfies plugins.LogStreamer.
 func (p *Plugin) LogStreamCommand(ctx context.Context, deps plugins.Deps, serverID int64) (string, []string, error) {
 	osName, _ := hostOSArch(ctx, deps.DB, serverID)

@@ -128,7 +128,7 @@ func patchSBServerVersionHandler(deps plugins.Deps) http.HandlerFunc {
 		// UPSERT plugin_hosts row with new version (status=deploying).
 		_, err := deps.DB.ExecContext(r.Context(), `
 			INSERT INTO plugin_hosts(plugin_id, server_id, config_json, deployed_version, status, updated_at)
-			VALUES ('singbox', ?, '{}', ?, 'deploying', ?)
+			VALUES ('singbox', $1, '{}', $2, 'deploying', $3)
 			ON CONFLICT(plugin_id, server_id) DO UPDATE
 			SET deployed_version = excluded.deployed_version,
 			    status           = 'deploying',
@@ -144,14 +144,14 @@ func patchSBServerVersionHandler(deps plugins.Deps) http.HandlerFunc {
 			ctx := context.Background()
 			if err := deployToHostFunc(ctx, deps, sid, body.Version); err != nil {
 				_, _ = deps.DB.ExecContext(ctx,
-					`UPDATE plugin_hosts SET status='failed', last_error=?
-					 WHERE plugin_id='singbox' AND server_id=?`,
+					`UPDATE plugin_hosts SET status='failed', last_error=$1
+					 WHERE plugin_id='singbox' AND server_id=$2`,
 					err.Error(), sid)
 				return
 			}
 			_, _ = deps.DB.ExecContext(ctx,
 				`UPDATE plugin_hosts SET status='running', last_error=''
-				 WHERE plugin_id='singbox' AND server_id=?`,
+				 WHERE plugin_id='singbox' AND server_id=$1`,
 				sid)
 		}()
 

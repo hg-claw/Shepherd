@@ -234,7 +234,7 @@ func patchServerVersionHandler(deps plugins.Deps) http.HandlerFunc {
 		// UPSERT plugin_hosts row with new version (status=deploying)
 		_, err := deps.DB.ExecContext(r.Context(), `
 			INSERT INTO plugin_hosts(plugin_id, server_id, config_json, deployed_version, status, updated_at)
-			VALUES ('xray', ?, '{}', ?, 'deploying', ?)
+			VALUES ('xray', $1, '{}', $2, 'deploying', $3)
 			ON CONFLICT(plugin_id, server_id) DO UPDATE
 			SET deployed_version = excluded.deployed_version,
 			    status           = 'deploying',
@@ -250,18 +250,18 @@ func patchServerVersionHandler(deps plugins.Deps) http.HandlerFunc {
 			// We pass {} as config; AssembleAndDeploy below puts the real config in place.
 			if err := p.DeployToHost(ctx, deps, sid, body.Version, []byte("{}")); err != nil {
 				_, _ = deps.DB.ExecContext(ctx,
-					`UPDATE plugin_hosts SET status='failed', last_error=? WHERE plugin_id='xray' AND server_id=?`,
+					`UPDATE plugin_hosts SET status='failed', last_error=$1 WHERE plugin_id='xray' AND server_id=$2`,
 					err.Error(), sid)
 				return
 			}
 			if err := AssembleAndDeploy(ctx, deps, sid); err != nil {
 				_, _ = deps.DB.ExecContext(ctx,
-					`UPDATE plugin_hosts SET status='failed', last_error=? WHERE plugin_id='xray' AND server_id=?`,
+					`UPDATE plugin_hosts SET status='failed', last_error=$1 WHERE plugin_id='xray' AND server_id=$2`,
 					err.Error(), sid)
 				return
 			}
 			_, _ = deps.DB.ExecContext(ctx,
-				`UPDATE plugin_hosts SET status='running', last_error='' WHERE plugin_id='xray' AND server_id=?`,
+				`UPDATE plugin_hosts SET status='running', last_error='' WHERE plugin_id='xray' AND server_id=$1`,
 				sid)
 		}()
 		writeJSONResp(w, 200, map[string]any{"ok": true, "version": body.Version})

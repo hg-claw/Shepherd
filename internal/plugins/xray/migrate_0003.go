@@ -50,7 +50,7 @@ func Migrate0003(ctx context.Context, db *sqlx.DB) error {
 		// Idempotency: did we already migrate this server?
 		var existingID int64
 		if err := db.GetContext(ctx, &existingID,
-			`SELECT id FROM xray_inbounds WHERE server_id=? AND port=?`, r.ServerID, port); err == nil {
+			`SELECT id FROM xray_inbounds WHERE server_id=$1 AND port=$2`, r.ServerID, port); err == nil {
 			serverToInboundID[r.ServerID] = existingID
 			continue
 		}
@@ -90,7 +90,7 @@ func Migrate0003(ctx context.Context, db *sqlx.DB) error {
 
 		var existingID int64
 		if err := db.GetContext(ctx, &existingID,
-			`SELECT id FROM xray_inbounds WHERE server_id=? AND port=?`, r.ServerID, port); err == nil {
+			`SELECT id FROM xray_inbounds WHERE server_id=$1 AND port=$2`, r.ServerID, port); err == nil {
 			serverToInboundID[r.ServerID] = existingID
 			continue
 		}

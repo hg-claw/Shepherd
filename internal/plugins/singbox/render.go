@@ -188,9 +188,17 @@ func renderInbound(in InboundView, certsByID map[int64]CertView) (map[string]any
 func renderVlessReality(base map[string]any, in InboundView) (map[string]any, error) {
 	base["type"] = "vless"
 	user := map[string]any{"uuid": strVal(in.UUID)}
+	// REALITY pairs with xtls-rprx-vision — sing-box rejects connections
+	// with "flow mismatch: expected none, but got xtls-rprx-vision" when
+	// the user has no flow set but the client uses vision. Our share URL
+	// hardcodes flow=xtls-rprx-vision, so the server must match. Default
+	// here when the DB row was created without one; an explicit non-empty
+	// override (advanced use) still wins.
+	flow := "xtls-rprx-vision"
 	if in.Flow != nil && *in.Flow != "" {
-		user["flow"] = *in.Flow
+		flow = *in.Flow
 	}
+	user["flow"] = flow
 	base["users"] = []any{user}
 	shortIDs := []any{}
 	if in.RealityShortID != nil {

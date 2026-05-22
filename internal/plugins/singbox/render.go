@@ -118,9 +118,12 @@ func RenderServerConfig(inbounds []InboundView, certs []CertView) ([]byte, error
 		// Without it the daemon parses the config cleanly but never listens,
 		// leaving the agent sampler with "connection refused" on 29090.
 		"experimental": map[string]any{
+			// path is under /var/lib (state dir, FHS convention) — pre-fix
+			// it was under /etc which the systemd unit hardening
+			// (ProtectSystem=full) makes read-only at runtime.
 			"cache_file": map[string]any{
 				"enabled": true,
-				"path":    "/etc/shepherd-singbox/cache.db",
+				"path":    "/var/lib/shepherd-singbox/cache.db",
 			},
 			"clash_api": map[string]any{
 				"external_controller": clashAPIAddr,

@@ -15,6 +15,12 @@ const (
 	singboxBinaryRemotePath     = "/usr/local/bin/shepherd-singbox"
 	singboxConfigRemotePath     = "/etc/shepherd-singbox/config.json"
 	singboxCertDir              = "/etc/shepherd-singbox/certs"
+	// Runtime mutable state (cache.db, future ones) lives under /var/lib
+	// per FHS convention. Pre-fix it was nested under /etc which the
+	// systemd unit hardening (ProtectSystem=full) marks read-only,
+	// causing FATAL: open /etc/shepherd-singbox/cache.db: read-only
+	// file system on host startup.
+	singboxStateDir             = "/var/lib/shepherd-singbox"
 	singboxUnitRemotePathLinux  = "/etc/systemd/system/shepherd-singbox.service"
 	singboxUnitRemotePathDarwin = "/Library/LaunchDaemons/com.shepherd.singbox.plist"
 	singboxUnitNameLinux        = "shepherd-singbox"
@@ -51,6 +57,16 @@ func AssembleAndDeploy(ctx context.Context, deps plugins.Deps, serverID int64) e
 
 	if len(mine) == 0 {
 		return pusher.Stop(ctx, osName, serverID, unitName)
+	}
+
+	// Ensure the state dir exists before sing-box tries to open
+	// cache.db there. systemd's StateDirectory= would create it on
+	// linux for free, but launchd has no equivalent and on linux it
+	// only runs once the unit is enabled — for the very first deploy
+	// we may write config + start the service in the same tick, so do
+	// it explicitly here on both OSes.
+	if _, _, _, err := deps.HostExec.RunCmd(ctx, serverID, "mkdir", "-p", singboxStateDir); err != nil {
+		return fmt.Errorf("mkdir %s: %w", singboxStateDir, err)
 	}
 
 	// Collect unique cert IDs referenced by this server's inbounds.

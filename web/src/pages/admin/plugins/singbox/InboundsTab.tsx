@@ -241,7 +241,9 @@ export default function InboundsTab() {
       const to = now.toISOString()
       const results = await Promise.all(
         Array.from(tagsByServer.entries()).map(([serverID, tags]) =>
-          fetchSingboxTrafficBatch({ server_id: serverID, tags, kind: 'inbound', from, to, resolution: 'raw' })
+          // sing-box agent emits kind="landing"|"relay" (not "inbound"); omit the
+          // kind filter so the WHERE clause doesn't exclude every row.
+          fetchSingboxTrafficBatch({ server_id: serverID, tags, from, to, resolution: 'raw' })
         )
       )
       const active = new Map<string, boolean>()

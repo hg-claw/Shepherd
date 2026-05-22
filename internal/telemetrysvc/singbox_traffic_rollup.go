@@ -86,22 +86,23 @@ func (r *SingboxTrafficRollup) Run(ctx context.Context) {
 // are excluded. Re-running is idempotent: the ON CONFLICT clause overwrites
 // with the fresh SUM so no double-counting occurs.
 //
-// Both sides of the WHERE comparison use strftime to normalise the timestamp
-// format — Go inserts RFC3339 ("T"/"Z") while SQLite datetime() uses
-// space-separated format; strftime handles both correctly.
+// The bucket / now expressions are driver-aware (sqlite strftime vs postgres
+// date_trunc) — same query string can't be used on both.
 func (r *SingboxTrafficRollup) rollupRawToMinute(ctx context.Context) error {
+	bucket := minuteBucketExpr(r.DB)
+	now := minuteNowExpr(r.DB)
 	_, err := r.DB.ExecContext(ctx, `
 		INSERT INTO singbox_traffic_minute (server_id, tag, kind, ts, bytes_up, bytes_down)
 		SELECT
 			server_id,
 			tag,
 			kind,
-			strftime('%Y-%m-%d %H:%M:00', ts) AS ts,
+			`+bucket+` AS ts,
 			SUM(bytes_up),
 			SUM(bytes_down)
 		FROM singbox_traffic_raw
-		WHERE strftime('%Y-%m-%d %H:%M:%S', ts) < strftime('%Y-%m-%d %H:%M:00', 'now')
-		GROUP BY server_id, tag, kind, strftime('%Y-%m-%d %H:%M:00', ts)
+		WHERE `+bucket+` < `+now+`
+		GROUP BY server_id, tag, kind, `+bucket+`
 		ON CONFLICT (server_id, tag, kind, ts) DO UPDATE SET
 			bytes_up   = excluded.bytes_up,
 			bytes_down = excluded.bytes_down`)
@@ -111,18 +112,20 @@ func (r *SingboxTrafficRollup) rollupRawToMinute(ctx context.Context) error {
 // rollupMinuteToHour aggregates closed 1-hour buckets from singbox_traffic_minute
 // into singbox_traffic_hour. Open buckets are excluded. Idempotent via UPSERT.
 func (r *SingboxTrafficRollup) rollupMinuteToHour(ctx context.Context) error {
+	bucket := hourBucketExpr(r.DB)
+	now := hourNowExpr(r.DB)
 	_, err := r.DB.ExecContext(ctx, `
 		INSERT INTO singbox_traffic_hour (server_id, tag, kind, ts, bytes_up, bytes_down)
 		SELECT
 			server_id,
 			tag,
 			kind,
-			strftime('%Y-%m-%d %H:00:00', ts) AS ts,
+			`+bucket+` AS ts,
 			SUM(bytes_up),
 			SUM(bytes_down)
 		FROM singbox_traffic_minute
-		WHERE strftime('%Y-%m-%d %H:%M:%S', ts) < strftime('%Y-%m-%d %H:00:00', 'now')
-		GROUP BY server_id, tag, kind, strftime('%Y-%m-%d %H:00:00', ts)
+		WHERE `+bucket+` < `+now+`
+		GROUP BY server_id, tag, kind, `+bucket+`
 		ON CONFLICT (server_id, tag, kind, ts) DO UPDATE SET
 			bytes_up   = excluded.bytes_up,
 			bytes_down = excluded.bytes_down`)
@@ -142,7 +145,7 @@ func (r *SingboxTrafficRollup) Cleanup(ctx context.Context) error {
 	} {
 		cutoff := time.Now().UTC().Add(-c.age)
 		if _, err := r.DB.ExecContext(ctx,
-			"DELETE FROM "+c.table+" WHERE ts < ?", cutoff); err != nil {
+			"DELETE FROM "+c.table+" WHERE ts < $1", cutoff); err != nil {
 			log.Printf("singbox traffic cleanup %s: %v", c.table, err)
 			return err
 		}

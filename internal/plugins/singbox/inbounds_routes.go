@@ -102,6 +102,21 @@ func validatePostInbound(ctx context.Context, store *InboundStore, body postInbo
 			return fmt.Errorf("upstream inbound %d is not a landing (role=%s)", upstream.ID, upstream.Role)
 		}
 	}
+	// vless-reality needs handshake target + private key — without them
+	// sing-box fails at runtime with "REALITY: failed to dial dest:
+	// invalid address". Catch at the API boundary so the UI surfaces
+	// the real reason instead of a sing-box crash log.
+	if body.Protocol == "vless-reality" {
+		if body.RealityPrivateKey == nil || *body.RealityPrivateKey == "" {
+			return errors.New("reality_private_key required for vless-reality")
+		}
+		if body.RealityHandshakeServer == nil || *body.RealityHandshakeServer == "" {
+			return errors.New("reality_handshake_server required for vless-reality (e.g. www.microsoft.com)")
+		}
+		if body.RealityHandshakePort == nil || *body.RealityHandshakePort <= 0 {
+			return errors.New("reality_handshake_port required for vless-reality (typically 443)")
+		}
+	}
 	return nil
 }
 
@@ -271,7 +286,11 @@ func patchInboundHandler(deps plugins.Deps) http.HandlerFunc {
 		if v, ok := body["extra"].(string); ok {
 			patch.ExtraJSON = &v
 		}
-		if v, ok := body["reality_private_key"].(string); ok && v != "[REDACTED]" {
+		// Skip the REDACTED placeholder AND empty string — the dialog
+		// starts the field empty and a save without touching it must
+		// preserve the existing key. Pre-fix an empty body value
+		// silently wiped the column, breaking the REALITY handshake.
+		if v, ok := body["reality_private_key"].(string); ok && v != "[REDACTED]" && v != "" {
 			patch.RealityPrivateKey = &v
 		}
 		store := &InboundStore{DB: deps.DB}

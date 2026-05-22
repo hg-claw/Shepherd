@@ -38,6 +38,7 @@ export type ServerRecord = {
   agent_last_seen: { Valid: boolean; Time: string } | null
   agent_fingerprint: { Valid: boolean; String: string } | null
   created_at: string
+  connected?: boolean
 }
 
 export type Latest = {

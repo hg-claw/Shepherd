@@ -3,6 +3,8 @@ package plugins
 import (
 	"context"
 	"testing"
+
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
 )
 
 func TestMetaIsValueType(t *testing.T) {
@@ -25,7 +27,7 @@ func TestHostStatusZeroValueState(t *testing.T) {
 type fakePlain struct{}
 
 func (fakePlain) Meta() Meta                                       { return Meta{ID: "p"} }
-func (fakePlain) Migrations() []Migration                          { return nil }
+func (fakePlain) Migrations(_ shepdb.Driver) []Migration           { return nil }
 func (fakePlain) RegisterRoutes(_ Mux, _ Deps)                     {}
 func (fakePlain) OnEnable(_ context.Context, _ Deps) error         { return nil }
 func (fakePlain) OnDisable(_ context.Context, _ Deps) error        { return nil }

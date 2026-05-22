@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 	xrayplugin "github.com/hg-claw/Shepherd/internal/plugins/xray"
 )
@@ -14,7 +15,7 @@ func newIngestWithTraffic(t *testing.T) (*Ingest, int64) {
 	t.Helper()
 	ing, sid := newIngest(t) // reuse helper from ingest_test.go
 	// run xray plugin migrations to create traffic tables
-	migs := xrayplugin.Migrations()
+	migs := xrayplugin.Migrations(shepdb.DriverSQLite)
 	if err := plugins.RunPluginMigrations(context.Background(), ing.DB, "xray", migs); err != nil {
 		t.Fatal(err)
 	}

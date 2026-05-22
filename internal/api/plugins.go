@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"strconv"
 
+	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 )
 
 type PluginsAPI struct {
 	Store        *plugins.Store
 	Deps         plugins.Deps
+	Driver       shepdb.Driver // for selecting per-driver plugin migrations
 	// SecretFields lists, per plugin ID, top-level JSON field names to redact
 	// from GET responses and preserve from PUT bodies when value equals "***".
 	SecretFields map[string][]string
@@ -79,7 +81,7 @@ func (a *PluginsAPI) Enable(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"enabled": true})
 		return
 	}
-	if err := plugins.RunPluginMigrations(ctx, a.Deps.DB, id, p.Migrations()); err != nil {
+	if err := plugins.RunPluginMigrations(ctx, a.Deps.DB, id, p.Migrations(a.Driver)); err != nil {
 		writeError(w, 500, "migrations: "+err.Error())
 		return
 	}

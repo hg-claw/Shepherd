@@ -35,7 +35,7 @@ func TestAssembleAndDeploy_PushesConfigAndRestarts(t *testing.T) {
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
 	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
-	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations())
+	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations(shepdb.DriverSQLite))
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,ssh_user,ssh_port,agent_os,agent_arch,created_at)
 		VALUES (1,'s1','1.1.1.1','r',22,'linux','amd64',?)`, time.Now())
 	store := &InboundStore{DB: d, Now: time.Now}
@@ -71,7 +71,7 @@ func TestAssembleAndDeploy_NoInboundsStopsService(t *testing.T) {
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
 	t.Cleanup(func() { _ = d.Close() })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
-	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations())
+	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations(shepdb.DriverSQLite))
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,ssh_user,ssh_port,agent_os,agent_arch,created_at)
 		VALUES (1,'s1','1.1.1.1','r',22,'linux','amd64',?)`, time.Now())
 	exec := &fakeHostExec{}

@@ -38,12 +38,13 @@ func (a *ServersAPI) List(w http.ResponseWriter, r *http.Request) {
 	}
 	type wrapped struct {
 		*serversvc.Server
-		Latest *telemetrysvc.Point `json:"latest"`
+		Latest    *telemetrysvc.Point `json:"latest"`
+		Connected bool                `json:"connected"`
 	}
 	out := make([]wrapped, 0, len(servers))
 	for _, s := range servers {
 		pt, _ := a.Query.Latest(r.Context(), s.ID) // nil if no telemetry yet — fine
-		out = append(out, wrapped{Server: s, Latest: pt})
+		out = append(out, wrapped{Server: s, Latest: pt, Connected: a.hubIsOnline(s.ID)})
 	}
 	writeJSON(w, 200, out)
 }
@@ -77,6 +78,15 @@ func (a *ServersAPI) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 201, srv)
 }
 
+// hubIsOnline returns Hub.IsOnline(id) when the hub is wired, false otherwise.
+// Hub may be nil in unit tests that exercise only the DB layer.
+func (a *ServersAPI) hubIsOnline(id int64) bool {
+	if a.Hub == nil {
+		return false
+	}
+	return a.Hub.IsOnline(id)
+}
+
 func (a *ServersAPI) Get(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r, "/api/servers/")
 	if !ok {
@@ -92,7 +102,10 @@ func (a *ServersAPI) Get(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 500, err.Error())
 		return
 	}
-	writeJSON(w, 200, srv)
+	writeJSON(w, 200, struct {
+		*serversvc.Server
+		Connected bool `json:"connected"`
+	}{Server: srv, Connected: a.hubIsOnline(id)})
 }
 
 type patchReq struct {

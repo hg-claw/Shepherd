@@ -22,6 +22,9 @@ import { Search } from 'lucide-react'
 type HostStatus = 'ok' | 'warn' | 'err' | 'offline'
 
 function isOnline(s: ServerWithLatest): boolean {
+  // Prefer the real-time `connected` field (Hub.IsOnline); fall back to the
+  // time-based heuristic for backwards-compat with older API responses.
+  if (s.connected !== undefined) return s.connected
   if (!s.agent_last_seen?.Valid) return false
   return Date.now() - new Date(s.agent_last_seen.Time).getTime() <= 90 * 1000
 }

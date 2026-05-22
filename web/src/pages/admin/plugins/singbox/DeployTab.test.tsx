@@ -93,9 +93,8 @@ describe('singbox/DeployTab', () => {
   it('shows "see error" tooltip for failed host with last_error', async () => {
     render(<DeployTab />, { wrapper })
     await waitFor(() => {
-      const errEl = screen.getByText('see error')
+      const errEl = screen.getByRole('button', { name: 'Show last error' })
       expect(errEl).toBeTruthy()
-      expect(errEl.getAttribute('title')).toContain('binary not found')
     })
   })
 

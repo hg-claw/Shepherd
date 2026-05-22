@@ -64,9 +64,14 @@ export default function AdminServerDetail() {
   const netTx = points.map((p) => ({ ts: p.ts, v: p.net_tx_bps ?? 0 }))
 
   // Hero metric values (from server record, not telemetry)
-  const isOnline = s.agent_last_seen?.Valid
-    ? Date.now() - new Date(s.agent_last_seen.Time).getTime() <= 90_000
-    : false
+  // Prefer the real-time `connected` field returned by the API (sourced from
+  // Hub.IsOnline) — survives the "fresh last_seen but actually disconnected"
+  // case that occurs during a Shepherd restart. Fall back to the time-based
+  // heuristic only when the field is absent (older API responses).
+  const isOnline = s.connected ??
+    (s.agent_last_seen?.Valid
+      ? Date.now() - new Date(s.agent_last_seen.Time).getTime() <= 90_000
+      : false)
 
   return (
     <div className="space-y-6">

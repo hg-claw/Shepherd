@@ -4,6 +4,7 @@ import { Play, Square, RotateCw, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Pill, type PillKind } from '@/components/Pill'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   listPluginHosts,
   fetchXrayVersions,
@@ -170,6 +171,11 @@ export default function DeployTab() {
   const hostsQ = useQuery({
     queryKey: ['plugin-hosts', 'xray'],
     queryFn: () => listPluginHosts('xray'),
+    refetchInterval: (q) => {
+      const rows = (q?.state?.data as Array<{ status?: string }> | undefined) ?? []
+      const transient = rows.some((r) => r.status === 'deploying')
+      return transient ? 2000 : 30_000
+    },
   })
   const versionsQ = useQuery({ queryKey: ['xray-versions'], queryFn: fetchXrayVersions })
 
@@ -231,12 +237,22 @@ export default function DeployTab() {
                 </td>
                 <td className="py-2 pr-4">
                   {errTrunc ? (
-                    <span
-                      className="text-err text-[11px] cursor-help"
-                      title={errTrunc}
-                    >
-                      see error
-                    </span>
+                    <TooltipProvider delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex h-6 w-6 items-center justify-center rounded text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/60"
+                            aria-label="Show last error"
+                          >
+                            ⚠
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-md break-words text-xs">
+                          {errTrunc}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}

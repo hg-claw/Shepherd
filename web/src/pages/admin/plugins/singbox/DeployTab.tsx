@@ -95,27 +95,38 @@ function RedeployButton({ serverID, deployedVersion }: { serverID: number; deplo
   )
 }
 
-function DeployButton({ serverID, latestVersion }: { serverID: number; latestVersion: string | null }) {
+function DeployButton({ serverID, versions }: { serverID: number; versions: string[] }) {
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
+  const [version, setVersion] = useState<string>(versions[0] ?? '')
   const deploy = useMutation({
-    mutationFn: () => patchSingboxServerVersion(serverID, latestVersion ?? ''),
+    mutationFn: () => patchSingboxServerVersion(serverID, version),
     onSuccess: () => {
-      toast('success', `Deploying v${latestVersion}`)
+      toast('success', `Deploying v${version}`)
       qc.invalidateQueries({ queryKey: ['plugin-hosts', 'singbox'] })
     },
     onError: (e: any) => toast('error', String(e?.message ?? e)),
   })
   return (
-    <Button
-      size="sm"
-      variant="outline"
-      className="h-6 px-2 text-[11px]"
-      disabled={!latestVersion || deploy.isPending}
-      onClick={() => deploy.mutate()}
-    >
-      {deploy.isPending ? 'Deploying…' : 'Deploy'}
-    </Button>
+    <span className="inline-flex items-center gap-1">
+      <Select value={version} onValueChange={setVersion} disabled={!versions.length || deploy.isPending}>
+        <SelectTrigger className="h-6 w-24 text-[11px] font-mono">
+          <SelectValue placeholder="version" />
+        </SelectTrigger>
+        <SelectContent>
+          {versions.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+        </SelectContent>
+      </Select>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-6 px-2 text-[11px]"
+        disabled={!version || deploy.isPending}
+        onClick={() => deploy.mutate()}
+      >
+        {deploy.isPending ? 'Deploying…' : 'Deploy'}
+      </Button>
+    </span>
   )
 }
 
@@ -192,13 +203,10 @@ export default function DeployTab() {
   const hosts = hostsQ.data ?? []
   const hostByServerID = new Map(hosts.map((h) => [h.server_id, h]))
 
-  // Resolve latest version: prefer versions API latest[0], fallback to cached[0].version
+  // Unique union of latest + cached versions for the version dropdown.
+  // First-time Deploy defaults to allVersions[0] (the freshest), and
+  // VersionInline lets admins pick a specific version when changing.
   const versionsData = versionsQ.data
-  const latestVersion: string | null = versionsData
-    ? (versionsData.latest[0] ?? versionsData.cached[0]?.version ?? null)
-    : null
-
-  // Unique union of latest + cached versions for the version dropdown
   const allVersions: string[] = versionsData
     ? Array.from(new Set([
         ...(versionsData.latest ?? []),
@@ -289,7 +297,7 @@ export default function DeployTab() {
                         />
                       </>
                     ) : (
-                      <DeployButton serverID={server.id} latestVersion={latestVersion} />
+                      <DeployButton serverID={server.id} versions={allVersions} />
                     )}
                   </span>
                 </td>

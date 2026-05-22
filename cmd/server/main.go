@@ -162,9 +162,13 @@ func main() {
 	}).Run(rootCtx)
 
 	authAPI := &api.AuthAPI{Auth: authH}
+	// hostExec is constructed before ServersAPI so UpdateAgent can borrow
+	// it; the same instance is also handed to pluginsDeps below.
+	hostExec := &plugins.HubHostExec{Hub: hub, Files: filesService, Reg: reg}
 	servers := &api.ServersAPI{
 		Servers: serverSvc, Settings: settingsStore, Query: tQuery, Hub: hub,
 		InstallManager: installMgr, Tokens: agentSvc,
+		HostExec:     hostExec,
 		BuildVersion: cfg.BuildVersion,
 		PublicURL:    deriveServerURL(cfg),
 	}
@@ -193,10 +197,9 @@ func main() {
 	auditAPI := &api.AuditAPI{DB: d}
 	recAPI := &api.RecordingsAPI{DB: d}
 
-	// HubHostExec wires plugins.HostExec to the project's filesvc (file push)
-	// and the agent WS hub (one-shot PTY exec via sessionmux). No DB row is
-	// written for plugin-initiated exec; sessions are ephemeral.
-	hostExec := &plugins.HubHostExec{Hub: hub, Files: filesService, Reg: reg}
+	// hostExec was constructed above (before ServersAPI) and is shared here
+	// for plugin-initiated exec. No DB row is written for plugin-initiated
+	// exec; sessions are ephemeral.
 	pluginsDeps := plugins.Deps{
 		DB:       d,
 		DataDir:  filepath.Join(cfg.DataDir, "plugins"),

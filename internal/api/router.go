@@ -79,6 +79,8 @@ func (r *Router) Handler() http.Handler {
 	admin.HandleFunc("GET /api/servers/{id}/telemetry", r.Servers.Telemetry)
 	admin.HandleFunc("POST /api/servers/{id}/repair", r.Servers.Repair)
 	admin.HandleFunc("POST /api/servers/{id}/install-command", r.Servers.InstallCommand)
+	admin.HandleFunc("POST /api/servers/{id}/update-agent", r.Servers.UpdateAgent)
+	admin.HandleFunc("POST /api/servers/update-agent", r.Servers.BatchUpdateAgent)
 	admin.HandleFunc("POST /api/servers/{id}/config", r.Servers.Config)
 	admin.HandleFunc("GET /api/servers/{id}/ip-candidates", r.Servers.IPCandidates)
 

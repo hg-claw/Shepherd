@@ -228,5 +228,17 @@
   "recording": {
     "title": "录制回放",
     "replay": "重放"
+  },
+  "server": {
+    "update_agent": "更新 agent",
+    "updating": "更新中…",
+    "update_started": "已触发更新 → {{v}}",
+    "updating_to": "正在更新到 v{{v}}…",
+    "batch_update_started": "已为 {{n}} 台 agent 触发更新",
+    "batch_update_partial": "已触发 {{ok}} 台，{{fail}} 台失败",
+    "batch_update_agents": "更新 {{n}} 台 agent",
+    "selected_count": "已选 {{n}} 台",
+    "select_all": "全选",
+    "select": "选择 {{name}}"
   }
 }

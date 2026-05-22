@@ -1,12 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Download } from 'lucide-react'
+import { Download, Search } from 'lucide-react'
 import { useAuditLog, type AuditRow } from '@/api/audit'
+import { KpiCard } from '@/components/KpiCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table'
+import { cn } from '@/lib/utils'
 
 function rowsToCSV(rows: AuditRow[]): string {
   const headers = ['ts', 'admin_id', 'server_id', 'action', 'result', 'details']
@@ -38,8 +37,10 @@ export default function AuditLogPage() {
     to: to || undefined,
   })
 
+  const rows = data ?? []
+
   const handleDownloadCSV = () => {
-    const csv = rowsToCSV(data ?? [])
+    const csv = rowsToCSV(rows)
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -49,69 +50,154 @@ export default function AuditLogPage() {
     URL.revokeObjectURL(url)
   }
 
+  const okCount = rows.filter((r) => r.result === 'ok').length
+  const errCount = rows.filter((r) => r.result === 'error').length
+  const uniqueAdmins = new Set(rows.map((r) => r.admin_id).filter(Boolean)).size
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl sm:text-2xl font-semibold">{t('audit.title')}</h1>
-        <Button size="sm" variant="outline" onClick={handleDownloadCSV}>
-          <Download className="h-4 w-4 mr-1" />
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h1 className="text-[22px] font-semibold tracking-tight m-0">{t('audit.title', 'Audit log')}</h1>
+          <p className="text-muted-foreground text-[13px] mt-1">
+            {t('audit.sub', 'Every privileged operation.')}{' '}
+            <span className="font-mono">30 days</span>{' '}
+            {t('audit.retention_hint', 'retention · exportable as CSV.')}
+          </p>
+        </div>
+        <Button size="sm" variant="outline" onClick={handleDownloadCSV} className="gap-1.5">
+          <Download className="h-3.5 w-3.5" />
           CSV
         </Button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-        <Input
-          placeholder={t('audit.action_filter')}
-          value={action}
-          onChange={(e) => setAction(e.target.value)}
+
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard label={t('audit.kpi.total', 'Total events')} value={String(rows.length)} sub={t('audit.kpi.in_view', 'in view')} />
+        <KpiCard label={t('audit.kpi.ok', 'Succeeded')} value={String(okCount)} sub={t('audit.kpi.ok_sub', 'result ok')} tone="ok" />
+        <KpiCard
+          label={t('audit.kpi.errors', 'Errors')}
+          value={String(errCount)}
+          sub={t('audit.kpi.errors_sub', 'result error')}
+          tone={errCount > 0 ? 'err' : undefined}
         />
+        <KpiCard label={t('audit.kpi.admins', 'Admins')} value={String(uniqueAdmins)} sub={t('audit.kpi.admins_sub', 'unique')} />
+      </div>
+
+      {/* Filters */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-dim pointer-events-none" />
+          <Input
+            placeholder={t('audit.action_filter', 'filter action…')}
+            value={action}
+            onChange={(e) => setAction(e.target.value)}
+            className="pl-8 font-mono text-[12px]"
+          />
+        </div>
         <Input
-          placeholder={t('audit.server_id_filter')}
+          placeholder={t('audit.server_id_filter', 'server id')}
           value={serverID}
           onChange={(e) => setServerID(e.target.value)}
+          className="font-mono text-[12px]"
         />
         <Input
-          placeholder={t('audit.from')}
+          placeholder={t('audit.from', 'from (RFC3339)')}
           value={from}
           onChange={(e) => setFrom(e.target.value)}
+          className="font-mono text-[12px]"
         />
         <Input
-          placeholder={t('audit.to')}
+          placeholder={t('audit.to', 'to (RFC3339)')}
           value={to}
           onChange={(e) => setTo(e.target.value)}
+          className="font-mono text-[12px]"
         />
       </div>
+
+      {/* Table */}
       {isLoading ? (
-        <div>{t('common.loading')}</div>
+        <div className="text-muted-foreground text-[13px]">{t('common.loading')}</div>
       ) : (
-        <div className="rounded-md border overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('audit.ts')}</TableHead>
-                <TableHead>{t('audit.action')}</TableHead>
-                <TableHead className="hidden sm:table-cell">{t('audit.admin')}</TableHead>
-                <TableHead className="hidden sm:table-cell">{t('audit.server')}</TableHead>
-                <TableHead>{t('audit.result')}</TableHead>
-                <TableHead className="hidden md:table-cell">{t('audit.details')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(data ?? []).map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-mono text-xs whitespace-nowrap">{r.ts}</TableCell>
-                  <TableCell className="font-mono text-xs">{r.action}</TableCell>
-                  <TableCell className="hidden sm:table-cell">{r.admin_id ?? '-'}</TableCell>
-                  <TableCell className="hidden sm:table-cell">{r.server_id ?? '-'}</TableCell>
-                  <TableCell className={r.result === 'error' ? 'text-destructive' : ''}>
-                    {r.result}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell font-mono text-xs max-w-md truncate">
-                    {r.details}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="border rounded-lg bg-elev overflow-hidden">
+          <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
+            <span className="text-foreground font-medium text-[12.5px]">
+              {t('audit.events', 'Events')}
+            </span>
+            <span className="text-fg-dim font-mono text-[11px] ml-auto">{rows.length} rows</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12.5px] border-collapse">
+              <thead>
+                <tr>
+                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b whitespace-nowrap">
+                    {t('audit.ts', 'Time')}
+                  </th>
+                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b">
+                    {t('audit.action', 'Action')}
+                  </th>
+                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
+                    {t('audit.admin', 'Admin')}
+                  </th>
+                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
+                    {t('audit.server', 'Server')}
+                  </th>
+                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b">
+                    {t('audit.result', 'Result')}
+                  </th>
+                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b hidden md:table-cell">
+                    {t('audit.details', 'Details')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-fg-dim font-mono text-[12px]">
+                      {t('audit.empty', 'no events in this range')}
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((r) => (
+                    <tr
+                      key={r.id}
+                      className={cn(
+                        'border-t transition-colors',
+                        r.result === 'error'
+                          ? 'bg-err-soft/20 hover:bg-err-soft/30'
+                          : 'hover:bg-sunken/70',
+                      )}
+                    >
+                      <td className="px-4 py-2 font-mono text-[11.5px] text-fg-dim whitespace-nowrap">
+                        {r.ts}
+                      </td>
+                      <td className="px-4 py-2 font-mono text-[12px]">{r.action}</td>
+                      <td className="px-4 py-2 hidden sm:table-cell font-mono text-[12px] text-fg-dim">
+                        {r.admin_id ?? '—'}
+                      </td>
+                      <td className="px-4 py-2 hidden sm:table-cell font-mono text-[12px] text-fg-dim">
+                        {r.server_id ?? '—'}
+                      </td>
+                      <td className="px-4 py-2">
+                        <span
+                          className={cn(
+                            'font-mono text-[12px]',
+                            r.result === 'error' ? 'text-err' : 'text-ok',
+                          )}
+                        >
+                          {r.result}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 hidden md:table-cell font-mono text-[11.5px] text-fg-dim max-w-md">
+                        <span className="truncate block">{r.details}</span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

@@ -231,7 +231,7 @@ export default function FileBrowserPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight m-0">
-            {t('files.title', 'Files')} & shell
+            {t('files.title', 'Files')} &amp; shell
           </h1>
           <p className="text-muted-foreground text-[13px] mt-1">
             {t(
@@ -488,8 +488,12 @@ export default function FileBrowserPage() {
           <span className="text-foreground font-medium text-[12.5px]">
             {t('files.transfers', 'Transfers')}
           </span>
+          {transfersActive > 0 && (
+            <span className="inline-flex items-center gap-1 h-4 px-1.5 rounded-full bg-warn-soft text-warn text-[10px] font-mono">
+              {transfersActive} active
+            </span>
+          )}
           <span className="ml-auto text-fg-dim text-[11px] font-mono">
-            {transfersActive > 0 ? `${transfersActive} active · ` : ''}
             {transfers.length} {t('files.items', 'items')}
           </span>
         </div>

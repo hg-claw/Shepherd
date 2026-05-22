@@ -105,9 +105,17 @@ export default function Settings() {
     <div className="space-y-5">
       <div>
         <h1 className="text-[22px] font-semibold tracking-tight m-0">{t('admin.settings')}</h1>
+        <p className="text-muted-foreground text-[13px] mt-1">
+          {t(
+            'settings.sub',
+            'Shepherd instance configuration. Changes write to the ',
+          )}
+          <code className="bg-sunken px-1 py-0.5 rounded text-[12px] font-mono">settings</code>
+          {t('settings.sub2', ' table immediately.')}
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-5 md:gap-7">
+      <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-5 md:gap-7">
         <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible -mx-3 px-3 md:mx-0 md:px-0">
           {TABS.map((it) => (
             <button
@@ -144,8 +152,8 @@ export default function Settings() {
           {tab === 'appearance' && <AppearanceTab />}
 
           {tab !== 'about' && tab !== 'keys' && tab !== 'appearance' && (
-            <div className="pt-2">
-              <Button type="submit" className="w-full sm:w-auto h-8">
+            <div className="flex items-center gap-2 pt-1">
+              <Button type="submit" size="sm" className="h-8 px-4">
                 {t('admin.save')}
               </Button>
             </div>
@@ -165,30 +173,23 @@ function KV({ k, v }: { k: string; v: React.ReactNode }) {
   )
 }
 
-function SectionTitle({ children, sub }: { children: React.ReactNode; sub?: string }) {
-  return (
-    <div>
-      <h3 className="text-[13px] font-semibold m-0 mb-1">{children}</h3>
-      {sub && <p className="text-muted-foreground text-[12px] m-0 mb-2.5">{sub}</p>}
-    </div>
-  )
-}
 
 function AboutTab() {
   const versionQ = useVersion()
   return (
-    <div>
-      <SectionTitle>About this install</SectionTitle>
-      <div className="border rounded-lg bg-elev px-4 py-1">
-        <KV k="Version" v={versionQ.data?.version ?? '…'} />
-        <KV
-          k="Admin"
-          v={<span>admin (single-user)</span>}
-        />
-        <KV k="Database" v="set via DATABASE_URL — see Storage" />
-        <KV k="Public wall" v={<span>enabled · /</span>} />
+    <div className="space-y-4">
+      <div className="border rounded-lg bg-elev overflow-hidden">
+        <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
+          <span className="text-foreground font-medium text-[12.5px]">About this install</span>
+        </div>
+        <div className="px-4 py-1">
+          <KV k="Version" v={versionQ.data?.version ?? '…'} />
+          <KV k="Admin" v={<span>admin (single-user)</span>} />
+          <KV k="Database" v="set via DATABASE_URL — see Storage" />
+          <KV k="Public wall" v={<span>enabled · /</span>} />
+        </div>
       </div>
-      <p className="text-muted-foreground text-[12px] mt-3">
+      <p className="text-muted-foreground text-[12px]">
         Workspace name, default channels, timezone, and team membership are not configurable in
         this release.
       </p>
@@ -204,12 +205,15 @@ function StorageTab({
   errors: Record<string, { message?: string } | undefined>
 }) {
   return (
-    <div className="space-y-5">
-      <div>
-        <SectionTitle sub="Set DATABASE_URL=postgres://… and restart to migrate to Postgres.">
-          Database
-        </SectionTitle>
-        <div className="border rounded-lg bg-elev px-4 py-3.5">
+    <div className="space-y-4">
+      <div className="border rounded-lg bg-elev overflow-hidden">
+        <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
+          <span className="text-foreground font-medium text-[12.5px]">Database</span>
+          <span className="text-fg-dim font-mono text-[11px] ml-auto">
+            Set DATABASE_URL=postgres://… and restart to migrate to Postgres.
+          </span>
+        </div>
+        <div className="px-4 py-3.5">
           <div className="flex flex-wrap items-center gap-3">
             <Pill kind="ok">SQLite</Pill>
             <span className="font-mono text-[12px] text-muted-foreground truncate">
@@ -219,42 +223,45 @@ function StorageTab({
         </div>
       </div>
 
-      <div>
-        <SectionTitle sub="How long to keep each rollup bucket. Older points get pruned every hour.">
-          Retention
-        </SectionTitle>
-        <div className="border rounded-lg bg-elev overflow-hidden">
-          <RetentionRow
-            label="raw"
-            desc="raw samples at the agent interval"
-            register={register('retention_30s')}
-            error={errors.retention_30s?.message}
-          />
-          <RetentionRow
-            label="5m"
-            desc="downsample → 5m bucket every 5m"
-            register={register('retention_5m')}
-            error={errors.retention_5m?.message}
-          />
-          <RetentionRow
-            label="1h"
-            desc="downsample → 1h bucket hourly"
-            register={register('retention_1h')}
-            error={errors.retention_1h?.message}
-          />
+      <div className="border rounded-lg bg-elev overflow-hidden">
+        <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
+          <span className="text-foreground font-medium text-[12.5px]">Retention</span>
+          <span className="text-fg-dim font-mono text-[11px] ml-auto">
+            Older points get pruned every hour.
+          </span>
         </div>
+        <RetentionRow
+          label="raw"
+          desc="raw samples at the agent interval"
+          register={register('retention_30s')}
+          error={errors.retention_30s?.message}
+        />
+        <RetentionRow
+          label="5m"
+          desc="downsample → 5m bucket every 5m"
+          register={register('retention_5m')}
+          error={errors.retention_5m?.message}
+        />
+        <RetentionRow
+          label="1h"
+          desc="downsample → 1h bucket hourly"
+          register={register('retention_1h')}
+          error={errors.retention_1h?.message}
+        />
       </div>
 
-      <div>
-        <SectionTitle>Default telemetry interval</SectionTitle>
-        <div className="border rounded-lg bg-elev px-4 py-3.5">
+      <div className="border rounded-lg bg-elev overflow-hidden">
+        <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
+          <span className="text-foreground font-medium text-[12.5px]">Default telemetry interval</span>
+        </div>
+        <div className="px-4 py-3.5">
           <div className="flex items-center gap-3">
             <Input
               type="number"
               {...register('default_telemetry_interval_seconds')}
-              className="w-28 h-8 font-mono"
+              className="w-28 h-8 font-mono text-[12.5px]"
             />
-            <span className="text-muted-foreground text-[12px]">seconds (5 – 3600)</span>
+            <span className="text-fg-dim font-mono text-[12px]">seconds · 5–3600</span>
           </div>
           {errors.default_telemetry_interval_seconds?.message && (
             <p className="text-xs text-destructive mt-1">
@@ -269,11 +276,18 @@ function StorageTab({
 
 function KeysTab() {
   return (
-    <div>
-      <SectionTitle sub="Pre-shared, server-global. Embedded into agent config at install time so an agent can re-enroll after a fingerprint change (disk swap, container rebuild). View / rotate from the server CLI for now.">
-        Recovery key (AUTO_RECOVER_KEY)
-      </SectionTitle>
-      <div className="border rounded-lg bg-elev px-4 py-3.5 space-y-3">
+    <div className="border rounded-lg bg-elev overflow-hidden">
+      <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
+        <span className="text-foreground font-medium text-[12.5px]">
+          Recovery key (AUTO_RECOVER_KEY)
+        </span>
+      </div>
+      <div className="px-4 py-3.5 space-y-3">
+        <p className="text-fg-dim text-[12px]">
+          Pre-shared, server-global. Embedded into agent config at install time so an agent can
+          re-enroll after a fingerprint change (disk swap, container rebuild). View / rotate from
+          the server CLI for now.
+        </p>
         <code className="block bg-sunken rounded-md border px-3 py-2.5 font-mono text-[12px] text-muted-foreground break-all">
           configured via AUTO_RECOVER_KEY env var; not exposed over the admin API
         </code>
@@ -290,12 +304,15 @@ function SecurityTab({ form }: { form: ReturnType<typeof useForm<FormVals>> }) {
   const sandboxOn = form.watch('file_sandbox_enabled')
   const ptyRec = form.watch('pty_recording_enabled')
   return (
-    <div className="space-y-5">
-      <div>
-        <SectionTitle sub="The remote file browser is restricted to these paths. Outside paths return 403 even with sudo.">
-          File browser sandbox
-        </SectionTitle>
-        <div className="border rounded-lg bg-elev p-4 space-y-3">
+    <div className="space-y-4">
+      <div className="border rounded-lg bg-elev overflow-hidden">
+        <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
+          <span className="text-foreground font-medium text-[12.5px]">File browser sandbox</span>
+          <span className="text-fg-dim font-mono text-[11px] ml-auto">
+            Outside paths return 403 even with sudo.
+          </span>
+        </div>
+        <div className="p-4 space-y-3">
           <ToggleRow
             label="Enable sandbox"
             hint="Disabling exposes the entire filesystem to admin sessions."
@@ -305,10 +322,13 @@ function SecurityTab({ form }: { form: ReturnType<typeof useForm<FormVals>> }) {
           <div>
             <Label className="text-[12px]">Allowed paths (one per line)</Label>
             <textarea
-              className="mt-1 w-full min-h-[110px] rounded-md border border-input bg-background px-3 py-2 text-[13px] font-mono ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="mt-1.5 w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-[12.5px] font-mono ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y"
               placeholder="/var/log&#10;/etc/shepherd"
               {...form.register('file_sandbox_paths')}
             />
+            <p className="text-fg-dim font-mono text-[11px] mt-1">
+              default · /tmp /var/log /etc/shepherd /home /opt /srv
+            </p>
           </div>
           <NumberRow
             label="Max upload size"
@@ -322,9 +342,14 @@ function SecurityTab({ form }: { form: ReturnType<typeof useForm<FormVals>> }) {
         </div>
       </div>
 
-      <div>
-        <SectionTitle>PTY sessions</SectionTitle>
-        <div className="border rounded-lg bg-elev p-4 space-y-3">
+      <div className="border rounded-lg bg-elev overflow-hidden">
+        <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
+          <span className="text-foreground font-medium text-[12.5px]">PTY sessions</span>
+          <span className="text-fg-dim font-mono text-[11px] ml-auto">
+            Recordings stored as asciicast v2.
+          </span>
+        </div>
+        <div className="p-4 space-y-3">
           <ToggleRow
             label="Record PTY sessions"
             hint="Records every key and output line as asciinema for replay."
@@ -352,11 +377,14 @@ function AuditTab({
   errors: Record<string, { message?: string } | undefined>
 }) {
   return (
-    <div>
-      <SectionTitle sub="Audit events cover PTY sessions, file uploads/downloads, batch runs, and settings changes.">
-        Retention
-      </SectionTitle>
-      <div className="border rounded-lg bg-elev p-4 space-y-3">
+    <div className="border rounded-lg bg-elev overflow-hidden">
+      <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
+        <span className="text-foreground font-medium text-[12.5px]">Retention</span>
+        <span className="text-fg-dim font-mono text-[11px] ml-auto">
+          Covers PTY sessions, file transfers, batch runs, settings changes.
+        </span>
+      </div>
+      <div className="p-4 space-y-3">
         <NumberRow
           label="Retain audit events"
           suffix="days"
@@ -365,7 +393,7 @@ function AuditTab({
           register={register('audit_retention_days')}
           error={errors.audit_retention_days?.message}
         />
-        <p className="text-fg-dim text-[12px]">
+        <p className="text-fg-dim font-mono text-[11.5px]">
           PTY recordings are pruned alongside their session row; storage used is reported in the
           server logs.
         </p>
@@ -377,13 +405,18 @@ function AuditTab({
 function AppearanceTab() {
   const { t } = useTranslation()
   return (
-    <div className="space-y-4">
-      <p className="text-muted-foreground text-[12.5px]">
-        {t(
-          'settings.appearance_hint',
-          'Theme and language live in the top bar so you can change them on any page.',
-        )}
-      </p>
+    <div className="border rounded-lg bg-elev overflow-hidden">
+      <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
+        <span className="text-foreground font-medium text-[12.5px]">Appearance</span>
+      </div>
+      <div className="px-4 py-3.5">
+        <p className="text-muted-foreground text-[12.5px]">
+          {t(
+            'settings.appearance_hint',
+            'Theme and language live in the top bar so you can change them on any page.',
+          )}
+        </p>
+      </div>
     </div>
   )
 }

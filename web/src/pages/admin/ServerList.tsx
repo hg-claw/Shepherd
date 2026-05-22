@@ -1,18 +1,23 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { Plus, Trash2, LayoutGrid, Rows3, Search } from 'lucide-react'
+import { Plus, Trash2, LayoutGrid, Rows3 } from 'lucide-react'
 import { useServers, useDeleteServer, type ServerWithLatest } from '@/api/servers'
 import { useUI } from '@/store/ui'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Pill, type PillKind } from '@/components/Pill'
+import { KpiCard } from '@/components/KpiCard'
+import { OnlineDot } from '@/components/OnlineDot'
+import { CountryFlag } from '@/components/CountryFlag'
+import { Seg } from '@/components/Seg'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
 import { pct } from '@/lib/bytes'
 import { relativeTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { Search } from 'lucide-react'
 
 type HostStatus = 'ok' | 'warn' | 'err' | 'offline'
 
@@ -91,11 +96,11 @@ export default function ServerList() {
       return 'table'
     }
   })
+
   // refetchInterval is dynamic: poll fast (1.5s) when ANY server is in a
   // transient stage (pending/installing) so the UI tracks state changes
   // promptly during a script install. Drops back to 30s once everything
-  // settles. Pre-fix a fresh agent enrolling could sit on stale 'pending'
-  // for up to half a minute despite the server-side flip being instant.
+  // settles.
   const { data, isLoading } = useServers({
     withLatest: true,
     refetchInterval: (q: any) => {
@@ -110,6 +115,7 @@ export default function ServerList() {
   const toast = useUI((s) => s.toast)
 
   const all = data ?? []
+
   const counts = useMemo(() => {
     const c = { all: all.length, ok: 0, warn: 0, err: 0, offline: 0 }
     for (const s of all) c[hostStatus(s)] += 1
@@ -121,6 +127,7 @@ export default function ServerList() {
     if (online.length === 0) return 0
     return online.reduce((sum, s) => sum + (s.latest?.cpu_pct ?? 0), 0) / online.length
   }, [all])
+
   const avgMem = useMemo(() => {
     const online = all.filter(isOnline)
     if (online.length === 0) return 0
@@ -147,6 +154,8 @@ export default function ServerList() {
     } catch {}
   }
 
+  const onlineCount = all.length - counts.offline
+
   const chipDefs: { key: 'all' | HostStatus; label: string; count: number }[] = [
     { key: 'all', label: t('filter.all', 'All'), count: counts.all },
     { key: 'ok', label: t('filter.ok', 'Healthy'), count: counts.ok },
@@ -155,8 +164,18 @@ export default function ServerList() {
     { key: 'offline', label: t('filter.offline', 'Offline'), count: counts.offline },
   ]
 
+  const handleDelete = async (s: ServerWithLatest) => {
+    try {
+      await del.mutateAsync(s.id)
+      toast('success', t('common.ok'))
+    } catch (err: any) {
+      toast('error', err?.message ?? t('common.error'))
+    }
+  }
+
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight m-0">
@@ -167,28 +186,42 @@ export default function ServerList() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <SegmentToggle
+          <Seg
             value={view}
             onChange={setViewPersist}
+            size="sm"
             options={[
-              { value: 'grid', icon: LayoutGrid, label: t('view.grid', 'Grid') },
-              { value: 'table', icon: Rows3, label: t('view.table', 'Table') },
+              { value: 'grid' as const, icon: LayoutGrid, label: t('view.grid', 'Grid') },
+              { value: 'table' as const, icon: Rows3, label: t('view.table', 'Table') },
             ]}
           />
           <Button asChild size="sm" className="h-8">
             <Link to="/admin/servers/new">
               <Plus className="mr-1 h-3.5 w-3.5" />
-              {t('admin.add_server')}
+              {t('admin.add_server', 'Add server')}
             </Link>
           </Button>
         </div>
       </div>
 
+      {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi label={t('hosts.kpi.online', 'Online')} value={`${all.length - counts.offline}/${all.length}`} sub={`${counts.offline} ${t('wall.offline')}`} />
-        <Kpi label={t('hosts.kpi.cpu', 'Avg CPU')} value={`${avgCpu.toFixed(1)}%`} sub={t('range.24h')} />
-        <Kpi label={t('hosts.kpi.mem', 'Avg memory')} value={`${avgMem.toFixed(1)}%`} sub={t('range.24h')} />
-        <Kpi
+        <KpiCard
+          label={t('hosts.kpi.online', 'Online')}
+          value={`${onlineCount}/${all.length}`}
+          sub={`${counts.offline} ${t('wall.offline', 'offline')}`}
+        />
+        <KpiCard
+          label={t('hosts.kpi.cpu', 'Avg CPU')}
+          value={`${avgCpu.toFixed(1)}%`}
+          sub={t('range.24h', '24h')}
+        />
+        <KpiCard
+          label={t('hosts.kpi.mem', 'Avg memory')}
+          value={`${avgMem.toFixed(1)}%`}
+          sub={t('range.24h', '24h')}
+        />
+        <KpiCard
           label={t('hosts.kpi.alerts', 'Alerts')}
           value={String(counts.err + counts.warn)}
           sub={`${counts.err} ${t('filter.err', 'critical')}`}
@@ -196,6 +229,7 @@ export default function ServerList() {
         />
       </div>
 
+      {/* Filter row */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-fg-dim pointer-events-none" />
@@ -203,12 +237,13 @@ export default function ServerList() {
             placeholder={t('common.filter', 'Filter…')}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="pl-7 max-w-full sm:max-w-[260px] h-8 text-[13px]"
+            className="pl-7 max-w-full sm:max-w-[240px] h-7 text-[13px]"
           />
         </div>
         {chipDefs.map((c) => (
           <button
             key={c.key}
+            type="button"
             onClick={() => setStatusFilter(c.key)}
             className={cn(
               'h-[26px] px-2.5 rounded-full text-[12px] inline-flex items-center gap-1.5 border transition-colors',
@@ -223,20 +258,14 @@ export default function ServerList() {
         ))}
       </div>
 
+      {/* Views */}
       {view === 'grid' ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
           {servers.map((s) => (
             <HostCard
               key={s.id}
               server={s}
-              onDelete={async () => {
-                try {
-                  await del.mutateAsync(s.id)
-                  toast('success', t('common.ok'))
-                } catch (err: any) {
-                  toast('error', err?.message ?? t('common.error'))
-                }
-              }}
+              onDelete={() => handleDelete(s)}
               t={t}
             />
           ))}
@@ -246,14 +275,14 @@ export default function ServerList() {
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr className="text-left">
-                <Th>{t('admin.name')}</Th>
-                <Th className="hidden md:table-cell">{t('admin.host')}</Th>
+                <Th>{t('admin.name', 'Name')}</Th>
+                <Th className="hidden md:table-cell">{t('admin.host', 'Host')}</Th>
                 <Th className="hidden lg:table-cell">OS</Th>
                 <Th className="hidden md:table-cell">Stage</Th>
-                <Th className="hidden lg:table-cell">{t('admin.agent_last_seen')}</Th>
+                <Th className="hidden lg:table-cell">{t('admin.agent_last_seen', 'Last seen')}</Th>
                 <Th>CPU</Th>
                 <Th className="hidden sm:table-cell">MEM</Th>
-                <Th className="text-right">{t('admin.actions')}</Th>
+                <Th className="text-right">{t('admin.actions', 'Actions')}</Th>
               </tr>
             </thead>
             <tbody>
@@ -262,73 +291,45 @@ export default function ServerList() {
                 const lastSeen = relativeTime(s.agent_last_seen?.Valid ? s.agent_last_seen.Time : null)
                 const memPct = pct(s.latest?.mem_used, s.latest?.mem_total)
                 return (
-                  <tr key={s.id} className="border-t hover:bg-sunken/60 cursor-pointer">
+                  <tr
+                    key={s.id}
+                    className="border-t hover:bg-sunken/60 cursor-pointer"
+                    onClick={() => window.location.assign(`/admin/servers/${s.id}`)}
+                  >
                     <Td>
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span
-                          className={cn(
-                            'inline-block h-1.5 w-1.5 rounded-full shrink-0',
-                            online
-                              ? 'bg-ok shadow-[0_0_0_3px_hsl(var(--ok-soft))] motion-safe:shep-pulse'
-                              : 'bg-err shadow-[0_0_0_3px_hsl(var(--err-soft))]',
-                          )}
-                        />
+                        <OnlineDot online={online} />
                         <Link
                           to={`/admin/servers/${s.id}`}
                           className="font-mono font-medium truncate hover:underline"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           {s.name}
                         </Link>
+                        {s.country_code?.String && (
+                          <CountryFlag code={s.country_code.String} />
+                        )}
                       </div>
                     </Td>
                     <Td className="hidden md:table-cell font-mono text-[12px] text-muted-foreground">
                       {s.ssh_host?.String ?? '—'}
                     </Td>
                     <Td className="hidden lg:table-cell font-mono text-[12px] text-fg-dim">
-                      {s.agent_os?.String ?? '—'}/{s.agent_arch?.String ?? '—'}
+                      {[s.agent_os?.String, s.agent_arch?.String].filter(Boolean).join('/') || '—'}
                     </Td>
                     <Td className="hidden md:table-cell">
                       <Pill kind={stageKind(s.install_stage)}>{s.install_stage}</Pill>
                     </Td>
-                    <Td className="hidden lg:table-cell text-[12px] text-muted-foreground">
+                    <Td className="hidden lg:table-cell text-[12px] text-muted-foreground font-mono tabular-nums">
                       {lastSeen ? t(lastSeen.key, { n: lastSeen.n, lng: i18n.language }) : '—'}
                     </Td>
                     <Td><Bar value={s.latest?.cpu_pct} /></Td>
                     <Td className="hidden sm:table-cell"><Bar value={memPct} /></Td>
-                    <Td className="text-right whitespace-nowrap">
+                    <Td className="text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-[12.5px]">
-                        <Link to={`/admin/servers/${s.id}`}>{t('admin.details')}</Link>
+                        <Link to={`/admin/servers/${s.id}`}>{t('admin.details', 'Details')}</Link>
                       </Button>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="sm" aria-label="delete" className="h-7 w-7 p-0">
-                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>{t('admin.delete')}</DialogTitle>
-                            <DialogDescription>
-                              {t('admin.confirm_delete', { name: s.name })}
-                            </DialogDescription>
-                          </DialogHeader>
-                          <DialogFooter>
-                            <Button
-                              variant="destructive"
-                              onClick={async () => {
-                                try {
-                                  await del.mutateAsync(s.id)
-                                  toast('success', t('common.ok'))
-                                } catch (err: any) {
-                                  toast('error', err?.message ?? t('common.error'))
-                                }
-                              }}
-                            >
-                              {t('admin.delete')}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
+                      <DeleteButton server={s} onDelete={() => handleDelete(s)} t={t} />
                     </Td>
                   </tr>
                 )
@@ -341,34 +342,36 @@ export default function ServerList() {
   )
 }
 
-function Kpi({
-  label,
-  value,
-  sub,
-  tone,
+function DeleteButton({
+  server,
+  onDelete,
+  t,
 }: {
-  label: string
-  value: string
-  sub?: string
-  tone?: 'ok' | 'warn' | 'err'
+  server: ServerWithLatest
+  onDelete: () => void
+  t: (k: string, opts?: any) => string
 }) {
   return (
-    <div className="relative bg-elev border rounded-lg px-4 py-3.5">
-      <div className="text-[11.5px] uppercase tracking-[0.05em] text-muted-foreground whitespace-nowrap">
-        {label}
-      </div>
-      <div
-        className={cn(
-          'font-mono text-[26px] mt-1 tracking-tight tabular-nums leading-none',
-          tone === 'ok' && 'text-ok',
-          tone === 'warn' && 'text-warn',
-          tone === 'err' && 'text-err',
-        )}
-      >
-        {value}
-      </div>
-      {sub && <div className="font-mono text-[11px] text-muted-foreground mt-1">{sub}</div>}
-    </div>
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" aria-label={t('admin.delete', 'Delete')} className="h-7 w-7 p-0">
+          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('admin.delete', 'Delete')}</DialogTitle>
+          <DialogDescription>
+            {t('admin.confirm_delete', { name: server.name })}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="destructive" onClick={onDelete}>
+            {t('admin.delete', 'Delete')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -387,8 +390,18 @@ function HostCard({
   const mem = pct(server.latest?.mem_used, server.latest?.mem_total) ?? 0
   const load = server.latest?.load_1 ?? 0
   const tcp = server.latest?.tcp_conn ?? 0
+
+  const statusLabel =
+    status === 'ok'
+      ? t('filter.ok', 'healthy')
+      : status === 'warn'
+        ? t('filter.warn', 'warn')
+        : status === 'err'
+          ? t('filter.err', 'critical')
+          : t('filter.offline', 'offline')
+
   return (
-    <div className="bg-elev border rounded-lg p-3.5 hover:border-strong transition-colors">
+    <div className="bg-elev border rounded-lg p-3.5 hover:border-strong transition-colors cursor-pointer">
       <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0">
           <Link
@@ -401,15 +414,7 @@ function HostCard({
             {(server.agent_os?.String ?? '—')} · {server.public_group?.String ?? '—'}
           </div>
         </div>
-        <Pill kind={status === 'offline' ? 'neutral' : status}>
-          {status === 'ok'
-            ? t('filter.ok', 'healthy')
-            : status === 'warn'
-              ? t('filter.warn', 'warn')
-              : status === 'err'
-                ? t('filter.err', 'critical')
-                : t('filter.offline', 'offline')}
-        </Pill>
+        <Pill kind={status === 'offline' ? 'neutral' : status}>{statusLabel}</Pill>
       </div>
       <div className="grid grid-cols-2 gap-y-2 gap-x-3.5 mt-3">
         <Stat label="CPU" v={online ? `${cpu.toFixed(1)}%` : '—'} />
@@ -419,28 +424,30 @@ function HostCard({
       </div>
       <div className="flex items-center gap-1 mt-3 pt-2.5 border-t border-dashed">
         <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-[12px]">
-          <Link to={`/admin/servers/${server.id}`}>{t('admin.details')}</Link>
+          <Link to={`/admin/servers/${server.id}`}>{t('admin.details', 'Details')}</Link>
         </Button>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 ml-auto" aria-label="delete">
-              <Trash2 className="h-3.5 w-3.5 text-destructive" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t('admin.delete')}</DialogTitle>
-              <DialogDescription>
-                {t('admin.confirm_delete', { name: server.name })}
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="destructive" onClick={onDelete}>
-                {t('admin.delete')}
+        <div className="ml-auto" onClick={(e) => e.stopPropagation()}>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" aria-label={t('admin.delete', 'Delete')}>
+                <Trash2 className="h-3.5 w-3.5 text-destructive" />
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t('admin.delete', 'Delete')}</DialogTitle>
+                <DialogDescription>
+                  {t('admin.confirm_delete', { name: server.name })}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="destructive" onClick={onDelete}>
+                  {t('admin.delete', 'Delete')}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
     </div>
   )
@@ -455,39 +462,11 @@ function Stat({ label, v }: { label: string; v: string }) {
   )
 }
 
-function SegmentToggle<T extends string>({
-  value,
-  onChange,
-  options,
-}: {
-  value: T
-  onChange: (v: T) => void
-  options: { value: T; icon?: React.ComponentType<{ className?: string }>; label: string }[]
-}) {
-  return (
-    <div className="inline-flex border rounded-md bg-elev overflow-hidden h-8">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          onClick={() => onChange(o.value)}
-          className={cn(
-            'px-2.5 text-[12px] font-mono inline-flex items-center gap-1 border-r last:border-r-0 transition-colors',
-            value === o.value ? 'bg-sunken text-foreground' : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {o.icon && <o.icon className="h-3.5 w-3.5" />}
-          <span className="hidden sm:inline">{o.label}</span>
-        </button>
-      ))}
-    </div>
-  )
-}
-
 function Th({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <th
       className={cn(
-        'font-medium text-muted-foreground text-[11px] uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0',
+        'font-medium text-muted-foreground text-[11px] uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0 text-left',
         className,
       )}
     >
@@ -495,6 +474,7 @@ function Th({ children, className }: { children: React.ReactNode; className?: st
     </th>
   )
 }
-function Td({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <td className={cn('px-3.5 py-2.5 align-middle', className)}>{children}</td>
+
+function Td({ children, className, onClick }: { children: React.ReactNode; className?: string; onClick?: React.MouseEventHandler<HTMLTableCellElement> }) {
+  return <td className={cn('px-3.5 py-2.5 align-middle', className)} onClick={onClick}>{children}</td>
 }

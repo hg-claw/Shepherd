@@ -30,6 +30,15 @@ vi.mock('@/api/plugins', () => ({
   ]),
   fetchXrayVersions: vi.fn().mockResolvedValue({ cached: [], latest: ['1.8.11', '1.8.10'] }),
   patchXrayServerVersion: (...args: any[]) => patchFn(...args),
+  // LifecycleButtons calls this once per row. Stub each mutation so
+  // .isPending and .mutateAsync are defined; tests don't drive the
+  // buttons themselves.
+  useHostLifecycle: () => ({
+    start:         { isPending: false, mutateAsync: vi.fn().mockResolvedValue({ status: 'running' }) },
+    stop:          { isPending: false, mutateAsync: vi.fn().mockResolvedValue({ status: 'stopped' }) },
+    restart:       { isPending: false, mutateAsync: vi.fn().mockResolvedValue({ status: 'running' }) },
+    refreshStatus: { isPending: false, mutateAsync: vi.fn().mockResolvedValue({ status: 'running' }) },
+  }),
 }))
 
 vi.mock('@/api/servers', () => ({

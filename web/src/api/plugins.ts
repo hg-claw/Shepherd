@@ -1,3 +1,4 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from './client'
 
 export interface PluginMeta {
@@ -417,6 +418,38 @@ export const fetchSingboxTraffic = (params: {
   if (params.kind)       q.set('kind', params.kind)
   if (params.resolution) q.set('resolution', params.resolution)
   return api.get<SingboxTrafficResponse>(`${SINGBOX}/traffic?${q}`)
+}
+
+// ── lifecycle hooks ───────────────────────────────────────────────────────────
+
+const postLifecycle = (plugin: string, serverID: number, action: 'start' | 'stop' | 'restart') =>
+  api.post<{ status: string }>(`/api/admin/plugins/${plugin}/hosts/${serverID}/${action}`, {})
+
+const getRefreshStatus = (plugin: string, serverID: number) =>
+  api.get<PluginHost>(`/api/admin/plugins/${plugin}/hosts/${serverID}/refresh-status`)
+
+export function useHostLifecycle(plugin: 'xray' | 'singbox', serverID: number) {
+  const qc = useQueryClient()
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['plugin-hosts', plugin] })
+
+  const start = useMutation({
+    mutationFn: () => postLifecycle(plugin, serverID, 'start'),
+    onSuccess: invalidate,
+  })
+  const stop = useMutation({
+    mutationFn: () => postLifecycle(plugin, serverID, 'stop'),
+    onSuccess: invalidate,
+  })
+  const restart = useMutation({
+    mutationFn: () => postLifecycle(plugin, serverID, 'restart'),
+    onSuccess: invalidate,
+  })
+  const refreshStatus = useMutation({
+    mutationFn: () => getRefreshStatus(plugin, serverID),
+    onSuccess: invalidate,
+  })
+
+  return { start, stop, restart, refreshStatus }
 }
 
 export const fetchSingboxTrafficBatch = (params: {

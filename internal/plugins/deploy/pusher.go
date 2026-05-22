@@ -124,6 +124,24 @@ func (p *Pusher) Reload(ctx context.Context, os string, serverID int64, unit str
 	return nil
 }
 
+// Start enables and starts a unit. os is "linux" or "darwin" (empty → "linux").
+func (p *Pusher) Start(ctx context.Context, os string, serverID int64, unit string, unitPath string) error {
+	if os == "" {
+		os = "linux"
+	}
+	switch os {
+	case "darwin":
+		if _, _, _, err := p.Exec.RunCmd(ctx, serverID, "launchctl", "bootstrap", "system", unitPath); err != nil {
+			return fmt.Errorf("launchctl bootstrap system %s: %w", unitPath, err)
+		}
+	default: // linux
+		if _, _, _, err := p.Exec.RunCmd(ctx, serverID, "systemctl", "enable", "--now", unit); err != nil {
+			return fmt.Errorf("systemctl enable --now %s: %w", unit, err)
+		}
+	}
+	return nil
+}
+
 // Stop disables and stops a unit. Errors swallowed best-effort.
 // os is "linux" or "darwin" (empty → "linux").
 func (p *Pusher) Stop(ctx context.Context, os string, serverID int64, unit string) error {

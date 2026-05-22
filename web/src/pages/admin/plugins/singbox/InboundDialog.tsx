@@ -151,7 +151,14 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
       if (needsTransport(protocol))  { body.transport_path = transportPath; body.transport_host = transportHost }
       if (needsReality(protocol))    {
         body.sni = sni
-        body.reality_private_key       = privKey
+        // Omit private_key on PATCH when the input is empty — that
+        // means the admin didn't touch the field. The field starts
+        // empty because the GET response redacts the secret;
+        // sending an empty string would otherwise overwrite the
+        // stored key with "" and break the REALITY handshake.
+        if (!isEdit || privKey !== '') {
+          body.reality_private_key = privKey
+        }
         body.reality_public_key        = pubKey
         body.reality_short_id          = shortID
         body.reality_handshake_server  = hsServer

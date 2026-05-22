@@ -19,6 +19,16 @@ type Config struct {
 	ServerPublicURL      string // optional; if set, used as the URL agents dial back to
 	DBDriver             db.Driver
 	DBDSN                string
+	// DataDir is where derivative state lives: PTY recordings, per-plugin
+	// caches, etc. For sqlite installs it usually matches the directory
+	// holding the .db file; for postgres installs the DSN is a URL with
+	// no filesystem meaning, so DataDir must be set explicitly via
+	// DATA_DIR. Defaults to /data (compose convention).
+	//
+	// Pre-fix some code used filepath.Dir(DBDSN) to derive paths. On
+	// postgres that yielded "postgres:/host:port" — mkdir would then try
+	// to create "postgres:" in cwd and fail. Always use DataDir now.
+	DataDir              string
 	AutoRecoverKey       string
 	InitialAdminUsername string
 	InitialAdminPassword string
@@ -34,6 +44,7 @@ func FromEnv() (Config, error) {
 		ServerPublicURL:      os.Getenv("SERVER_PUBLIC_URL"),
 		DBDriver:             db.Driver(getEnvDefault("DATABASE_DRIVER", "sqlite")),
 		DBDSN:                os.Getenv("DATABASE_DSN"),
+		DataDir:              getEnvDefault("DATA_DIR", "/data"),
 		AutoRecoverKey:       os.Getenv("AUTO_RECOVER_KEY"),
 		InitialAdminUsername: os.Getenv("INITIAL_ADMIN_USERNAME"),
 		InitialAdminPassword: os.Getenv("INITIAL_ADMIN_PASSWORD"),

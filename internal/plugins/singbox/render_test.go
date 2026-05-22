@@ -41,6 +41,28 @@ func TestRenderServerConfig_ErrorOnEmpty(t *testing.T) {
 	}
 }
 
+func TestRenderServerConfig_VlessRealityFlowDefaultsToVision(t *testing.T) {
+	// REALITY pairs with xtls-rprx-vision; if the DB row has no flow set,
+	// render must default it so the server matches the share URL clients
+	// see (which always advertises flow=xtls-rprx-vision). Without this
+	// default sing-box rejects connections with "flow mismatch".
+	in := mkVlessRealityLanding()
+	in.Flow = nil
+	cfg, err := RenderServerConfig([]InboundView{in}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(cfg, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	users := out["inbounds"].([]any)[0].(map[string]any)["users"].([]any)
+	user := users[0].(map[string]any)
+	if user["flow"] != "xtls-rprx-vision" {
+		t.Errorf("user.flow = %v, want xtls-rprx-vision", user["flow"])
+	}
+}
+
 func TestRenderServerConfig_VlessRealityLanding(t *testing.T) {
 	cfg, err := RenderServerConfig([]InboundView{mkVlessRealityLanding()}, nil)
 	if err != nil {

@@ -274,6 +274,16 @@ func patchInboundHandler(deps plugins.Deps) http.HandlerFunc {
 		if v, ok := body["reality_short_id"].(string); ok {
 			patch.RealityShortID = &v
 		}
+		// Handshake fields were silently dropped here pre-fix — the
+		// route accepted them but never threaded them into the patch
+		// struct, so saving a new handshake host had no effect.
+		if v, ok := body["reality_handshake_server"].(string); ok {
+			patch.RealityHandshakeServer = &v
+		}
+		if v, ok := body["reality_handshake_port"].(float64); ok {
+			port := int64(v)
+			patch.RealityHandshakePort = &port
+		}
 		if v, ok := body["transport_path"].(string); ok {
 			patch.TransportPath = &v
 		}

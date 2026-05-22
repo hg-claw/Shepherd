@@ -94,7 +94,7 @@ func main() {
 		Reg:           reg,
 		Audit:         auditW,
 		Now:           time.Now,
-		RecordingsDir: filepath.Join(filepath.Dir(cfg.DBDSN), "pty-recordings"),
+		RecordingsDir: filepath.Join(cfg.DataDir, "pty-recordings"),
 	}
 
 	scriptsStore := &scriptsvc.Store{DB: d, Now: time.Now}
@@ -199,7 +199,7 @@ func main() {
 	hostExec := &plugins.HubHostExec{Hub: hub, Files: filesService, Reg: reg}
 	pluginsDeps := plugins.Deps{
 		DB:       d,
-		DataDir:  filepath.Join(filepath.Dir(cfg.DBDSN), "plugins"),
+		DataDir:  filepath.Join(cfg.DataDir, "plugins"),
 		HostExec: hostExec,
 		Now:      time.Now,
 	}

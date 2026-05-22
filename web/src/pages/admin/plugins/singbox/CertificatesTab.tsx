@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
@@ -180,9 +181,19 @@ export default function CertificatesTab() {
   const toast = useUI((s) => s.toast)
   const [showIssue, setShowIssue] = useState(false)
 
+  // Poll fast (2s) whenever any cert is mid-issuance — ACME completes
+  // in seconds-to-minutes and the user wants the status pill to flip
+  // promptly. Otherwise back off to 30s so a tab left open doesn't hit
+  // the API every couple seconds forever. Same dynamic-interval pattern
+  // ServerList uses for install_stage transitions.
   const { data: certs = [] } = useQuery({
     queryKey: ['singbox-certs'],
     queryFn: listSingboxCerts,
+    refetchInterval: (q) => {
+      const rows = (q?.state?.data as Array<{ status?: string }> | undefined) ?? []
+      const transient = rows.some((r) => r.status === 'issuing')
+      return transient ? 2000 : 30_000
+    },
   })
 
   const { data: inbounds = [] } = useQuery<SingboxInbound[]>({
@@ -275,15 +286,29 @@ export default function CertificatesTab() {
                 {/* Challenge */}
                 <td className="px-3 py-2 text-xs">{c.challenge_type}</td>
 
-                {/* Last error — icon + tooltip */}
+                {/* Last error — icon + tooltip. shadcn Tooltip replaces
+                    the native `title` attribute which (a) was too slow
+                    to surface on hover and (b) had a hit area limited
+                    to the 1ch ⚠ glyph. The trigger is now button-sized
+                    + opens on focus too. */}
                 <td className="px-3 py-2">
                   {c.last_error ? (
-                    <span
-                      className="cursor-help text-destructive"
-                      title={c.last_error}
-                    >
-                      ⚠
-                    </span>
+                    <TooltipProvider delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex h-6 w-6 items-center justify-center rounded text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/60"
+                            aria-label="Show last error"
+                          >
+                            ⚠
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-md break-words text-xs">
+                          {c.last_error}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}

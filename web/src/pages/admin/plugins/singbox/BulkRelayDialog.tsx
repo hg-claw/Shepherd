@@ -9,7 +9,7 @@ import {
 import { useServers } from '@/api/servers'
 import {
   createSingboxInbound, generateX25519, generateShortID,
-  type SingboxInbound,
+  type SingboxInbound, type CreateSingboxInboundBody,
 } from '@/api/plugins'
 import { useUI } from '@/store/ui'
 import { randomPort, randomUUID } from '../xray/templates'
@@ -21,30 +21,175 @@ interface Props {
   allInbounds: SingboxInbound[]
 }
 
+// Generate a 32-character url-safe-base64 random password (no padding).
+function randomPassword(): string {
+  const bytes = new Uint8Array(24)
+  crypto.getRandomValues(bytes)
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+}
+
 interface RelayDraft {
   serverID: number
   serverName: string
   port: number
-  uuid: string
-  privateKey: string
-  publicKey: string
-  shortID: string
+  // vless-reality specific
+  uuid?: string
+  privateKey?: string
+  publicKey?: string
+  shortID?: string
+  // other protocols
+  password?: string
 }
 
-function newDraft(serverID: number, serverName: string, takenPorts: Set<number>): RelayDraft {
+function needsX25519(protocol: string): boolean {
+  return protocol === 'vless-reality'
+}
+
+function newDraft(
+  serverID: number,
+  serverName: string,
+  takenPorts: Set<number>,
+  protocol: string,
+): RelayDraft {
   let port = randomPort()
   while (takenPorts.has(port)) port = randomPort()
-  return {
-    serverID, serverName, port,
-    uuid: randomUUID(),
-    privateKey: '', publicKey: '', shortID: '',
+  const draft: RelayDraft = { serverID, serverName, port }
+
+  if (protocol === 'vless-reality') {
+    draft.uuid = randomUUID()
+    draft.privateKey = ''
+    draft.publicKey = ''
+    draft.shortID = ''
+  } else if (
+    protocol === 'vless-ws-tls' || protocol === 'vless-h2-tls' || protocol === 'vless-httpupgrade-tls'
+  ) {
+    draft.uuid = randomUUID()
+  } else if (
+    protocol === 'vmess-tcp' || protocol === 'vmess-http' || protocol === 'vmess-quic' ||
+    protocol === 'vmess-ws-tls' || protocol === 'vmess-h2-tls' || protocol === 'vmess-httpupgrade-tls'
+  ) {
+    draft.uuid = randomUUID()
+  } else if (
+    protocol === 'trojan-tls' || protocol === 'trojan-ws-tls' ||
+    protocol === 'trojan-h2-tls' || protocol === 'trojan-httpupgrade-tls'
+  ) {
+    draft.password = randomPassword()
+  } else if (protocol === 'hysteria2' || protocol === 'anytls') {
+    draft.password = randomPassword()
+  } else if (protocol === 'tuic-v5') {
+    draft.uuid = randomUUID()
+    draft.password = randomPassword()
+  } else if (protocol === 'shadowsocks-2022') {
+    draft.password = randomPassword()
   }
+
+  return draft
+}
+
+// Build the createSingboxInbound body for a relay draft, inheriting
+// protocol-specific fields from the landing.
+function buildRelayBody(
+  d: RelayDraft,
+  landing: SingboxInbound,
+): CreateSingboxInboundBody {
+  const proto = landing.protocol
+  const base: CreateSingboxInboundBody = {
+    server_id: d.serverID,
+    port: d.port,
+    role: 'relay',
+    protocol: proto,
+    upstream_inbound_id: landing.id,
+  }
+
+  if (proto === 'vless-reality') {
+    return {
+      ...base,
+      uuid: d.uuid,
+      sni: landing.sni,
+      reality_public_key: d.publicKey,
+      reality_private_key: d.privateKey,
+      reality_short_id: d.shortID,
+    }
+  }
+
+  if (
+    proto === 'vless-ws-tls' || proto === 'vless-h2-tls' || proto === 'vless-httpupgrade-tls'
+  ) {
+    return {
+      ...base,
+      uuid: d.uuid,
+      sni: landing.sni,
+      transport_path: landing.transport_path,
+      transport_host: landing.transport_host,
+      cert_id: landing.cert_id ?? undefined,
+    }
+  }
+
+  if (
+    proto === 'vmess-tcp' || proto === 'vmess-http' || proto === 'vmess-quic' ||
+    proto === 'vmess-ws-tls' || proto === 'vmess-h2-tls' || proto === 'vmess-httpupgrade-tls'
+  ) {
+    return {
+      ...base,
+      uuid: d.uuid,
+      sni: landing.sni,
+      transport_path: landing.transport_path,
+      transport_host: landing.transport_host,
+      alter_id: landing.alter_id,
+      cert_id: landing.cert_id ?? undefined,
+    }
+  }
+
+  if (
+    proto === 'trojan-tls' || proto === 'trojan-ws-tls' ||
+    proto === 'trojan-h2-tls' || proto === 'trojan-httpupgrade-tls'
+  ) {
+    return {
+      ...base,
+      password: d.password,
+      sni: landing.sni,
+      transport_path: landing.transport_path,
+      transport_host: landing.transport_host,
+      cert_id: landing.cert_id ?? undefined,
+    }
+  }
+
+  if (proto === 'hysteria2' || proto === 'anytls') {
+    return {
+      ...base,
+      password: d.password,
+      sni: landing.sni,
+      cert_id: landing.cert_id ?? undefined,
+    }
+  }
+
+  if (proto === 'tuic-v5') {
+    return {
+      ...base,
+      uuid: d.uuid,
+      password: d.password,
+      sni: landing.sni,
+      cert_id: landing.cert_id ?? undefined,
+    }
+  }
+
+  if (proto === 'shadowsocks-2022') {
+    return {
+      ...base,
+      ss_password: d.password,
+      ss_method: landing.ss_method,
+    }
+  }
+
+  return base
 }
 
 export default function BulkRelayDialog({ open, onOpenChange, landingInbound, allInbounds }: Props) {
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const serversQ = useServers()
+  const proto = landingInbound.protocol
 
   // Map server_id -> Set<port> for port conflict avoidance.
   const portsByServer = useMemo(() => {
@@ -63,7 +208,6 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
 
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [drafts, setDrafts] = useState<Map<number, RelayDraft>>(new Map())
-  const [sharedSNI, setSharedSNI] = useState<string>(landingInbound.sni || 'www.lovelive-anime.jp')
 
   const toggle = (s: { id: number; name: string }) => {
     setSelected((prev) => {
@@ -76,7 +220,7 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
         const taken = portsByServer.get(s.id) ?? new Set<number>()
         setDrafts((dPrev) => {
           const d = new Map(dPrev)
-          d.set(s.id, newDraft(s.id, s.name, taken))
+          d.set(s.id, newDraft(s.id, s.name, taken, proto))
           return d
         })
       }
@@ -95,10 +239,12 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
     })
   }
 
-  // Eager fill on selection (defensive against the "click Deploy All before keys arrive" race)
-  for (const [id, d] of drafts) {
-    if (!d.privateKey || !d.publicKey || !d.shortID) {
-      void regenKeys(id); break
+  // Eager fill on selection for vless-reality (defensive against the "click Deploy All before keys arrive" race)
+  if (needsX25519(proto)) {
+    for (const [id, d] of drafts) {
+      if (!d.privateKey || !d.publicKey || !d.shortID) {
+        void regenKeys(id); break
+      }
     }
   }
 
@@ -108,20 +254,12 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
       let ok = 0, fail = 0
       for (const id of ids) {
         const d = drafts.get(id)!
-        if (!d.privateKey || !d.publicKey || !d.shortID) {
+        if (needsX25519(proto) && (!d.privateKey || !d.publicKey || !d.shortID)) {
           await regenKeys(id)
         }
         const refresh = drafts.get(id)!
         try {
-          await createSingboxInbound({
-            server_id: id, port: refresh.port, role: 'relay',
-            protocol: 'vless-reality',
-            uuid: refresh.uuid, sni: sharedSNI,
-            reality_public_key: refresh.publicKey,
-            reality_private_key: refresh.privateKey,
-            reality_short_id: refresh.shortID,
-            upstream_inbound_id: landingInbound.id,
-          })
+          await createSingboxInbound(buildRelayBody(refresh, landingInbound))
           ok++
           toast('success', `Deployed relay on ${d.serverName}`)
         } catch (e: any) {
@@ -148,15 +286,10 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
           <DialogTitle className="font-mono">
             Add relays → {landingInbound.tag} @ {landingInbound.server_name}
           </DialogTitle>
+          <p className="text-[12px] text-muted-foreground font-mono">{proto}</p>
         </DialogHeader>
 
         <div className="space-y-3">
-          <div>
-            <Label className="text-[12px]">REALITY SNI (shared)</Label>
-            <Input value={sharedSNI} onChange={(e) => setSharedSNI(e.target.value)}
-              className="h-8 font-mono mt-1" />
-          </div>
-
           <div>
             <Label className="text-[12px]">Target servers</Label>
             <div className="mt-1 rounded-md border bg-elev max-h-64 overflow-y-auto">
@@ -186,11 +319,15 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
                             const m = new Map(prev); m.set(s.id, { ...d, port: Number(e.target.value) }); return m
                           })}
                           className="h-7 w-24 font-mono" />
-                        <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]"
-                          onClick={(e) => { e.preventDefault(); void regenKeys(s.id) }}>↻ keys</Button>
-                        <span className="font-mono text-fg-dim text-[10px] truncate" title={d.publicKey}>
-                          {d.publicKey ? d.publicKey.slice(0, 8) + '…' : 'generating…'}
-                        </span>
+                        {needsX25519(proto) && (
+                          <>
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]"
+                              onClick={(e) => { e.preventDefault(); void regenKeys(s.id) }}>↻ keys</Button>
+                            <span className="font-mono text-fg-dim text-[10px] truncate" title={d.publicKey}>
+                              {d.publicKey ? d.publicKey.slice(0, 8) + '…' : 'generating…'}
+                            </span>
+                          </>
+                        )}
                       </>
                     )}
                   </label>

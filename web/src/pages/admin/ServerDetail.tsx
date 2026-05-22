@@ -33,6 +33,8 @@ export default function AdminServerDetail() {
   const navigate = useNavigate()
   const openTab = useConsoleTabs((s) => s.open)
 
+  const [targetVersion, setTargetVersion] = useState<string | null>(null)
+
   const server = useServer(id, {
     refetchInterval: ((q: any) => {
       const data = q?.state?.data as { install_stage?: string; agent_version?: { String?: string } } | undefined
@@ -60,7 +62,6 @@ export default function AdminServerDetail() {
   const [interval, setIntervalSecs] = useState(30)
   const [repairToken, setRepairToken] = useState<{ token: string; expires: string } | null>(null)
   const [installPanel, setInstallPanel] = useState<{ command: string; expires_at: string } | null>(null)
-  const [targetVersion, setTargetVersion] = useState<string | null>(null)
 
   if (!s) return <div>{t('common.loading')}</div>
 

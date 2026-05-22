@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Play, Square, RotateCw, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Pill, type PillKind } from '@/components/Pill'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   listPluginHosts,
@@ -28,7 +28,7 @@ function statusPill(status: XrayStatus): { kind: PillKind; label: string } {
   }
 }
 
-function VersionInline({ serverID, current }: { serverID: number; current: string | null }) {
+function VersionInline({ serverID, current, versions }: { serverID: number; current: string | null; versions: string[] }) {
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const [editing, setEditing] = useState(false)
@@ -50,10 +50,20 @@ function VersionInline({ serverID, current }: { serverID: number; current: strin
       </span>
     )
   }
+  // Build version list; prepend current if not already included
+  const versionList = current && !versions.includes(current) ? [current, ...versions] : versions
   return (
     <span className="inline-flex items-center gap-1">
-      <Input value={value} onChange={(e) => setValue(e.target.value)}
-        className="h-6 w-20 font-mono text-[11px]" />
+      <Select value={value} onValueChange={setValue}>
+        <SelectTrigger className="h-6 w-28 font-mono text-[11px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {versionList.map((v) => (
+            <SelectItem key={v} value={v} className="font-mono text-[11px]">{v}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <Button size="sm" className="h-6 px-2 text-[11px]" disabled={apply.isPending}
         onClick={() => apply.mutate()}>Apply</Button>
       <button className="text-fg-dim text-[11px]" onClick={() => setEditing(false)}>cancel</button>
@@ -188,6 +198,14 @@ export default function DeployTab() {
     ? (versionsData.latest[0] ?? versionsData.cached[0]?.version ?? null)
     : null
 
+  // Unique union of latest + cached versions for the version dropdown
+  const allVersions: string[] = versionsData
+    ? Array.from(new Set([
+        ...(versionsData.latest ?? []),
+        ...(versionsData.cached ?? []).map((c) => c.version),
+      ]))
+    : []
+
   const rows: Array<{ server: ServerRecord; host: PluginHost | undefined }> =
     servers.map((s) => ({ server: s, host: hostByServerID.get(s.id) }))
 
@@ -230,7 +248,7 @@ export default function DeployTab() {
                 </td>
                 <td className="py-2 pr-4">
                   {host ? (
-                    <VersionInline serverID={server.id} current={host.deployed_version} />
+                    <VersionInline serverID={server.id} current={host.deployed_version} versions={allVersions} />
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}

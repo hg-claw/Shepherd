@@ -39,11 +39,15 @@ RUN CGO_ENABLED=1 go build \
 
 # ── Stage 3: runtime ──────────────────────────────────────────────
 FROM alpine:3.19 AS runtime
-RUN apk add --no-cache ca-certificates sqlite-libs && \
-    addgroup -S shep && adduser -S -G shep shep && \
-    mkdir -p /data && chown shep:shep /data
+# su-exec is needed by entrypoint.sh to drop privileges from root to shep
+# AFTER we've chown'd DATA_DIR. Fresh docker named volumes get created
+# root:root on the host side regardless of what the image baked in, so
+# we can't run as shep from the start.
+RUN apk add --no-cache ca-certificates sqlite-libs su-exec && \
+    addgroup -S shep && adduser -S -G shep shep
 COPY --from=go-builder /out/shepherd-server /usr/local/bin/shepherd-server
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 EXPOSE 8080
-USER shep
 WORKDIR /data
-ENTRYPOINT ["/usr/local/bin/shepherd-server"]
+ENTRYPOINT ["/entrypoint.sh", "/usr/local/bin/shepherd-server"]

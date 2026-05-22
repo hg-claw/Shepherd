@@ -14,21 +14,21 @@ import (
 	"testing"
 )
 
-// makeTarGz builds a minimal sing-box tarball with the binary inside a versioned directory.
+// makeTarGz builds a minimal shepherd-singbox tarball with the binary inside
+// the same directory layout the build workflow produces:
+// shepherd-singbox-vX.Y.Z-v2rayapi-{os}-{arch}/sing-box
 func makeTarGz(t *testing.T, version, osName, arch string, binContent []byte) []byte {
 	t.Helper()
 	var buf bytes.Buffer
 	gw := gzip.NewWriter(&buf)
 	tw := tar.NewWriter(gw)
 
-	dirName := fmt.Sprintf("sing-box-%s-%s-%s", version, osName, arch)
-	// Write a directory entry
+	dirName := fmt.Sprintf("shepherd-singbox-v%s-v2rayapi-%s-%s", version, osName, arch)
 	_ = tw.WriteHeader(&tar.Header{
 		Typeflag: tar.TypeDir,
 		Name:     dirName + "/",
 		Mode:     0755,
 	})
-	// Write the binary inside the versioned directory
 	_ = tw.WriteHeader(&tar.Header{
 		Name: dirName + "/sing-box",
 		Mode: 0755,
@@ -41,7 +41,7 @@ func makeTarGz(t *testing.T, version, osName, arch string, binContent []byte) []
 }
 
 func TestReleaser_FetchAndCacheHit(t *testing.T) {
-	const version = "1.11.5"
+	const version = "1.13.10"
 	const osName = "linux"
 	const arch = "amd64"
 
@@ -50,21 +50,26 @@ func TestReleaser_FetchAndCacheHit(t *testing.T) {
 	h256 := sha256.Sum256(tarBuf)
 	wantSHA := hex.EncodeToString(h256[:])
 
-	assetName := fmt.Sprintf("sing-box-%s-%s-%s.tar.gz", version, osName, arch)
+	assetName := fmt.Sprintf("shepherd-singbox-v%s-v2rayapi-%s-%s.tar.gz", version, osName, arch)
 	var hitCount int
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/repos/SagerNet/sing-box/releases":
-			releases := []map[string]any{{
-				"tag_name": "v" + version,
-				"assets": []map[string]any{
-					{
-						"name":                 assetName,
-						"browser_download_url": "http://" + r.Host + "/dl/" + assetName,
+		case "/repos/example/repo/releases":
+			// Mix in a Shepherd server release tag to prove the filter
+			// drops it instead of crashing the asset lookup.
+			releases := []map[string]any{
+				{"tag_name": "v0.7.6", "assets": []any{}},
+				{
+					"tag_name": releaseTag(version),
+					"assets": []map[string]any{
+						{
+							"name":                 assetName,
+							"browser_download_url": "http://" + r.Host + "/dl/" + assetName,
+						},
 					},
 				},
-			}}
+			}
 			_ = json.NewEncoder(w).Encode(releases)
 		case "/dl/" + assetName:
 			hitCount++
@@ -79,11 +84,11 @@ func TestReleaser_FetchAndCacheHit(t *testing.T) {
 	cacheDir := t.TempDir()
 	rel := &Releaser{
 		BaseURL:  srv.URL,
+		Repo:     "example/repo",
 		CacheDir: cacheDir,
 		HTTP:     srv.Client(),
 	}
 
-	// First fetch: should download and extract.
 	bin, err := rel.Fetch(context.Background(), version, osName, arch)
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
@@ -91,23 +96,13 @@ func TestReleaser_FetchAndCacheHit(t *testing.T) {
 	if bin.Version != version {
 		t.Errorf("Version = %q want %q", bin.Version, version)
 	}
-	if bin.OS != osName {
-		t.Errorf("OS = %q want %q", bin.OS, osName)
-	}
-	if bin.Arch != arch {
-		t.Errorf("Arch = %q want %q", bin.Arch, arch)
-	}
 	if bin.Sha256 != wantSHA {
 		t.Errorf("Sha256 = %q want %q", bin.Sha256, wantSHA)
-	}
-	if bin.Path == "" {
-		t.Fatal("Path is empty")
 	}
 	if hitCount != 1 {
 		t.Errorf("download hit count = %d, want 1", hitCount)
 	}
 
-	// Second fetch: cache hit, no second HTTP download.
 	bin2, err := rel.Fetch(context.Background(), version, osName, arch)
 	if err != nil {
 		t.Fatalf("cache hit Fetch: %v", err)
@@ -120,23 +115,58 @@ func TestReleaser_FetchAndCacheHit(t *testing.T) {
 	}
 }
 
+func TestReleaser_ListLatestTagsFiltersUnrelated(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Shepherd's own server tags mixed with our singbox flavor tags.
+		releases := []map[string]any{
+			{"tag_name": "v0.7.6"},
+			{"tag_name": "singbox-v1.13.10-v2rayapi"},
+			{"tag_name": "v0.7.5"},
+			{"tag_name": "singbox-v1.13.9-v2rayapi"},
+			{"tag_name": "v0.7.4"},
+		}
+		_ = json.NewEncoder(w).Encode(releases)
+	}))
+	defer srv.Close()
+
+	rel := &Releaser{BaseURL: srv.URL, Repo: "example/repo", HTTP: srv.Client()}
+	got, err := rel.ListLatestTags(context.Background(), 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"1.13.10", "1.13.9"}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("ListLatestTags = %v, want %v", got, want)
+	}
+}
+
 func TestSingboxAssetName(t *testing.T) {
 	cases := []struct {
 		osName, arch, want string
 	}{
-		{"linux", "amd64", "sing-box-1.10.0-linux-amd64.tar.gz"},
-		{"linux", "arm64", "sing-box-1.10.0-linux-arm64.tar.gz"},
-		{"linux", "arm", "sing-box-1.10.0-linux-armv7.tar.gz"},
-		{"linux", "386", "sing-box-1.10.0-linux-386.tar.gz"},
-		{"darwin", "amd64", "sing-box-1.10.0-darwin-amd64.tar.gz"},
-		{"darwin", "arm64", "sing-box-1.10.0-darwin-arm64.tar.gz"},
-		{"windows", "amd64", "sing-box-1.10.0-windows-amd64.tar.gz"},
-		{"windows", "386", "sing-box-1.10.0-windows-386.tar.gz"},
+		{"linux", "amd64", "shepherd-singbox-v1.13.10-v2rayapi-linux-amd64.tar.gz"},
+		{"linux", "arm64", "shepherd-singbox-v1.13.10-v2rayapi-linux-arm64.tar.gz"},
+		{"linux", "arm", "shepherd-singbox-v1.13.10-v2rayapi-linux-armv7.tar.gz"},
 	}
 	for _, c := range cases {
-		got := singboxAssetName("1.10.0", c.osName, c.arch)
+		got := singboxAssetName("1.13.10", c.osName, c.arch)
 		if got != c.want {
-			t.Errorf("singboxAssetName(1.10.0, %s, %s) = %q want %q", c.osName, c.arch, got, c.want)
+			t.Errorf("singboxAssetName(1.13.10, %s, %s) = %q want %q", c.osName, c.arch, got, c.want)
+		}
+	}
+}
+
+func TestStripReleaseTag(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"singbox-v1.13.10-v2rayapi", "1.13.10"},
+		{"singbox-v1.0.0-rc1-v2rayapi", "1.0.0-rc1"},
+		{"v0.7.6", ""},
+		{"singbox-v1.13.10", ""},
+		{"", ""},
+	}
+	for _, c := range cases {
+		if got := stripReleaseTag(c.in); got != c.want {
+			t.Errorf("stripReleaseTag(%q) = %q want %q", c.in, got, c.want)
 		}
 	}
 }

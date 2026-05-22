@@ -17,20 +17,36 @@ import { useServers } from '@/api/servers'
 // Copy URL is only supported for vless-reality in v1.
 // Other protocols emit a disabled button with an explanatory tooltip.
 function buildSingboxShareURL(inbound: SingboxInbound, hostname: string): string | null {
-  if (inbound.protocol !== 'vless-reality') return null
-  if (!hostname || !inbound.port || !inbound.uuid || !inbound.reality_public_key) return null
-  const q = new URLSearchParams({
-    encryption: 'none',
-    security: 'reality',
-    sni: inbound.sni ?? '',
-    fp: 'chrome',
-    pbk: inbound.reality_public_key,
-    sid: inbound.reality_short_id ?? '',
-    type: 'tcp',
-    flow: 'xtls-rprx-vision',
-  })
+  if (!hostname || !inbound.port) return null
   const label = `${inbound.server_name}/${inbound.tag}`
-  return `vless://${inbound.uuid}@${hostname}:${inbound.port}?${q.toString()}#${encodeURIComponent(label)}`
+
+  if (inbound.protocol === 'vless-reality') {
+    if (!inbound.uuid || !inbound.reality_public_key) return null
+    const q = new URLSearchParams({
+      encryption: 'none',
+      security: 'reality',
+      sni: inbound.sni ?? '',
+      fp: 'chrome',
+      pbk: inbound.reality_public_key,
+      sid: inbound.reality_short_id ?? '',
+      type: 'tcp',
+      flow: 'xtls-rprx-vision',
+    })
+    return `vless://${inbound.uuid}@${hostname}:${inbound.port}?${q.toString()}#${encodeURIComponent(label)}`
+  }
+
+  // AnyTLS share-URL convention (clash-meta / sing-box compatible):
+  //   anytls://<password>@<host>:<port>?sni=<sni>&insecure=0#<label>
+  if (inbound.protocol === 'anytls') {
+    if (!inbound.password) return null
+    const q = new URLSearchParams()
+    if (inbound.sni) q.set('sni', inbound.sni)
+    q.set('insecure', '0')
+    const password = encodeURIComponent(inbound.password)
+    return `anytls://${password}@${hostname}:${inbound.port}?${q.toString()}#${encodeURIComponent(label)}`
+  }
+
+  return null
 }
 
 export default function InboundsTab() {
@@ -199,10 +215,13 @@ export default function InboundsTab() {
                   const shareURL = isLanding
                     ? buildSingboxShareURL(i, hostname)
                     : null
-                  const canCopyURL = i.protocol === 'vless-reality' && !!shareURL
+                  // Protocols with implemented share-URL builders. Extend
+                  // buildSingboxShareURL() above to add more here.
+                  const urlSupported = i.protocol === 'vless-reality' || i.protocol === 'anytls'
+                  const canCopyURL = urlSupported && !!shareURL
                   const copyTitle = canCopyURL
                     ? 'Copy share URL'
-                    : i.protocol === 'vless-reality'
+                    : urlSupported
                     ? 'cannot build URL — missing fields'
                     : 'client URL not yet supported for this protocol'
                   // TLS protocols that need a cert but have none: show warning

@@ -41,6 +41,40 @@ func TestRenderServerConfig_ErrorOnEmpty(t *testing.T) {
 	}
 }
 
+func TestRenderServerConfig_V2RayAPIStatsBlock(t *testing.T) {
+	// experimental.v2ray_api.stats.inbounds is the allowlist sing-box's
+	// StatsService consults — every inbound tag we ship must appear or
+	// its bytes never get counted. Verify (a) the block exists, (b) the
+	// listen address is the loopback TCP we agreed on (upstream's server
+	// can't bind unix sockets), and (c) the inbound list matches the
+	// rendered inbounds exactly.
+	a := mkVlessRealityLanding()
+	a.Tag = "landing-aaa"
+	b := mkVlessRealityLanding()
+	b.Tag = "landing-bbb"
+	cfg, err := RenderServerConfig([]InboundView{a, b}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(cfg, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	exp := out["experimental"].(map[string]any)
+	v2 := exp["v2ray_api"].(map[string]any)
+	if v2["listen"] != "127.0.0.1:29091" {
+		t.Errorf("v2ray_api.listen = %v, want 127.0.0.1:29091", v2["listen"])
+	}
+	stats := v2["stats"].(map[string]any)
+	if stats["enabled"] != true {
+		t.Errorf("v2ray_api.stats.enabled = %v, want true", stats["enabled"])
+	}
+	ibs := stats["inbounds"].([]any)
+	if len(ibs) != 2 || ibs[0].(string) != "landing-aaa" || ibs[1].(string) != "landing-bbb" {
+		t.Errorf("v2ray_api.stats.inbounds = %v, want [landing-aaa landing-bbb]", ibs)
+	}
+}
+
 func TestRenderServerConfig_VlessRealityFlowDefaultsToVision(t *testing.T) {
 	// REALITY pairs with xtls-rprx-vision; if the DB row has no flow set,
 	// render must default it so the server matches the share URL clients

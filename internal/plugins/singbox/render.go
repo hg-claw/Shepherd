@@ -9,6 +9,12 @@ import (
 
 const (
 	clashAPIAddr = "127.0.0.1:29090"
+	// v2RayAPIAddr is where sing-box's gRPC stats service listens. Loopback
+	// TCP rather than a unix socket because upstream hardcodes
+	// net.Listen("tcp", listen) in experimental/v2rayapi/server.go — a
+	// unix socket would require a patched sing-box build.
+	// The agent's v2ray-api sampler dials this same address.
+	v2RayAPIAddr = "127.0.0.1:29091"
 	configDir    = "/etc/shepherd-singbox"
 )
 
@@ -35,6 +41,11 @@ func RenderServerConfig(inbounds []InboundView, certs []CertView) ([]byte, error
 	inboundsJSON := make([]any, 0, len(inbounds))
 	outbounds := make([]any, 0)
 	routeRules := make([]any, 0)
+	// v2RayStatsInbounds is the list passed to experimental.v2ray_api.stats.inbounds.
+	// sing-box's StatsService only attaches counters to tags in this allowlist
+	// (see experimental/v2rayapi/stats.go: `countInbound := s.inbounds[inbound]`)
+	// — leave any inbound off and its traffic is invisible to the gRPC sampler.
+	v2RayStatsInbounds := make([]any, 0, len(inbounds))
 	hasLanding := false
 
 	for _, in := range inbounds {
@@ -43,6 +54,7 @@ func RenderServerConfig(inbounds []InboundView, certs []CertView) ([]byte, error
 			return nil, fmt.Errorf("inbound %s: %w", in.Tag, err)
 		}
 		inboundsJSON = append(inboundsJSON, ib)
+		v2RayStatsInbounds = append(v2RayStatsInbounds, in.Tag)
 		if in.Role == "landing" {
 			hasLanding = true
 		}
@@ -128,6 +140,20 @@ func RenderServerConfig(inbounds []InboundView, certs []CertView) ([]byte, error
 			"clash_api": map[string]any{
 				"external_controller": clashAPIAddr,
 				"secret":              "",
+			},
+			// v2ray_api stats service — the canonical traffic counter source
+			// since v0.7.6. clash_api stays alongside for the active-
+			// connection UI (planned). The binary must be built with the
+			// with_v2ray_api tag (Shepherd's own sing-box builds from
+			// .github/workflows/sing-box-build.yml include it; upstream's
+			// stock release binaries do not — a stock binary will fatal-
+			// fail trying to parse this block).
+			"v2ray_api": map[string]any{
+				"listen": v2RayAPIAddr,
+				"stats": map[string]any{
+					"enabled":  true,
+					"inbounds": v2RayStatsInbounds,
+				},
 			},
 		},
 	}

@@ -10,6 +10,10 @@ RestartSec=2
 NoNewPrivileges=true
 ProtectSystem=full
 ProtectHome=true
+# Auto-create /var/lib/shepherd-singbox (state dir for cache.db etc.)
+# before ExecStart. ProtectSystem=full leaves /var writable, so this
+# path stays mutable for sing-box's runtime files.
+StateDirectory=shepherd-singbox
 
 [Install]
 WantedBy=multi-user.target

@@ -18,7 +18,7 @@ import (
 	"github.com/hg-claw/Shepherd/internal/agent/filehandler"
 	"github.com/hg-claw/Shepherd/internal/agent/netinfo"
 	"github.com/hg-claw/Shepherd/internal/agent/ptyrunner"
-	"github.com/hg-claw/Shepherd/internal/agent/singboxsampler"
+	"github.com/hg-claw/Shepherd/internal/agent/singboxv2sampler"
 	"github.com/hg-claw/Shepherd/internal/agent/state"
 	"github.com/hg-claw/Shepherd/internal/agent/xraysampler"
 	"github.com/hg-claw/Shepherd/internal/agentapi"
@@ -38,7 +38,11 @@ type Client struct {
 	TrafficSampler *xraysampler.Sampler
 
 	// SingboxTrafficSampler, if non-nil, is started as a goroutine after each WS connect.
-	SingboxTrafficSampler *singboxsampler.Sampler
+	// Migrated from clash-api polling (singboxsampler) to v2ray-api gRPC
+	// stats in v0.7.7 — the new sampler reads atomic-swap counters that
+	// survive connection close, eliminating the under-counting we saw
+	// under bursty traffic.
+	SingboxTrafficSampler *singboxv2sampler.Sampler
 
 	mu      sync.Mutex
 	conn    *websocket.Conn

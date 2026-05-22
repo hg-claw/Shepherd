@@ -209,5 +209,17 @@
   "recording": {
     "title": "Recording",
     "replay": "Replay"
+  },
+  "server": {
+    "update_agent": "Update agent",
+    "updating": "Updating…",
+    "update_started": "Update started → {{v}}",
+    "updating_to": "Updating to v{{v}}…",
+    "batch_update_started": "Started update for {{n}} agents",
+    "batch_update_partial": "Started {{ok}} updates; {{fail}} failed",
+    "batch_update_agents": "Update {{n}} agents",
+    "selected_count": "{{n}} selected",
+    "select_all": "Select all",
+    "select": "Select {{name}}"
   }
 }

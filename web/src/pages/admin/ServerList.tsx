@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { Plus, Trash2, LayoutGrid, Rows3 } from 'lucide-react'
-import { useServers, useDeleteServer, type ServerWithLatest } from '@/api/servers'
+import { Plus, Trash2, LayoutGrid, Rows3, ArrowUpCircle } from 'lucide-react'
+import { useServers, useDeleteServer, useBatchUpdateAgent, type ServerWithLatest } from '@/api/servers'
 import { useUI } from '@/store/ui'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -88,6 +88,7 @@ export default function ServerList() {
   const { t, i18n } = useTranslation()
   const [filter, setFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | HostStatus>('all')
+  const [selected, setSelected] = useState<Set<number>>(new Set())
   const [view, setView] = useState<'grid' | 'table'>(() => {
     try {
       const v = localStorage.getItem(VIEW_KEY)
@@ -112,6 +113,7 @@ export default function ServerList() {
     },
   })
   const del = useDeleteServer()
+  const batchUpdate = useBatchUpdateAgent()
   const toast = useUI((s) => s.toast)
 
   const all = data ?? []
@@ -170,6 +172,43 @@ export default function ServerList() {
       toast('success', t('common.ok'))
     } catch (err: any) {
       toast('error', err?.message ?? t('common.error'))
+    }
+  }
+
+  const handleBatchUpdate = async () => {
+    const ids = Array.from(selected)
+    if (ids.length === 0) return
+    try {
+      const res = await batchUpdate.mutateAsync(ids)
+      const failed = res.results.filter((r) => !r.ok)
+      if (failed.length === 0) {
+        toast('success', t('server.batch_update_started', 'Started update for {{n}} agents', { n: ids.length }))
+      } else {
+        toast('success', t('server.batch_update_partial', 'Started {{ok}} updates; {{fail}} failed', {
+          ok: ids.length - failed.length,
+          fail: failed.length,
+        }))
+      }
+      setSelected(new Set())
+    } catch (err: any) {
+      toast('error', err?.message ?? t('common.error'))
+    }
+  }
+
+  const toggleSelect = (id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selected.size === servers.length) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(servers.map((s) => s.id)))
     }
   }
 
@@ -258,6 +297,34 @@ export default function ServerList() {
         ))}
       </div>
 
+      {/* Batch action toolbar — only visible when servers are selected */}
+      {selected.size > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border bg-accent/30 px-4 py-2.5">
+          <span className="text-sm font-medium">
+            {t('server.selected_count', '{{n}} selected', { n: selected.size })}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={batchUpdate.isPending}
+            onClick={handleBatchUpdate}
+            className="h-7 text-[12.5px]"
+          >
+            <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
+            {batchUpdate.isPending
+              ? t('server.updating', 'Updating…')
+              : t('server.batch_update_agents', 'Update {{n}} agents', { n: selected.size })}
+          </Button>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set())}
+            className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+          >
+            {t('common.cancel', 'Cancel')}
+          </button>
+        </div>
+      )}
+
       {/* Views */}
       {view === 'grid' ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
@@ -275,6 +342,15 @@ export default function ServerList() {
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr className="text-left">
+                <Th className="w-8">
+                  <input
+                    type="checkbox"
+                    aria-label={t('server.select_all', 'Select all')}
+                    checked={servers.length > 0 && selected.size === servers.length}
+                    onChange={toggleSelectAll}
+                    className="h-3.5 w-3.5 cursor-pointer"
+                  />
+                </Th>
                 <Th>{t('admin.name', 'Name')}</Th>
                 <Th className="hidden md:table-cell">{t('admin.host', 'Host')}</Th>
                 <Th className="hidden lg:table-cell">OS</Th>
@@ -296,6 +372,16 @@ export default function ServerList() {
                     className="border-t hover:bg-sunken/60 cursor-pointer"
                     onClick={() => window.location.assign(`/admin/servers/${s.id}`)}
                   >
+                    <Td onClick={(e) => { e.stopPropagation(); toggleSelect(s.id) }}>
+                      <input
+                        type="checkbox"
+                        aria-label={t('server.select', 'Select {{name}}', { name: s.name })}
+                        checked={selected.has(s.id)}
+                        onChange={() => toggleSelect(s.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-3.5 w-3.5 cursor-pointer"
+                      />
+                    </Td>
                     <Td>
                       <div className="flex items-center gap-2.5 min-w-0">
                         <OnlineDot online={online} />

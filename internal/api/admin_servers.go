@@ -1,10 +1,12 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
 	"github.com/hg-claw/Shepherd/internal/agentsvc"
@@ -13,6 +15,11 @@ import (
 	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
 )
 
+// hostExecer is the minimal subset of plugins.HostExec needed by UpdateAgent.
+type hostExecer interface {
+	RunCmd(ctx context.Context, serverID int64, name string, args ...string) (stdout, stderr []byte, exitCode int, err error)
+}
+
 type ServersAPI struct {
 	Servers        *serversvc.Service
 	Settings       *serversvc.SettingsStore
@@ -20,6 +27,7 @@ type ServersAPI struct {
 	Hub            *agentsvc.Hub
 	InstallManager *serversvc.InstallManager
 	Tokens         *agentsvc.Service // for repair; also provides ListIPCandidates
+	HostExec       hostExecer        // for UpdateAgent / BatchUpdateAgent
 	// BuildVersion and PublicURL are used by ScriptInstall to embed the
 	// pinned script URL and server address in the returned curl|bash command.
 	BuildVersion string
@@ -396,6 +404,120 @@ func (a *ServersAPI) InstallCommand(w http.ResponseWriter, r *http.Request) {
 		"expires_at": exp,
 		"command":    buildInstallCommand(a.BuildVersion, a.PublicURL, tok),
 	})
+}
+
+// UpdateAgent triggers an in-place agent upgrade on the target server by
+// dispatching the install script via the agent's existing RunCmd capability.
+// The script restarts the systemd unit mid-run, which kills the WebSocket
+// connection — we therefore fire-and-forget the command in a goroutine and
+// return 202 immediately.
+//
+// POST /api/servers/{id}/update-agent
+func (a *ServersAPI) UpdateAgent(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || id <= 0 {
+		writeError(w, 400, "bad id")
+		return
+	}
+	if _, err := a.Servers.Get(r.Context(), id); err != nil {
+		if errors.Is(err, serversvc.ErrNotFound) {
+			writeError(w, 404, "server not found")
+			return
+		}
+		writeError(w, 500, err.Error())
+		return
+	}
+	if !a.Hub.IsOnline(id) {
+		writeError(w, 409, "agent offline")
+		return
+	}
+	tok, exp, err := a.Tokens.IssueEnrollmentToken(r.Context(), id)
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	cmd := buildInstallCommand(a.BuildVersion, a.PublicURL, tok)
+	// Fire-and-forget: the install script restarts the agent service which
+	// kills the WS connection. Reading the result would block forever.
+	go func() {
+		ctx := context.Background()
+		_, _, _, _ = a.HostExec.RunCmd(ctx, id, "sh", "-c", cmd)
+	}()
+	writeJSON(w, 202, map[string]any{
+		"ok":             true,
+		"target_version": a.BuildVersion,
+		"expires_at":     exp,
+	})
+}
+
+type batchUpdateReq struct {
+	ServerIDs []int64 `json:"server_ids"`
+}
+
+type batchUpdateResult struct {
+	ServerID int64  `json:"server_id"`
+	OK       bool   `json:"ok"`
+	Error    string `json:"error,omitempty"`
+}
+
+// BatchUpdateAgent triggers in-place agent upgrades on multiple servers in
+// parallel (up to 20 concurrent goroutines).
+//
+// POST /api/servers/update-agent
+func (a *ServersAPI) BatchUpdateAgent(w http.ResponseWriter, r *http.Request) {
+	var in batchUpdateReq
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, 400, "bad json")
+		return
+	}
+	if len(in.ServerIDs) == 0 {
+		writeError(w, 400, "server_ids required")
+		return
+	}
+
+	const maxConcurrent = 20
+	sem := make(chan struct{}, maxConcurrent)
+
+	results := make([]batchUpdateResult, len(in.ServerIDs))
+	var wg sync.WaitGroup
+	for i, sID := range in.ServerIDs {
+		wg.Add(1)
+		go func(idx int, serverID int64) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			res := batchUpdateResult{ServerID: serverID, OK: false}
+			defer func() { results[idx] = res }()
+
+			if _, err := a.Servers.Get(r.Context(), serverID); err != nil {
+				if errors.Is(err, serversvc.ErrNotFound) {
+					res.Error = "not found"
+				} else {
+					res.Error = err.Error()
+				}
+				return
+			}
+			if !a.Hub.IsOnline(serverID) {
+				res.Error = "agent offline"
+				return
+			}
+			tok, _, err := a.Tokens.IssueEnrollmentToken(r.Context(), serverID)
+			if err != nil {
+				res.Error = err.Error()
+				return
+			}
+			cmd := buildInstallCommand(a.BuildVersion, a.PublicURL, tok)
+			go func() {
+				ctx := context.Background()
+				_, _, _, _ = a.HostExec.RunCmd(ctx, serverID, "sh", "-c", cmd)
+			}()
+			res.OK = true
+		}(i, sID)
+	}
+	wg.Wait()
+	writeJSON(w, 200, map[string]any{"results": results})
 }
 
 // buildInstallCommand renders the single-line curl|bash an admin pastes

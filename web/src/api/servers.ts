@@ -198,3 +198,31 @@ export function usePushConfig(id: number) {
       api.post<void>(`/api/servers/${id}/config`, input),
   })
 }
+
+export interface UpdateAgentResult {
+  ok: true
+  target_version: string
+  expires_at: string
+}
+
+export function useUpdateAgent(id: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      api.post<UpdateAgentResult>(`/api/servers/${id}/update-agent`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['server', id] }),
+  })
+}
+
+export interface BatchUpdateAgentResult {
+  results: { server_id: number; ok: boolean; error?: string }[]
+}
+
+export function useBatchUpdateAgent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (serverIDs: number[]) =>
+      api.post<BatchUpdateAgentResult>('/api/servers/update-agent', { server_ids: serverIDs }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['servers'] }),
+  })
+}

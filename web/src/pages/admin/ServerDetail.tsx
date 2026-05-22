@@ -1,8 +1,8 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FolderTree, Terminal as TerminalIcon } from 'lucide-react'
-import { useServer, useTelemetry, usePatchServer, useDeleteServer, useRepair, usePushConfig, useServerIPCandidates, useServerInstallCommand } from '@/api/servers'
+import { FolderTree, Terminal as TerminalIcon, ArrowUpCircle } from 'lucide-react'
+import { useServer, useTelemetry, usePatchServer, useDeleteServer, useRepair, usePushConfig, useServerIPCandidates, useServerInstallCommand, useUpdateAgent } from '@/api/servers'
 import { InstallCommandPanel } from '@/components/admin/InstallCommandPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -35,8 +35,12 @@ export default function AdminServerDetail() {
 
   const server = useServer(id, {
     refetchInterval: ((q: any) => {
-      const stage = (q?.state?.data as { install_stage?: string } | undefined)?.install_stage
-      return stage === 'installing' || stage === 'pending' ? 1500 : 30_000
+      const data = q?.state?.data as { install_stage?: string; agent_version?: { String?: string } } | undefined
+      const stage = data?.install_stage
+      if (stage === 'installing' || stage === 'pending') return 1500
+      // Poll every 3s while waiting for agent to come back with new version
+      if (targetVersion && data?.agent_version?.String !== targetVersion) return 3000
+      return 30_000
     }) as unknown as number,
   })
   const s = server.data
@@ -51,9 +55,12 @@ export default function AdminServerDetail() {
   const ipCandidates = useServerIPCandidates(id)
   const installCmd = useServerInstallCommand(id)
 
+  const updateAgent = useUpdateAgent(id)
+
   const [interval, setIntervalSecs] = useState(30)
   const [repairToken, setRepairToken] = useState<{ token: string; expires: string } | null>(null)
   const [installPanel, setInstallPanel] = useState<{ command: string; expires_at: string } | null>(null)
+  const [targetVersion, setTargetVersion] = useState<string | null>(null)
 
   if (!s) return <div>{t('common.loading')}</div>
 
@@ -121,7 +128,17 @@ export default function AdminServerDetail() {
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
           <Field label="name" defaultValue={s.name} onBlur={(v) => patch.mutate({ name: v })} />
           <KV k="ssh_host" v={s.ssh_host?.String ?? '-'} />
-          <KV k="agent_version" v={s.agent_version?.String ?? '-'} />
+          <div className="flex justify-between gap-4 items-center">
+            <span className="text-muted-foreground">agent_version</span>
+            <span className="font-mono text-xs flex items-center gap-2">
+              {s.agent_version?.String ?? '-'}
+              {targetVersion && s.agent_version?.String !== targetVersion && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300 px-2 py-0.5 text-[11px] font-medium">
+                  {t('server.updating_to', 'Updating to v{{v}}…', { v: targetVersion.replace(/^v/, '') })}
+                </span>
+              )}
+            </span>
+          </div>
           <KV k="agent_os" v={`${s.agent_os?.String ?? '-'}/${s.agent_arch?.String ?? '-'}`} />
           <KV k="agent_kernel" v={s.agent_kernel?.String ?? '-'} />
           <KV k="agent_fingerprint" v={s.agent_fingerprint?.String ?? '-'} long />
@@ -200,6 +217,23 @@ export default function AdminServerDetail() {
           }}
         >
           {installCmd.isPending ? 'Issuing…' : 'Install command'}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={updateAgent.isPending}
+          onClick={async () => {
+            try {
+              const r = await updateAgent.mutateAsync()
+              setTargetVersion(r.target_version)
+              toast('success', t('server.update_started', 'Update started → {{v}}', { v: r.target_version }))
+            } catch (e: any) {
+              toast('error', e?.message ?? t('common.error'))
+            }
+          }}
+        >
+          <ArrowUpCircle className="h-4 w-4 mr-1" />
+          {updateAgent.isPending ? t('server.updating', 'Updating…') : t('server.update_agent', 'Update agent')}
         </Button>
       </div>
 

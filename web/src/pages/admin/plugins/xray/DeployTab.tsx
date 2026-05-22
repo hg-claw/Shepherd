@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Play, Square, RotateCw, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Pill, type PillKind } from '@/components/Pill'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   listPluginHosts,
@@ -28,7 +28,7 @@ function statusPill(status: XrayStatus): { kind: PillKind; label: string } {
   }
 }
 
-function VersionInline({ serverID, current }: { serverID: number; current: string | null }) {
+function VersionInline({ serverID, current, versions }: { serverID: number; current: string | null; versions: string[] }) {
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const [editing, setEditing] = useState(false)
@@ -50,10 +50,20 @@ function VersionInline({ serverID, current }: { serverID: number; current: strin
       </span>
     )
   }
+  // Build version list; prepend current if not already included
+  const versionList = current && !versions.includes(current) ? [current, ...versions] : versions
   return (
     <span className="inline-flex items-center gap-1">
-      <Input value={value} onChange={(e) => setValue(e.target.value)}
-        className="h-6 w-20 font-mono text-[11px]" />
+      <Select value={value} onValueChange={setValue}>
+        <SelectTrigger className="h-6 w-28 font-mono text-[11px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {versionList.map((v) => (
+            <SelectItem key={v} value={v} className="font-mono text-[11px]">{v}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <Button size="sm" className="h-6 px-2 text-[11px]" disabled={apply.isPending}
         onClick={() => apply.mutate()}>Apply</Button>
       <button className="text-fg-dim text-[11px]" onClick={() => setEditing(false)}>cancel</button>
@@ -85,27 +95,41 @@ function RedeployButton({ serverID, deployedVersion }: { serverID: number; deplo
   )
 }
 
-function DeployButton({ serverID, latestVersion }: { serverID: number; latestVersion: string | null }) {
+function DeployButton({ serverID, versions }: { serverID: number; versions: string[] }) {
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
+  // Default to the first available (latest) version, but let the admin
+  // pick a specific one — useful when the latest is on hold for a
+  // compatibility issue and an older known-good version is wanted.
+  const [version, setVersion] = useState<string>(versions[0] ?? '')
   const deploy = useMutation({
-    mutationFn: () => patchXrayServerVersion(serverID, latestVersion ?? ''),
+    mutationFn: () => patchXrayServerVersion(serverID, version),
     onSuccess: () => {
-      toast('success', `Deploying v${latestVersion}`)
+      toast('success', `Deploying v${version}`)
       qc.invalidateQueries({ queryKey: ['plugin-hosts', 'xray'] })
     },
     onError: (e: any) => toast('error', String(e?.message ?? e)),
   })
   return (
-    <Button
-      size="sm"
-      variant="outline"
-      className="h-6 px-2 text-[11px]"
-      disabled={!latestVersion || deploy.isPending}
-      onClick={() => deploy.mutate()}
-    >
-      {deploy.isPending ? 'Deploying…' : 'Deploy'}
-    </Button>
+    <span className="inline-flex items-center gap-1">
+      <Select value={version} onValueChange={setVersion} disabled={!versions.length || deploy.isPending}>
+        <SelectTrigger className="h-6 w-24 text-[11px] font-mono">
+          <SelectValue placeholder="version" />
+        </SelectTrigger>
+        <SelectContent>
+          {versions.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+        </SelectContent>
+      </Select>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-6 px-2 text-[11px]"
+        disabled={!version || deploy.isPending}
+        onClick={() => deploy.mutate()}
+      >
+        {deploy.isPending ? 'Deploying…' : 'Deploy'}
+      </Button>
+    </span>
   )
 }
 
@@ -182,11 +206,16 @@ export default function DeployTab() {
   const hosts = hostsQ.data ?? []
   const hostByServerID = new Map(hosts.map((h) => [h.server_id, h]))
 
-  // Resolve latest version: prefer versions API latest[0], fallback to cached[0].version
+  // Unique union of latest + cached versions for the version dropdown.
+  // First-time Deploy defaults to allVersions[0] (the freshest), and
+  // VersionInline lets admins pick a specific version when changing.
   const versionsData = versionsQ.data
-  const latestVersion: string | null = versionsData
-    ? (versionsData.latest[0] ?? versionsData.cached[0]?.version ?? null)
-    : null
+  const allVersions: string[] = versionsData
+    ? Array.from(new Set([
+        ...(versionsData.latest ?? []),
+        ...(versionsData.cached ?? []).map((c) => c.version),
+      ]))
+    : []
 
   const rows: Array<{ server: ServerRecord; host: PluginHost | undefined }> =
     servers.map((s) => ({ server: s, host: hostByServerID.get(s.id) }))
@@ -230,7 +259,7 @@ export default function DeployTab() {
                 </td>
                 <td className="py-2 pr-4">
                   {host ? (
-                    <VersionInline serverID={server.id} current={host.deployed_version} />
+                    <VersionInline serverID={server.id} current={host.deployed_version} versions={allVersions} />
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
@@ -271,7 +300,7 @@ export default function DeployTab() {
                         />
                       </>
                     ) : (
-                      <DeployButton serverID={server.id} latestVersion={latestVersion} />
+                      <DeployButton serverID={server.id} versions={allVersions} />
                     )}
                   </span>
                 </td>

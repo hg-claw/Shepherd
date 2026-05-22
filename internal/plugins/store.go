@@ -111,7 +111,10 @@ func (s *Store) SetHostStatus(ctx context.Context, pluginID string, serverID int
 	now := s.Now().UTC()
 	_, err := s.DB.ExecContext(ctx,
 		`UPDATE plugin_hosts
-		 SET status=$1, deployed_version=NULLIF($2, ''), last_error=NULLIF($3, ''), updated_at=$4
+		 SET status=$1,
+		     deployed_version=CASE WHEN $2 = '' THEN deployed_version ELSE $2 END,
+		     last_error=NULLIF($3, ''),
+		     updated_at=$4
 		 WHERE plugin_id=$5 AND server_id=$6`,
 		status, version, lastErr, now, pluginID, serverID)
 	return err

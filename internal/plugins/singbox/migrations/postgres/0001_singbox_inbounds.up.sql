@@ -15,7 +15,10 @@ CREATE TABLE IF NOT EXISTS singbox_inbounds (
 
   -- TLS (VLESS+TLS / Trojan / Hysteria2 / TUIC / AnyTLS)
   sni                       TEXT,
-  cert_id                   BIGINT REFERENCES singbox_certificates(id) ON DELETE RESTRICT,
+  -- FK to singbox_certificates is added in 0004 (the table is created
+  -- there). Postgres rejects forward refs at CREATE TABLE time, unlike
+  -- sqlite which silently tolerates them.
+  cert_id                   BIGINT,
 
   -- REALITY (VLESS-REALITY)
   reality_private_key       TEXT,

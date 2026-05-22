@@ -5,6 +5,7 @@ package singboxsampler
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // TagBytes holds cumulative upload/download bytes for one inbound tag,
@@ -29,13 +30,34 @@ type connectionEntry struct {
 	Metadata connectionMeta `json:"metadata"`
 }
 
+// connectionMeta mirrors the relevant slice of TrackerMetadata.MarshalJSON in
+// sing-box (experimental/clashapi/trafficontrol/tracker.go). The inbound info
+// lives under metadata.type as "<InboundType>/<Tag>" (e.g. "anytls/landing-…").
+// There is no `metadata.inbound` field — looking for one silently swallowed
+// every connection and reported zero traffic.
 type connectionMeta struct {
-	Inbound string `json:"inbound"`
+	Type string `json:"type"`
+}
+
+// inboundTagFromType extracts the user-visible inbound tag from a
+// clash-api metadata.type value. Examples:
+//
+//	"anytls/landing-55ecc720"   → "landing-55ecc720"
+//	"vless/relay-aabb1122"      → "relay-aabb1122"
+//	"anytls"                    → ""  (no tag on the inbound — skipped)
+//
+// Skipping the no-tag case keeps untagged inbounds (shouldn't happen for us,
+// but defensive) from being aggregated under a "type-only" bucket.
+func inboundTagFromType(t string) string {
+	if i := strings.IndexByte(t, '/'); i >= 0 {
+		return t[i+1:]
+	}
+	return ""
 }
 
 // ParseConnections parses the raw JSON body of a GET /connections response
 // and returns per-inbound-tag cumulative bytes aggregated across all active
-// connections. Connections with an empty metadata.inbound tag are skipped.
+// connections. Connections without a tagged inbound are skipped.
 func ParseConnections(data []byte) (ConnSnapshot, error) {
 	var resp connectionsResponse
 	if err := json.Unmarshal(data, &resp); err != nil {
@@ -44,7 +66,7 @@ func ParseConnections(data []byte) (ConnSnapshot, error) {
 
 	out := make(ConnSnapshot, 8)
 	for _, c := range resp.Connections {
-		tag := c.Metadata.Inbound
+		tag := inboundTagFromType(c.Metadata.Type)
 		if tag == "" {
 			continue
 		}

@@ -14,23 +14,156 @@ import InboundDialog from './InboundDialog'
 import BulkRelayDialog from './BulkRelayDialog'
 import { useServers } from '@/api/servers'
 
-// Copy URL is only supported for vless-reality in v1.
-// Other protocols emit a disabled button with an explanatory tooltip.
+// All 18 protocols that have share-URL builders implemented.
+const SINGBOX_URL_PROTOCOLS = new Set([
+  'vless-reality',
+  'vless-ws-tls',
+  'vless-h2-tls',
+  'vless-httpupgrade-tls',
+  'vmess-tcp',
+  'vmess-http',
+  'vmess-quic',
+  'vmess-ws-tls',
+  'vmess-h2-tls',
+  'vmess-httpupgrade-tls',
+  'trojan-tls',
+  'trojan-ws-tls',
+  'trojan-h2-tls',
+  'trojan-httpupgrade-tls',
+  'hysteria2',
+  'tuic-v5',
+  'anytls',
+  'shadowsocks-2022',
+])
+
 function buildSingboxShareURL(inbound: SingboxInbound, hostname: string): string | null {
-  if (inbound.protocol !== 'vless-reality') return null
-  if (!hostname || !inbound.port || !inbound.uuid || !inbound.reality_public_key) return null
-  const q = new URLSearchParams({
-    encryption: 'none',
-    security: 'reality',
-    sni: inbound.sni ?? '',
-    fp: 'chrome',
-    pbk: inbound.reality_public_key,
-    sid: inbound.reality_short_id ?? '',
-    type: 'tcp',
-    flow: 'xtls-rprx-vision',
-  })
-  const label = `${inbound.server_name}/${inbound.tag}`
-  return `vless://${inbound.uuid}@${hostname}:${inbound.port}?${q.toString()}#${encodeURIComponent(label)}`
+  if (!hostname || !inbound.port) return null
+  const label = encodeURIComponent(`${inbound.server_name}/${inbound.tag}`)
+  const p = inbound.protocol
+
+  // ── VLESS family ────────────────────────────────────────────────────────────
+  if (p === 'vless-reality') {
+    if (!inbound.uuid || !inbound.reality_public_key) return null
+    const q = new URLSearchParams({
+      encryption: 'none',
+      security: 'reality',
+      sni: inbound.sni ?? '',
+      fp: 'chrome',
+      pbk: inbound.reality_public_key,
+      sid: inbound.reality_short_id ?? '',
+      type: 'tcp',
+      flow: 'xtls-rprx-vision',
+    })
+    return `vless://${inbound.uuid}@${hostname}:${inbound.port}?${q.toString()}#${label}`
+  }
+
+  if (p === 'vless-ws-tls' || p === 'vless-h2-tls' || p === 'vless-httpupgrade-tls') {
+    if (!inbound.uuid) return null
+    const netMap: Record<string, string> = {
+      'vless-ws-tls': 'ws',
+      'vless-h2-tls': 'http',
+      'vless-httpupgrade-tls': 'httpupgrade',
+    }
+    const q = new URLSearchParams({
+      encryption: 'none',
+      security: 'tls',
+      sni: inbound.sni ?? inbound.transport_host ?? '',
+      fp: 'chrome',
+      type: netMap[p],
+      path: inbound.transport_path || '/',
+      host: inbound.transport_host ?? '',
+    })
+    return `vless://${inbound.uuid}@${hostname}:${inbound.port}?${q.toString()}#${label}`
+  }
+
+  // ── VMess family ─────────────────────────────────────────────────────────────
+  if (p === 'vmess-tcp' || p === 'vmess-http' || p === 'vmess-quic' ||
+      p === 'vmess-ws-tls' || p === 'vmess-h2-tls' || p === 'vmess-httpupgrade-tls') {
+    if (!inbound.uuid) return null
+    const netMap: Record<string, string> = {
+      'vmess-tcp': 'tcp',
+      'vmess-http': 'tcp',
+      'vmess-quic': 'quic',
+      'vmess-ws-tls': 'ws',
+      'vmess-h2-tls': 'h2',
+      'vmess-httpupgrade-tls': 'httpupgrade',
+    }
+    const tlsProtos = new Set(['vmess-ws-tls', 'vmess-h2-tls', 'vmess-httpupgrade-tls'])
+    const obj = {
+      v: '2',
+      ps: `${inbound.server_name}/${inbound.tag}`,
+      add: hostname,
+      port: String(inbound.port),
+      id: inbound.uuid,
+      aid: String(inbound.alter_id ?? 0),
+      scy: 'auto',
+      net: netMap[p],
+      type: p === 'vmess-http' ? 'http' : 'none',
+      host: inbound.transport_host ?? '',
+      path: inbound.transport_path || '/',
+      tls: tlsProtos.has(p) ? 'tls' : '',
+      sni: inbound.sni ?? inbound.transport_host ?? '',
+    }
+    const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(obj))))
+    return `vmess://${b64}`
+  }
+
+  // ── Trojan family ────────────────────────────────────────────────────────────
+  if (p === 'trojan-tls' || p === 'trojan-ws-tls' || p === 'trojan-h2-tls' || p === 'trojan-httpupgrade-tls') {
+    if (!inbound.password) return null
+    const netMap: Record<string, string> = {
+      'trojan-tls': 'tcp',
+      'trojan-ws-tls': 'ws',
+      'trojan-h2-tls': 'http',
+      'trojan-httpupgrade-tls': 'httpupgrade',
+    }
+    const q = new URLSearchParams({
+      security: 'tls',
+      sni: inbound.sni ?? '',
+      type: netMap[p],
+    })
+    if (p !== 'trojan-tls') {
+      q.set('path', inbound.transport_path || '/')
+      q.set('host', inbound.transport_host ?? '')
+    }
+    const password = encodeURIComponent(inbound.password)
+    return `trojan://${password}@${hostname}:${inbound.port}?${q.toString()}#${label}`
+  }
+
+  // ── Single protocols ─────────────────────────────────────────────────────────
+  if (p === 'hysteria2') {
+    if (!inbound.password || !inbound.sni) return null
+    const q = new URLSearchParams({ sni: inbound.sni, insecure: '0' })
+    const password = encodeURIComponent(inbound.password)
+    return `hysteria2://${password}@${hostname}:${inbound.port}?${q.toString()}#${label}`
+  }
+
+  if (p === 'tuic-v5') {
+    if (!inbound.uuid || !inbound.password || !inbound.sni) return null
+    const q = new URLSearchParams({
+      congestion_control: 'bbr',
+      udp_relay_mode: 'native',
+      sni: inbound.sni,
+    })
+    const password = encodeURIComponent(inbound.password)
+    return `tuic://${inbound.uuid}:${password}@${hostname}:${inbound.port}?${q.toString()}#${label}`
+  }
+
+  if (p === 'anytls') {
+    if (!inbound.password) return null
+    const q = new URLSearchParams({ insecure: '0' })
+    if (inbound.sni) q.set('sni', inbound.sni)
+    const password = encodeURIComponent(inbound.password)
+    return `anytls://${password}@${hostname}:${inbound.port}?${q.toString()}#${label}`
+  }
+
+  if (p === 'shadowsocks-2022') {
+    if (!inbound.ss_method || !inbound.ss_password) return null
+    const userinfo = btoa(`${inbound.ss_method}:${inbound.ss_password}`).replace(/=/g, '')
+    return `ss://${userinfo}@${hostname}:${inbound.port}#${label}`
+  }
+
+  return null
 }
 
 export default function InboundsTab() {
@@ -199,10 +332,11 @@ export default function InboundsTab() {
                   const shareURL = isLanding
                     ? buildSingboxShareURL(i, hostname)
                     : null
-                  const canCopyURL = i.protocol === 'vless-reality' && !!shareURL
+                  const urlSupported = SINGBOX_URL_PROTOCOLS.has(i.protocol)
+                  const canCopyURL = urlSupported && !!shareURL
                   const copyTitle = canCopyURL
                     ? 'Copy share URL'
-                    : i.protocol === 'vless-reality'
+                    : urlSupported
                     ? 'cannot build URL — missing fields'
                     : 'client URL not yet supported for this protocol'
                   // TLS protocols that need a cert but have none: show warning

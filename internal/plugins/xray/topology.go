@@ -38,14 +38,14 @@ func (s *TopologyStore) Get(ctx context.Context, serverID int64) (Topology, erro
 	var t Topology
 	err := s.DB.GetContext(ctx, &t,
 		`SELECT server_id, role, upstream_server_id, updated_at
-		 FROM xray_host_topology WHERE server_id=?`, serverID)
+		 FROM xray_host_topology WHERE server_id=$1`, serverID)
 	return t, err
 }
 
 func (s *TopologyStore) UpsertLanding(ctx context.Context, serverID int64) error {
 	_, err := s.DB.ExecContext(ctx,
 		`INSERT INTO xray_host_topology(server_id, role, upstream_server_id, updated_at)
-		 VALUES (?, 'landing', NULL, ?)
+		 VALUES ($1, 'landing', NULL, $2)
 		 ON CONFLICT(server_id) DO UPDATE SET
 		   role='landing', upstream_server_id=NULL, updated_at=excluded.updated_at`,
 		serverID, s.now())
@@ -55,7 +55,7 @@ func (s *TopologyStore) UpsertLanding(ctx context.Context, serverID int64) error
 func (s *TopologyStore) UpsertRelay(ctx context.Context, serverID, upstreamServerID int64) error {
 	_, err := s.DB.ExecContext(ctx,
 		`INSERT INTO xray_host_topology(server_id, role, upstream_server_id, updated_at)
-		 VALUES (?, 'relay', ?, ?)
+		 VALUES ($1, 'relay', $2, $3)
 		 ON CONFLICT(server_id) DO UPDATE SET
 		   role='relay', upstream_server_id=excluded.upstream_server_id,
 		   updated_at=excluded.updated_at`,
@@ -67,7 +67,7 @@ func (s *TopologyStore) UpsertRelay(ctx context.Context, serverID, upstreamServe
 // return an error if other relays still point to this server.
 func (s *TopologyStore) Delete(ctx context.Context, serverID int64) error {
 	_, err := s.DB.ExecContext(ctx,
-		`DELETE FROM xray_host_topology WHERE server_id=?`, serverID)
+		`DELETE FROM xray_host_topology WHERE server_id=$1`, serverID)
 	return err
 }
 
@@ -75,7 +75,7 @@ func (s *TopologyStore) ListByUpstream(ctx context.Context, upstreamServerID int
 	rows := []Topology{}
 	err := s.DB.SelectContext(ctx, &rows,
 		`SELECT server_id, role, upstream_server_id, updated_at
-		 FROM xray_host_topology WHERE upstream_server_id=?`, upstreamServerID)
+		 FROM xray_host_topology WHERE upstream_server_id=$1`, upstreamServerID)
 	return rows, err
 }
 

@@ -112,7 +112,7 @@ func AssembleAndDeploy(ctx context.Context, deps plugins.Deps, serverID int64) e
 func sbHostOSArch(ctx context.Context, db *sqlx.DB, serverID int64) (string, string) {
 	var osName, arch sql.NullString
 	_ = db.QueryRowxContext(ctx,
-		"SELECT agent_os, agent_arch FROM servers WHERE id=?", serverID).
+		"SELECT agent_os, agent_arch FROM servers WHERE id=$1", serverID).
 		Scan(&osName, &arch)
 	o := "linux"
 	if osName.Valid && osName.String != "" {

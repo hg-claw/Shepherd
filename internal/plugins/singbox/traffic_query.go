@@ -148,11 +148,11 @@ func queryPoints(db *sqlx.DB, table, tag, kind string, serverID int64, from, to 
 	var args []any
 	if kind != "" {
 		query = `SELECT ts, bytes_up, bytes_down FROM ` + table +
-			` WHERE server_id = ? AND tag = ? AND kind = ? AND ts BETWEEN ? AND ? ORDER BY ts ASC`
+			` WHERE server_id = $1 AND tag = $2 AND kind = $3 AND ts BETWEEN $4 AND $5 ORDER BY ts ASC`
 		args = []any{serverID, tag, kind, from.UTC(), to.UTC()}
 	} else {
 		query = `SELECT ts, bytes_up, bytes_down FROM ` + table +
-			` WHERE server_id = ? AND tag = ? AND ts BETWEEN ? AND ? ORDER BY ts ASC`
+			` WHERE server_id = $1 AND tag = $2 AND ts BETWEEN $3 AND $4 ORDER BY ts ASC`
 		args = []any{serverID, tag, from.UTC(), to.UTC()}
 	}
 	rows, err := db.Queryx(query, args...)

@@ -65,6 +65,13 @@ func postCertHandler(deps plugins.Deps) http.HandlerFunc {
 			writeErr(w, 400, "bad json")
 			return
 		}
+		// Normalize: trim + lowercase. DNS + ACME treat hostnames as
+		// case-insensitive but our UNIQUE(domain) index does not, and a
+		// renew on "Example.com" after issuing "example.com" would
+		// silently create a duplicate. Lowercasing at the boundary fixes
+		// both the dup risk and the cosmetic display inconsistency.
+		body.Domain = strings.ToLower(strings.TrimSpace(body.Domain))
+		body.Email = strings.TrimSpace(body.Email)
 		if body.Domain == "" {
 			writeErr(w, 400, "domain required")
 			return

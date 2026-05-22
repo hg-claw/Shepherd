@@ -15,7 +15,7 @@ func RunPluginMigrations(ctx context.Context, db *sqlx.DB, pluginID string, migs
 	for _, m := range migs {
 		var n int
 		err := db.GetContext(ctx, &n,
-			"SELECT COUNT(*) FROM plugin_migrations WHERE plugin_id=? AND name=?", pluginID, m.Name)
+			"SELECT COUNT(*) FROM plugin_migrations WHERE plugin_id=$1 AND name=$2", pluginID, m.Name)
 		if err != nil {
 			return fmt.Errorf("plugin %s migration %s: lookup: %w", pluginID, m.Name, err)
 		}
@@ -31,7 +31,7 @@ func RunPluginMigrations(ctx context.Context, db *sqlx.DB, pluginID string, migs
 			return fmt.Errorf("plugin %s migration %s: exec: %w", pluginID, m.Name, err)
 		}
 		if _, err := tx.ExecContext(ctx,
-			"INSERT INTO plugin_migrations(plugin_id, name, applied_at) VALUES (?, ?, ?)",
+			"INSERT INTO plugin_migrations(plugin_id, name, applied_at) VALUES ($1, $2, $3)",
 			pluginID, m.Name, time.Now().UTC()); err != nil {
 			_ = tx.Rollback()
 			return err

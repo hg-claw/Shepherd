@@ -172,7 +172,7 @@ func main() {
 		Settings:        settingsStore,
 		OnSandboxChange: sandboxPusher.PushAll,
 	}
-	public := &api.PublicAPI{Servers: serverSvc, Settings: settingsStore, Query: tQuery, Hub: hub, Tokens: agentSvc}
+	public := &api.PublicAPI{Servers: serverSvc, Settings: settingsStore, Query: tQuery, Hub: hub, Tokens: agentSvc, BuildVersion: cfg.BuildVersion}
 	public.InitRateLimit(30, time.Minute)
 	agentAPI := &api.AgentAPI{
 		Agents:            agentSvc,

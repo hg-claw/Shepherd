@@ -19,6 +19,7 @@ import { LangToggle } from '@/components/LangToggle'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { useAuth } from '@/store/auth'
+import { useVersion } from '@/api/version'
 import { useLogout } from '@/api/auth'
 import { useServers } from '@/api/servers'
 import { listPlugins } from '@/api/plugins'
@@ -51,6 +52,7 @@ export function AdminLayout() {
   const logout = useLogout()
   const navigate = useNavigate()
   const loc = useLocation()
+  const versionQ = useVersion()
   const params = useParams()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const recentIds = useRecentHosts()
@@ -288,7 +290,7 @@ export function AdminLayout() {
       <header className="md:col-span-2 flex items-stretch border-b bg-elev sticky top-0 z-30 h-12">
         <div className="hidden md:flex w-[232px] shrink-0 items-center px-4 border-r">
           <BrandMark />
-          <span className="ml-auto text-fg-dim text-[10.5px] font-mono">v0.2.1</span>
+          <span className="ml-auto text-fg-dim text-[10.5px] font-mono">{versionQ.data?.version ?? ''}</span>
         </div>
 
         <div className="flex flex-1 items-center gap-3 px-3 sm:px-4 min-w-0">

@@ -13,12 +13,24 @@ import (
 )
 
 type PublicAPI struct {
-	Servers  *serversvc.Service
-	Settings *serversvc.SettingsStore
-	Query    *telemetrysvc.Query
-	Hub      *agentsvc.Hub
-	Tokens   *agentsvc.Service // for AgentStatus token lookup
+	Servers      *serversvc.Service
+	Settings     *serversvc.SettingsStore
+	Query        *telemetrysvc.Query
+	Hub          *agentsvc.Hub
+	Tokens       *agentsvc.Service // for AgentStatus token lookup
+	BuildVersion string            // injected from cfg.BuildVersion; surfaced via /api/version
 	statusLimit *tokenRateLimiter
+}
+
+// Version returns the running server's BuildVersion. Public — admin UI uses
+// this to display the current release tag in the settings page and side
+// nav, replacing a previously hardcoded version literal that went stale.
+func (a *PublicAPI) Version(w http.ResponseWriter, _ *http.Request) {
+	v := a.BuildVersion
+	if v == "" {
+		v = "dev"
+	}
+	writeJSON(w, 200, map[string]any{"version": v})
 }
 
 // InitRateLimit configures the per-token rate limit for AgentStatus.

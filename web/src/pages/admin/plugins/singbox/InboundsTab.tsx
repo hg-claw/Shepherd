@@ -379,7 +379,7 @@ export default function InboundsTab() {
                       <td className="px-3 py-2 font-mono text-[12.5px]">{i.protocol}</td>
                       <td className="px-3 py-2 font-mono text-[12.5px]">{i.port}</td>
                       <td className="px-3 py-2 text-right whitespace-nowrap">
-                        {isLanding && i.protocol === 'vless-reality' && (
+                        {isLanding && (
                           <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
                             onClick={() => setBulkRelayTarget(i)}>
                             + Bulk Relay

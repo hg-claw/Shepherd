@@ -93,6 +93,23 @@ func TestParse_MissingSummary(t *testing.T) {
 	}
 }
 
+func TestParse_RefusesLocalisedSummary(t *testing.T) {
+	// Locked-in design choice: the parser is English-only. If we ever
+	// localise it we'd need a per-locale regex set and the build would
+	// have to ship a locale matrix — moving target, no upside. The
+	// agent forces LC_ALL=C in the child env (sampler.go:runPing) so
+	// real probes always get English. This test pins that contract:
+	// a localised summary MUST produce errNoLossLine, so a regression
+	// that strips the env var would surface as zero data immediately
+	// rather than silently after an OS upgrade.
+	out := `--- 1.1.1.1 ping 统计 ---
+3 包已发送, 3 已接收, 0% 包丢失, 时间 2003ms
+往返延时 最小/平均/最大/标准差 = 1.0/2.0/3.0/0.5 毫秒`
+	if _, err := parsePingOutput(out); !errors.Is(err, errNoLossLine) {
+		t.Errorf("localised output should be rejected; got err=%v", err)
+	}
+}
+
 func TestParse_BSDStyleHeader(t *testing.T) {
 	// macOS / BSD: "round-trip min/avg/max/stddev = X/Y/Z/W ms".
 	out := `--- 1.1.1.1 ping statistics ---

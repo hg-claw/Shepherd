@@ -269,6 +269,10 @@ func TestBuildInstallCommand(t *testing.T) {
 				"--server https://shepherd.example.com",
 				"--version v0.5.0",
 				"sudo bash -s --",
+				// Detachment shim: without it the install script gets
+				// killed mid-binary-swap when systemd stops shepherd-agent.
+				"systemd-run --quiet --collect --unit=shepherd-agent-update",
+				"setsid", // fallback path for hosts without systemd-run
 			},
 			wantNotContain: []string{"main"},
 		},
@@ -282,7 +286,9 @@ func TestBuildInstallCommand(t *testing.T) {
 				"--token T_xyz",
 				"--version main",
 			},
-			wantNotContain: []string{"v0.5.0", "dev"},
+			// Negative checks have to be precise — naive substrings like "dev"
+			// false-match against the `/dev/null` redirect in the detach shim.
+			wantNotContain: []string{"v0.5.0", "--version dev"},
 		},
 	}
 	for _, c := range cases {

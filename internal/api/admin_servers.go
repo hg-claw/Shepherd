@@ -533,25 +533,44 @@ func (a *ServersAPI) BatchUpdateAgent(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"results": results})
 }
 
-// buildInstallCommand renders the single-line curl|bash an admin pastes
-// onto a target machine. The script URL AND the --version flag are both
-// pinned to the running server's BuildVersion so script + binary + server
-// stay in lockstep. For dev builds we point the script URL at `main`
-// (raw URLs have no `latest` symlink) and pass --version=main so the
-// script's release_tag helper picks `main` over the hardcoded BUILD_TAG
-// fallback baked into the .sh.
+// buildInstallCommand renders the install / upgrade command dispatched to
+// a target host. The script URL AND the --version flag are both pinned to
+// the running server's BuildVersion so script + binary + server stay in
+// lockstep. For dev builds we point the script URL at `main` (raw URLs
+// have no `latest` symlink) and pass --version=main so the script's
+// release_tag helper picks `main` over the hardcoded BUILD_TAG fallback
+// baked into the .sh.
 //
-// Pre-fix the script always re-installed the v0.5.0 agent regardless of
-// server version because the .sh's BUILD_TAG was a hardcoded constant
+// Pre-fix #1 (older): the script always re-installed v0.5.0 regardless
+// of server version because the .sh's BUILD_TAG was a hardcoded constant
 // and we passed no --version override; upgrades were silently a no-op.
+//
+// Pre-fix #2 (v0.7.8): the dispatched command was a bare `curl | bash`
+// child of the agent's cgroup. When install-agent.sh hit
+// `systemctl stop shepherd-agent`, systemd's default cgroup-wide kill
+// took down the install script mid-binary-swap, then `Restart=always`
+// brought the OLD binary back. Operators saw "agent restarts to same
+// version, no error". Wrap with systemd-run so the install runs as its
+// own transient unit in a brand-new cgroup, immune to shepherd-agent's
+// teardown. The `setsid` fallback covers hosts without systemd-run
+// (rare — sysvinit, busybox) but isn't as cgroup-robust.
 func buildInstallCommand(buildVersion, publicURL, token string) string {
 	tag := buildVersion
 	if tag == "" || tag == "dev" {
 		tag = "main"
 	}
 	scriptURL := "https://raw.githubusercontent.com/hg-claw/Shepherd/" + tag + "/scripts/install-agent.sh"
-	return "curl -fsSL " + scriptURL +
+	inner := "curl -fsSL " + scriptURL +
 		" | sudo bash -s -- --token " + token +
 		" --server " + publicURL +
 		" --version " + tag
+	// Single-quote wrapping the inner command. Token / URL / version
+	// never contain single quotes in practice (token is base64-ish, URL
+	// from server config, version is a semver tag), and we control all
+	// three at this layer.
+	return "if command -v systemd-run >/dev/null 2>&1; then" +
+		" systemd-run --quiet --collect --unit=shepherd-agent-update sh -c '" + inner + "';" +
+		" else" +
+		" (setsid sh -c '" + inner + "' </dev/null >/var/log/shepherd-agent-update.log 2>&1 &);" +
+		" fi"
 }

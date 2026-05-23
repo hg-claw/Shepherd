@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { Outlet, Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
@@ -56,7 +56,12 @@ export function AdminLayout() {
   const params = useParams()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const recentIds = useRecentHosts()
-  const serversQuery = useServers({ refetchInterval: 60_000 })
+  // The Recent-hosts sidebar dot is computed from agent_last_seen on
+  // every render. Without a periodic refetch + re-render, the dot freezes
+  // green even after the agent stops checking in — observed in
+  // production at the v0.7.x mark. 30s matches the agent's WS heartbeat
+  // window so a real offline transition surfaces within one tick.
+  const serversQuery = useServers({ refetchInterval: 30_000 })
   const pluginsQuery = useQuery({
     queryKey: ['plugins'],
     queryFn: listPlugins,
@@ -386,7 +391,14 @@ export function AdminLayout() {
 
       <main className="overflow-auto bg-background min-w-0">
         <div className="px-4 sm:px-6 py-5 sm:py-6 pb-20 max-w-[1480px] mx-auto">
-          <Outlet />
+          {/* Suspense lives at the outlet (not above the layout) so
+              switching between lazy routes only blanks the content area,
+              not the entire sidebar/header. fallback=null is a quick
+              flash on slow chunks — most lazy chunks finish in <100ms
+              over the wire post-PR #51 splitting. */}
+          <Suspense fallback={null}>
+            <Outlet />
+          </Suspense>
         </div>
       </main>
     </div>

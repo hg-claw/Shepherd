@@ -50,11 +50,40 @@ function hostStatus(s: ServerWithLatest): HostStatus {
   return 'ok'
 }
 
-function stageKind(stage: string): PillKind {
-  if (stage === 'failed') return 'err'
-  if (stage === 'installing' || stage === 'pending') return 'warn'
-  if (stage === 'installed' || stage === 'done') return 'ok'
-  return 'neutral'
+// HostStage is the derived "where is this host in its lifecycle right now"
+// surfaced in the table's Stage column. install_stage alone freezes at
+// "done" once installed, so a host whose agent has died silently still
+// looked green. This folds in agent_last_seen so the column reflects
+// current reachability.
+type HostStage = 'installing' | 'install-failed' | 'online' | 'offline' | 'not-installed'
+
+function hostStage(s: ServerWithLatest): HostStage {
+  if (s.install_stage === 'pending' || s.install_stage === 'installing') {
+    return 'installing'
+  }
+  if (s.install_stage === 'failed') {
+    return 'install-failed'
+  }
+  // install_stage === 'done' from here on.
+  if (!s.agent_last_seen?.Valid) {
+    // Install reported success but the agent never connected back.
+    // Most common cause: install script wrote the binary and exited 0
+    // but the systemd unit never came up (env file missing, port
+    // collision, signature mismatch, …). Distinct from "we used to see
+    // it and now we don't" — that's plain "offline".
+    return 'not-installed'
+  }
+  return isOnline(s) ? 'online' : 'offline'
+}
+
+function hostStageKind(st: HostStage): PillKind {
+  switch (st) {
+    case 'installing':     return 'warn'
+    case 'install-failed': return 'err'
+    case 'online':         return 'ok'
+    case 'offline':        return 'err'
+    case 'not-installed':  return 'neutral'
+  }
 }
 
 function pctKind(v: number | null | undefined): 'ok' | 'warn' | 'err' {
@@ -407,7 +436,14 @@ export default function ServerList() {
                       {[s.agent_os?.String, s.agent_arch?.String].filter(Boolean).join('/') || '—'}
                     </Td>
                     <Td className="hidden md:table-cell">
-                      <Pill kind={stageKind(s.install_stage)}>{s.install_stage}</Pill>
+                      {(() => {
+                        const st = hostStage(s)
+                        return (
+                          <Pill kind={hostStageKind(st)}>
+                            {t(`host_stage.${st}`, st)}
+                          </Pill>
+                        )
+                      })()}
                     </Td>
                     <Td className="hidden lg:table-cell text-[12px] text-muted-foreground font-mono tabular-nums">
                       {lastSeen ? t(lastSeen.key, { n: lastSeen.n, lng: i18n.language }) : '—'}

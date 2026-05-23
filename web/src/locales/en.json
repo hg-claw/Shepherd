@@ -116,6 +116,13 @@
     "err": "Critical",
     "offline": "Offline"
   },
+  "host_stage": {
+    "installing": "installing",
+    "install-failed": "install failed",
+    "online": "online",
+    "offline": "offline",
+    "not-installed": "not installed"
+  },
   "view": {
     "grid": "Grid",
     "table": "Table"

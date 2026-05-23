@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { CountryFlag } from './CountryFlag'
 import { type DisplayMode } from './MetricBadge'
-import type { PublicCard } from '@/api/public'
+import type { PublicCard, NetqualityISPSummary } from '@/api/public'
 import { cn } from '@/lib/utils'
 import { relativeTime } from '@/lib/time'
 
@@ -64,10 +64,60 @@ export function MetricCard({ card, mode: _mode }: Props) {
           <span>MEM {mem != null ? `${mem.toFixed(0)}%` : '—'}</span>
           {disk != null && <span>DSK {disk.toFixed(0)}%</span>}
         </div>
+        {/* Netquality per-ISP RTT pills — render only when the plugin
+            is enabled on this server AND has recent samples. Hidden by
+            default so cards for hosts without the plugin stay compact. */}
+        {card.netquality && card.netquality.length > 0 && (
+          <NetqualityPills items={card.netquality} />
+        )}
         {status === 'offline' && (
           <div className="mt-1.5 text-[10.5px] text-fg-dim font-mono">{lastSeenLabel}</div>
         )}
       </div>
     </Link>
+  )
+}
+
+// ── Netquality pills ─────────────────────────────────────────────────────────
+
+const ISP_SHORT: Record<NetqualityISPSummary['isp'], string> = {
+  telecom: '电',
+  unicom: '联',
+  mobile: '移',
+  overseas: '外',
+}
+
+// Loss > 10% steals the colour from RTT — a fast-looking line that
+// drops 30% of packets isn't actually fast.
+function rttTone(rtt: number, loss: number): 'ok' | 'warn' | 'err' {
+  if (loss >= 50) return 'err'
+  if (loss >= 10) return 'warn'
+  if (rtt >= 250) return 'err'
+  if (rtt >= 150) return 'warn'
+  return 'ok'
+}
+
+function NetqualityPills({ items }: { items: NetqualityISPSummary[] }) {
+  return (
+    <div className="flex gap-1.5 mt-1.5 flex-wrap" onClick={(e) => e.preventDefault()}>
+      {items.map((it) => {
+        const tone = rttTone(it.rtt_avg_ms, it.loss_pct)
+        return (
+          <span
+            key={it.isp}
+            className={cn(
+              'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums',
+              tone === 'ok' && 'bg-[hsl(var(--ok)/0.12)] text-[hsl(var(--ok))]',
+              tone === 'warn' && 'bg-[hsl(var(--warn)/0.15)] text-[hsl(var(--warn))]',
+              tone === 'err' && 'bg-[hsl(var(--err)/0.15)] text-[hsl(var(--err))]',
+            )}
+            title={`${it.isp}: ${it.rtt_avg_ms.toFixed(0)}ms / ${it.loss_pct.toFixed(0)}% loss`}
+          >
+            <span>{ISP_SHORT[it.isp]}</span>
+            <span>{it.rtt_avg_ms.toFixed(0)}ms</span>
+          </span>
+        )
+      })}
+    </div>
   )
 }

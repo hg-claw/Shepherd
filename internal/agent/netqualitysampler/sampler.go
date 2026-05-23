@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"sync"
 	"time"
@@ -119,13 +120,26 @@ func (s *Sampler) tick(ctx context.Context, cfg agentapi.NetqualityConfig) {
 // "haven't sampled yet" (no row) from "sampled and failed" (status row).
 func (s *Sampler) probe(ctx context.Context, t agentapi.NetqualityTarget, ts time.Time) agentapi.NetqualitySample {
 	sample := agentapi.NetqualitySample{TargetID: t.ID, TS: ts, Status: "error", LossPct: 100}
-	out, _ := s.exec()(ctx, t.Host, defaultPingCount, defaultPingTimeout)
-	// We ignore exec error: ping returns non-zero on partial loss too,
-	// and the output still has the summary line we want. The only case
-	// where we truly have nothing to parse is when ping never printed a
-	// summary, which parsePingOutput surfaces via errNoLossLine.
-	ps, err := parsePingOutput(out)
-	if err != nil {
+	out, execErr := s.exec()(ctx, t.Host, defaultPingCount, defaultPingTimeout)
+	// We don't bail on exec error: ping returns non-zero on partial loss
+	// too, and the output still has the summary line we want. The only
+	// case where we truly have nothing to parse is when ping never
+	// printed a summary, which parsePingOutput surfaces via errNoLossLine.
+	ps, parseErr := parsePingOutput(out)
+	if parseErr != nil {
+		// First-class diagnostic surface: without this, operators see a
+		// column of "error" rows in the UI with no explanation. The most
+		// common culprits we've actually hit: non-English locale leaks
+		// past the LC_ALL=C below (some busybox builds ignore env),
+		// network namespace lacks CAP_NET_RAW for ping, or there's no
+		// ping binary at all. Truncate the output so a localised
+		// `--help` doesn't fill the journal.
+		short := out
+		if len(short) > 200 {
+			short = short[:200] + "...[truncated]"
+		}
+		log.Printf("netqualitysampler: probe %q parse failed (exec err=%v): %s",
+			t.Host, execErr, short)
 		return sample
 	}
 	sample.Status = ps.Status
@@ -148,6 +162,13 @@ func (s *Sampler) exec() func(context.Context, string, int, time.Duration) (stri
 // returns the combined stdout/stderr blob. Linux only for now; the BSD
 // flag set (-W milliseconds vs seconds) differs and macOS hosts aren't
 // in the agent's deployment matrix.
+//
+// Locale: ping(1) localises the "X packets transmitted" summary
+// (zh_CN turns it into "X 包已发送, X 已接收, X% 包丢失"). Our parser
+// regex is English-only by design — translating it per-locale would
+// add a moving target with no upside — so we force LC_ALL=C in the
+// child environment. Affects only the spawned ping, not the agent's
+// own logs.
 func runPing(ctx context.Context, host string, count int, timeout time.Duration) (string, error) {
 	cctx, cancel := context.WithTimeout(ctx, time.Duration(count+2)*timeout)
 	defer cancel()
@@ -156,6 +177,8 @@ func runPing(ctx context.Context, host string, count int, timeout time.Duration)
 		"-W", fmt.Sprintf("%d", int(timeout.Seconds())),
 		host,
 	}
-	out, err := exec.CommandContext(cctx, "ping", args...).CombinedOutput()
+	cmd := exec.CommandContext(cctx, "ping", args...)
+	cmd.Env = append(os.Environ(), "LC_ALL=C", "LANG=C")
+	out, err := cmd.CombinedOutput()
 	return string(out), err
 }

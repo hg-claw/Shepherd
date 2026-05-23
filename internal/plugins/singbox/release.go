@@ -103,8 +103,18 @@ func singboxAssetName(version, osName, arch string) string {
 }
 
 // cachedPath returns the path where the extracted binary is stored.
+//
+// The version segment is the full release tag ("singbox-vX.Y.Z-v2rayapi")
+// rather than just "vX.Y.Z" so the cache key naturally invalidates when
+// the build flavor changes. Earlier versions of Shepherd cached upstream
+// sing-box binaries under "v<version>/sing-box"; after the switch to our
+// self-built shepherd-singbox-…-v2rayapi releases (PR #45), a cache hit
+// on the old key would have pushed an upstream binary against a config
+// that needed with_v2ray_api — sing-box fatal-fails. The new key cannot
+// collide with the old one, so the bad cache entries are orphaned
+// (occupying disk until manually cleared) but never returned.
 func (r *Releaser) cachedPath(version, osName, arch string) string {
-	return filepath.Join(r.CacheDir, osName+"-"+arch, "v"+version, "sing-box")
+	return filepath.Join(r.CacheDir, osName+"-"+arch, releaseTag(version), "sing-box")
 }
 
 // Fetch returns the binary, downloading and extracting it if not already cached.

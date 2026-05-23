@@ -191,11 +191,42 @@ func main() {
 	// (it always is in this binary), fold its per-ISP RTT averages into
 	// each public card. The closure copies the typed plugin result into
 	// the api package's local type to keep the import direction clean.
+	// Both public-facing netquality closures gate on the plugin's
+	// system-level enabled flag BEFORE touching the netquality_*
+	// tables. The plugin's migrations only run on first OnEnable, so
+	// hosts where the operator never enabled the plugin don't have
+	// those tables at all — calling LatestPerISP / LatestHistory
+	// without this guard would issue a doomed query per server per
+	// wall refresh. The two-level rule "show iff plugin AND host both
+	// enabled" is enforced here (plugin) + inside the helpers (host).
+	isNetqualityOn := pluginEnabledChecker(rootCtx, pluginStore, "netquality")
 	public.NetqualitySummary = func(ctx context.Context, serverID int64) []api.NetqualityISPSummary {
+		if !isNetqualityOn() {
+			return nil
+		}
 		rows := netqualityplugin.LatestPerISP(ctx, d, serverID)
 		out := make([]api.NetqualityISPSummary, 0, len(rows))
 		for _, r := range rows {
 			out = append(out, api.NetqualityISPSummary{ISP: r.ISP, RTTAvgMs: r.RTTAvgMs, LossPct: r.LossPct})
+		}
+		return out
+	}
+	public.NetqualityHistory = func(ctx context.Context, serverID int64, rng string) []api.NetqualityISPHistoryRow {
+		if !isNetqualityOn() {
+			return nil
+		}
+		rows := netqualityplugin.LatestHistory(ctx, d, serverID, netqualityplugin.HistoryRange(rng))
+		out := make([]api.NetqualityISPHistoryRow, 0, len(rows))
+		for _, r := range rows {
+			pts := make([]api.NetqualityISPHistoryPoint, 0, len(r.Points))
+			for _, p := range r.Points {
+				pts = append(pts, api.NetqualityISPHistoryPoint{
+					TS:       p.TS,
+					RTTAvgMs: p.RTTAvgMs,
+					LossPct:  p.LossPct,
+				})
+			}
+			out = append(out, api.NetqualityISPHistoryRow{ISP: r.ISP, Points: pts})
 		}
 		return out
 	}

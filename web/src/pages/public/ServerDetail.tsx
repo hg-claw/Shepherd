@@ -6,7 +6,7 @@ import { Pill, type PillKind } from '@/components/Pill'
 import { CountryFlag } from '@/components/CountryFlag'
 import { TimeSeriesChart } from '@/components/TimeSeriesChart'
 import { Seg } from '@/components/Seg'
-import { usePublicTelemetry, usePublicServers } from '@/api/public'
+import { usePublicTelemetry, usePublicServers, usePublicNetquality } from '@/api/public'
 import type { Range } from '@/api/servers'
 import { bps, pct } from '@/lib/bytes'
 import { relativeTime } from '@/lib/time'
@@ -31,6 +31,15 @@ const RANGE_OPTIONS: { value: Range; label: string }[] = [
   { value: '7d', label: '7d' },
 ]
 
+// Series labels for the netquality chart. Kept short so the legend
+// chips fit alongside the line colours.
+const ISP_SERIES_LABEL: Record<'telecom' | 'unicom' | 'mobile' | 'overseas', string> = {
+  telecom: '电信',
+  unicom: '联通',
+  mobile: '移动',
+  overseas: '海外',
+}
+
 export default function PublicServerDetail() {
   const { id: idStr } = useParams<{ id: string }>()
   const id = Number(idStr)
@@ -43,6 +52,9 @@ export default function PublicServerDetail() {
   const card = wall.data?.find((c) => c.id === id)
 
   const tele = usePublicTelemetry(id, range)
+  // History from the netquality plugin. Empty when the plugin isn't on
+  // for this server — the chart card hides itself in that case.
+  const netq = usePublicNetquality(id, range)
 
   if (wall.isLoading || tele.isLoading)
     return <div className="text-muted-foreground">{t('common.loading')}</div>
@@ -187,6 +199,26 @@ export default function PublicServerDetail() {
           />
         </ChartCard>
       </div>
+
+      {/* Per-ISP ping history. Plugin opt-in; the row is hidden when
+          netquality isn't enabled (empty array from /netquality). */}
+      {netq.data && netq.data.length > 0 && (
+        <div className="border-t">
+          <ChartCard title={`Network quality · ${rangeStr}`}>
+            <TimeSeriesChart
+              series={netq.data.map((row) => ({
+                name: ISP_SERIES_LABEL[row.isp] ?? row.isp,
+                values: row.points.map((p) => ({
+                  ts: p.ts,
+                  v: p.rtt_avg_ms ?? 0,
+                })),
+              }))}
+              yFormat={(v) => `${v.toFixed(0)} ms`}
+              tooltipFormat={(v) => `${v.toFixed(1)} ms`}
+            />
+          </ChartCard>
+        </div>
+      )}
 
       {/* Redaction disclaimer — identifying fields are intentionally omitted */}
       <div className="px-4 py-3 border-t text-center text-[11.5px] font-mono text-fg-dim">

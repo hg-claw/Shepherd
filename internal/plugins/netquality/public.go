@@ -66,3 +66,106 @@ func LatestPerISP(ctx context.Context, db *sqlx.DB, serverID int64) []ISPSummary
 	}
 	return rows
 }
+
+// HistoryPoint is one (timestamp, ISP) cell in the public per-server
+// history chart. The minute or hour rollup row picks the bucket grain;
+// we aggregate ACROSS the targets in that ISP so the chart line is
+// "average RTT my server feels from this ISP at this minute", not "RTT
+// to a specific resolver" (which could leak the full target list).
+type HistoryPoint struct {
+	TS       time.Time `db:"ts"         json:"ts"`
+	ISP      string    `db:"isp"        json:"isp"`
+	RTTAvgMs *float64  `db:"rtt_avg_ms" json:"rtt_avg_ms,omitempty"`
+	LossPct  *float64  `db:"loss_pct"   json:"loss_pct,omitempty"`
+}
+
+// HistoryRange names the time window. We honour the same vocabulary as
+// the rest of the public API (1h / 24h / 7d) and pick the resolution
+// internally — minute for short ranges, hour for long ones — so the
+// caller doesn't have to know about our rollup tables.
+type HistoryRange string
+
+const (
+	History1h  HistoryRange = "1h"
+	History24h HistoryRange = "24h"
+	History7d  HistoryRange = "7d"
+)
+
+// HistoryRow groups all points for one ISP. The wire shape JSON is
+// {isp, points: [{ts, rtt_avg_ms, loss_pct}, ...]} so the front-end can
+// render one line per ISP without pivoting client-side.
+type HistoryRow struct {
+	ISP    string         `json:"isp"`
+	Points []HistoryPoint `json:"points"`
+}
+
+// LatestHistory returns one HistoryRow per ISP for the given server and
+// range. Returns nil silently when the plugin is disabled for this
+// server or the underlying table is missing — public callers must not
+// 500 because they don't know if the plugin is on.
+func LatestHistory(ctx context.Context, db *sqlx.DB, serverID int64, rng HistoryRange) []HistoryRow {
+	var enabled bool
+	if err := db.GetContext(ctx, &enabled,
+		`SELECT enabled FROM netquality_hosts WHERE server_id = $1`, serverID); err != nil {
+		return nil
+	}
+	if !enabled {
+		return nil
+	}
+
+	// Pick window + table. Minute rollup has 1-min grain; hour rollup
+	// has 1-hour grain. Going through rollups instead of raw keeps the
+	// public query cheap even at 7d range.
+	var from time.Time
+	var table string
+	now := time.Now().UTC()
+	switch rng {
+	case History1h:
+		from = now.Add(-1 * time.Hour)
+		table = "netquality_samples_minute"
+	case History24h:
+		from = now.Add(-24 * time.Hour)
+		table = "netquality_samples_minute"
+	case History7d:
+		from = now.Add(-7 * 24 * time.Hour)
+		table = "netquality_samples_hour"
+	default:
+		// Unknown range from a sloppy client — silently downgrade to
+		// 1h rather than error. The public endpoint never returns
+		// 4xx body so callers don't get to fingerprint the plugin.
+		from = now.Add(-1 * time.Hour)
+		table = "netquality_samples_minute"
+	}
+
+	var rows []HistoryPoint
+	if err := db.SelectContext(ctx, &rows, `
+		SELECT s.ts AS ts,
+		       t.isp AS isp,
+		       AVG(s.rtt_avg_ms) AS rtt_avg_ms,
+		       AVG(s.loss_pct)   AS loss_pct
+		  FROM `+table+` s
+		  JOIN netquality_targets t ON s.target_id = t.id
+		 WHERE s.server_id = $1
+		   AND t.enabled = true
+		   AND s.ts >= $2
+		 GROUP BY s.ts, t.isp
+		 ORDER BY s.ts, t.isp`,
+		serverID, from); err != nil {
+		return nil
+	}
+
+	// Pivot ts × isp → one HistoryRow per ISP. Stable iteration order
+	// (telecom → unicom → mobile → overseas) makes the chart legend
+	// consistent across reloads.
+	byISP := map[string][]HistoryPoint{}
+	for _, r := range rows {
+		byISP[r.ISP] = append(byISP[r.ISP], r)
+	}
+	out := make([]HistoryRow, 0, 4)
+	for _, isp := range []string{"telecom", "unicom", "mobile", "overseas"} {
+		if pts, ok := byISP[isp]; ok {
+			out = append(out, HistoryRow{ISP: isp, Points: pts})
+		}
+	}
+	return out
+}

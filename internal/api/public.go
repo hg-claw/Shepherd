@@ -24,6 +24,11 @@ type PublicAPI struct {
 	// LatestPerISP helper. Left nil in tests / when the plugin isn't
 	// linked; nil-safe (the public list handler skips the augmentation).
 	NetqualitySummary func(ctx context.Context, serverID int64) []NetqualityISPSummary
+	// NetqualityHistory powers the public detail page chart. Same nil-
+	// safe contract — the handler returns an empty list if unset, never
+	// 500s. range is one of "1h" / "24h" / "7d"; sloppy values are
+	// silently downgraded by the helper.
+	NetqualityHistory func(ctx context.Context, serverID int64, rng string) []NetqualityISPHistoryRow
 	statusLimit *tokenRateLimiter
 }
 
@@ -34,6 +39,19 @@ type NetqualityISPSummary struct {
 	ISP      string  `json:"isp"`
 	RTTAvgMs float64 `json:"rtt_avg_ms"`
 	LossPct  float64 `json:"loss_pct"`
+}
+
+// NetqualityISPHistoryRow is one ISP's time-series for the public chart.
+// One row per ISP per request; points already ordered by ts ascending.
+type NetqualityISPHistoryRow struct {
+	ISP    string                    `json:"isp"`
+	Points []NetqualityISPHistoryPoint `json:"points"`
+}
+
+type NetqualityISPHistoryPoint struct {
+	TS       time.Time `json:"ts"`
+	RTTAvgMs *float64  `json:"rtt_avg_ms,omitempty"`
+	LossPct  *float64  `json:"loss_pct,omitempty"`
 }
 
 // Version returns the running server's BuildVersion. Public — admin UI uses
@@ -126,6 +144,40 @@ func (a *PublicAPI) Servers_ListPublic(w http.ResponseWriter, r *http.Request) {
 		out = append(out, card)
 	}
 	writeJSON(w, 200, out)
+}
+
+// NetqualityHistoryHandler serves the public per-server netquality chart.
+// GET /api/public/servers/{id}/netquality?range=1h|24h|7d
+//
+// The server must be opt-in to public visibility (show_on_public) AND
+// have the netquality plugin enabled, otherwise we return an empty
+// array — never a 4xx. Public callers must not be able to fingerprint
+// "is the plugin on" from this endpoint.
+func (a *PublicAPI) NetqualityHistoryHandler(w http.ResponseWriter, r *http.Request) {
+	const prefix = "/api/public/servers/"
+	rest := strings.TrimPrefix(r.URL.Path, prefix)
+	// path = "{id}/netquality"
+	parts := strings.SplitN(rest, "/", 2)
+	id, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		writeError(w, 400, "bad id")
+		return
+	}
+	s, err := a.Servers.Get(r.Context(), id)
+	if err != nil || s == nil || !s.ShowOnPublic {
+		// Mirror Telemetry: hide unpublished servers from the public.
+		writeJSON(w, 200, []any{})
+		return
+	}
+	rng := r.URL.Query().Get("range")
+	if rng == "" {
+		rng = "1h"
+	}
+	if a.NetqualityHistory == nil {
+		writeJSON(w, 200, []any{})
+		return
+	}
+	writeJSON(w, 200, a.NetqualityHistory(r.Context(), id, rng))
 }
 
 func renderLatest(p *telemetrysvc.Point) *latest {

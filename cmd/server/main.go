@@ -23,6 +23,7 @@ import (
 	"github.com/hg-claw/Shepherd/internal/installer"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 	_ "github.com/hg-claw/Shepherd/internal/plugins/cloudflare"          // registers via init()
+	_ "github.com/hg-claw/Shepherd/internal/plugins/netquality"          // registers via init()
 	singboxplugin "github.com/hg-claw/Shepherd/internal/plugins/singbox" // registers via init()
 	xrayplugin "github.com/hg-claw/Shepherd/internal/plugins/xray"       // registers via init() + Migrate0003
 

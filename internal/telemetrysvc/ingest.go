@@ -62,6 +62,15 @@ func (i *Ingest) HandleFrame(ctx context.Context, serverID int64, env agentapi.E
 		if err := i.WriteSingboxTrafficBatch(ctx, serverID, batch.Samples); err != nil {
 			log.Printf("singbox.traffic write (server=%d): %v", serverID, err)
 		}
+	case agentapi.TypeNetqualityBatch:
+		var batch agentapi.NetqualityBatch
+		if err := env.Decode(&batch); err != nil {
+			log.Printf("netquality.batch decode (server=%d): %v", serverID, err)
+			return
+		}
+		if err := i.WriteNetqualityBatch(ctx, serverID, batch.Samples); err != nil {
+			log.Printf("netquality.batch write (server=%d): %v", serverID, err)
+		}
 	}
 }
 

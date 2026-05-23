@@ -17,6 +17,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/hg-claw/Shepherd/internal/agent/filehandler"
 	"github.com/hg-claw/Shepherd/internal/agent/netinfo"
+	"github.com/hg-claw/Shepherd/internal/agent/netqualitysampler"
 	"github.com/hg-claw/Shepherd/internal/agent/ptyrunner"
 	"github.com/hg-claw/Shepherd/internal/agent/singboxv2sampler"
 	"github.com/hg-claw/Shepherd/internal/agent/state"
@@ -43,6 +44,12 @@ type Client struct {
 	// survive connection close, eliminating the under-counting we saw
 	// under bursty traffic.
 	SingboxTrafficSampler *singboxv2sampler.Sampler
+
+	// NetqualitySampler, if non-nil, is started as a goroutine after each
+	// WS connect. The sampler's config is pushed by the server via
+	// TypeNetqualityConfig and applied in dispatch.go; nothing here
+	// configures it directly.
+	NetqualitySampler *netqualitysampler.Sampler
 
 	mu      sync.Mutex
 	conn    *websocket.Conn
@@ -236,6 +243,18 @@ func (c *Client) dialAndRun(ctx context.Context) error {
 			}
 		}()
 		go c.SingboxTrafficSampler.Run(sbCtx)
+	}
+	if c.NetqualitySampler != nil {
+		nqCtx, nqCancel := context.WithCancel(ctx)
+		go func() {
+			select {
+			case <-stop:
+				nqCancel()
+			case <-ctx.Done():
+				nqCancel()
+			}
+		}()
+		go c.NetqualitySampler.Run(nqCtx)
 	}
 	// Close the connection when ctx is done so ReadMessage unblocks immediately.
 	go func() {

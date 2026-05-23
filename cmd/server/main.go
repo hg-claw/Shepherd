@@ -23,7 +23,7 @@ import (
 	"github.com/hg-claw/Shepherd/internal/installer"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 	_ "github.com/hg-claw/Shepherd/internal/plugins/cloudflare"          // registers via init()
-	_ "github.com/hg-claw/Shepherd/internal/plugins/netquality"          // registers via init()
+	netqualityplugin "github.com/hg-claw/Shepherd/internal/plugins/netquality" // registers via init() + WS push helper
 	singboxplugin "github.com/hg-claw/Shepherd/internal/plugins/singbox" // registers via init()
 	xrayplugin "github.com/hg-claw/Shepherd/internal/plugins/xray"       // registers via init() + Migrate0003
 
@@ -85,6 +85,15 @@ func main() {
 		Enabled: pluginEnabledChecker(rootCtx, pluginStore, "singbox"),
 	}
 	go sbRollup.Run(rootCtx)
+
+	// netquality rollup (same shape — raw → minute → hour, retention
+	// 24h / 7d / 90d). Gated on the netquality plugin being enabled so
+	// fresh installs that never turn it on don't pay any DB cost.
+	nqRollup := &telemetrysvc.NetqualityRollup{
+		DB:      d,
+		Enabled: pluginEnabledChecker(rootCtx, pluginStore, "netquality"),
+	}
+	go nqRollup.Run(rootCtx)
 
 	reg := sessionmux.New()
 	auditW := &audit.Writer{DB: d, Now: time.Now}
@@ -186,6 +195,7 @@ func main() {
 		Reg:               reg,
 		OnAgentDisconnect: ptyService.AgentDisconnected,
 		PushSandbox:       func(serverID int64) { sandboxPusher.PushOne(rootCtx, serverID) },
+		PushNetquality:    func(serverID int64) { netqualityplugin.PushConfig(rootCtx, d, hub, serverID) },
 	}
 
 	consoleAPI := &api.ConsoleAPI{PTY: ptyService}

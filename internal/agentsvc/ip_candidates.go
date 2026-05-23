@@ -52,7 +52,7 @@ func SaveCandidates(ctx context.Context, db *sqlx.DB, serverID int64, cands []IP
 		}
 		if _, err := db.ExecContext(ctx,
 			`INSERT INTO server_ip_candidates(server_id, addr, kind, source, detected_at)
-			 VALUES (?, ?, ?, ?, ?)
+			 VALUES ($1, $2, $3, $4, $5)
 			 ON CONFLICT(server_id, addr) DO UPDATE SET
 			   kind=excluded.kind, source=excluded.source, detected_at=excluded.detected_at`,
 			serverID, c.Addr, c.Kind, c.Source, now); err != nil {
@@ -95,7 +95,7 @@ func (s *Service) ListIPCandidates(ctx context.Context, serverID int64) ([]IPCan
 	err := s.DB.SelectContext(ctx, &rows,
 		`SELECT server_id, addr, kind, source, detected_at
 		   FROM server_ip_candidates
-		  WHERE server_id=?
+		  WHERE server_id=$1
 		  ORDER BY addr`,
 		serverID)
 	if err != nil {

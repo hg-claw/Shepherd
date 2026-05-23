@@ -20,7 +20,7 @@ func (i *Ingest) WriteTrafficBatch(ctx context.Context, serverID int64, samples 
 
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO xray_traffic_raw (server_id, tag, kind, ts, bytes_up, bytes_down)
-		VALUES (?, ?, ?, ?, ?, ?)`)
+		VALUES ($1, $2, $3, $4, $5, $6)`)
 	if err != nil {
 		return err
 	}

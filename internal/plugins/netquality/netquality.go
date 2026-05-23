@@ -19,7 +19,9 @@ import (
 	"github.com/hg-claw/Shepherd/internal/plugins"
 )
 
-type Plugin struct{}
+type Plugin struct {
+	deps plugins.Deps // captured in RegisterRoutes; routes.go reads it
+}
 
 func New() *Plugin { return &Plugin{} }
 
@@ -38,9 +40,8 @@ func (p *Plugin) OnEnable(ctx context.Context, deps plugins.Deps) error {
 
 func (p *Plugin) OnDisable(_ context.Context, _ plugins.Deps) error { return nil }
 
-// RegisterRoutes wires the admin REST endpoints. (Empty for now; PR #3
-// hangs target / host config / samples endpoints off this hook.)
-func (p *Plugin) RegisterRoutes(_ plugins.Mux, _ plugins.Deps) {}
+// RegisterRoutes is defined in routes.go (kept separate to give the REST
+// surface its own file once it grew past a few endpoints).
 
 // seedBuiltinTargets inserts the canonical target list once. Idempotent
 // via UNIQUE(source, host) — re-running is a no-op.

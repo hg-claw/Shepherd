@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/jmoiron/sqlx"
 )
@@ -44,6 +45,10 @@ type Deps struct {
 	DataDir  string // e.g. "data/plugins/<id>/". Created before first call.
 	HostExec HostExec
 	Now      func() time.Time
+	// HubSend lets a plugin push an envelope to a specific server's WS
+	// connection. Returns the hub's Send error verbatim — callers
+	// usually just log it. Nil in test deps that don't boot a hub.
+	HubSend func(serverID int64, env agentapi.Envelope) error
 }
 
 // HostExec is the agent-side execution surface needed by HostAware plugins.

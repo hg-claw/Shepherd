@@ -7,18 +7,27 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
-	"github.com/hg-claw/Shepherd/internal/agentsvc"
 )
 
 // PushConfig assembles the current netquality config for one server and
-// sends it down the WebSocket. Called from AgentAPI.PushNetquality
-// (wired in cmd/server/main.go) on every WS connect, and re-called by
-// PR #3's admin endpoints whenever a target is added/removed or the
-// host's enable/interval flips.
+// sends it down the WebSocket via sendFn (typically Hub.Send, supplied
+// either through plugins.Deps.HubSend or wired directly in main.go).
+//
+// Called from AgentAPI.PushNetquality on every WS connect, and re-called
+// by the admin endpoints (PR #3) whenever a target is added/removed or
+// the host's enable/interval flips.
 //
 // "Disabled" is encoded as Targets=nil so the agent's sampler short-
 // circuits without us having to invent a separate "off" signal.
-func PushConfig(ctx context.Context, db *sqlx.DB, hub *agentsvc.Hub, serverID int64) {
+func PushConfig(
+	ctx context.Context,
+	db *sqlx.DB,
+	sendFn func(serverID int64, env agentapi.Envelope) error,
+	serverID int64,
+) {
+	if sendFn == nil {
+		return
+	}
 	cfg, err := buildConfig(ctx, db, serverID)
 	if err != nil {
 		log.Printf("netquality push (server=%d): build: %v", serverID, err)
@@ -29,7 +38,7 @@ func PushConfig(ctx context.Context, db *sqlx.DB, hub *agentsvc.Hub, serverID in
 		log.Printf("netquality push (server=%d): frame: %v", serverID, err)
 		return
 	}
-	if err := hub.Send(serverID, env); err != nil {
+	if err := sendFn(serverID, env); err != nil {
 		// "agent offline" is the normal case during config edits while
 		// the host is down — log at info level only to avoid spamming.
 		log.Printf("netquality push (server=%d): %v", serverID, err)
@@ -41,15 +50,13 @@ func PushConfig(ctx context.Context, db *sqlx.DB, hub *agentsvc.Hub, serverID in
 // row) we return an empty config — same shape as "disabled".
 func buildConfig(ctx context.Context, db *sqlx.DB, serverID int64) (agentapi.NetqualityConfig, error) {
 	var host struct {
-		Enabled                 bool `db:"enabled"`
-		SampleIntervalSeconds   int  `db:"sample_interval_seconds"`
+		Enabled               bool `db:"enabled"`
+		SampleIntervalSeconds int  `db:"sample_interval_seconds"`
 	}
 	err := db.GetContext(ctx, &host, `
 		SELECT enabled, sample_interval_seconds
 		  FROM netquality_hosts WHERE server_id = $1`, serverID)
 	if err != nil {
-		// "no row" is not an error — host hasn't been configured yet.
-		// Returning the zero-value config makes the agent idle.
 		return agentapi.NetqualityConfig{}, nil
 	}
 	if !host.Enabled {

@@ -2,6 +2,15 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from './client'
 import type { Point, Range } from './servers'
 
+// One per-ISP RTT/loss summary, appended to the card when the
+// netquality plugin is enabled for this server AND has recent samples.
+// Field shape matches internal/api/public.go: NetqualityISPSummary.
+export type NetqualityISPSummary = {
+  isp: 'telecom' | 'unicom' | 'mobile' | 'overseas'
+  rtt_avg_ms: number
+  loss_pct: number
+}
+
 export type PublicCard = {
   id: number
   alias: string
@@ -18,6 +27,7 @@ export type PublicCard = {
     load_1: number
     tcp_conn: number
   }
+  netquality?: NetqualityISPSummary[]
 }
 
 export function usePublicServers() {

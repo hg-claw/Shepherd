@@ -20,7 +20,10 @@ func Migrations(driver shepdb.Driver) []plugins.Migration { return loadMigration
 // other plugins (cloudflare/singbox/xray) so the same migrator can pick
 // them up unchanged.
 func loadMigrations(driver shepdb.Driver) []plugins.Migration {
-	names := []string{"0001_netquality.up.sql"}
+	names := []string{
+		"0001_netquality.up.sql",
+		"0002_host_targets.up.sql",
+	}
 	subdir := "sqlite"
 	if driver == shepdb.DriverPostgres {
 		subdir = "postgres"

@@ -62,9 +62,21 @@ func buildConfig(ctx context.Context, db *sqlx.DB, serverID int64) (agentapi.Net
 	if !host.Enabled {
 		return agentapi.NetqualityConfig{IntervalSeconds: host.SampleIntervalSeconds}, nil
 	}
+	// Per-host target selection (added in PR #58). The set of targets a
+	// host samples is the intersection of (a) globally-enabled targets
+	// from the catalog and (b) the per-host opt-in rows from
+	// netquality_host_targets. A host with no rows in that table
+	// samples nothing — the operator must pick. seedHostTargets in
+	// routes.go fills the table on the first enable transition so
+	// pre-existing hosts keep working out of the box.
 	var targets []agentapi.NetqualityTarget
 	if err := db.SelectContext(ctx, &targets, `
-		SELECT id, host FROM netquality_targets WHERE enabled = true`); err != nil {
+		SELECT t.id, t.host
+		  FROM netquality_targets t
+		  JOIN netquality_host_targets ht
+		    ON ht.target_id = t.id AND ht.server_id = $1 AND ht.enabled = true
+		 WHERE t.enabled = true
+		 ORDER BY t.id`, serverID); err != nil {
 		return agentapi.NetqualityConfig{}, err
 	}
 	return agentapi.NetqualityConfig{

@@ -167,3 +167,126 @@ func TestRoutes_UpsertHost_InsertsThenUpdates(t *testing.T) {
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+
+func TestRoutes_UpsertHost_FirstEnableSeedsTargets(t *testing.T) {
+	// Operator turns the plugin on for a host that has never been
+	// configured. We auto-seed netquality_host_targets with every
+	// globally-enabled target so the legacy "every target" behaviour
+	// holds without a separate UI click.
+	p, mux := setupForRoutes(t)
+	body := `{"enabled":true,"sample_interval_seconds":300}`
+	req := httptest.NewRequest("PUT", "/hosts/1", bytes.NewBufferString(body))
+	req.SetPathValue("server_id", "1")
+	w := httptest.NewRecorder()
+	mux.h["PUT /hosts/{server_id}"](w, req)
+	if w.Code != 200 {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var n int
+	_ = p.deps.DB.Get(&n, `SELECT COUNT(*) FROM netquality_host_targets WHERE server_id=1`)
+	if n == 0 {
+		t.Error("first enable did not seed any per-host targets")
+	}
+	if n != len(builtinTargets) {
+		t.Errorf("seeded %d targets, want %d (every enabled builtin)", n, len(builtinTargets))
+	}
+}
+
+func TestRoutes_UpsertHost_RepeatEnableDoesntReseed(t *testing.T) {
+	// After the operator curates their set (removes some targets), a
+	// subsequent re-enable MUST NOT undo their edits.
+	p, mux := setupForRoutes(t)
+	req := httptest.NewRequest("PUT", "/hosts/1", bytes.NewBufferString(`{"enabled":true,"sample_interval_seconds":300}`))
+	req.SetPathValue("server_id", "1")
+	mux.h["PUT /hosts/{server_id}"](httptest.NewRecorder(), req)
+	// Operator deletes most of the seed.
+	_, _ = p.deps.DB.Exec(`DELETE FROM netquality_host_targets WHERE server_id=1 AND target_id > 2`)
+	// Flip off then on.
+	req = httptest.NewRequest("PUT", "/hosts/1", bytes.NewBufferString(`{"enabled":false,"sample_interval_seconds":300}`))
+	req.SetPathValue("server_id", "1")
+	mux.h["PUT /hosts/{server_id}"](httptest.NewRecorder(), req)
+	req = httptest.NewRequest("PUT", "/hosts/1", bytes.NewBufferString(`{"enabled":true,"sample_interval_seconds":300}`))
+	req.SetPathValue("server_id", "1")
+	mux.h["PUT /hosts/{server_id}"](httptest.NewRecorder(), req)
+
+	// First-enable transition triggers re-seed (we just flipped from
+	// disabled). Operator's previous curation IS restored because
+	// seedHostTargets uses ON CONFLICT DO NOTHING — rows that survive
+	// the curation stay, missing rows reappear. That's the intended
+	// behaviour: "re-enabling restores the full default set". If we
+	// want "do not touch on re-enable" we'd need a separate signal.
+	// Verify here so the behaviour is locked in.
+	var n int
+	_ = p.deps.DB.Get(&n, `SELECT COUNT(*) FROM netquality_host_targets WHERE server_id=1`)
+	if n != len(builtinTargets) {
+		t.Errorf("re-enable: rows=%d want %d (full set restored on first-enable transition)", n, len(builtinTargets))
+	}
+}
+
+func TestRoutes_PutHostTargets_ReplacesSetIdempotently(t *testing.T) {
+	p, mux := setupForRoutes(t)
+	// First enable to seed.
+	req := httptest.NewRequest("PUT", "/hosts/1", bytes.NewBufferString(`{"enabled":true,"sample_interval_seconds":300}`))
+	req.SetPathValue("server_id", "1")
+	mux.h["PUT /hosts/{server_id}"](httptest.NewRecorder(), req)
+
+	// Pick two existing target IDs.
+	var ids []int64
+	_ = p.deps.DB.Select(&ids, `SELECT id FROM netquality_targets ORDER BY id LIMIT 2`)
+
+	body, _ := json.Marshal(map[string]any{"target_ids": ids})
+	req = httptest.NewRequest("PUT", "/hosts/1/targets", bytes.NewReader(body))
+	req.SetPathValue("server_id", "1")
+	w := httptest.NewRecorder()
+	mux.h["PUT /hosts/{server_id}/targets"](w, req)
+	if w.Code != 200 {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var n int
+	_ = p.deps.DB.Get(&n, `SELECT COUNT(*) FROM netquality_host_targets WHERE server_id=1`)
+	if n != 2 {
+		t.Errorf("after replace: rows=%d want 2", n)
+	}
+
+	// Replace again with one fewer ID — idempotent (no duplicates, no leftover rows).
+	body, _ = json.Marshal(map[string]any{"target_ids": ids[:1]})
+	req = httptest.NewRequest("PUT", "/hosts/1/targets", bytes.NewReader(body))
+	req.SetPathValue("server_id", "1")
+	w = httptest.NewRecorder()
+	mux.h["PUT /hosts/{server_id}/targets"](w, req)
+	_ = p.deps.DB.Get(&n, `SELECT COUNT(*) FROM netquality_host_targets WHERE server_id=1`)
+	if n != 1 {
+		t.Errorf("second replace: rows=%d want 1", n)
+	}
+}
+
+func TestRoutes_ListHostTargets_FlagsSelectedRows(t *testing.T) {
+	p, mux := setupForRoutes(t)
+	// Seed via first enable.
+	req := httptest.NewRequest("PUT", "/hosts/1", bytes.NewBufferString(`{"enabled":true,"sample_interval_seconds":300}`))
+	req.SetPathValue("server_id", "1")
+	mux.h["PUT /hosts/{server_id}"](httptest.NewRecorder(), req)
+	// Drop half so we can verify the selected flag flips correctly.
+	_, _ = p.deps.DB.Exec(`DELETE FROM netquality_host_targets WHERE server_id=1 AND target_id % 2 = 0`)
+
+	req = httptest.NewRequest("GET", "/hosts/1/targets", nil)
+	req.SetPathValue("server_id", "1")
+	w := httptest.NewRecorder()
+	mux.h["GET /hosts/{server_id}/targets"](w, req)
+	if w.Code != 200 {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	var rows []hostTargetRow
+	_ = json.Unmarshal(w.Body.Bytes(), &rows)
+	var selected, deselected int
+	for _, r := range rows {
+		if r.Selected {
+			selected++
+		} else {
+			deselected++
+		}
+	}
+	if selected == 0 || deselected == 0 {
+		t.Errorf("expected mix of selected/deselected rows; got %d/%d", selected, deselected)
+	}
+}

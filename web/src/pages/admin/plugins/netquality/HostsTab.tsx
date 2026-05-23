@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { ListChecks } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Pill } from '@/components/Pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -7,6 +8,7 @@ import { Switch } from '@/components/ui/switch'
 import { useServers, type ServerRecord } from '@/api/servers'
 import { listNetqualityHosts, putNetqualityHost, type NetqualityHost } from '@/api/netquality'
 import { useUI } from '@/store/ui'
+import HostTargetsDialog from './HostTargetsDialog'
 
 // One row per server. enabled toggle is the master switch; the interval
 // selector only matters when enabled is true. We default new hosts to
@@ -32,6 +34,11 @@ export default function HostsTab() {
   const hostByID = new Map<number, NetqualityHost>(
     (hostsQ.data ?? []).map((h) => [h.server_id, h]),
   )
+
+  // Per-host targets dialog state. We track which server's picker is open
+  // here (rather than inside HostRow) so the dialog re-renders cleanly on
+  // close — keying off a single piece of state.
+  const [targetsFor, setTargetsFor] = useState<{ id: number; name: string } | null>(null)
 
   const apply = useMutation({
     mutationFn: ({ serverID, enabled, interval }: { serverID: number; enabled: boolean; interval: number }) =>
@@ -67,6 +74,7 @@ export default function HostsTab() {
               host={hostByID.get(s.id)}
               busy={apply.isPending}
               onApply={(enabled, interval) => apply.mutate({ serverID: s.id, enabled, interval })}
+              onPickTargets={() => setTargetsFor({ id: s.id, name: s.name })}
             />
           ))}
           {servers.length === 0 && (
@@ -78,6 +86,15 @@ export default function HostsTab() {
           )}
         </tbody>
       </table>
+
+      {targetsFor && (
+        <HostTargetsDialog
+          open={true}
+          onOpenChange={(open) => { if (!open) setTargetsFor(null) }}
+          serverID={targetsFor.id}
+          serverName={targetsFor.name}
+        />
+      )}
     </div>
   )
 }
@@ -87,11 +104,13 @@ function HostRow({
   host,
   busy,
   onApply,
+  onPickTargets,
 }: {
   server: ServerRecord
   host: NetqualityHost | undefined
   busy: boolean
   onApply: (enabled: boolean, interval: number) => void
+  onPickTargets: () => void
 }) {
   // Local state tracks the user's pending edit. We commit on toggle /
   // interval change immediately — saves a round of "click apply".
@@ -160,9 +179,23 @@ function HostRow({
         {host?.updated_at ? new Date(host.updated_at).toLocaleString() : '—'}
       </td>
       <td className="py-2 text-right">
-        <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-[11.5px]">
-          <a href={`/admin/plugins/netquality/results?server_id=${server.id}`}>Results →</a>
-        </Button>
+        <span className="inline-flex items-center gap-1">
+          {enabled && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-[11.5px]"
+              onClick={onPickTargets}
+              title="Pick which targets this host samples"
+            >
+              <ListChecks className="h-3.5 w-3.5 mr-1" />
+              Targets
+            </Button>
+          )}
+          <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-[11.5px]">
+            <a href={`/admin/plugins/netquality/results?server_id=${server.id}`}>Results →</a>
+          </Button>
+        </span>
       </td>
     </tr>
   )

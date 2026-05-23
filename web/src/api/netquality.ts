@@ -87,6 +87,27 @@ export const putNetqualityHost = (
 export const fetchNetqualityLatest = (serverID: number) =>
   api.get<NetqualityLatestRow[]>(`${ROOT}/samples/latest?server_id=${serverID}`)
 
+// Per-host target picker.
+//
+// listHostTargets returns one row per globally-enabled target with a
+// `selected` flag for the given host; updateHostTargets idempotently
+// replaces the host's selection. The agent gets a fresh PushConfig
+// after the PUT so the next tick uses the new set.
+export interface HostTargetRow {
+  target_id: number
+  isp: NetqualityISP
+  region: string
+  label: string
+  host: string
+  selected: boolean
+}
+
+export const listHostTargets = (serverID: number) =>
+  api.get<HostTargetRow[]>(`${ROOT}/hosts/${serverID}/targets`)
+
+export const updateHostTargets = (serverID: number, targetIDs: number[]) =>
+  api.put<{ ok: true }>(`${ROOT}/hosts/${serverID}/targets`, { target_ids: targetIDs })
+
 export const fetchNetqualitySamples = (params: {
   server_id: number
   target_id: number

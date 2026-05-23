@@ -195,7 +195,7 @@ func main() {
 		Reg:               reg,
 		OnAgentDisconnect: ptyService.AgentDisconnected,
 		PushSandbox:       func(serverID int64) { sandboxPusher.PushOne(rootCtx, serverID) },
-		PushNetquality:    func(serverID int64) { netqualityplugin.PushConfig(rootCtx, d, hub, serverID) },
+		PushNetquality:    func(serverID int64) { netqualityplugin.PushConfig(rootCtx, d, hub.Send, serverID) },
 	}
 
 	consoleAPI := &api.ConsoleAPI{PTY: ptyService}
@@ -216,6 +216,7 @@ func main() {
 		DataDir:  filepath.Join(cfg.DataDir, "plugins"),
 		HostExec: hostExec,
 		Now:      time.Now,
+		HubSend:  hub.Send,
 	}
 	pluginsAPI := &api.PluginsAPI{
 		Store:  pluginStore,

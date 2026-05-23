@@ -29,6 +29,13 @@ type AgentAPI struct {
 	Reg               *sessionmux.Registry
 	OnAgentDisconnect func(serverID int64)
 	PushSandbox       func(serverID int64)
+	// PushNetquality is called once on every WS connect so the agent gets
+	// its current target list + cadence without waiting for the next
+	// admin-triggered config edit. Hook owner queries netquality_hosts
+	// joined against netquality_targets and frames a NetqualityConfig
+	// envelope. nil means "feature not wired" — safe; agent's sampler
+	// just stays idle until something pushes a non-empty config.
+	PushNetquality func(serverID int64)
 }
 
 // FrameHandler dispatches agent→server frames. Implemented by ingest pipeline (Task 13).
@@ -124,6 +131,9 @@ func (a *AgentAPI) WS(w http.ResponseWriter, r *http.Request) {
 
 	if a.PushSandbox != nil {
 		a.PushSandbox(sid)
+	}
+	if a.PushNetquality != nil {
+		a.PushNetquality(sid)
 	}
 
 	_ = c.SetReadDeadline(time.Now().Add(wsPongWait))

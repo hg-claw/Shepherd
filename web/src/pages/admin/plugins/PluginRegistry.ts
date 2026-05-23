@@ -44,6 +44,16 @@ export const PluginRegistry: Record<string, PluginUIEntry> = {
       { key: 'logs',         label: 'Logs' },
     ],
   },
+  netquality: {
+    module: () => import('./netquality'),
+    tabs: [
+      // Order mirrors a typical workflow: turn it on (Hosts) → confirm
+      // targets (Targets) → inspect what's been measured (Results).
+      { key: 'hosts',   label: 'Hosts' },
+      { key: 'targets', label: 'Targets' },
+      { key: 'results', label: 'Results' },
+    ],
+  },
 }
 
 export const lazyPluginPage = (id: string) => {

@@ -187,6 +187,18 @@ func main() {
 		OnSandboxChange: sandboxPusher.PushAll,
 	}
 	public := &api.PublicAPI{Servers: serverSvc, Settings: settingsStore, Query: tQuery, Hub: hub, Tokens: agentSvc, BuildVersion: cfg.BuildVersion}
+	// Public-wall augmentation: when the netquality plugin is linked
+	// (it always is in this binary), fold its per-ISP RTT averages into
+	// each public card. The closure copies the typed plugin result into
+	// the api package's local type to keep the import direction clean.
+	public.NetqualitySummary = func(ctx context.Context, serverID int64) []api.NetqualityISPSummary {
+		rows := netqualityplugin.LatestPerISP(ctx, d, serverID)
+		out := make([]api.NetqualityISPSummary, 0, len(rows))
+		for _, r := range rows {
+			out = append(out, api.NetqualityISPSummary{ISP: r.ISP, RTTAvgMs: r.RTTAvgMs, LossPct: r.LossPct})
+		}
+		return out
+	}
 	public.InitRateLimit(30, time.Minute)
 	agentAPI := &api.AgentAPI{
 		Agents:            agentSvc,

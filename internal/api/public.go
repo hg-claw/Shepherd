@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -19,7 +20,20 @@ type PublicAPI struct {
 	Hub          *agentsvc.Hub
 	Tokens       *agentsvc.Service // for AgentStatus token lookup
 	BuildVersion string            // injected from cfg.BuildVersion; surfaced via /api/version
+	// NetqualitySummary is set by main.go to the netquality plugin's
+	// LatestPerISP helper. Left nil in tests / when the plugin isn't
+	// linked; nil-safe (the public list handler skips the augmentation).
+	NetqualitySummary func(ctx context.Context, serverID int64) []NetqualityISPSummary
 	statusLimit *tokenRateLimiter
+}
+
+// NetqualityISPSummary is one ISP's recent average RTT/loss for a
+// public-wall card. Kept here (not imported from the plugin) so
+// PublicAPI doesn't pull in plugins/* in tests.
+type NetqualityISPSummary struct {
+	ISP      string  `json:"isp"`
+	RTTAvgMs float64 `json:"rtt_avg_ms"`
+	LossPct  float64 `json:"loss_pct"`
 }
 
 // Version returns the running server's BuildVersion. Public — admin UI uses
@@ -46,6 +60,11 @@ type publicCard struct {
 	CountryCode string  `json:"country_code"`
 	Online      bool    `json:"online"`
 	Latest      *latest `json:"latest,omitempty"`
+	// Netquality is per-ISP RTT/loss the netquality plugin recorded
+	// recently for this server. Omitted from the wire when the plugin
+	// isn't enabled or hasn't sampled yet — the wall UI just renders
+	// the rest of the card.
+	Netquality []NetqualityISPSummary `json:"netquality,omitempty"`
 }
 
 type latest struct {
@@ -96,6 +115,13 @@ func (a *PublicAPI) Servers_ListPublic(w http.ResponseWriter, r *http.Request) {
 		}
 		if pt, err := a.Query.Latest(r.Context(), s.ID); err == nil && pt != nil {
 			card.Latest = renderLatest(pt)
+		}
+		// Augment with the netquality summary when the plugin is wired
+		// AND has data for this server. A nil/empty result drops the
+		// field via omitempty so we don't leak "feature exists but is
+		// dark" cues to the public wall.
+		if a.NetqualitySummary != nil {
+			card.Netquality = a.NetqualitySummary(r.Context(), s.ID)
 		}
 		out = append(out, card)
 	}

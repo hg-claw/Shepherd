@@ -43,6 +43,16 @@ func (c *Client) dispatchControl(ctx context.Context, env agentapi.Envelope, fh 
 		_ = c.writeJSON(pong)
 	case agentapi.TypeConfigUpdate:
 		c.applyConfig(env, fh)
+	case agentapi.TypeNetqualityConfig:
+		// Net-quality target list + cadence push. The sampler reads its
+		// own cfg from cache; we just refresh that cache here. nil
+		// sampler (feature off in this build) is a silent no-op.
+		if c.NetqualitySampler != nil {
+			var nq agentapi.NetqualityConfig
+			if err := env.Decode(&nq); err == nil {
+				c.NetqualitySampler.SetConfig(nq)
+			}
+		}
 	case agentapi.TypePTYOpen:
 		var p agentapi.PTYOpen
 		if err := env.Decode(&p); err == nil {

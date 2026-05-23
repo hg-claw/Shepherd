@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { Outlet, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -23,7 +24,9 @@ export function PublicLayout() {
         </div>
       </header>
       <main className="container flex-1 px-4 sm:px-6 py-5 sm:py-6">
-        <Outlet />
+        <Suspense fallback={null}>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   )

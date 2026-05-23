@@ -135,6 +135,13 @@
     "err": "严重",
     "offline": "离线"
   },
+  "host_stage": {
+    "installing": "安装中",
+    "install-failed": "安装失败",
+    "online": "在线",
+    "offline": "离线",
+    "not-installed": "未安装"
+  },
   "view": {
     "grid": "卡片",
     "table": "表格"

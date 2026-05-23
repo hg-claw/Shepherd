@@ -33,15 +33,29 @@ import { AdminLayout } from './layouts/AdminLayout'
 import { ConsoleDock } from './components/ConsoleDock'
 
 export default function App() {
+  // No top-level Suspense — that boundary used to wrap the whole <Routes>
+  // tree, so when a lazy chunk hadn't downloaded yet React unmounted EVERY
+  // layout (sidebar, header, console dock) and rendered the fallback,
+  // producing the black flash on every navigation. Suspense now lives
+  // inside each layout, wrapping just <Outlet />, so the chrome stays
+  // painted while the route content swaps. Login + NotFound (no shared
+  // layout) get inline Suspense wrappers.
   return (
-    <Suspense fallback={null}>
+    <>
       <Routes>
         <Route element={<PublicLayout />}>
           <Route path="/" element={<Wall />} />
           <Route path="/public/servers/:id" element={<PublicServerDetail />} />
         </Route>
 
-        <Route path="/admin/login" element={<Login />} />
+        <Route
+          path="/admin/login"
+          element={
+            <Suspense fallback={null}>
+              <Login />
+            </Suspense>
+          }
+        />
 
         <Route
           element={
@@ -70,9 +84,16 @@ export default function App() {
           <Route path="/admin/recordings/:id" element={<RecordingPlayerPage />} />
         </Route>
 
-        <Route path="*" element={<NotFound />} />
+        <Route
+          path="*"
+          element={
+            <Suspense fallback={null}>
+              <NotFound />
+            </Suspense>
+          }
+        />
       </Routes>
       <ConsoleDock />
-    </Suspense>
+    </>
   )
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/hg-claw/Shepherd/internal/agent/collector"
 	"github.com/hg-claw/Shepherd/internal/agent/fingerprint"
+	"github.com/hg-claw/Shepherd/internal/agent/netqualitysampler"
 	"github.com/hg-claw/Shepherd/internal/agent/singboxv2sampler"
 	"github.com/hg-claw/Shepherd/internal/agent/state"
 	"github.com/hg-claw/Shepherd/internal/agent/wsclient"
@@ -67,6 +68,11 @@ func main() {
 		Send:     client.Send,
 	}
 	client.SingboxTrafficSampler = singboxSampler
+
+	// netquality sampler runs idle until the server pushes a target
+	// list (TypeNetqualityConfig). Interval comes from the same push.
+	netqSampler := &netqualitysampler.Sampler{Send: client.Send}
+	client.NetqualitySampler = netqSampler
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()

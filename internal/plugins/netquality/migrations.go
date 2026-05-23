@@ -11,6 +11,11 @@ import (
 //go:embed migrations/sqlite/*.sql migrations/postgres/*.sql
 var migFS embed.FS
 
+// Migrations is the package-level form mirrored by every plugin — lets
+// telemetrysvc / ingest tests apply our schema without instantiating
+// the Plugin struct first.
+func Migrations(driver shepdb.Driver) []plugins.Migration { return loadMigrations(driver) }
+
 // loadMigrations returns the per-driver migration set. Shape mirrors the
 // other plugins (cloudflare/singbox/xray) so the same migrator can pick
 // them up unchanged.

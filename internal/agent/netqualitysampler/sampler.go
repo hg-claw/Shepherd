@@ -1,13 +1,33 @@
+// Package netqualitysampler runs periodic ICMP probes against a
+// server-pushed target list and emits NetqualityBatch envelopes back to
+// the server. It's the agent-side half of the netquality plugin; the
+// catalog + ingest + rollup live server-side under
+// internal/plugins/netquality and internal/telemetrysvc.
+//
+// Probe implementation: github.com/prometheus-community/pro-bing's
+// native Go ICMP — NOT a shell-out to ping(1). The shell-out path was
+// tried first (PR #54..#59) and failed for two unrelated reasons in
+// production:
+//   - Some hosts have ping(1) localised (LC_ALL=C wasn't enough on the
+//     reporter's box — busybox builds ignore LANG/LC env vars).
+//   - The output parser was English-only, so a slightly different ping
+//     binary (iputils vs busybox vs s6's variant) silently produced
+//     status="error" rows that gave operators nothing to investigate.
+//
+// Going native sidesteps both: pro-bing constructs and decodes ICMP
+// packets itself, returns a typed *Statistics, and surfaces a real
+// Go error when the OS refuses (most often EPERM with no CAP_NET_RAW
+// and an unset ping_group_range — diagnostics for that case land in
+// the probe log line below).
 package netqualitysampler
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"os"
-	"os/exec"
 	"sync"
 	"time"
+
+	probing "github.com/prometheus-community/pro-bing"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
 )
@@ -22,12 +42,12 @@ const defaultIntervalSeconds = 300
 // patience threshold (each burst takes ~loss×n×1s in the worst case).
 const defaultPingCount = 10
 
-// defaultPingTimeout is the per-packet timeout passed to ping -W (Linux)
-// or -t (BSD). 2s is high enough for trans-Pacific RTT (~250ms in
-// practice) while still bounding the worst-case burst time to 20s.
-const defaultPingTimeout = 2 * time.Second
+// defaultPingTimeout is the per-burst timeout. We let pro-bing drive
+// pacing itself; this is the total wall clock budget after which we
+// take whatever stats we have.
+const defaultPingTimeout = 12 * time.Second
 
-// Sampler runs the per-target ping loop. The server pushes a config via
+// Sampler runs the per-target ICMP loop. The server pushes a config via
 // SetConfig — until then Run is a no-op (no targets → no work).
 //
 // Concurrency: SetConfig is called from the wsclient reader goroutine;
@@ -38,11 +58,23 @@ type Sampler struct {
 	// nil during construction; the loop short-circuits in that case.
 	Send func(agentapi.Envelope) error
 
-	// pingExec is swapped in tests with a fake that returns canned output.
-	pingExec func(ctx context.Context, host string, count int, timeout time.Duration) (string, error)
+	// pingExec is swapped in tests with a fake that returns canned stats.
+	// Production code uses doPing below.
+	pingExec func(ctx context.Context, host string, count int, timeout time.Duration) (*probeStats, error)
 
 	mu  sync.Mutex
 	cfg agentapi.NetqualityConfig
+}
+
+// probeStats is the structured result of one ping burst. Mirrors the
+// subset of pro-bing's *Statistics we forward to the server.
+type probeStats struct {
+	PacketsSent int
+	PacketsRecv int
+	AvgRtt      time.Duration
+	MinRtt      time.Duration
+	MaxRtt      time.Duration
+	StdDevRtt   time.Duration // pro-bing's "stddev" — what we surface as jitter
 }
 
 // SetConfig replaces the current ping plan. Called by the WS receiver
@@ -85,16 +117,14 @@ func (s *Sampler) Run(ctx context.Context) {
 		if len(cfg.Targets) > 0 {
 			s.tick(ctx, cfg)
 		}
-		// Re-read the interval AFTER tick — operator changes apply at
-		// the boundary, not mid-burst.
 		timer.Reset(s.effectiveInterval(s.snapshot()))
 	}
 }
 
 // tick runs one round: ping each target sequentially, build samples,
 // emit one batch. Sequential rather than parallel because (a) the burst
-// itself is bounded by the timeout and (b) parallel ping fans out ICMP
-// floods that some IDS / hosting providers flag.
+// itself is bounded by the timeout and (b) parallel ICMP flood fan-out
+// trips some IDS / hosting providers.
 func (s *Sampler) tick(ctx context.Context, cfg agentapi.NetqualityConfig) {
 	now := time.Now().UTC()
 	samples := make([]agentapi.NetqualitySample, 0, len(cfg.Targets))
@@ -114,71 +144,101 @@ func (s *Sampler) tick(ctx context.Context, cfg agentapi.NetqualityConfig) {
 	}
 }
 
-// probe runs ping(1) against one target and converts the result into a
-// NetqualitySample. NEVER returns an error — even a complete ping
-// failure is recorded as status="error" so the dashboards distinguish
-// "haven't sampled yet" (no row) from "sampled and failed" (status row).
+// probe runs one ICMP burst against one target. NEVER returns an error —
+// even a complete failure is recorded as status="error" so the
+// dashboards distinguish "haven't sampled yet" (no row) from "sampled
+// and failed" (status row).
 func (s *Sampler) probe(ctx context.Context, t agentapi.NetqualityTarget, ts time.Time) agentapi.NetqualitySample {
 	sample := agentapi.NetqualitySample{TargetID: t.ID, TS: ts, Status: "error", LossPct: 100}
-	out, execErr := s.exec()(ctx, t.Host, defaultPingCount, defaultPingTimeout)
-	// We don't bail on exec error: ping returns non-zero on partial loss
-	// too, and the output still has the summary line we want. The only
-	// case where we truly have nothing to parse is when ping never
-	// printed a summary, which parsePingOutput surfaces via errNoLossLine.
-	ps, parseErr := parsePingOutput(out)
-	if parseErr != nil {
-		// First-class diagnostic surface: without this, operators see a
-		// column of "error" rows in the UI with no explanation. The most
-		// common culprits we've actually hit: non-English locale leaks
-		// past the LC_ALL=C below (some busybox builds ignore env),
-		// network namespace lacks CAP_NET_RAW for ping, or there's no
-		// ping binary at all. Truncate the output so a localised
-		// `--help` doesn't fill the journal.
-		short := out
-		if len(short) > 200 {
-			short = short[:200] + "...[truncated]"
-		}
-		log.Printf("netqualitysampler: probe %q parse failed (exec err=%v): %s",
-			t.Host, execErr, short)
+	st, err := s.exec()(ctx, t.Host, defaultPingCount, defaultPingTimeout)
+	if err != nil {
+		// Log every probe failure once — operators see the real OS
+		// error (usually "operation not permitted" when CAP_NET_RAW
+		// isn't set + ping_group_range is empty, or "no route to host"
+		// for misconfigured firewalls). Pre-fix this turned into a
+		// silent status='error' row with no clue why.
+		log.Printf("netqualitysampler: probe %q: %v", t.Host, err)
 		return sample
 	}
-	sample.Status = ps.Status
-	sample.LossPct = ps.LossPct
-	sample.RTTAvgMs = ps.RTTAvgMs
-	sample.RTTMinMs = ps.RTTMinMs
-	sample.RTTMaxMs = ps.RTTMaxMs
-	sample.JitterMs = ps.JitterMs
+	if st.PacketsSent == 0 {
+		// Couldn't send a single packet — treat as error rather than
+		// 100% loss so the operator knows it's a process-level issue
+		// (e.g. routing table empty), not a network reachability one.
+		log.Printf("netqualitysampler: probe %q: 0 packets sent (config rejected by kernel)", t.Host)
+		return sample
+	}
+	loss := 100 * float64(st.PacketsSent-st.PacketsRecv) / float64(st.PacketsSent)
+	sample.LossPct = loss
+	if st.PacketsRecv == 0 {
+		sample.Status = "lost"
+		return sample
+	}
+	sample.Status = "ok"
+	avg := durationMs(st.AvgRtt)
+	mn := durationMs(st.MinRtt)
+	mx := durationMs(st.MaxRtt)
+	jit := durationMs(st.StdDevRtt)
+	sample.RTTAvgMs = &avg
+	sample.RTTMinMs = &mn
+	sample.RTTMaxMs = &mx
+	sample.JitterMs = &jit
 	return sample
 }
 
-func (s *Sampler) exec() func(context.Context, string, int, time.Duration) (string, error) {
+func (s *Sampler) exec() func(context.Context, string, int, time.Duration) (*probeStats, error) {
 	if s.pingExec != nil {
 		return s.pingExec
 	}
-	return runPing
+	return doPing
 }
 
-// runPing executes `ping -c <count> -W <timeout-seconds> <host>` and
-// returns the combined stdout/stderr blob. Linux only for now; the BSD
-// flag set (-W milliseconds vs seconds) differs and macOS hosts aren't
-// in the agent's deployment matrix.
-//
-// Locale: ping(1) localises the "X packets transmitted" summary
-// (zh_CN turns it into "X 包已发送, X 已接收, X% 包丢失"). Our parser
-// regex is English-only by design — translating it per-locale would
-// add a moving target with no upside — so we force LC_ALL=C in the
-// child environment. Affects only the spawned ping, not the agent's
-// own logs.
-func runPing(ctx context.Context, host string, count int, timeout time.Duration) (string, error) {
-	cctx, cancel := context.WithTimeout(ctx, time.Duration(count+2)*timeout)
-	defer cancel()
-	args := []string{
-		"-c", fmt.Sprintf("%d", count),
-		"-W", fmt.Sprintf("%d", int(timeout.Seconds())),
-		host,
+// doPing runs the actual ICMP burst via pro-bing. Privileged mode uses
+// SOCK_RAW (needs CAP_NET_RAW); the agent runs as root under its
+// systemd unit so this is the natural fit. On hosts that drop the
+// capability the operator's signal is the EPERM in probe's log line.
+func doPing(ctx context.Context, host string, count int, timeout time.Duration) (*probeStats, error) {
+	p, err := probing.NewPinger(host)
+	if err != nil {
+		return nil, err
 	}
-	cmd := exec.CommandContext(cctx, "ping", args...)
-	cmd.Env = append(os.Environ(), "LC_ALL=C", "LANG=C")
-	out, err := cmd.CombinedOutput()
-	return string(out), err
+	p.Count = count
+	p.Timeout = timeout
+	// Interval between sends. The default (1s) makes a 10-packet burst
+	// take 10s wall clock — too long when 30 targets × N hosts.
+	p.Interval = 200 * time.Millisecond
+	// SOCK_RAW on Linux. On macOS / when running as root inside an
+	// unprivileged container this still works because Docker grants
+	// CAP_NET_RAW by default.
+	p.SetPrivileged(true)
+
+	// pro-bing's Run() blocks until Count is hit OR Timeout elapses.
+	// Wrap in our own ctx so a Run() cancel takes the pinger down
+	// promptly — without this the goroutine could outlive the tick.
+	done := make(chan error, 1)
+	go func() { done <- p.RunWithContext(ctx) }()
+	select {
+	case <-ctx.Done():
+		p.Stop()
+		<-done
+		return nil, ctx.Err()
+	case err := <-done:
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	st := p.Statistics()
+	return &probeStats{
+		PacketsSent: st.PacketsSent,
+		PacketsRecv: st.PacketsRecv,
+		AvgRtt:      st.AvgRtt,
+		MinRtt:      st.MinRtt,
+		MaxRtt:      st.MaxRtt,
+		StdDevRtt:   st.StdDevRtt,
+	}, nil
+}
+
+// durationMs returns the duration as milliseconds with sub-ms precision.
+func durationMs(d time.Duration) float64 {
+	return float64(d.Microseconds()) / 1000.0
 }

@@ -34,6 +34,10 @@ func (p *Plugin) RegisterRoutes(mux plugins.Mux, deps plugins.Deps) {
 	// agent picks up the new plan without waiting for its next WS reconnect.
 	mux.HandleFunc("GET /hosts", p.listHosts)
 	mux.HandleFunc("PUT /hosts/{server_id}", p.upsertHost)
+	// Per-host target opt-in. GET returns every globally-enabled target
+	// with a 'selected' flag for this host; PUT replaces the host's set.
+	mux.HandleFunc("GET /hosts/{server_id}/targets", p.listHostTargets)
+	mux.HandleFunc("PUT /hosts/{server_id}/targets", p.putHostTargets)
 
 	// Sample history. Mirrors singbox traffic's resolution-by-span heuristic:
 	// short span → raw, medium → minute, long → hour. Resolution can be
@@ -210,6 +214,16 @@ func (p *Plugin) upsertHost(w http.ResponseWriter, r *http.Request) {
 		b.SampleIntervalSeconds = 300
 	}
 	now := time.Now().UTC()
+	// We need to know whether this is the first enable transition, so
+	// the seed-on-first-enable below only fires when there's actually
+	// nothing in netquality_host_targets yet (rather than once per
+	// upsert, which would re-create rows the operator just removed).
+	var prevEnabled bool
+	hadRow := true
+	if err := p.deps.DB.GetContext(r.Context(), &prevEnabled,
+		`SELECT enabled FROM netquality_hosts WHERE server_id=$1`, sid); err != nil {
+		hadRow = false
+	}
 	if _, err := p.deps.DB.ExecContext(r.Context(), `
 		INSERT INTO netquality_hosts (server_id, enabled, sample_interval_seconds, updated_at)
 		VALUES ($1, $2, $3, $4)
@@ -221,8 +235,113 @@ func (p *Plugin) upsertHost(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err)
 		return
 	}
-	// Push to this one host so the new plan takes effect on the next
-	// sample tick rather than the next reconnect.
+	// First-enable transition: hadRow=false (brand-new host) OR
+	// hadRow=true but prevEnabled=false. In both cases seed the per-host
+	// target set with everything globally enabled, so the operator gets
+	// the legacy "every target" behaviour without an extra click.
+	// Subsequent flips don't re-seed — that would clobber operator edits.
+	firstEnable := b.Enabled && (!hadRow || !prevEnabled)
+	if firstEnable {
+		if err := seedHostTargets(r.Context(), p.deps.DB, sid); err != nil {
+			// Non-fatal: host is configured, just no targets yet. The
+			// operator can pick them via PUT /hosts/{id}/targets.
+			// (We surface this via the response so the UI can flag it.)
+			writeJSON(w, 200, map[string]any{"ok": true, "warning": "target seed failed: " + err.Error()})
+			return
+		}
+	}
+	PushConfig(r.Context(), p.deps.DB, p.deps.HubSend, sid)
+	writeJSON(w, 200, map[string]any{"ok": true})
+}
+
+// seedHostTargets fills netquality_host_targets for a server with every
+// globally-enabled target. Called once on first enable. Idempotent via
+// the PK; an operator who has already curated their set won't see rows
+// reappear.
+func seedHostTargets(ctx context.Context, db *sqlx.DB, serverID int64) error {
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO netquality_host_targets (server_id, target_id, enabled)
+		SELECT $1, id, true FROM netquality_targets WHERE enabled = true
+		ON CONFLICT (server_id, target_id) DO NOTHING`,
+		serverID)
+	return err
+}
+
+// hostTargetRow combines the catalog row with the per-host selection so
+// the UI can render "every available target with a checkbox" in one
+// payload.
+type hostTargetRow struct {
+	TargetID int64  `db:"target_id" json:"target_id"`
+	ISP      string `db:"isp"       json:"isp"`
+	Region   string `db:"region"    json:"region"`
+	Label    string `db:"label"     json:"label"`
+	Host     string `db:"host"      json:"host"`
+	Selected bool   `db:"selected"  json:"selected"`
+}
+
+func (p *Plugin) listHostTargets(w http.ResponseWriter, r *http.Request) {
+	sid, err := strconv.ParseInt(r.PathValue("server_id"), 10, 64)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	// COALESCE makes "no row at all" equivalent to "selected=false" so the
+	// UI shows the operator the entire catalog as a single picker.
+	var rows []hostTargetRow
+	if err := p.deps.DB.SelectContext(r.Context(), &rows, `
+		SELECT t.id AS target_id, t.isp, t.region, t.label, t.host,
+		       COALESCE(ht.enabled, false) AS selected
+		  FROM netquality_targets t
+		  LEFT JOIN netquality_host_targets ht
+		    ON ht.target_id = t.id AND ht.server_id = $1
+		 WHERE t.enabled = true
+		 ORDER BY t.isp, t.region, t.label`, sid); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	writeJSON(w, 200, rows)
+}
+
+type putHostTargetsBody struct {
+	TargetIDs []int64 `json:"target_ids"`
+}
+
+func (p *Plugin) putHostTargets(w http.ResponseWriter, r *http.Request) {
+	sid, err := strconv.ParseInt(r.PathValue("server_id"), 10, 64)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	var b putHostTargetsBody
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	// Idempotent replace: wipe then insert. One transaction so a
+	// half-written set doesn't leak to the next PushConfig.
+	tx, err := p.deps.DB.BeginTxx(r.Context(), nil)
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(r.Context(),
+		`DELETE FROM netquality_host_targets WHERE server_id=$1`, sid); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	for _, tid := range b.TargetIDs {
+		if _, err := tx.ExecContext(r.Context(),
+			`INSERT INTO netquality_host_targets (server_id, target_id, enabled) VALUES ($1, $2, true)`,
+			sid, tid); err != nil {
+			writeErr(w, 500, err)
+			return
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		writeErr(w, 500, err)
+		return
+	}
 	PushConfig(r.Context(), p.deps.DB, p.deps.HubSend, sid)
 	writeJSON(w, 200, map[string]any{"ok": true})
 }

@@ -148,7 +148,7 @@ func (a *ScriptsAPI) RunDetail(w http.ResponseWriter, r *http.Request) {
 	var rows []targetRow
 	if err := a.Store.DB.SelectContext(r.Context(), &rows,
 		`SELECT id, server_id, pty_session_id, status, exit_code, started_at, finished_at
-		 FROM script_run_targets WHERE run_id=?`, rid); err != nil {
+		 FROM script_run_targets WHERE run_id=$1`, rid); err != nil {
 		writeError(w, 500, err.Error())
 		return
 	}

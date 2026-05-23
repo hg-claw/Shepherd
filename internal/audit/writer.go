@@ -30,7 +30,7 @@ func (w *Writer) Write(ctx context.Context, adminID, serverID *int64, action str
 	}
 	_, err := w.DB.ExecContext(ctx,
 		`INSERT INTO audit_log(ts, admin_id, server_id, action, details_json, result)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
+		 VALUES ($1, $2, $3, $4, $5, $6)`,
 		now, adminID, serverID, action, string(b), result)
 	if err != nil {
 		log.Printf("audit write: %v", err)

@@ -181,6 +181,43 @@ func TestSetConfig_RaceFree(t *testing.T) {
 	<-done
 }
 
+func TestTick_ProbesInParallel(t *testing.T) {
+	// Sequential ticks couldn't keep up with a 60s sample_interval when
+	// some targets timed out (12s × N). Parallel fan-out caps the round
+	// at roughly the slowest probe. This test pins the contract: 8
+	// targets that each "take" 200ms should land well under 8×200ms.
+	const targetCount = 8
+	const perProbe = 200 * time.Millisecond
+
+	var ran int32
+	s := &Sampler{
+		pingExec: func(_ context.Context, _ string, _ int, _ time.Duration) (*probeStats, error) {
+			time.Sleep(perProbe)
+			atomic.AddInt32(&ran, 1)
+			return mkOKStats(), nil
+		},
+		Send: func(agentapi.Envelope) error { return nil },
+	}
+	cfg := agentapi.NetqualityConfig{}
+	for i := 0; i < targetCount; i++ {
+		cfg.Targets = append(cfg.Targets, agentapi.NetqualityTarget{ID: int64(i), Host: "x"})
+	}
+
+	t0 := time.Now()
+	s.tick(context.Background(), cfg)
+	elapsed := time.Since(t0)
+
+	if int(ran) != targetCount {
+		t.Errorf("ran=%d want %d", ran, targetCount)
+	}
+	// Sequential would be 8×200ms = 1600ms. Parallel (16 cap) should be
+	// ≈200ms + scheduler jitter. Leave generous headroom for CI: < 800ms
+	// proves parallelism without flaking on slow runners.
+	if elapsed > 800*time.Millisecond {
+		t.Errorf("tick elapsed %v; want <800ms (parallel fan-out)", elapsed)
+	}
+}
+
 func TestDurationMs_SubMillisecondPrecision(t *testing.T) {
 	// We bucket the wire field as milliseconds but keep two decimals so
 	// LAN RTTs (often 100-500μs) don't truncate to 0. Lock in the

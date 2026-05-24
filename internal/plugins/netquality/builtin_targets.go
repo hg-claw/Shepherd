@@ -39,11 +39,16 @@ var builtinTargets = []builtinTarget{
 	{"mobile", "Guangdong", "移动 广东", "211.139.163.6"},
 	{"mobile", "Sichuan", "移动 四川", "211.137.96.205"},
 
-	// Overseas anchors
+	// Overseas anchors. We avoid Google 8.8.8.8 — globally anycast, so
+	// the latency it reports has nothing to do with reaching the US
+	// specifically. Replaced with OpenDNS (Cisco-operated, anchored
+	// strongly in US-West/Central peering). IIJ 210.130.1.40 stopped
+	// responding for our reporter — swapped for NTT Communications JP
+	// which has held its address ≥10 years per its public NIC entry.
 	{"overseas", "Global", "Cloudflare 1.1.1.1", "1.1.1.1"},
-	{"overseas", "US", "Google 8.8.8.8", "8.8.8.8"},
+	{"overseas", "US", "OpenDNS US", "208.67.222.222"},
 	{"overseas", "Global", "Quad9 9.9.9.9", "9.9.9.9"},
 	{"overseas", "Hong Kong", "HK PCCW", "203.80.96.10"},
-	{"overseas", "Japan", "Japan IIJ", "210.130.1.40"},
+	{"overseas", "Japan", "NTT Comms JP", "210.132.100.101"},
 	{"overseas", "Singapore", "Singapore Singtel", "165.21.83.88"},
 }

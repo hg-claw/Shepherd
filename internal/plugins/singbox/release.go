@@ -185,68 +185,80 @@ func (r *Releaser) Fetch(ctx context.Context, version, osName, arch string) (Bin
 // (no "v" prefix, no "singbox-…-v2rayapi" wrapper). Releases that don't match
 // our tag pattern (e.g. the Shepherd server's own vX.Y.Z tags) are filtered
 // out — both flavours live in the same GitHub repo.
+//
+// Pagination: the singbox build pipeline is on a separate cadence from the
+// main Shepherd release cycle, so the most recent N pages of /releases can
+// be entirely Shepherd vX.Y.Z tags with NO matching singbox-… tag. Pre-fix
+// we just over-fetched by 4× and hoped — once we had ~20 Shepherd releases
+// between singbox builds, the filter starved and returned []. Walk pages
+// until we hit limit matches or maxPages.
 func (r *Releaser) ListLatestTags(ctx context.Context, limit int) ([]string, error) {
 	if limit <= 0 {
 		limit = 5
 	}
-	// Over-fetch a little so the filter doesn't starve us — every Shepherd
-	// release pushes a non-singbox tag we'll drop here.
-	perPage := limit * 4
-	if perPage < 20 {
-		perPage = 20
-	}
-	u := fmt.Sprintf("%s/repos/%s/releases?per_page=%d", r.apiBase(), r.repo(), perPage)
-	body, err := httpGet(ctx, r.client(), u)
-	if err != nil {
-		return nil, err
-	}
-	var entries []struct {
-		TagName string `json:"tag_name"`
-	}
-	if err := json.Unmarshal(body, &entries); err != nil {
-		return nil, fmt.Errorf("parse releases: %w", err)
-	}
+	const perPage = 100 // GitHub max
+	const maxPages = 5  // 500 releases — way past any realistic gap
+
 	out := make([]string, 0, limit)
-	for _, e := range entries {
-		v := stripReleaseTag(e.TagName)
-		if v == "" {
-			continue
+	for page := 1; page <= maxPages; page++ {
+		u := fmt.Sprintf("%s/repos/%s/releases?per_page=%d&page=%d",
+			r.apiBase(), r.repo(), perPage, page)
+		body, err := httpGet(ctx, r.client(), u)
+		if err != nil {
+			return nil, err
 		}
-		out = append(out, v)
-		if len(out) >= limit {
+		var entries []struct {
+			TagName string `json:"tag_name"`
+		}
+		if err := json.Unmarshal(body, &entries); err != nil {
+			return nil, fmt.Errorf("parse releases: %w", err)
+		}
+		// Empty page = ran out of releases entirely; return what we have.
+		if len(entries) == 0 {
 			break
+		}
+		for _, e := range entries {
+			v := stripReleaseTag(e.TagName)
+			if v == "" {
+				continue
+			}
+			out = append(out, v)
+			if len(out) >= limit {
+				return out, nil
+			}
 		}
 	}
 	return out, nil
 }
 
-// resolveAssetURL fetches the GitHub releases list and returns the download URL
-// for the named asset in the given version's release.
+// resolveAssetURL fetches the GitHub release for the requested version and
+// returns the download URL for the named asset.
+//
+// Pre-fix this iterated `/releases` (first page only) and matched by tag
+// name client-side — same starvation bug as ListLatestTags once the
+// release fell off page 1. Use GitHub's tag-direct endpoint instead so
+// the lookup is O(1) regardless of how many intervening Shepherd
+// releases have piled up.
 func (r *Releaser) resolveAssetURL(ctx context.Context, version, assetName string) (string, error) {
-	u := fmt.Sprintf("%s/repos/%s/releases", r.apiBase(), r.repo())
+	want := releaseTag(version)
+	u := fmt.Sprintf("%s/repos/%s/releases/tags/%s", r.apiBase(), r.repo(), want)
 	body, err := httpGet(ctx, r.client(), u)
 	if err != nil {
-		return "", fmt.Errorf("fetch releases: %w", err)
+		return "", fmt.Errorf("fetch release %q: %w", want, err)
 	}
-	var releases []struct {
+	var rel struct {
 		TagName string `json:"tag_name"`
 		Assets  []struct {
 			Name               string `json:"name"`
 			BrowserDownloadURL string `json:"browser_download_url"`
 		} `json:"assets"`
 	}
-	if err := json.Unmarshal(body, &releases); err != nil {
-		return "", fmt.Errorf("parse releases JSON: %w", err)
+	if err := json.Unmarshal(body, &rel); err != nil {
+		return "", fmt.Errorf("parse release JSON: %w", err)
 	}
-	want := releaseTag(version)
-	for _, rel := range releases {
-		if rel.TagName != want {
-			continue
-		}
-		for _, a := range rel.Assets {
-			if a.Name == assetName {
-				return a.BrowserDownloadURL, nil
-			}
+	for _, a := range rel.Assets {
+		if a.Name == assetName {
+			return a.BrowserDownloadURL, nil
 		}
 	}
 	return "", fmt.Errorf("asset %q not found in release %q", assetName, want)

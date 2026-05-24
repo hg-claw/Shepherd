@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 )
 
@@ -55,22 +56,20 @@ func TestReleaser_FetchAndCacheHit(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/repos/example/repo/releases":
-			// Mix in a Shepherd server release tag to prove the filter
-			// drops it instead of crashing the asset lookup.
-			releases := []map[string]any{
-				{"tag_name": "v0.7.6", "assets": []any{}},
-				{
-					"tag_name": releaseTag(version),
-					"assets": []map[string]any{
-						{
-							"name":                 assetName,
-							"browser_download_url": "http://" + r.Host + "/dl/" + assetName,
-						},
+		case "/repos/example/repo/releases/tags/" + releaseTag(version):
+			// Tag-direct endpoint — returns ONE release object, not a list.
+			// Pre-fix the code iterated /releases (paged) and got starved
+			// on busy repos; this proves we now hit the O(1) lookup.
+			rel := map[string]any{
+				"tag_name": releaseTag(version),
+				"assets": []map[string]any{
+					{
+						"name":                 assetName,
+						"browser_download_url": "http://" + r.Host + "/dl/" + assetName,
 					},
 				},
 			}
-			_ = json.NewEncoder(w).Encode(releases)
+			_ = json.NewEncoder(w).Encode(rel)
 		case "/dl/" + assetName:
 			hitCount++
 			w.Header().Set("Content-Length", fmt.Sprint(len(tarBuf)))
@@ -116,8 +115,14 @@ func TestReleaser_FetchAndCacheHit(t *testing.T) {
 }
 
 func TestReleaser_ListLatestTagsFiltersUnrelated(t *testing.T) {
+	// Mimic GitHub's per-page semantics — page=1 returns the data,
+	// page=2+ returns an empty array. The pagination loop relies on
+	// the empty-array signal to terminate.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Shepherd's own server tags mixed with our singbox flavor tags.
+		if r.URL.Query().Get("page") != "1" {
+			_ = json.NewEncoder(w).Encode([]map[string]any{})
+			return
+		}
 		releases := []map[string]any{
 			{"tag_name": "v0.7.6"},
 			{"tag_name": "singbox-v1.13.10-v2rayapi"},
@@ -137,6 +142,42 @@ func TestReleaser_ListLatestTagsFiltersUnrelated(t *testing.T) {
 	want := []string{"1.13.10", "1.13.9"}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("ListLatestTags = %v, want %v", got, want)
+	}
+}
+
+// Production regression: the singbox release was buried at position ~23
+// in the /releases listing after ~10 intervening Shepherd vX.Y.Z tags.
+// The old single-page fetch (per_page≈20) couldn't see it and returned
+// []. This test sets up exactly that shape: 20 unrelated Shepherd tags
+// on page 1, the actual singbox tag on page 2.
+func TestReleaser_ListLatestTagsPaginatesPastUnrelatedTags(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		page := r.URL.Query().Get("page")
+		switch page {
+		case "1":
+			// 20 Shepherd server tags — none match the singbox filter
+			releases := make([]map[string]any, 20)
+			for i := range releases {
+				releases[i] = map[string]any{"tag_name": "v0.7." + strconv.Itoa(i)}
+			}
+			_ = json.NewEncoder(w).Encode(releases)
+		case "2":
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"tag_name": "singbox-v1.13.12-v2rayapi"},
+			})
+		default:
+			_ = json.NewEncoder(w).Encode([]map[string]any{})
+		}
+	}))
+	defer srv.Close()
+
+	rel := &Releaser{BaseURL: srv.URL, Repo: "example/repo", HTTP: srv.Client()}
+	got, err := rel.ListLatestTags(context.Background(), 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(got) != fmt.Sprint([]string{"1.13.12"}) {
+		t.Errorf("ListLatestTags = %v, want [1.13.12] (must paginate past page-1 of non-matches)", got)
 	}
 }
 

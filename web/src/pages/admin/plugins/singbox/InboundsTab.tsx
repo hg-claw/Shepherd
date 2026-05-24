@@ -331,9 +331,14 @@ export default function InboundsTab() {
                 {inbounds.map((i) => {
                   const dep = dependentsByLandingID.get(i.id) ?? 0
                   const isLanding = i.role === 'landing'
-                  const shareURL = isLanding
-                    ? buildSingboxShareURL(i, hostname)
-                    : null
+                  // Relays get their own copyable share URL — clients
+                  // connect directly to the relay's host:port and use
+                  // the relay's OWN credentials (uuid / public_key /
+                  // short_id were generated in BulkRelayDialog at
+                  // relay-create time, not copied from the landing).
+                  // Pre-fix the build was gated to landings only and
+                  // the Copy URL button always disabled for relay rows.
+                  const shareURL = buildSingboxShareURL(i, hostname)
                   const urlSupported = SINGBOX_URL_PROTOCOLS.has(i.protocol)
                   const canCopyURL = urlSupported && !!shareURL
                   const copyTitle = canCopyURL

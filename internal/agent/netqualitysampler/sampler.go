@@ -121,16 +121,38 @@ func (s *Sampler) Run(ctx context.Context) {
 	}
 }
 
-// tick runs one round: ping each target sequentially, build samples,
-// emit one batch. Sequential rather than parallel because (a) the burst
-// itself is bounded by the timeout and (b) parallel ICMP flood fan-out
-// trips some IDS / hosting providers.
+// tick runs one round: ping every target in parallel (bounded fan-out),
+// build samples, emit one batch.
+//
+// Pre-fix this was sequential: 19 targets × up to 12s per timed-out
+// burst = 228s worst case, so a 60s sample_interval couldn't keep up
+// and the operator saw "1 min set, points every ~3 min" in production.
+// Parallelising bounds the round to roughly the slowest single target
+// regardless of count. Each pinger uses its own ICMP socket so they
+// don't contend on a shared resource; the "ICMP flood" concern that
+// motivated the old sequential design only applies to mass packets at
+// ONE destination, which is the opposite of what we're doing.
+//
+// Concurrency cap is 16 so a host configured with 100+ custom targets
+// still won't open hundreds of raw sockets at once.
 func (s *Sampler) tick(ctx context.Context, cfg agentapi.NetqualityConfig) {
 	now := time.Now().UTC()
-	samples := make([]agentapi.NetqualitySample, 0, len(cfg.Targets))
-	for _, t := range cfg.Targets {
-		samples = append(samples, s.probe(ctx, t, now))
+	samples := make([]agentapi.NetqualitySample, len(cfg.Targets))
+
+	const maxParallel = 16
+	sem := make(chan struct{}, maxParallel)
+	var wg sync.WaitGroup
+	for i, tgt := range cfg.Targets {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(idx int, t agentapi.NetqualityTarget) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			samples[idx] = s.probe(ctx, t, now)
+		}(i, tgt)
 	}
+	wg.Wait()
+
 	env, err := agentapi.Frame(agentapi.TypeNetqualityBatch, agentapi.NetqualityBatch{Samples: samples})
 	if err != nil {
 		log.Printf("netqualitysampler: frame error: %v", err)

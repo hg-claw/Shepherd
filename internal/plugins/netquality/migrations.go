@@ -23,6 +23,7 @@ func loadMigrations(driver shepdb.Driver) []plugins.Migration {
 	names := []string{
 		"0001_netquality.up.sql",
 		"0002_host_targets.up.sql",
+		"0003_swap_bad_anchors.up.sql",
 	}
 	subdir := "sqlite"
 	if driver == shepdb.DriverPostgres {

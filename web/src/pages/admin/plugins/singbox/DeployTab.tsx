@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Play, Square, RotateCw, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -98,7 +98,19 @@ function RedeployButton({ serverID, deployedVersion }: { serverID: number; deplo
 function DeployButton({ serverID, versions }: { serverID: number; versions: string[] }) {
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
+  // useState initializer fires once at mount. When the parent renders us
+  // before fetchSingboxVersions resolved (the common case for a "not
+  // deployed" row visible immediately on tab open), versions[0] is
+  // undefined → version starts as "" → Deploy stays disabled even after
+  // the versions list lands. Sync via effect so the first version
+  // becomes the default once available; operator can still override
+  // from the dropdown before clicking Deploy.
   const [version, setVersion] = useState<string>(versions[0] ?? '')
+  useEffect(() => {
+    if (!version && versions[0]) {
+      setVersion(versions[0])
+    }
+  }, [versions, version])
   const deploy = useMutation({
     mutationFn: () => patchSingboxServerVersion(serverID, version),
     onSuccess: () => {

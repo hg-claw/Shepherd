@@ -94,6 +94,15 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const isEdit = !!initial
+  // Relays have a different shape from landings: they're created by
+  // BulkRelayDialog and store the relay-side keys, NOT the landing-side
+  // handshake server / private key (those are landing-only concepts in
+  // our model — see render.go renderVlessReality). Treating a relay
+  // like a landing during edit overwrote the relay's NULL columns with
+  // dialog defaults ('', '443'), which the renderer then emitted into
+  // the config and broke the relay. Detect role and adapt: hide the
+  // landing-only fields and skip them in the patch body.
+  const isRelayEdit = isEdit && initial!.role === 'relay'
 
   // ── Certs ──
   const { data: certs = [] } = useQuery({
@@ -161,8 +170,13 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
         }
         body.reality_public_key        = pubKey
         body.reality_short_id          = shortID
-        body.reality_handshake_server  = hsServer
-        body.reality_handshake_port    = Number(hsPort)
+        // Skip the landing-only handshake fields when editing a relay
+        // — relays don't have these in our schema and overwriting
+        // with the dialog's empty defaults corrupts the row.
+        if (!isRelayEdit) {
+          body.reality_handshake_server  = hsServer
+          body.reality_handshake_port    = Number(hsPort)
+        }
       }
       if (needsSS(protocol)) {
         body.ss_method   = ssMethod
@@ -222,10 +236,21 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
         <DialogHeader>
           <DialogTitle className="font-mono">
             {isEdit ? `Edit — ${initial!.tag}` : 'New inbound'}
+            {isRelayEdit && (
+              <span className="ml-2 text-[10px] uppercase tracking-wider text-warn font-sans align-middle">
+                relay · limited
+              </span>
+            )}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3 py-1">
+          {isRelayEdit && (
+            <div className="rounded border border-warn/50 bg-warn/10 px-2.5 py-1.5 text-[11.5px] text-warn">
+              Editing a relay. Handshake server / port are inherited from the upstream landing
+              and not editable here — change them on the landing inbound to propagate.
+            </div>
+          )}
           {/* ── Port + Protocol ── */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -298,8 +323,9 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                 </p>
               </div>
 
-              {/* Short ID */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Short ID + Handshake host (handshake hidden for relays —
+                  not part of their schema). */}
+              <div className={isRelayEdit ? '' : 'grid grid-cols-2 gap-3'}>
                 <div>
                   <Label className={labelCls} htmlFor="ib-sid">Short ID</Label>
                   <div className="flex gap-2">
@@ -309,21 +335,24 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                       onClick={genShortID}>Gen</Button>
                   </div>
                 </div>
-                <div>
-                  {/* Handshake server */}
-                  <Label className={labelCls} htmlFor="ib-hs">Handshake host</Label>
-                  <Input id="ib-hs" className={inputCls}
-                    value={hsServer} onChange={(e) => setHSServer(e.target.value)}
-                    placeholder="www.apple.com" />
-                </div>
+                {!isRelayEdit && (
+                  <div>
+                    <Label className={labelCls} htmlFor="ib-hs">Handshake host</Label>
+                    <Input id="ib-hs" className={inputCls}
+                      value={hsServer} onChange={(e) => setHSServer(e.target.value)}
+                      placeholder="www.apple.com" />
+                  </div>
+                )}
               </div>
 
-              <div>
-                <Label className={labelCls} htmlFor="ib-hp">Handshake port</Label>
-                <Input id="ib-hp" className={inputCls + ' w-28'}
-                  value={hsPort} onChange={(e) => setHSPort(e.target.value)}
-                  placeholder="443" />
-              </div>
+              {!isRelayEdit && (
+                <div>
+                  <Label className={labelCls} htmlFor="ib-hp">Handshake port</Label>
+                  <Input id="ib-hp" className={inputCls + ' w-28'}
+                    value={hsPort} onChange={(e) => setHSPort(e.target.value)}
+                    placeholder="443" />
+                </div>
+              )}
             </>
           )}
 

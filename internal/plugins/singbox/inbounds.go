@@ -37,6 +37,14 @@ type Inbound struct {
 	AlterID                *int64     `db:"alter_id"`
 	SSMethod               *string    `db:"ss_method"`
 	UpstreamInboundID      *int64     `db:"upstream_inbound_id"`
+	// RelayMode is meaningful only when Role=="relay":
+	//   "proxy"   = legacy dual-termination (relay has its own keys)
+	//   "forward" = transparent forwarder via sing-box "direct" inbound
+	//               (no per-relay keys, client uses landing's URL with
+	//               relay's IP:port).
+	// On landings the column carries the DB default "proxy" but is ignored
+	// by render. Set-once at insert; immutable via Patch.
+	RelayMode              string     `db:"relay_mode"`
 	ExtraJSON              *string    `db:"extra_json"` // raw JSON text; *string, not []byte
 	CreatedAt              time.Time  `db:"created_at"`
 	UpdatedAt              time.Time  `db:"updated_at"`
@@ -110,6 +118,11 @@ func (s *InboundStore) Insert(ctx context.Context, in Inbound) (int64, error) {
 	if in.Tag == "" {
 		in.Tag = s.GenerateTag(in.Role)
 	}
+	if in.RelayMode == "" {
+		// Match the DB-side DEFAULT so the Scan path back into the
+		// Inbound struct reads the same value the caller saw written.
+		in.RelayMode = "proxy"
+	}
 	now := s.now()
 	var id int64
 	if err := s.DB.QueryRowxContext(ctx, `
@@ -119,16 +132,16 @@ func (s *InboundStore) Insert(ctx context.Context, in Inbound) (int64, error) {
 		  reality_private_key, reality_public_key, reality_short_id,
 		  reality_handshake_server, reality_handshake_port,
 		  transport_path, transport_host, alter_id, ss_method,
-		  upstream_inbound_id, extra_json,
+		  upstream_inbound_id, relay_mode, extra_json,
 		  created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5, $6,$7,$8,$9,$10, $11,$12,$13, $14,$15, $16,$17,$18,$19, $20,$21, $22,$23)
+		) VALUES ($1,$2,$3,$4,$5, $6,$7,$8,$9,$10, $11,$12,$13, $14,$15, $16,$17,$18,$19, $20,$21,$22, $23,$24)
 		RETURNING id`,
 		in.ServerID, in.Tag, in.Port, in.Role, in.Protocol,
 		in.UUID, in.Flow, in.Password, in.SNI, in.CertID,
 		in.RealityPrivateKey, in.RealityPublicKey, in.RealityShortID,
 		in.RealityHandshakeServer, in.RealityHandshakePort,
 		in.TransportPath, in.TransportHost, in.AlterID, in.SSMethod,
-		in.UpstreamInboundID, in.ExtraJSON,
+		in.UpstreamInboundID, in.RelayMode, in.ExtraJSON,
 		now, now).Scan(&id); err != nil {
 		return 0, err
 	}
@@ -161,7 +174,7 @@ func (s *InboundStore) ListAllWithUpstream(ctx context.Context) ([]InboundView, 
 		  i.reality_private_key, i.reality_public_key, i.reality_short_id,
 		  i.reality_handshake_server, i.reality_handshake_port,
 		  i.transport_path, i.transport_host, i.alter_id, i.ss_method,
-		  i.upstream_inbound_id, i.extra_json,
+		  i.upstream_inbound_id, i.relay_mode, i.extra_json,
 		  i.created_at, i.updated_at,
 		  s.name                    AS server_name,
 		  u.tag                     AS upstream_tag,

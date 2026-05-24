@@ -87,11 +87,17 @@ function newDraft(
   return draft
 }
 
+type RelayMode = 'forward' | 'proxy'
+
 // Build the createSingboxInbound body for a relay draft, inheriting
-// protocol-specific fields from the landing.
+// protocol-specific fields from the landing. In "forward" mode the
+// server renders a transparent direct inbound that NATs traffic to the
+// landing — no keys, no double encryption — and ignores all protocol-
+// secret fields on the relay row, so we don't send any of them.
 function buildRelayBody(
   d: RelayDraft,
   landing: SingboxInbound,
+  mode: RelayMode,
 ): CreateSingboxInboundBody {
   const proto = landing.protocol
   const base: CreateSingboxInboundBody = {
@@ -100,7 +106,9 @@ function buildRelayBody(
     role: 'relay',
     protocol: proto,
     upstream_inbound_id: landing.id,
+    relay_mode: mode,
   }
+  if (mode === 'forward') return base
 
   if (proto === 'vless-reality') {
     return {
@@ -225,6 +233,12 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
 
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [drafts, setDrafts] = useState<Map<number, RelayDraft>>(new Map())
+  // Relay forwarding mode. Default to "forward" — transparent NAT to
+  // the landing, no per-relay keys, no double encryption. Keep "proxy"
+  // available for the rare case where the operator wants the relay to
+  // terminate the protocol with its own credentials (legacy v0.8.x
+  // behaviour).
+  const [mode, setMode] = useState<RelayMode>('forward')
 
   const toggle = (s: { id: number; name: string }) => {
     // Refuse to flip existing-relay rows. They appear checked + locked;
@@ -259,8 +273,10 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
     })
   }
 
-  // Eager fill on selection for vless-reality (defensive against the "click Deploy All before keys arrive" race)
-  if (needsX25519(proto)) {
+  // Eager fill on selection for vless-reality (defensive against the
+  // "click Deploy All before keys arrive" race). Skipped in forward
+  // mode because forward relays don't have keys.
+  if (mode === 'proxy' && needsX25519(proto)) {
     for (const [id, d] of drafts) {
       if (!d.privateKey || !d.publicKey || !d.shortID) {
         void regenKeys(id); break
@@ -274,12 +290,12 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
       let ok = 0, fail = 0
       for (const id of ids) {
         const d = drafts.get(id)!
-        if (needsX25519(proto) && (!d.privateKey || !d.publicKey || !d.shortID)) {
+        if (mode === 'proxy' && needsX25519(proto) && (!d.privateKey || !d.publicKey || !d.shortID)) {
           await regenKeys(id)
         }
         const refresh = drafts.get(id)!
         try {
-          await createSingboxInbound(buildRelayBody(refresh, landingInbound))
+          await createSingboxInbound(buildRelayBody(refresh, landingInbound, mode))
           ok++
           toast('success', `Deployed relay on ${d.serverName}`)
         } catch (e: any) {
@@ -310,6 +326,35 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
         </DialogHeader>
 
         <div className="space-y-3">
+          <div>
+            <Label className="text-[12px]">Mode</Label>
+            <div className="mt-1 flex gap-1 text-[12px]">
+              <Button
+                type="button"
+                size="sm"
+                variant={mode === 'forward' ? 'default' : 'outline'}
+                className="h-7"
+                onClick={() => setMode('forward')}
+              >
+                Forward (transparent NAT)
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={mode === 'proxy' ? 'default' : 'outline'}
+                className="h-7"
+                onClick={() => setMode('proxy')}
+              >
+                Proxy (per-relay keys)
+              </Button>
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {mode === 'forward'
+                ? 'Relay just NATs traffic to the landing. Client uses the landing’s URL with the relay’s IP:port. No per-relay keys, no double encryption — cheaper and the same URL works for every IP.'
+                : 'Relay terminates the protocol with its own keys and re-encapsulates to the landing. Each relay gets a unique share URL. Use this when you specifically want per-relay credentials for revocation.'}
+            </p>
+          </div>
+
           <div>
             <Label className="text-[12px]">Target servers</Label>
             <div className="mt-1 rounded-md border bg-elev max-h-64 overflow-y-auto">
@@ -351,7 +396,7 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
                             const m = new Map(prev); m.set(s.id, { ...d, port: Number(e.target.value) }); return m
                           })}
                           className="h-7 w-24 font-mono" />
-                        {needsX25519(proto) && (
+                        {mode === 'proxy' && needsX25519(proto) && (
                           <>
                             <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]"
                               onClick={(e) => { e.preventDefault(); void regenKeys(s.id) }}>↻ keys</Button>

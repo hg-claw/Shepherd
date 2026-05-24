@@ -3,6 +3,7 @@ package singbox
 import (
 	"database/sql"
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -636,6 +637,89 @@ func TestRender_SS2022(t *testing.T) {
 }
 
 // ── Relay outbound tests ─────────────────────────────────────────────────────
+
+// Forward-mode relays render a sing-box "direct" inbound with
+// override_address/port pointing at the landing; no per-relay outbound
+// is emitted; routing sends the inbound to the built-in "direct"
+// outbound. The point of this test is the absence of crypto: the
+// rendered config has no users / keys / sni for the relay row, just a
+// listen → override.
+func TestRender_ForwardRelay_EmitsDirectInbound(t *testing.T) {
+	landing := mkVlessRealityLanding()
+	upID := int64(1)
+	relay := InboundView{
+		Inbound: Inbound{
+			ID: 200, ServerID: 2, Tag: "relay-forward1", Port: 7443,
+			Role: "relay", Protocol: "vless-reality",
+			RelayMode:         "forward",
+			UpstreamInboundID: &upID,
+		},
+		ServerName:         "s2",
+		UpstreamTag:        sql.NullString{String: "landing-a1b2c3d4", Valid: true},
+		UpstreamPort:       sql.NullInt64{Int64: 443, Valid: true},
+		UpstreamServerID:   sql.NullInt64{Int64: 1, Valid: true},
+		UpstreamServerName: sql.NullString{String: "s1", Valid: true},
+		UpstreamAddress:    sql.NullString{String: "203.0.113.10", Valid: true},
+	}
+	cfg, err := RenderServerConfig([]InboundView{landing, relay}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out map[string]any
+	_ = json.Unmarshal(cfg, &out)
+
+	inbounds := out["inbounds"].([]any)
+	var relayIB map[string]any
+	for _, ib := range inbounds {
+		m := ib.(map[string]any)
+		if m["tag"] == "relay-forward1" {
+			relayIB = m
+		}
+	}
+	if relayIB == nil {
+		t.Fatal("forward relay inbound missing")
+	}
+	if relayIB["type"] != "direct" {
+		t.Errorf("type=%v, want direct", relayIB["type"])
+	}
+	if relayIB["override_address"] != "203.0.113.10" {
+		t.Errorf("override_address=%v, want 203.0.113.10", relayIB["override_address"])
+	}
+	if int(relayIB["override_port"].(float64)) != 443 {
+		t.Errorf("override_port=%v, want 443", relayIB["override_port"])
+	}
+	// No vless protocol carry-over.
+	if _, has := relayIB["users"]; has {
+		t.Errorf("forward relay must not render users[]; got %v", relayIB["users"])
+	}
+	if _, has := relayIB["tls"]; has {
+		t.Errorf("forward relay must not render tls block")
+	}
+
+	// No per-relay outbound. Just landing's direct + block.
+	for _, o := range out["outbounds"].([]any) {
+		om := o.(map[string]any)
+		if tag, _ := om["tag"].(string); strings.HasPrefix(tag, "to-") {
+			t.Errorf("forward relay should not produce a to-* outbound; got %v", tag)
+		}
+	}
+
+	// Route rule sends the inbound to the built-in direct outbound.
+	rules := out["route"].(map[string]any)["rules"].([]any)
+	var found bool
+	for _, r := range rules {
+		m := r.(map[string]any)
+		if ins, ok := m["inbound"].([]any); ok && len(ins) > 0 && ins[0] == "relay-forward1" {
+			if m["outbound"] != "direct" {
+				t.Errorf("forward relay routes to %v, want direct", m["outbound"])
+			}
+			found = true
+		}
+	}
+	if !found {
+		t.Error("no route rule for forward relay inbound")
+	}
+}
 
 func TestRender_VlessRealityRelay(t *testing.T) {
 	landing := mkVlessRealityLanding()

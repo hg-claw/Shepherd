@@ -22,6 +22,7 @@ func loadMigrations(driver shepdb.Driver) []plugins.Migration {
 		"0003_singbox_traffic.up.sql",
 		"0004_singbox_certificates.up.sql",
 		"0005_singbox_cert_challenge_type.up.sql",
+		"0006_relay_mode.up.sql",
 	}
 	subdir := "sqlite"
 	if driver == shepdb.DriverPostgres {

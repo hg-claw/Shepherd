@@ -295,6 +295,7 @@ export interface SingboxInbound {
   upstream_tag?: string | null
   upstream_server_id?: number | null
   upstream_server_name?: string | null
+  relay_mode?: 'proxy' | 'forward'
   created_at: string
   updated_at: string
 }
@@ -322,6 +323,12 @@ export interface CreateSingboxInboundBody {
   cert_id?: number
   extra_json?: string
   upstream_inbound_id?: number
+  // Honoured only when role='relay'. "proxy" = legacy dual-termination
+  // (relay has its own keys, re-encapsulates to landing). "forward" =
+  // transparent sing-box "direct" inbound — no per-relay keys, client
+  // uses landing's URL with relay's IP:port. Default server-side is
+  // "proxy" for backward compat; new UI defaults to "forward".
+  relay_mode?: 'proxy' | 'forward'
 }
 
 export interface PatchSingboxInboundBody {

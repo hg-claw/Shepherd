@@ -56,6 +56,11 @@ type postInboundBody struct {
 	SSMethod               *string `json:"ss_method"`
 	Extra                  *string `json:"extra"`
 	UpstreamInboundID      *int64  `json:"upstream_inbound_id"`
+	// RelayMode is honored only when role="relay". Values: "proxy"
+	// (legacy dual-termination), "forward" (transparent sing-box
+	// direct inbound). Empty defaults to "proxy" for backward
+	// compatibility with existing clients.
+	RelayMode              string  `json:"relay_mode"`
 }
 
 func writeJSON(w http.ResponseWriter, code int, body any) {
@@ -149,6 +154,7 @@ func inboundToMap(v InboundView) map[string]any {
 		"ss_method":               v.SSMethod,
 		"extra_json":              v.ExtraJSON,
 		"upstream_inbound_id":     v.UpstreamInboundID,
+		"relay_mode":              v.RelayMode,
 		"created_at":              v.CreatedAt,
 		"updated_at":              v.UpdatedAt,
 	}
@@ -198,6 +204,7 @@ func postInboundHandler(deps plugins.Deps) http.HandlerFunc {
 			SSMethod:               body.SSMethod,
 			ExtraJSON:              body.Extra,
 			UpstreamInboundID:      body.UpstreamInboundID,
+			RelayMode:              body.RelayMode,
 		}
 		id, err := store.Insert(r.Context(), in)
 		if err != nil {

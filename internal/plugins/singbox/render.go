@@ -62,15 +62,28 @@ func RenderServerConfig(inbounds []InboundView, certs []CertView) ([]byte, error
 			if !in.UpstreamTag.Valid {
 				return nil, fmt.Errorf("relay %s missing upstream JOIN fields", in.Tag)
 			}
-			ob, err := renderRelayOutbound(in)
-			if err != nil {
-				return nil, fmt.Errorf("relay outbound %s: %w", in.Tag, err)
+			if in.RelayMode == "forward" {
+				// "direct" inbound (rendered in renderInbound below)
+				// override_address/port already point at the landing.
+				// All we need here is a route rule that sends this
+				// inbound's traffic to the built-in "direct" outbound
+				// — no per-relay outbound, no protocol-aware
+				// re-encapsulation. Lighter, no per-relay keys.
+				routeRules = append(routeRules, map[string]any{
+					"inbound":  []any{in.Tag},
+					"outbound": "direct",
+				})
+			} else {
+				ob, err := renderRelayOutbound(in)
+				if err != nil {
+					return nil, fmt.Errorf("relay outbound %s: %w", in.Tag, err)
+				}
+				outbounds = append(outbounds, ob)
+				routeRules = append(routeRules, map[string]any{
+					"inbound":  []any{in.Tag},
+					"outbound": "to-" + in.UpstreamTag.String,
+				})
 			}
-			outbounds = append(outbounds, ob)
-			routeRules = append(routeRules, map[string]any{
-				"inbound":  []any{in.Tag},
-				"outbound": "to-" + in.UpstreamTag.String,
-			})
 		}
 	}
 
@@ -161,11 +174,28 @@ func RenderServerConfig(inbounds []InboundView, certs []CertView) ([]byte, error
 }
 
 // renderInbound dispatches to the per-protocol renderer.
+//
+// Forward-mode relays short-circuit the protocol switch: they emit a
+// sing-box "direct" inbound whose override_address/port point at the
+// landing's server:port. The client connecting to this relay sees raw
+// bytes forwarded to the landing — no protocol parsing, no per-relay
+// keys, no double encryption. The route rule in RenderServerConfig
+// sends the inbound's traffic to the built-in "direct" outbound.
 func renderInbound(in InboundView, certsByID map[int64]CertView) (map[string]any, error) {
 	base := map[string]any{
 		"tag":         in.Tag,
 		"listen":      "::",
 		"listen_port": in.Port,
+	}
+	if in.Role == "relay" && in.RelayMode == "forward" {
+		if !in.UpstreamAddress.Valid || !in.UpstreamPort.Valid {
+			return nil, fmt.Errorf("forward relay %s: upstream address/port missing", in.Tag)
+		}
+		base["type"] = "direct"
+		base["override_address"] = in.UpstreamAddress.String
+		base["override_port"] = in.UpstreamPort.Int64
+		// network field omitted = both TCP+UDP.
+		return base, nil
 	}
 	switch in.Protocol {
 	case "vless-reality":

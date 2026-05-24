@@ -1,0 +1,13 @@
+-- relay_mode picks how the relay forwards traffic:
+--   'proxy'   = legacy: relay terminates the protocol (own keys), re-
+--               encapsulates to landing as a vless/trojan/etc outbound
+--   'forward' = new default: relay is a transparent dokodemo-style
+--               forwarder (sing-box "direct" inbound with
+--               override_address/port). Client uses LANDING's URL
+--               with the relay's IP:port — no per-relay keys, no
+--               double encryption, lower CPU.
+--
+-- Existing rows keep 'proxy' (backward compat); new relays choose at
+-- create time via the BulkRelayDialog mode toggle. Field is set-once at
+-- insert — switching modes after the fact means redeploying.
+ALTER TABLE singbox_inbounds ADD COLUMN relay_mode TEXT NOT NULL DEFAULT 'proxy';

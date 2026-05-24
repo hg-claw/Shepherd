@@ -74,6 +74,10 @@ describe('singbox/BulkRelayDialog', () => {
   it('calls createSingboxInbound with role=relay + upstream_inbound_id for vless-reality', async () => {
     wrap(<BulkRelayDialog open={true} onOpenChange={() => {}}
       landingInbound={landingVlessReality} allInbounds={[landingVlessReality]} />)
+    // The dialog now defaults to "forward" mode (transparent NAT, no
+    // per-relay keys). These older tests assert the legacy proxy-mode
+    // body shape, so flip to "Proxy" first.
+    fireEvent.click(await screen.findByRole('button', { name: /proxy.*per-relay/i }))
     fireEvent.click(await screen.findByLabelText(/select osaka-1/))
     fireEvent.click(screen.getByRole('button', { name: /deploy all/i }))
     await waitFor(() => {
@@ -92,6 +96,10 @@ describe('singbox/BulkRelayDialog', () => {
   it('calls createSingboxInbound with password for trojan-tls, inheriting sni + cert_id', async () => {
     wrap(<BulkRelayDialog open={true} onOpenChange={() => {}}
       landingInbound={landingTrojanTLS} allInbounds={[landingTrojanTLS]} />)
+    // The dialog now defaults to "forward" mode (transparent NAT, no
+    // per-relay keys). These older tests assert the legacy proxy-mode
+    // body shape, so flip to "Proxy" first.
+    fireEvent.click(await screen.findByRole('button', { name: /proxy.*per-relay/i }))
     fireEvent.click(await screen.findByLabelText(/select osaka-1/))
     fireEvent.click(screen.getByRole('button', { name: /deploy all/i }))
     await waitFor(() => {
@@ -110,9 +118,39 @@ describe('singbox/BulkRelayDialog', () => {
     expect(call.uuid).toBeUndefined()
   })
 
+  it('forward mode (default): sends only port+role+protocol+upstream+relay_mode, no keys', async () => {
+    // New default. Forward relays don't have per-row credentials at
+    // all — the server renders a direct inbound that NATs to the
+    // landing. Confirm the body is minimal.
+    wrap(<BulkRelayDialog open={true} onOpenChange={() => {}}
+      landingInbound={landingVlessReality} allInbounds={[landingVlessReality]} />)
+    fireEvent.click(await screen.findByLabelText(/select osaka-1/))
+    fireEvent.click(screen.getByRole('button', { name: /deploy all/i }))
+    await waitFor(() => {
+      expect(pluginsAPI.createSingboxInbound).toHaveBeenCalledTimes(1)
+    })
+    const call = (pluginsAPI.createSingboxInbound as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(call.relay_mode).toBe('forward')
+    expect(call.role).toBe('relay')
+    expect(call.upstream_inbound_id).toBe(landingVlessReality.id)
+    expect(call.protocol).toBe('vless-reality')
+    // Forward relays must not carry credentials.
+    expect(call.uuid).toBeUndefined()
+    expect(call.reality_public_key).toBeUndefined()
+    expect(call.reality_private_key).toBeUndefined()
+    expect(call.reality_short_id).toBeUndefined()
+    expect(call.sni).toBeUndefined()
+    expect(call.password).toBeUndefined()
+    expect(call.ss_password).toBeUndefined()
+  })
+
   it('calls createSingboxInbound with new ss_password for shadowsocks-2022, inheriting ss_method', async () => {
     wrap(<BulkRelayDialog open={true} onOpenChange={() => {}}
       landingInbound={landingShadowsocks} allInbounds={[landingShadowsocks]} />)
+    // The dialog now defaults to "forward" mode (transparent NAT, no
+    // per-relay keys). These older tests assert the legacy proxy-mode
+    // body shape, so flip to "Proxy" first.
+    fireEvent.click(await screen.findByRole('button', { name: /proxy.*per-relay/i }))
     fireEvent.click(await screen.findByLabelText(/select osaka-1/))
     fireEvent.click(screen.getByRole('button', { name: /deploy all/i }))
     await waitFor(() => {

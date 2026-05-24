@@ -203,6 +203,16 @@ export default function InboundsTab() {
     return m
   }, [inboundsQ.data])
 
+  // Inbound by id for forward-relay URL building: a forward relay's
+  // share URL is the LANDING's protocol config with the relay's
+  // hostname:port substituted, since the relay carries no per-row
+  // secrets in forward mode.
+  const inboundByID = useMemo(() => {
+    const m = new Map<number, SingboxInbound>()
+    for (const i of inboundsQ.data ?? []) m.set(i.id, i)
+    return m
+  }, [inboundsQ.data])
+
   // PluginHost lookup for singbox version + process status
   const hostByServer = useMemo(() => {
     const m = new Map<number, PluginHost>()
@@ -331,14 +341,27 @@ export default function InboundsTab() {
                 {inbounds.map((i) => {
                   const dep = dependentsByLandingID.get(i.id) ?? 0
                   const isLanding = i.role === 'landing'
-                  // Relays get their own copyable share URL — clients
-                  // connect directly to the relay's host:port and use
-                  // the relay's OWN credentials (uuid / public_key /
-                  // short_id were generated in BulkRelayDialog at
-                  // relay-create time, not copied from the landing).
-                  // Pre-fix the build was gated to landings only and
-                  // the Copy URL button always disabled for relay rows.
-                  const shareURL = buildSingboxShareURL(i, hostname)
+                  // Share URL construction:
+                  // - landing → URL from the landing's own credentials
+                  //   + landing's hostname:port
+                  // - proxy-mode relay → URL from the relay's own
+                  //   credentials (generated at create-time) + relay's
+                  //   hostname:port
+                  // - forward-mode relay → URL from the LANDING's
+                  //   credentials + relay's hostname:port (the client
+                  //   ultimately terminates with the landing — the
+                  //   relay is a transparent NAT)
+                  let urlSource = i
+                  if (i.role === 'relay' && i.relay_mode === 'forward' && i.upstream_inbound_id != null) {
+                    const landing = inboundByID.get(i.upstream_inbound_id)
+                    if (landing) {
+                      // Synthesise a row that has the landing's secrets
+                      // but the relay's port. host comes from the
+                      // relay's server (the outer loop's `hostname`).
+                      urlSource = { ...landing, port: i.port }
+                    }
+                  }
+                  const shareURL = buildSingboxShareURL(urlSource, hostname)
                   const urlSupported = SINGBOX_URL_PROTOCOLS.has(i.protocol)
                   const canCopyURL = urlSupported && !!shareURL
                   const copyTitle = canCopyURL

@@ -206,10 +206,30 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
     return (serversQ.data ?? []).filter((s) => s.id !== landingInbound.server_id)
   }, [serversQ.data, landingInbound.server_id])
 
+  // server_ids that ALREADY host a relay pointing at this landing.
+  // Pre-fix the dialog rendered every server unchecked on each open,
+  // so an operator who hit "Deploy all" twice ended up trying to
+  // create duplicate relays (DB rejects with a unique-port collision
+  // and the operator sees a confusing failure cascade). Mark these
+  // rows as already-deployed: checkbox locked on, "deployed" badge,
+  // Deploy all skips them.
+  const existingRelayServerIDs = useMemo(() => {
+    const ids = new Set<number>()
+    for (const i of allInbounds) {
+      if (i.role === 'relay' && i.upstream_inbound_id === landingInbound.id) {
+        ids.add(i.server_id)
+      }
+    }
+    return ids
+  }, [allInbounds, landingInbound.id])
+
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [drafts, setDrafts] = useState<Map<number, RelayDraft>>(new Map())
 
   const toggle = (s: { id: number; name: string }) => {
+    // Refuse to flip existing-relay rows. They appear checked + locked;
+    // the operator removes them via the regular inbound Delete instead.
+    if (existingRelayServerIDs.has(s.id)) return
     setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(s.id)) {
@@ -297,21 +317,33 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
                 <p className="px-3 py-4 text-[12px] text-muted-foreground">No eligible servers.</p>
               )}
               {targets.map((s) => {
-                const checked = selected.has(s.id)
+                const alreadyDeployed = existingRelayServerIDs.has(s.id)
+                // Already-deployed rows render as locked checked. Pre-fix
+                // the dialog showed them unchecked, so a second-open Deploy
+                // duplicated relays (and the port-uniqueness check then
+                // cascaded confusing errors). Locked here, the operator
+                // unambiguously sees "this one's already done".
+                const checked = alreadyDeployed || selected.has(s.id)
                 const d = drafts.get(s.id)
                 const taken = portsByServer.get(s.id) ?? new Set<number>()
                 return (
                   <label key={s.id}
                     className="flex items-center gap-3 px-3 py-2 border-b last:border-b-0 text-[12.5px]">
-                    <input type="checkbox" checked={checked} onChange={() => toggle({ id: s.id, name: s.name })}
+                    <input type="checkbox" checked={checked} disabled={alreadyDeployed}
+                      onChange={() => toggle({ id: s.id, name: s.name })}
                       aria-label={`select ${s.name}`} />
                     <span className="font-mono w-32 truncate">{s.name}</span>
+                    {alreadyDeployed && (
+                      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-ok/15 text-ok">
+                        deployed
+                      </span>
+                    )}
                     {taken.size > 0 && (
                       <span className="text-fg-dim text-[10.5px]" title={`used: ${Array.from(taken).join(', ')}`}>
                         {taken.size} port(s) in use
                       </span>
                     )}
-                    {checked && d && (
+                    {checked && !alreadyDeployed && d && (
                       <>
                         <span className="font-mono text-fg-dim">port</span>
                         <Input type="number" value={d.port}

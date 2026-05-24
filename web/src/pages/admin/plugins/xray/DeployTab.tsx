@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Play, Square, RotateCw, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -101,7 +101,17 @@ function DeployButton({ serverID, versions }: { serverID: number; versions: stri
   // Default to the first available (latest) version, but let the admin
   // pick a specific one — useful when the latest is on hold for a
   // compatibility issue and an older known-good version is wanted.
+  //
+  // useState only fires once at mount; when the parent renders us
+  // before fetchXrayVersions resolves, versions[0] is undefined and
+  // version stays "" forever — Deploy button disabled, "not deployed"
+  // rows stuck. Effect-sync once the list arrives.
   const [version, setVersion] = useState<string>(versions[0] ?? '')
+  useEffect(() => {
+    if (!version && versions[0]) {
+      setVersion(versions[0])
+    }
+  }, [versions, version])
   const deploy = useMutation({
     mutationFn: () => patchXrayServerVersion(serverID, version),
     onSuccess: () => {

@@ -28,9 +28,16 @@ const sbLatestTTL = 24 * time.Hour
 
 // sbCachedLatest returns the most recent 5 sing-box release tags, refreshing
 // at most once per sbLatestTTL window.
+//
+// We refuse to cache an EMPTY result. Pre-fix, the first request after a
+// fresh boot would hit a starved ListLatestTags (see release.go header)
+// and store []string{} for 24h — subsequent UI loads then saw "no
+// versions available" with no recourse short of restarting the server.
+// An empty result is treated like a fetch error: don't update the cache,
+// keep retrying every request until something lands.
 func sbCachedLatest(ctx context.Context) []string {
 	sbLatestMu.Lock()
-	if time.Since(sbLatestStamp) < sbLatestTTL {
+	if time.Since(sbLatestStamp) < sbLatestTTL && len(sbLatestVal) > 0 {
 		out := append([]string(nil), sbLatestVal...)
 		sbLatestMu.Unlock()
 		return out
@@ -39,7 +46,7 @@ func sbCachedLatest(ctx context.Context) []string {
 	tags, err := latestFetcherSB(ctx)
 	sbLatestMu.Lock()
 	defer sbLatestMu.Unlock()
-	if err == nil {
+	if err == nil && len(tags) > 0 {
 		sbLatestVal = tags
 		sbLatestStamp = time.Now()
 	}

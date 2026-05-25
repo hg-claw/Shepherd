@@ -121,6 +121,10 @@ export default function ServerList() {
   const [filter, setFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | HostStatus>('all')
   const [selected, setSelected] = useState<Set<number>>(new Set())
+  // CN mirror toggle for the batch update path. Declared here (above
+  // the `if (isLoading) return` early-out) because moving it lower
+  // would change the hook-call count across renders — React #310.
+  const [batchCN, setBatchCN] = useState(false)
   const [view, setView] = useState<'grid' | 'table'>(() => {
     try {
       const v = localStorage.getItem(VIEW_KEY)
@@ -206,10 +210,6 @@ export default function ServerList() {
       toast('error', err?.message ?? t('common.error'))
     }
   }
-
-  // CN mirror toggle for the batch update path. Session-local — flips
-  // back to off after every batch (operator opts in per action).
-  const [batchCN, setBatchCN] = useState(false)
 
   const handleBatchUpdate = async () => {
     const ids = Array.from(selected)

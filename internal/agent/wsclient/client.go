@@ -335,6 +335,19 @@ func (c *Client) applyConfig(env agentapi.Envelope, fh *filehandler.Handler) {
 	if err := env.Decode(&u); err != nil {
 		return
 	}
+	// Always log receipt so operators can confirm the frame round-tripped.
+	// We render the LogVerbose pointer explicitly because "nil" and
+	// "*false" mean different things on the apply branch below.
+	verboseRepr := "nil"
+	if u.LogVerbose != nil {
+		if *u.LogVerbose {
+			verboseRepr = "true"
+		} else {
+			verboseRepr = "false"
+		}
+	}
+	log.Printf("ws: ConfigUpdate received (log_verbose=%s telemetry=%d sandbox=%v)",
+		verboseRepr, u.TelemetryIntervalSeconds, u.FileSandboxEnabled != nil)
 	if u.TelemetryIntervalSeconds > 0 {
 		if c.OnConfig != nil {
 			c.OnConfig(u.TelemetryIntervalSeconds)

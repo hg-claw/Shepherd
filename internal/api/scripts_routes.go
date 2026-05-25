@@ -41,6 +41,24 @@ func (a *ScriptsAPI) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, out)
 }
 
+// Get returns a single script by id. The run page fetches this to render
+// the param form; without a GET route the path /api/admin/scripts/{id}
+// only matched PATCH/DELETE, so the GET 405'd and the page hung loading.
+func (a *ScriptsAPI) Get(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	sc, err := a.Store.Get(r.Context(), id)
+	if err != nil {
+		writeError(w, 404, err.Error())
+		return
+	}
+	var params []scriptsvc.Param
+	_ = json.Unmarshal([]byte(sc.ParamsJSON), &params)
+	writeJSON(w, 200, scriptDTO{
+		ID: sc.ID, Name: sc.Name, Description: sc.Description,
+		Content: sc.Content, Params: params, DefaultTimeoutS: sc.DefaultTimeoutS,
+	})
+}
+
 func (a *ScriptsAPI) Create(w http.ResponseWriter, r *http.Request) {
 	var dto scriptDTO
 	if err := decodeJSON(r, &dto); err != nil {

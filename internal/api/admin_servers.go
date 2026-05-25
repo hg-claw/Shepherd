@@ -352,6 +352,10 @@ type scriptInstallReq struct {
 	PublicGroup  string `json:"public_group"`
 	CountryCode  string `json:"country_code"`
 	ShowOnPublic bool   `json:"show_on_public"`
+	// CN routes both the script URL and the install-time release-asset
+	// downloads through https://gh-proxy.com/. Set when the target host
+	// is in mainland China and can't reach github.com directly.
+	CN           bool   `json:"cn"`
 }
 
 // ScriptInstall creates a server row with no SSH credentials (the agent
@@ -388,7 +392,7 @@ func (a *ServersAPI) ScriptInstall(w http.ResponseWriter, r *http.Request) {
 		"server_id":  srv.ID,
 		"token":      tok,
 		"expires_at": exp,
-		"command":    buildInstallCommand(a.BuildVersion, a.PublicURL, tok),
+		"command":    buildInstallCommand(a.BuildVersion, a.PublicURL, tok, in.CN),
 	})
 }
 
@@ -411,11 +415,12 @@ func (a *ServersAPI) InstallCommand(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 500, err.Error())
 		return
 	}
+	cn := r.URL.Query().Get("cn") == "1" || r.URL.Query().Get("cn") == "true"
 	writeJSON(w, 200, map[string]any{
 		"server_id":  id,
 		"token":      tok,
 		"expires_at": exp,
-		"command":    buildInstallCommand(a.BuildVersion, a.PublicURL, tok),
+		"command":    buildInstallCommand(a.BuildVersion, a.PublicURL, tok, cn),
 	})
 }
 
@@ -450,7 +455,10 @@ func (a *ServersAPI) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 500, err.Error())
 		return
 	}
-	cmd := buildInstallCommand(a.BuildVersion, a.PublicURL, tok)
+	// Optional ?cn=1 to route the update through the gh-proxy mirror.
+	// Doesn't persist anywhere — each update call passes its own flag.
+	cn := r.URL.Query().Get("cn") == "1" || r.URL.Query().Get("cn") == "true"
+	cmd := buildInstallCommand(a.BuildVersion, a.PublicURL, tok, cn)
 	// Fire-and-forget: the install script restarts the agent service which
 	// kills the WS connection. Reading the result would block forever.
 	go func() {
@@ -466,6 +474,9 @@ func (a *ServersAPI) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 
 type batchUpdateReq struct {
 	ServerIDs []int64 `json:"server_ids"`
+	// CN routes every spawned install through the gh-proxy mirror.
+	// Pass once per batch; applies to every server in the request.
+	CN        bool    `json:"cn"`
 }
 
 type batchUpdateResult struct {
@@ -521,7 +532,7 @@ func (a *ServersAPI) BatchUpdateAgent(w http.ResponseWriter, r *http.Request) {
 				res.Error = err.Error()
 				return
 			}
-			cmd := buildInstallCommand(a.BuildVersion, a.PublicURL, tok)
+			cmd := buildInstallCommand(a.BuildVersion, a.PublicURL, tok, in.CN)
 			go func() {
 				ctx := context.Background()
 				_, _, _, _ = a.HostExec.RunCmd(ctx, serverID, "sh", "-c", cmd)
@@ -554,16 +565,26 @@ func (a *ServersAPI) BatchUpdateAgent(w http.ResponseWriter, r *http.Request) {
 // own transient unit in a brand-new cgroup, immune to shepherd-agent's
 // teardown. The `setsid` fallback covers hosts without systemd-run
 // (rare — sysvinit, busybox) but isn't as cgroup-robust.
-func buildInstallCommand(buildVersion, publicURL, token string) string {
+func buildInstallCommand(buildVersion, publicURL, token string, cn bool) string {
 	tag := buildVersion
 	if tag == "" || tag == "dev" {
 		tag = "main"
 	}
+	// The script URL itself is github-hosted, so the cn-mirror has to
+	// be applied here too — otherwise the operator can't even download
+	// the installer from a mainland host. The installer's --cn flag
+	// then propagates the prefix to subsequent asset downloads.
 	scriptURL := "https://raw.githubusercontent.com/hg-claw/Shepherd/" + tag + "/scripts/install-agent.sh"
+	if cn {
+		scriptURL = "https://gh-proxy.com/" + scriptURL
+	}
 	inner := "curl -fsSL " + scriptURL +
 		" | sudo bash -s -- --token " + token +
 		" --server " + publicURL +
 		" --version " + tag
+	if cn {
+		inner += " --cn"
+	}
 	// Single-quote wrapping the inner command. Token / URL / version
 	// never contain single quotes in practice (token is base64-ish, URL
 	// from server config, version is a semver tag), and we control all

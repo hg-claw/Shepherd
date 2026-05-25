@@ -51,6 +51,13 @@ MODE=""        # install | uninstall
 TOKEN=""
 SERVER_URL=""
 VERSION=""     # optional override; empty → derived from script URL pinning
+# MIRROR_PREFIX is prepended to every github.com / raw.githubusercontent.com
+# URL we fetch (releases asset, checksum file, etc.). Empty by default; set
+# to a value like "https://gh-proxy.com/" via --cn or --mirror to route
+# through a mainland-friendly proxy. The wrapper appends the original
+# https:// scheme + host + path verbatim (no rewriting), which is what
+# gh-proxy.com and similar relays expect.
+MIRROR_PREFIX=""
 
 parse_args() {
 	MODE="install"
@@ -59,13 +66,34 @@ parse_args() {
 			--token)     TOKEN="$2";      shift 2 ;;
 			--server)    SERVER_URL="$2"; shift 2 ;;
 			--version)   VERSION="$2";    shift 2 ;;
+			--cn)        MIRROR_PREFIX="https://gh-proxy.com/"; shift ;;
+			--mirror)    MIRROR_PREFIX="$2"; shift 2 ;;
 			--uninstall) MODE="uninstall"; shift   ;;
 			*) err "unknown arg: $1"; return 1 ;;
 		esac
 	done
+	# Normalise trailing slash on the mirror prefix so the gh_url helper can
+	# concatenate without thinking about it.
+	if [ -n "$MIRROR_PREFIX" ]; then
+		case "$MIRROR_PREFIX" in
+			*/) ;;
+			*) MIRROR_PREFIX="${MIRROR_PREFIX}/" ;;
+		esac
+	fi
 	if [ "$MODE" = "install" ]; then
 		[ -n "$TOKEN" ]      || { err "--token required"; return 1; }
 		[ -n "$SERVER_URL" ] || { err "--server required"; return 1; }
+	fi
+}
+
+# gh_url wraps a github.com / raw.githubusercontent.com URL with the mirror
+# prefix when one is configured. Untouched URLs pass through unchanged so
+# the same script runs identically without the flag.
+gh_url() {
+	if [ -z "$MIRROR_PREFIX" ]; then
+		echo "$1"
+	else
+		echo "${MIRROR_PREFIX}$1"
 	fi
 }
 
@@ -81,13 +109,15 @@ release_tag() {
 
 asset_url() {
 	local os="$1" arch="$2" tag="$3"
+	local u
 	if [ "$os" = "linux" ]; then
 		# Linux release ships server+agent in one tarball.
-		echo "https://github.com/${REPO}/releases/download/${tag}/shepherd-linux-${arch}.tar.gz"
+		u="https://github.com/${REPO}/releases/download/${tag}/shepherd-linux-${arch}.tar.gz"
 	else
 		# Darwin release ships agent-only.
-		echo "https://github.com/${REPO}/releases/download/${tag}/shepherd-agent-${os}-${arch}.tar.gz"
+		u="https://github.com/${REPO}/releases/download/${tag}/shepherd-agent-${os}-${arch}.tar.gz"
 	fi
+	gh_url "$u"
 }
 
 sha256sum_cmd() {

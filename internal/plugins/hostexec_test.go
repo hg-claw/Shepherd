@@ -3,6 +3,8 @@ package plugins
 import (
 	"context"
 	"testing"
+
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 )
 
 // hubExecStub mirrors the production HostExec shape so tests can be sure
@@ -10,6 +12,7 @@ import (
 type hubExecStub struct{}
 
 func (hubExecStub) PushFile(context.Context, int64, string, uint32, []byte) error { return nil }
+func (hubExecStub) FetchURL(context.Context, int64, agentapi.FileFetch) error     { return nil }
 func (hubExecStub) RunCmd(context.Context, int64, string, ...string) ([]byte, []byte, int, error) {
 	return nil, nil, 0, nil
 }

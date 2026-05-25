@@ -218,7 +218,8 @@ func deleteInboundHandler(deps plugins.Deps) http.HandlerFunc {
 }
 
 type patchVersionBody struct {
-	Version string `json:"version"`
+	Version   string `json:"version"`
+	UseMirror bool   `json:"use_mirror,omitempty"`
 }
 
 func patchServerVersionHandler(deps plugins.Deps) http.HandlerFunc {
@@ -248,7 +249,7 @@ func patchServerVersionHandler(deps plugins.Deps) http.HandlerFunc {
 			p := &Plugin{}
 			// DeployToHost fetches binary + pushes binary/unit/restart.
 			// We pass {} as config; AssembleAndDeploy below puts the real config in place.
-			if err := p.DeployToHost(ctx, deps, sid, body.Version, []byte("{}")); err != nil {
+			if err := p.DeployToHost(ctx, deps, sid, body.Version, []byte("{}"), body.UseMirror); err != nil {
 				_, _ = deps.DB.ExecContext(ctx,
 					`UPDATE plugin_hosts SET status='failed', last_error=$1 WHERE plugin_id='xray' AND server_id=$2`,
 					err.Error(), sid)

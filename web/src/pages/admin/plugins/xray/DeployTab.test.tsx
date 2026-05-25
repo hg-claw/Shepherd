@@ -111,7 +111,7 @@ describe('xray/DeployTab', () => {
     const btns = await screen.findAllByText('Re-deploy')
     await user.click(btns[0])
     await waitFor(() => {
-      expect(patchFn).toHaveBeenCalledWith(1, '1.8.11')
+      expect(patchFn).toHaveBeenCalledWith(1, '1.8.11', false)
     })
   })
 })

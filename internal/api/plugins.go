@@ -195,10 +195,11 @@ func (a *PluginsAPI) PutConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 type hostBody struct {
-	ServerID int64           `json:"server_id"`
-	Version  string          `json:"version"`
-	Config   json.RawMessage `json:"config"`
-	Topology json.RawMessage `json:"topology"`
+	ServerID  int64           `json:"server_id"`
+	Version   string          `json:"version"`
+	Config    json.RawMessage `json:"config"`
+	Topology  json.RawMessage `json:"topology"`
+	UseMirror bool            `json:"use_mirror,omitempty"`
 }
 
 func (a *PluginsAPI) ListHosts(w http.ResponseWriter, r *http.Request) {
@@ -257,7 +258,7 @@ func (a *PluginsAPI) PostHost(w http.ResponseWriter, r *http.Request) {
 
 	go func() {
 		ctx := context.Background()
-		if err := ha.DeployToHost(ctx, a.Deps, body.ServerID, body.Version, cfg); err != nil {
+		if err := ha.DeployToHost(ctx, a.Deps, body.ServerID, body.Version, cfg, body.UseMirror); err != nil {
 			_ = a.Store.SetHostStatus(ctx, id, body.ServerID, "failed", body.Version, err.Error())
 			return
 		}

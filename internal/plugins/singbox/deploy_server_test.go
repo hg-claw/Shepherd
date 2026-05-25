@@ -8,13 +8,15 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 )
 
 type fakeSBHostExec struct {
-	pushed map[string][]byte
-	cmds   [][]string
+	pushed  map[string][]byte
+	fetched []agentapi.FileFetch
+	cmds    [][]string
 }
 
 func (f *fakeSBHostExec) PushFile(_ context.Context, _ int64, path string, _ uint32, content []byte) error {
@@ -22,6 +24,11 @@ func (f *fakeSBHostExec) PushFile(_ context.Context, _ int64, path string, _ uin
 		f.pushed = map[string][]byte{}
 	}
 	f.pushed[path] = append([]byte(nil), content...)
+	return nil
+}
+
+func (f *fakeSBHostExec) FetchURL(_ context.Context, _ int64, spec agentapi.FileFetch) error {
+	f.fetched = append(f.fetched, spec)
 	return nil
 }
 

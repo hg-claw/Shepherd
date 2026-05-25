@@ -2,18 +2,19 @@ package xray
 
 import (
 	"context"
-	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/hg-claw/Shepherd/internal/plugins"
-	"path/filepath"
 )
 
 type captureExec struct {
-	pushed []push
-	cmds   [][]string
+	pushed   []push
+	fetched  []agentapi.FileFetch
+	cmds     [][]string
 }
 type push struct {
 	path string
@@ -23,6 +24,10 @@ type push struct {
 
 func (c *captureExec) PushFile(_ context.Context, _ int64, path string, mode uint32, body []byte) error {
 	c.pushed = append(c.pushed, push{path, mode, body})
+	return nil
+}
+func (c *captureExec) FetchURL(_ context.Context, _ int64, spec agentapi.FileFetch) error {
+	c.fetched = append(c.fetched, spec)
 	return nil
 }
 func (c *captureExec) RunCmd(_ context.Context, _ int64, name string, args ...string) ([]byte, []byte, int, error) {
@@ -39,11 +44,26 @@ func (c *captureExec) StreamCmd(context.Context, int64, string, []string, func(s
 	return nil
 }
 
-// fakeReleaser provides a binary "Binary" without actually downloading.
-type fakeReleaser struct{ path string }
+// fakeReleaser returns a canned FetchSpec without hitting GitHub.
+type fakeReleaser struct {
+	url    string
+	sha    string
+	mirror bool
+}
 
-func (f *fakeReleaser) Fetch(_ context.Context, version, osStr, arch string) (Binary, error) {
-	return Binary{Version: version, OS: osStr, Arch: arch, Path: f.path, SizeBytes: 3, Sha256: "deadbeef"}, nil
+func (f *fakeReleaser) ResolveFetchSpec(_ context.Context, version, osStr, arch string, useMirror bool) (agentapi.FileFetch, error) {
+	f.mirror = useMirror
+	u := f.url
+	if u == "" {
+		u = "https://github.com/XTLS/Xray-core/releases/download/v" + version + "/Xray-linux-64.zip"
+	}
+	if useMirror {
+		u = CNMirrorPrefix + u
+	}
+	return agentapi.FileFetch{
+		URL: u, Path: xrayBinaryRemotePathUnix, Mode: 0o755, SHA256: f.sha,
+		Extract: &agentapi.FetchExtract{Kind: "zip", EntryGlob: "xray"},
+	}, nil
 }
 
 func newXrayTestDB(t *testing.T) *plugins.Deps {
@@ -74,26 +94,22 @@ func newXrayTestDBDarwin(t *testing.T) *plugins.Deps {
 	return &plugins.Deps{DB: d}
 }
 
-func TestDeployToHost_PushesBinaryConfigAndUnit(t *testing.T) {
-	// pre-create the fake binary file
-	tmp := t.TempDir() + "/xray-fake"
-	if err := os.WriteFile(tmp, []byte("BIN"), 0755); err != nil {
-		t.Fatal(err)
-	}
-
+func TestDeployToHost_FetchesBinaryAndPushesConfigAndUnit(t *testing.T) {
 	exec := &captureExec{}
 	p := New()
-	p.releaser = &fakeReleaser{path: tmp}
+	p.releaser = &fakeReleaser{}
 	baseDeps := newXrayTestDB(t)
 	baseDeps.HostExec = exec
 	deps := *baseDeps
 
 	cfg := []byte(`{"inbounds":[],"outbounds":[]}`)
-	if err := p.DeployToHost(context.Background(), deps, 1, "1.8.11", cfg); err != nil {
+	if err := p.DeployToHost(context.Background(), deps, 1, "1.8.11", cfg, false); err != nil {
 		t.Fatal(err)
 	}
+	if len(exec.fetched) != 1 || exec.fetched[0].Path != "/usr/local/bin/shepherd-xray" {
+		t.Fatalf("FetchURL not called for binary, got fetched=%v", exec.fetched)
+	}
 	wantPaths := []string{
-		"/usr/local/bin/shepherd-xray",
 		"/etc/shepherd-xray/config.json",
 		"/etc/systemd/system/shepherd-xray.service",
 	}
@@ -102,32 +118,45 @@ func TestDeployToHost_PushesBinaryConfigAndUnit(t *testing.T) {
 			t.Fatalf("push[%d] = %v, want %s", i, exec.pushed[i], want)
 		}
 	}
-	if !strings.Contains(string(exec.pushed[2].body), "shepherd-xray") {
-		t.Fatalf("unit body missing service name: %s", exec.pushed[2].body)
+	if !strings.Contains(string(exec.pushed[1].body), "shepherd-xray") {
+		t.Fatalf("unit body missing service name: %s", exec.pushed[1].body)
+	}
+}
+
+func TestDeployToHost_UseMirror_PassedThrough(t *testing.T) {
+	exec := &captureExec{}
+	p := New()
+	rel := &fakeReleaser{}
+	p.releaser = rel
+	baseDeps := newXrayTestDB(t)
+	baseDeps.HostExec = exec
+	deps := *baseDeps
+
+	if err := p.DeployToHost(context.Background(), deps, 1, "1.8.11", []byte(`{}`), true); err != nil {
+		t.Fatal(err)
+	}
+	if !rel.mirror {
+		t.Fatal("useMirror=true did not propagate to Releaser.ResolveFetchSpec")
+	}
+	if !strings.HasPrefix(exec.fetched[0].URL, CNMirrorPrefix) {
+		t.Errorf("fetched URL = %q, expected to start with %q", exec.fetched[0].URL, CNMirrorPrefix)
 	}
 }
 
 func TestDeployToHost_Darwin_PushesPlistAndLaunchctl(t *testing.T) {
-	tmp := t.TempDir() + "/xray-fake"
-	if err := os.WriteFile(tmp, []byte("BIN"), 0755); err != nil {
-		t.Fatal(err)
-	}
-
 	exec := &captureExec{}
 	p := New()
-	p.releaser = &fakeReleaser{path: tmp}
+	p.releaser = &fakeReleaser{}
 	baseDeps := newXrayTestDBDarwin(t)
 	baseDeps.HostExec = exec
 	deps := *baseDeps
 
 	cfg := []byte(`{"inbounds":[],"outbounds":[]}`)
-	if err := p.DeployToHost(context.Background(), deps, 1, "1.8.11", cfg); err != nil {
+	if err := p.DeployToHost(context.Background(), deps, 1, "1.8.11", cfg, false); err != nil {
 		t.Fatal(err)
 	}
 
-	// Check plist path was pushed (not the .service path)
 	wantPaths := []string{
-		"/usr/local/bin/shepherd-xray",
 		"/etc/shepherd-xray/config.json",
 		"/Library/LaunchDaemons/com.shepherd.xray.plist",
 	}
@@ -137,12 +166,10 @@ func TestDeployToHost_Darwin_PushesPlistAndLaunchctl(t *testing.T) {
 		}
 	}
 
-	// Check plist content contains the label
-	if !strings.Contains(string(exec.pushed[2].body), "com.shepherd.xray") {
-		t.Fatalf("plist body missing label: %s", exec.pushed[2].body)
+	if !strings.Contains(string(exec.pushed[1].body), "com.shepherd.xray") {
+		t.Fatalf("plist body missing label: %s", exec.pushed[1].body)
 	}
 
-	// Check launchctl bootstrap was called
 	foundBootstrap := false
 	for _, cmd := range exec.cmds {
 		if len(cmd) >= 3 && cmd[0] == "launchctl" && cmd[1] == "bootstrap" {

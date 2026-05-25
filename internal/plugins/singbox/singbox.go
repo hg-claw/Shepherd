@@ -4,8 +4,8 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"os"
 
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 	"github.com/hg-claw/Shepherd/internal/plugins/deploy"
@@ -19,7 +19,7 @@ var unitDarwin []byte
 
 // releaserIface lets tests inject a fake.
 type releaserIface interface {
-	Fetch(ctx context.Context, version, osName, arch string) (Binary, error)
+	ResolveFetchSpec(ctx context.Context, version, osName, arch string, useMirror bool) (agentapi.FileFetch, error)
 }
 
 // Plugin implements plugins.Plugin, plugins.HostAware, and plugins.LogStreamer.
@@ -37,33 +37,28 @@ func (p *Plugin) OnEnable(_ context.Context, _ plugins.Deps) error  { return nil
 func (p *Plugin) OnDisable(_ context.Context, _ plugins.Deps) error { return nil }
 func (p *Plugin) RegisterRoutes(mux plugins.Mux, deps plugins.Deps) { registerRoutes(mux, deps) }
 
-// DeployToHost pushes the binary and systemd/launchd unit file to the host,
-// then calls AssembleAndDeploy to render + push the real config and restart.
-// configJSON is ignored here — the rendered config comes from AssembleAndDeploy.
-// Returns an error if version is empty.
-func (p *Plugin) DeployToHost(ctx context.Context, deps plugins.Deps, serverID int64, version string, _ []byte) error {
+// DeployToHost tells the agent to fetch the sing-box binary directly from
+// the GitHub release (optionally via the CN mirror) and pushes the
+// systemd/launchd unit file, then calls AssembleAndDeploy to render +
+// push the real config and restart. configJSON is ignored — the rendered
+// config comes from AssembleAndDeploy. useMirror selects per-deploy
+// whether the agent fetches via gh-proxy.com.
+func (p *Plugin) DeployToHost(ctx context.Context, deps plugins.Deps, serverID int64, version string, _ []byte, useMirror bool) error {
 	if version == "" {
 		return fmt.Errorf("version required")
+	}
+	if err := plugins.RequireAgentVersionAtLeast(ctx, deps.DB, serverID, plugins.MinAgentVersionForFetch); err != nil {
+		return err
 	}
 	osName, arch := sbHostOSArch(ctx, deps.DB, serverID)
 
 	r := p.releaser
 	if r == nil {
-		// CN-mirror toggle from the global settings table. Reads on every
-		// deploy so flipping the setting takes effect on the next attempt
-		// without a server restart. Empty string when off = pass-through.
-		r = &Releaser{
-			CacheDir:     deps.DataDir + "/cache",
-			MirrorPrefix: plugins.LoadCNMirror(ctx, deps.DB),
-		}
+		r = &Releaser{}
 	}
-	bin, err := r.Fetch(ctx, version, osName, arch)
+	spec, err := r.ResolveFetchSpec(ctx, version, osName, arch, useMirror)
 	if err != nil {
-		return fmt.Errorf("fetch binary: %w", err)
-	}
-	binBytes, err := os.ReadFile(bin.Path)
-	if err != nil {
-		return fmt.Errorf("read binary: %w", err)
+		return fmt.Errorf("resolve fetch spec: %w", err)
 	}
 
 	unitBytes := unitLinux
@@ -76,11 +71,10 @@ func (p *Plugin) DeployToHost(ctx context.Context, deps plugins.Deps, serverID i
 	}
 
 	pusher := &deploy.Pusher{Exec: deps.HostExec}
-	if err := pusher.DeployService(ctx, deploy.DeployParams{
+	if err := pusher.DeployServiceFetch(ctx, deploy.DeployFetchParams{
 		OS:          osName,
 		ServerID:    serverID,
-		BinaryPath:  singboxBinaryRemotePath,
-		BinaryBytes: binBytes,
+		BinaryFetch: spec,
 		ConfigPath:  singboxConfigRemotePath,
 		ConfigBytes: []byte("{}"),
 		UnitPath:    unitPath,

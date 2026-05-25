@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 )
 
@@ -28,6 +29,7 @@ type fakeExec struct {
 func (f *fakeExec) PushFile(context.Context, int64, string, uint32, []byte) error {
 	return nil
 }
+func (f *fakeExec) FetchURL(context.Context, int64, agentapi.FileFetch) error { return nil }
 func (f *fakeExec) RunCmd(context.Context, int64, string, ...string) ([]byte, []byte, int, error) {
 	return nil, nil, 0, nil
 }

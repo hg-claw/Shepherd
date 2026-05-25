@@ -1,78 +1,73 @@
 package xray
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func makeZip(t *testing.T, name, body string) []byte {
-	t.Helper()
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	w, err := zw.Create(name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := w.Write([]byte(body)); err != nil {
-		t.Fatal(err)
-	}
-	if err := zw.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return buf.Bytes()
-}
-
-func TestFetchAndCache(t *testing.T) {
-	zipBytes := makeZip(t, "xray", "BIN-CONTENT")
+func TestReleaser_ResolveFetchSpec_Direct(t *testing.T) {
+	zipBytes := []byte("FAKE-XRAY-ZIP")
 	dgst := sha256.Sum256(zipBytes)
-	dgstHex := hex.EncodeToString(dgst[:])
+	wantSHA := hex.EncodeToString(dgst[:])
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/releases/download/v1.2.3/Xray-linux-64.zip", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write(zipBytes)
-	})
 	mux.HandleFunc("/releases/download/v1.2.3/Xray-linux-64.zip.dgst", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.WriteString(w, "SHA2-256= "+dgstHex+"\n")
+		_, _ = io.WriteString(w, "SHA2-256= "+wantSHA+"\n")
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	r := &Releaser{
-		BaseURL:  srv.URL,
-		CacheDir: t.TempDir(),
-	}
-	bin, err := r.Fetch(context.Background(), "1.2.3", "linux", "amd64")
+	r := &Releaser{BaseURL: srv.URL}
+	spec, err := r.ResolveFetchSpec(context.Background(), "1.2.3", "linux", "amd64", false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bin.Version != "1.2.3" || bin.Sha256 != dgstHex {
-		t.Fatalf("unexpected binary metadata: %+v", bin)
+	wantURL := srv.URL + "/releases/download/v1.2.3/Xray-linux-64.zip"
+	if spec.URL != wantURL {
+		t.Errorf("URL = %q, want %q", spec.URL, wantURL)
 	}
-	got, err := os.ReadFile(bin.Path)
-	if err != nil {
-		t.Fatal(err)
+	if spec.SHA256 != wantSHA {
+		t.Errorf("SHA256 = %q, want %q", spec.SHA256, wantSHA)
 	}
-	if string(got) != "BIN-CONTENT" {
-		t.Fatalf("extracted binary content = %q", got)
+	if spec.Path != xrayBinaryRemotePathUnix {
+		t.Errorf("Path = %q, want %q", spec.Path, xrayBinaryRemotePathUnix)
 	}
+	if spec.Extract == nil || spec.Extract.Kind != "zip" || spec.Extract.EntryGlob != "xray" {
+		t.Errorf("Extract = %+v, want zip/xray", spec.Extract)
+	}
+}
 
-	cached := bin.Path
-	bin2, err := r.Fetch(context.Background(), "1.2.3", "linux", "amd64")
-	if err != nil {
-		t.Fatal(err)
+func TestReleaser_BuildAssetURLs_Mirror(t *testing.T) {
+	r := &Releaser{BaseURL: "https://github.com/XTLS/Xray-core"}
+	zipURL, dgstURL := r.buildAssetURLs("1.2.3", "linux", "amd64", true)
+	if !strings.HasPrefix(zipURL, CNMirrorPrefix) {
+		t.Errorf("zipURL = %q, want prefix %q", zipURL, CNMirrorPrefix)
 	}
-	if bin2.Path != cached {
-		t.Fatalf("expected cache hit, paths differ: %s vs %s", cached, bin2.Path)
+	if !strings.HasPrefix(dgstURL, CNMirrorPrefix) {
+		t.Errorf("dgstURL = %q, want prefix %q", dgstURL, CNMirrorPrefix)
+	}
+	if !strings.HasSuffix(zipURL, "/Xray-linux-64.zip") {
+		t.Errorf("zipURL = %q, missing asset suffix", zipURL)
+	}
+	if !strings.HasSuffix(dgstURL, "/Xray-linux-64.zip.dgst") {
+		t.Errorf("dgstURL = %q, missing dgst suffix", dgstURL)
+	}
+}
+
+func TestReleaser_BuildAssetURLs_Direct(t *testing.T) {
+	r := &Releaser{BaseURL: "https://github.com/XTLS/Xray-core"}
+	zipURL, dgstURL := r.buildAssetURLs("1.2.3", "linux", "amd64", false)
+	if strings.HasPrefix(zipURL, CNMirrorPrefix) {
+		t.Errorf("zipURL = %q, should NOT have mirror prefix", zipURL)
+	}
+	if strings.HasPrefix(dgstURL, CNMirrorPrefix) {
+		t.Errorf("dgstURL = %q, should NOT have mirror prefix", dgstURL)
 	}
 }
 
@@ -117,58 +112,24 @@ func TestXrayAssetAliases(t *testing.T) {
 	}
 }
 
-func TestFetchPicksSHA256FromMultilineDgst(t *testing.T) {
-	zipBytes := makeZip(t, "xray", "BIN")
-	dgst := sha256.Sum256(zipBytes)
-	want := hex.EncodeToString(dgst[:])
-
-	// Real xray .dgst body: MD5, SHA1, SHA2-256, SHA2-512 — four lines.
-	// The previous parser grabbed the LAST space-separated token in the whole
-	// body, which was the SHA2-512 hex. This test would have failed under that
-	// implementation.
+func TestFetchDigest_PicksSHA256FromMultilineDgst(t *testing.T) {
+	const want = "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
 	body := "MD5= 00000000000000000000000000000000\n" +
 		"SHA1= 0000000000000000000000000000000000000000\n" +
 		"SHA2-256= " + want + "\n" +
 		"SHA2-512= 0000000000000000000000000000000000000000000000000000000000000000" +
 		"0000000000000000000000000000000000000000000000000000000000000000\n"
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/releases/download/v1.0.0/Xray-linux-64.zip", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write(zipBytes)
-	})
-	mux.HandleFunc("/releases/download/v1.0.0/Xray-linux-64.zip.dgst", func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, body)
-	})
-	srv := httptest.NewServer(mux)
+	}))
 	defer srv.Close()
-	r := &Releaser{BaseURL: srv.URL, CacheDir: t.TempDir()}
-	bin, err := r.Fetch(context.Background(), "1.0.0", "linux", "amd64")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if bin.Sha256 != want {
-		t.Fatalf("Sha256 = %s want %s", bin.Sha256, want)
-	}
-}
 
-func TestFetchShaMismatch(t *testing.T) {
-	zipBytes := makeZip(t, "xray", "X")
-	mux := http.NewServeMux()
-	mux.HandleFunc("/releases/download/v9.9.9/Xray-linux-64.zip", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write(zipBytes)
-	})
-	mux.HandleFunc("/releases/download/v9.9.9/Xray-linux-64.zip.dgst", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.WriteString(w, "SHA2-256= 0000000000000000000000000000000000000000000000000000000000000000\n")
-	})
-	srv := httptest.NewServer(mux)
-	defer srv.Close()
-	r := &Releaser{BaseURL: srv.URL, CacheDir: t.TempDir()}
-	_, err := r.Fetch(context.Background(), "9.9.9", "linux", "amd64")
-	if err == nil || !strings.Contains(err.Error(), "sha256") {
-		t.Fatalf("expected sha256 error, got %v", err)
+	got, err := fetchDigest(context.Background(), srv.Client(), srv.URL)
+	if err != nil {
+		t.Fatalf("fetchDigest: %v", err)
 	}
-	files, _ := filepath.Glob(r.CacheDir + "/*")
-	if len(files) != 0 {
-		t.Fatalf("cache should be empty on failure: %v", files)
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }

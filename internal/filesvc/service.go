@@ -131,6 +131,39 @@ func (u *uploadAdapter) DeliverControl(env agentapi.Envelope) {
 	}
 }
 
+// Fetch tells the agent at serverID to download URL and install it at
+// Path. Unlike Upload, the bytes-on-wire goes from agent → internet,
+// not server → agent — the WS link only carries one FileFetch frame
+// + one FileUploadAck. Used for plugin binary deploys where the
+// server's outbound WS bandwidth was the bottleneck.
+//
+// Timeout covers the full agent-side operation: download + extract +
+// install. 15 minutes is generous because gh-proxy.com on a slow CN
+// link routinely takes 5+ minutes for a 60MB asset.
+func (s *Service) Fetch(ctx context.Context, serverID int64, spec agentapi.FileFetch) error {
+	sid := agentapi.NewSID()
+	spec.Sid = sid
+	a := &uploadAdapter{sid: sid, got: make(chan agentapi.FileUploadAck, 1)}
+	s.Reg.RegisterFile(sid, a)
+	defer s.Reg.Unregister(sid)
+
+	env, _ := agentapi.Frame(agentapi.TypeFileFetch, spec)
+	if err := s.Hub.Send(serverID, env); err != nil {
+		return err
+	}
+	select {
+	case ack := <-a.got:
+		if !ack.OK {
+			return errors.New(ack.Error)
+		}
+		return nil
+	case <-time.After(15 * time.Minute):
+		return ErrTimeout
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 func (s *Service) Upload(ctx context.Context, serverID int64, path string, mode uint32, size int64, sha256hex string, body io.Reader) error {
 	sid := agentapi.NewSID()
 	a := &uploadAdapter{sid: sid, got: make(chan agentapi.FileUploadAck, 1)}

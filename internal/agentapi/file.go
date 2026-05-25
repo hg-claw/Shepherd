@@ -17,6 +17,12 @@ const (
 	TypeFileDownloadMeta  = "file.download.meta"
 	TypeFileDownloadEnd   = "file.download.end"
 	TypeFileCancel        = "file.cancel"
+	// TypeFileFetch — server → agent. Instructs the agent to download a
+	// URL directly (with optional sha256 verify + archive extract) and
+	// install the result at Path. Replaces the per-deploy server→agent
+	// push for large plugin binaries that were saturating the WS link.
+	// Agent ACKs with the existing TypeFileUploadAck shape.
+	TypeFileFetch = "file.fetch"
 )
 
 type FileEntry struct {
@@ -101,4 +107,29 @@ type FileDownloadEnd struct {
 type FileCancel struct {
 	Sid    string `json:"sid"`
 	Reason string `json:"reason"`
+}
+
+// FileFetch instructs the agent to download URL and install it at Path.
+// SHA256 (hex, lowercase) is verified before install when non-empty;
+// passing "" tells the agent to trust TLS only. Extract is non-nil only
+// when URL points to an archive — the agent extracts a single entry
+// (EntryGlob, filepath.Match semantics) and installs that, dropping the
+// rest. Mode is the final dest file permission (Unix octal).
+type FileFetch struct {
+	Sid     string        `json:"sid"`
+	URL     string        `json:"url"`
+	Path    string        `json:"path"`
+	Mode    uint32        `json:"mode"`
+	SHA256  string        `json:"sha256,omitempty"`
+	Extract *FetchExtract `json:"extract,omitempty"`
+}
+
+// FetchExtract describes how to unpack the downloaded body. EntryGlob
+// is matched with filepath.Match against each archive entry's full
+// name; the first match is installed and the rest discarded. Use a
+// leading wildcard ("*/sing-box") when the archive nests under a
+// version-named directory whose exact name varies per release.
+type FetchExtract struct {
+	Kind      string `json:"kind"`       // "tar.gz" | "zip"
+	EntryGlob string `json:"entry_glob"` // filepath.Match pattern
 }

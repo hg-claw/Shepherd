@@ -192,8 +192,15 @@ export const patchXrayInbound = (id: number, body: PatchXrayInboundBody) =>
 export const deleteXrayInbound = (id: number) =>
   api.del(`/api/admin/plugins/xray/inbounds/${id}`)
 
-export const patchXrayServerVersion = (serverID: number, version: string) =>
-  api.patch<{ ok: true; version: string }>(`/api/admin/plugins/xray/servers/${serverID}`, { version })
+export const patchXrayServerVersion = (
+  serverID: number,
+  version: string,
+  useMirror: boolean = false,
+) =>
+  api.patch<{ ok: true; version: string }>(
+    `/api/admin/plugins/xray/servers/${serverID}`,
+    { version, use_mirror: useMirror },
+  )
 
 // ── xray traffic monitoring ──────────────────────────────────────────────────
 
@@ -395,8 +402,15 @@ export const patchSingboxInbound = (id: number, body: PatchSingboxInboundBody): 
 export const deleteSingboxInbound = (id: number): Promise<void> =>
   api.del(`${SINGBOX}/inbounds/${id}`)
 
-export const patchSingboxServerVersion = (serverID: number, version: string) =>
-  api.patch<{ ok: true; version: string }>(`${SINGBOX}/servers/${serverID}`, { version })
+export const patchSingboxServerVersion = (
+  serverID: number,
+  version: string,
+  useMirror: boolean = false,
+) =>
+  api.patch<{ ok: true; version: string }>(
+    `${SINGBOX}/servers/${serverID}`,
+    { version, use_mirror: useMirror },
+  )
 
 export const fetchSingboxVersions = () =>
   api.get<{ cached: { version: string; os: string; arch: string }[]; latest: string[] }>(`${SINGBOX}/versions`)

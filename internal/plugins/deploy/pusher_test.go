@@ -5,16 +5,23 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 )
 
 type recExec struct {
 	pushedPaths []string
+	fetched     []agentapi.FileFetch
 	cmds        [][]string
 	failCmd     string
 }
 
 func (r *recExec) PushFile(_ context.Context, _ int64, path string, _ uint32, _ []byte) error {
 	r.pushedPaths = append(r.pushedPaths, path)
+	return nil
+}
+func (r *recExec) FetchURL(_ context.Context, _ int64, spec agentapi.FileFetch) error {
+	r.fetched = append(r.fetched, spec)
 	return nil
 }
 func (r *recExec) RunCmd(_ context.Context, _ int64, name string, args ...string) ([]byte, []byte, int, error) {
@@ -35,11 +42,12 @@ func (recExec) StreamCmd(context.Context, int64, string, []string, func(string))
 func TestPushAndStart_Linux(t *testing.T) {
 	exec := &recExec{}
 	p := &Pusher{Exec: exec}
-	err := p.DeployService(context.Background(), DeployParams{
-		OS:          "linux",
-		ServerID:    7,
-		BinaryPath:  "/usr/local/bin/foo",
-		BinaryBytes: []byte("BIN"),
+	err := p.DeployServiceFetch(context.Background(), DeployFetchParams{
+		OS:       "linux",
+		ServerID: 7,
+		BinaryFetch: agentapi.FileFetch{
+			URL: "https://example.com/foo.tgz", Path: "/usr/local/bin/foo", Mode: 0o755,
+		},
 		ConfigPath:  "/etc/foo/cfg",
 		ConfigBytes: []byte("cfg"),
 		UnitPath:    "/etc/systemd/system/foo.service",
@@ -49,8 +57,11 @@ func TestPushAndStart_Linux(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(exec.pushedPaths) != 3 {
-		t.Fatalf("expected 3 file pushes, got %v", exec.pushedPaths)
+	if len(exec.fetched) != 1 {
+		t.Fatalf("expected 1 fetch, got %d", len(exec.fetched))
+	}
+	if len(exec.pushedPaths) != 2 {
+		t.Fatalf("expected 2 file pushes (config + unit), got %v", exec.pushedPaths)
 	}
 	// Must include a `restart` — `enable --now` is a no-op for an
 	// already-running unit and would leave the old config in memory.
@@ -80,11 +91,12 @@ func TestIsActiveTrue_Linux(t *testing.T) {
 func TestPushAndStart_Darwin(t *testing.T) {
 	exec := &recExec{}
 	p := &Pusher{Exec: exec}
-	err := p.DeployService(context.Background(), DeployParams{
-		OS:          "darwin",
-		ServerID:    7,
-		BinaryPath:  "/usr/local/bin/shepherd-xray",
-		BinaryBytes: []byte("BIN"),
+	err := p.DeployServiceFetch(context.Background(), DeployFetchParams{
+		OS:       "darwin",
+		ServerID: 7,
+		BinaryFetch: agentapi.FileFetch{
+			URL: "https://example.com/xray.zip", Path: "/usr/local/bin/shepherd-xray", Mode: 0o755,
+		},
 		ConfigPath:  "/etc/shepherd-xray/config.json",
 		ConfigBytes: []byte("{}"),
 		UnitPath:    "/Library/LaunchDaemons/com.shepherd.xray.plist",
@@ -94,8 +106,11 @@ func TestPushAndStart_Darwin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(exec.pushedPaths) != 3 {
-		t.Fatalf("expected 3 file pushes, got %v", exec.pushedPaths)
+	if len(exec.fetched) != 1 {
+		t.Fatalf("expected 1 fetch, got %d", len(exec.fetched))
+	}
+	if len(exec.pushedPaths) != 2 {
+		t.Fatalf("expected 2 file pushes (config + plist), got %v", exec.pushedPaths)
 	}
 	// Must do bootout BEFORE bootstrap — without that, a second deploy of
 	// an already-loaded service fails ("service already loaded") and the

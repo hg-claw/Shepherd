@@ -56,6 +56,12 @@ type Deps struct {
 // substitute a fake without booting the whole agent stack.
 type HostExec interface {
 	PushFile(ctx context.Context, serverID int64, path string, mode uint32, content []byte) error // mode: Unix octal (0644, 0755, etc.)
+	// FetchURL tells the agent to download spec.URL directly (with
+	// optional sha256 verify + archive extract) and install at
+	// spec.Path. Replaces PushFile for large plugin binaries — the
+	// WS link only carries the spec frame + one ack, not the binary
+	// bytes. Path/Mode/SHA256/Extract live on the spec.
+	FetchURL(ctx context.Context, serverID int64, spec agentapi.FileFetch) error
 	RunCmd(ctx context.Context, serverID int64, name string, args ...string) (stdout, stderr []byte, exitCode int, err error)
 	// StreamCmd runs name with args on serverID, calling onLine for each output
 	// line as it arrives. onLine must not block — queue and return promptly.
@@ -76,9 +82,13 @@ type Plugin interface {
 }
 
 // HostAware is implemented by plugins that deploy something to managed hosts.
+//
+// useMirror selects per-deploy whether the binary download URL passed
+// to the agent gets wrapped with the CN mirror prefix. Each deploy
+// decides independently — replaces the v0.8.7 global setting.
 type HostAware interface {
 	Plugin
-	DeployToHost(ctx context.Context, deps Deps, serverID int64, version string, configJSON []byte) error
+	DeployToHost(ctx context.Context, deps Deps, serverID int64, version string, configJSON []byte, useMirror bool) error
 	UndeployFromHost(ctx context.Context, deps Deps, serverID int64) error
 	HostStatus(ctx context.Context, deps Deps, serverID int64) (HostStatus, error)
 }

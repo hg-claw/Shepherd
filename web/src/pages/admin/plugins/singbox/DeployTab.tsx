@@ -33,8 +33,9 @@ function VersionInline({ serverID, current, versions }: { serverID: number; curr
   const toast = useUI((s) => s.toast)
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(current ?? '')
+  const [useMirror, setUseMirror] = useState(false)
   const apply = useMutation({
-    mutationFn: () => patchSingboxServerVersion(serverID, value),
+    mutationFn: () => patchSingboxServerVersion(serverID, value, useMirror),
     onSuccess: () => {
       toast('success', `Upgrading to v${value}`)
       qc.invalidateQueries({ queryKey: ['plugin-hosts', 'singbox'] })
@@ -66,6 +67,10 @@ function VersionInline({ serverID, current, versions }: { serverID: number; curr
       </Select>
       <Button size="sm" className="h-6 px-2 text-[11px]" disabled={apply.isPending}
         onClick={() => apply.mutate()}>Apply</Button>
+      <label className="inline-flex items-center gap-1 text-fg-dim text-[11px] cursor-pointer" title="Route the binary download via gh-proxy.com (for CN hosts that can't reach github.com)">
+        <input type="checkbox" className="h-3 w-3" checked={useMirror} onChange={(e) => setUseMirror(e.target.checked)} />
+        mirror
+      </label>
       <button className="text-fg-dim text-[11px]" onClick={() => setEditing(false)}>cancel</button>
     </span>
   )
@@ -74,8 +79,9 @@ function VersionInline({ serverID, current, versions }: { serverID: number; curr
 function RedeployButton({ serverID, deployedVersion }: { serverID: number; deployedVersion: string | null }) {
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
+  const [useMirror, setUseMirror] = useState(false)
   const redeploy = useMutation({
-    mutationFn: () => patchSingboxServerVersion(serverID, deployedVersion ?? ''),
+    mutationFn: () => patchSingboxServerVersion(serverID, deployedVersion ?? '', useMirror),
     onSuccess: () => {
       toast('success', 'Re-deploy triggered')
       qc.invalidateQueries({ queryKey: ['plugin-hosts', 'singbox'] })
@@ -83,15 +89,21 @@ function RedeployButton({ serverID, deployedVersion }: { serverID: number; deplo
     onError: (e: any) => toast('error', String(e?.message ?? e)),
   })
   return (
-    <Button
-      size="sm"
-      variant="outline"
-      className="h-6 px-2 text-[11px]"
-      disabled={!deployedVersion || redeploy.isPending}
-      onClick={() => redeploy.mutate()}
-    >
-      Re-deploy
-    </Button>
+    <span className="inline-flex items-center gap-1">
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-6 px-2 text-[11px]"
+        disabled={!deployedVersion || redeploy.isPending}
+        onClick={() => redeploy.mutate()}
+      >
+        Re-deploy
+      </Button>
+      <label className="inline-flex items-center gap-1 text-fg-dim text-[11px] cursor-pointer" title="Route the binary download via gh-proxy.com (for CN hosts)">
+        <input type="checkbox" className="h-3 w-3" checked={useMirror} onChange={(e) => setUseMirror(e.target.checked)} />
+        mirror
+      </label>
+    </span>
   )
 }
 
@@ -106,13 +118,14 @@ function DeployButton({ serverID, versions }: { serverID: number; versions: stri
   // becomes the default once available; operator can still override
   // from the dropdown before clicking Deploy.
   const [version, setVersion] = useState<string>(versions[0] ?? '')
+  const [useMirror, setUseMirror] = useState(false)
   useEffect(() => {
     if (!version && versions[0]) {
       setVersion(versions[0])
     }
   }, [versions, version])
   const deploy = useMutation({
-    mutationFn: () => patchSingboxServerVersion(serverID, version),
+    mutationFn: () => patchSingboxServerVersion(serverID, version, useMirror),
     onSuccess: () => {
       toast('success', `Deploying v${version}`)
       qc.invalidateQueries({ queryKey: ['plugin-hosts', 'singbox'] })
@@ -138,6 +151,10 @@ function DeployButton({ serverID, versions }: { serverID: number; versions: stri
       >
         {deploy.isPending ? 'Deploying…' : 'Deploy'}
       </Button>
+      <label className="inline-flex items-center gap-1 text-fg-dim text-[11px] cursor-pointer" title="Route the binary download via gh-proxy.com (for CN hosts)">
+        <input type="checkbox" className="h-3 w-3" checked={useMirror} onChange={(e) => setUseMirror(e.target.checked)} />
+        mirror
+      </label>
     </span>
   )
 }

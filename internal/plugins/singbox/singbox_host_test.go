@@ -98,7 +98,7 @@ func TestPlugin_DeployToHost_VersionRequired(t *testing.T) {
 	exec := &fakeSBHostExec{}
 	p := New()
 	deps := plugins.Deps{DB: d, HostExec: exec}
-	err := p.DeployToHost(context.Background(), deps, 1, "", nil)
+	err := p.DeployToHost(context.Background(), deps, 1, "", nil, false)
 	if err == nil {
 		t.Fatal("expected error for empty version, got nil")
 	}

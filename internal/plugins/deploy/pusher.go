@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 )
 
@@ -15,11 +16,14 @@ type Pusher struct {
 	Exec plugins.HostExec
 }
 
-type DeployParams struct {
+// DeployFetchParams describes one fetch-and-deploy. The binary comes
+// down to the agent directly via FetchURL (BinaryFetch); the small
+// config and unit files still go server→agent over WS PushFile (they're
+// a few KB each and PushFile's existing semantics handle them fine).
+type DeployFetchParams struct {
 	OS          string // "linux" or "darwin"; defaults to "linux" when empty
 	ServerID    int64
-	BinaryPath  string
-	BinaryBytes []byte
+	BinaryFetch agentapi.FileFetch // URL + sha + Path + Mode + Extract
 	ConfigPath  string
 	ConfigBytes []byte
 	UnitPath    string
@@ -27,19 +31,20 @@ type DeployParams struct {
 	UnitName    string // systemd unit name (linux) or launchd label (darwin)
 }
 
-func (dp *DeployParams) os() string {
+func (dp *DeployFetchParams) os() string {
 	if dp.OS == "" {
 		return "linux"
 	}
 	return dp.OS
 }
 
-// DeployService pushes the binary, config, and unit file to the host then
-// starts the service. It dispatches to systemd (linux) or launchd (darwin)
-// based on dp.OS.
-func (p *Pusher) DeployService(ctx context.Context, dp DeployParams) error {
-	if err := p.Exec.PushFile(ctx, dp.ServerID, dp.BinaryPath, 0755, dp.BinaryBytes); err != nil {
-		return fmt.Errorf("push binary: %w", err)
+// DeployServiceFetch tells the agent to fetch the binary from
+// dp.BinaryFetch.URL directly, pushes config + unit, then starts the
+// service. Dispatches to systemd (linux) or launchd (darwin) based on
+// dp.OS.
+func (p *Pusher) DeployServiceFetch(ctx context.Context, dp DeployFetchParams) error {
+	if err := p.Exec.FetchURL(ctx, dp.ServerID, dp.BinaryFetch); err != nil {
+		return fmt.Errorf("fetch binary: %w", err)
 	}
 	if err := p.Exec.PushFile(ctx, dp.ServerID, dp.ConfigPath, 0600, dp.ConfigBytes); err != nil {
 		return fmt.Errorf("push config: %w", err)

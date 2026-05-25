@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Plus, Trash2, LayoutGrid, Rows3, ArrowUpCircle } from 'lucide-react'
-import { useServers, useDeleteServer, useBatchUpdateAgent, type ServerWithLatest } from '@/api/servers'
+import { useServers, useDeleteServer, useBatchUpdateAgent, useReinstall, type ServerWithLatest } from '@/api/servers'
 import { useUI } from '@/store/ui'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -406,6 +406,7 @@ export default function ServerList() {
                 const online = isOnline(s)
                 const lastSeen = relativeTime(s.agent_last_seen?.Valid ? s.agent_last_seen.Time : null)
                 const memPct = pct(s.latest?.mem_used, s.latest?.mem_total)
+                const stage = hostStage(s)
                 return (
                   <tr
                     key={s.id}
@@ -459,6 +460,9 @@ export default function ServerList() {
                     <Td><Bar value={s.latest?.cpu_pct} /></Td>
                     <Td className="hidden sm:table-cell"><Bar value={memPct} /></Td>
                     <Td className="text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      {(stage === 'install-failed' || stage === 'not-installed') && (
+                        <ReinstallButton server={s} t={t} />
+                      )}
                       <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-[12.5px]">
                         <Link to={`/admin/servers/${s.id}`}>{t('admin.details', 'Details')}</Link>
                       </Button>
@@ -472,6 +476,110 @@ export default function ServerList() {
         </div>
       )}
     </div>
+  )
+}
+
+function ReinstallButton({
+  server,
+  t,
+}: {
+  server: ServerWithLatest
+  t: (k: string, opts?: any) => string
+}) {
+  const toast = useUI((s) => s.toast)
+  const [open, setOpen] = useState(false)
+  const [user, setUser] = useState(server.ssh_user?.String ?? '')
+  const [password, setPassword] = useState('')
+  const [key, setKey] = useState('')
+  const [arch, setArch] = useState<'amd64' | 'arm64'>(
+    server.agent_arch?.String === 'arm64' ? 'arm64' : 'amd64',
+  )
+  const reinstall = useReinstall(server.id)
+
+  const submit = () => {
+    if (!password && !key) {
+      toast('error', t('server.reinstall_need_cred', 'Enter a password or private key'))
+      return
+    }
+    reinstall.mutate(
+      {
+        ssh_user: user || undefined,
+        ssh_password: password || undefined,
+        ssh_key: key || undefined,
+        arch,
+      },
+      {
+        onSuccess: () => {
+          toast('success', t('server.reinstall_started', 'Re-install started'))
+          setOpen(false)
+          setPassword('')
+          setKey('')
+        },
+        onError: (e: any) => toast('error', String(e?.message ?? e)),
+      },
+    )
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-[12.5px]">
+          {t('server.reinstall', 'Reinstall')}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('server.reinstall', 'Reinstall')} · {server.name}</DialogTitle>
+          <DialogDescription>
+            {t(
+              'server.reinstall_desc',
+              'Retry the agent install over SSH with fresh credentials. Use a private key if password auth is disabled on the host.',
+            )}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <label className="text-[12px] text-fg-dim">ssh_user</label>
+            <Input value={user} onChange={(e) => setUser(e.target.value)} placeholder="root" className="mt-1 h-8 text-[12.5px]" />
+          </div>
+          <div>
+            <label className="text-[12px] text-fg-dim">ssh_password</label>
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 h-8 text-[12.5px]" />
+          </div>
+          <div>
+            <label className="text-[12px] text-fg-dim">ssh_key (PEM)</label>
+            <textarea
+              rows={4}
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+              className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-vertical"
+            />
+            <p className="text-fg-dim text-[11px] mt-1">
+              {t('server.reinstall_cred_hint', 'Provide either password or key. Passphrase-protected keys are not supported.')}
+            </p>
+          </div>
+          <div>
+            <label className="text-[12px] text-fg-dim">arch</label>
+            <div className="mt-1">
+              <Seg
+                value={arch}
+                onChange={(v) => setArch(v as 'amd64' | 'arm64')}
+                options={[
+                  { value: 'amd64', label: 'amd64' },
+                  { value: 'arm64', label: 'arm64' },
+                ]}
+              />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={submit} disabled={reinstall.isPending}>
+            {reinstall.isPending ? t('server.reinstall_starting', 'Starting…') : t('server.reinstall', 'Reinstall')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

@@ -60,6 +60,73 @@ func TestInstall_HappyPath_HTTP(t *testing.T) {
 	t.Fatal("install did not reach 'done'")
 }
 
+func TestReinstall_RetriesExistingRowWithKey(t *testing.T) {
+	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	t.Cleanup(func() { _ = d.Close() })
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+
+	svc := &serversvc.Service{DB: d}
+	// Pre-existing server in 'failed' stage with stored ssh target.
+	srv, _ := svc.Create(context.Background(), serversvc.CreateInput{
+		Name: "h", SSHHost: "1.2.3.4", SSHUser: "root", SSHPort: 22,
+	})
+	_ = svc.SetInstallStage(context.Background(), srv.ID, "failed", strPtr("password rejected"))
+
+	tokens := &agentsvc.Service{DB: d}
+	mgr := &serversvc.InstallManager{Service: svc, Installer: &fakeInstaller2{}, Tokens: tokens, ServerURL: "http://x"}
+	api := &ServersAPI{
+		Servers: svc, Tokens: tokens, Hub: agentsvc.NewHub(),
+		Query: &telemetrysvc.Query{DB: d}, InstallManager: mgr,
+	}
+
+	// Retry with a private key (no name needed — row already exists).
+	body, _ := json.Marshal(reinstallReq{SSHKey: "KEYDATA", Arch: "amd64"})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/servers/"+strconv.FormatInt(srv.ID, 10)+"/reinstall", bytes.NewReader(body))
+	r.SetPathValue("id", strconv.FormatInt(srv.ID, 10))
+	api.Reinstall(w, r)
+	if w.Code != 202 {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	// No NEW server row created — still exactly one.
+	var count int
+	_ = d.Get(&count, "SELECT COUNT(*) FROM servers")
+	if count != 1 {
+		t.Fatalf("reinstall created a duplicate row: count=%d", count)
+	}
+	for i := 0; i < 100; i++ {
+		var stage string
+		_ = d.Get(&stage, "SELECT install_stage FROM servers WHERE id=$1", srv.ID)
+		if stage == "done" {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("reinstall did not reach 'done'")
+}
+
+func TestReinstall_RequiresCredential(t *testing.T) {
+	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	t.Cleanup(func() { _ = d.Close() })
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+	svc := &serversvc.Service{DB: d}
+	srv, _ := svc.Create(context.Background(), serversvc.CreateInput{Name: "h", SSHHost: "x", SSHUser: "root"})
+	api := &ServersAPI{Servers: svc, Hub: agentsvc.NewHub(), Query: &telemetrysvc.Query{DB: d}}
+
+	body, _ := json.Marshal(reinstallReq{Arch: "amd64"}) // no password, no key
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/servers/"+strconv.FormatInt(srv.ID, 10)+"/reinstall", bytes.NewReader(body))
+	r.SetPathValue("id", strconv.FormatInt(srv.ID, 10))
+	api.Reinstall(w, r)
+	if w.Code != 400 {
+		t.Fatalf("expected 400 for missing creds, got %d", w.Code)
+	}
+}
+
+func strPtr(s string) *string { return &s }
+
 func TestConfig_OfflineAgent_Returns409(t *testing.T) {
 	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})

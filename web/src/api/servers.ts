@@ -128,6 +128,28 @@ export function useInstall() {
   })
 }
 
+// ReinstallInput retries the SSH install on an existing server row.
+// ssh_host/ssh_port/ssh_user are optional — the server defaults them to
+// what's stored. The common case is retrying with a key after password
+// auth turned out to be disabled, so only ssh_key changes.
+export type ReinstallInput = {
+  ssh_host?: string
+  ssh_port?: number
+  ssh_user?: string
+  ssh_password?: string
+  ssh_key?: string
+  arch?: 'amd64' | 'arm64'
+}
+
+export function useReinstall(id: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: ReinstallInput) =>
+      api.post<{ server_id: number }>(`/api/servers/${id}/reinstall`, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['servers'] }),
+  })
+}
+
 export interface ScriptInstallInput {
   name: string
   public_alias?: string

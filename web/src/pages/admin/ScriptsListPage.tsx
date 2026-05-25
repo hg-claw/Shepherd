@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Plus, Search, Trash2, Play, ChevronRight, ChevronDown } from 'lucide-react'
-import { useScripts, useDeleteScript, useScriptRuns } from '@/api/scripts'
+import { useScripts, useDeleteScript, useScriptRuns, useScriptRunDetail } from '@/api/scripts'
+import { useServers } from '@/api/servers'
 import { KpiCard } from '@/components/KpiCard'
 import { Pill } from '@/components/Pill'
 import { Button } from '@/components/ui/button'
@@ -20,9 +21,13 @@ export default function ScriptsListPage() {
   const { t } = useTranslation()
   const { data, isLoading } = useScripts()
   const { data: runsData } = useScriptRuns()
+  const { data: serversData } = useServers()
   const del = useDeleteScript()
   const [filter, setFilter] = useState('')
   const [expandedRunId, setExpandedRunId] = useState<number | null>(null)
+
+  const serverName = (id: number) =>
+    serversData?.find((s) => s.id === id)?.name ?? `#${id}`
 
   if (isLoading) return <div className="text-muted-foreground text-[13px] p-4">{t('common.loading')}</div>
 
@@ -273,38 +278,46 @@ export default function ScriptsListPage() {
                   const runStatus = r.finished_at ? 'succeeded' : 'running'
                   const isExpanded = expandedRunId === r.id
                   return (
-                    <tr
-                      key={r.id}
-                      className={cn('border-t transition-colors', isExpanded ? 'bg-sunken/50' : 'hover:bg-sunken/40 cursor-pointer')}
-                      onClick={() => setExpandedRunId(isExpanded ? null : r.id)}
-                    >
-                      <td className="px-4 py-2 w-8">
-                        {isExpanded
-                          ? <ChevronDown className="h-3.5 w-3.5 text-fg-dim" />
-                          : <ChevronRight className="h-3.5 w-3.5 text-fg-dim" />}
-                      </td>
-                      <td className="px-4 py-2">
-                        <Link
-                          to={`/admin/script-runs/${r.id}`}
-                          className="font-mono text-foreground hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          #{r.id}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-2 hidden sm:table-cell font-mono text-fg-dim text-[12px]">
-                        {r.script_id}
-                      </td>
-                      <td className="px-4 py-2">
-                        <Pill kind={statusKind(runStatus)}>{runStatus}</Pill>
-                      </td>
-                      <td className="px-4 py-2 font-mono text-fg-dim text-[11.5px] whitespace-nowrap">
-                        {r.started_at}
-                      </td>
-                      <td className="px-4 py-2 hidden md:table-cell font-mono text-fg-dim text-[11.5px] whitespace-nowrap">
-                        {r.finished_at ?? '—'}
-                      </td>
-                    </tr>
+                    <Fragment key={r.id}>
+                      <tr
+                        className={cn('border-t transition-colors', isExpanded ? 'bg-sunken/50' : 'hover:bg-sunken/40 cursor-pointer')}
+                        onClick={() => setExpandedRunId(isExpanded ? null : r.id)}
+                      >
+                        <td className="px-4 py-2 w-8">
+                          {isExpanded
+                            ? <ChevronDown className="h-3.5 w-3.5 text-fg-dim" />
+                            : <ChevronRight className="h-3.5 w-3.5 text-fg-dim" />}
+                        </td>
+                        <td className="px-4 py-2">
+                          <Link
+                            to={`/admin/script-runs/${r.id}`}
+                            className="font-mono text-foreground hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            #{r.id}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-2 hidden sm:table-cell font-mono text-fg-dim text-[12px]">
+                          {r.script_id}
+                        </td>
+                        <td className="px-4 py-2">
+                          <Pill kind={statusKind(runStatus)}>{runStatus}</Pill>
+                        </td>
+                        <td className="px-4 py-2 font-mono text-fg-dim text-[11.5px] whitespace-nowrap">
+                          {r.started_at}
+                        </td>
+                        <td className="px-4 py-2 hidden md:table-cell font-mono text-fg-dim text-[11.5px] whitespace-nowrap">
+                          {r.finished_at ?? '—'}
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="bg-sunken/30 border-t">
+                          <td colSpan={6} className="px-4 py-2">
+                            <ExpandedRunTargets runId={r.id} running={!r.finished_at} serverName={serverName} t={t} />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   )
                 })}
               </tbody>
@@ -312,6 +325,60 @@ export default function ScriptsListPage() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ExpandedRunTargets shows the per-server results for one run inline when
+// its row is expanded. Fetches GET /api/admin/script-runs/{id}; polls
+// while the run is still in flight so live runs fill in as agents report.
+function ExpandedRunTargets({
+  runId,
+  running,
+  serverName,
+  t,
+}: {
+  runId: number
+  running: boolean
+  serverName: (id: number) => string
+  t: (k: string, opts?: any) => string
+}) {
+  const { data, isLoading } = useScriptRunDetail(runId, running ? 2000 : undefined)
+  const targets = data ?? []
+
+  if (isLoading) {
+    return <div className="text-fg-dim text-[12px] py-1">{t('common.loading', 'Loading…')}</div>
+  }
+  if (targets.length === 0) {
+    return <div className="text-fg-dim text-[12px] py-1">{t('scripts.no_targets', 'No targets recorded for this run.')}</div>
+  }
+  return (
+    <div className="space-y-1">
+      {targets.map((tgt) => (
+        <div key={tgt.id} className="flex items-center gap-3 text-[12px]">
+          <Pill kind={statusKind(tgt.status)}>{tgt.status}</Pill>
+          <span className="font-mono text-foreground">{serverName(tgt.server_id)}</span>
+          <span className="font-mono text-fg-dim tabular-nums">
+            {t('scripts.exit', 'exit')} {tgt.exit_code ?? '—'}
+          </span>
+          {tgt.status === 'failed' && (
+            <Link
+              to={`/admin/script-runs/${runId}/targets/${tgt.id}`}
+              className="text-err hover:underline ml-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {t('scripts.view_error', 'View error')}
+            </Link>
+          )}
+        </div>
+      ))}
+      <Link
+        to={`/admin/script-runs/${runId}`}
+        className="inline-block text-[12px] text-muted-foreground hover:underline pt-1"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {t('scripts.view_run_detail', 'Open full run detail →')}
+      </Link>
     </div>
   )
 }

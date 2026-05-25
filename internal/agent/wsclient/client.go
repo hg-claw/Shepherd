@@ -21,6 +21,7 @@ import (
 	"github.com/hg-claw/Shepherd/internal/agent/ptyrunner"
 	"github.com/hg-claw/Shepherd/internal/agent/singboxv2sampler"
 	"github.com/hg-claw/Shepherd/internal/agent/state"
+	"github.com/hg-claw/Shepherd/internal/agent/vlog"
 	"github.com/hg-claw/Shepherd/internal/agent/xraysampler"
 	"github.com/hg-claw/Shepherd/internal/agentapi"
 	"github.com/hg-claw/Shepherd/internal/agentconfig"
@@ -180,6 +181,7 @@ func (c *Client) dialAndRun(ctx context.Context) error {
 
 	dialer := *websocket.DefaultDialer
 	dialer.HandshakeTimeout = 30 * time.Second
+	vlog.Debugf("ws dial %s", wsURL)
 	conn, resp, err := dialer.DialContext(ctx, wsURL, hdr)
 	if err != nil {
 		if resp != nil && (resp.StatusCode == 401 || resp.StatusCode == 403) {
@@ -195,11 +197,13 @@ func (c *Client) dialAndRun(ctx context.Context) error {
 	c.mu.Lock()
 	c.conn = conn
 	c.mu.Unlock()
+	vlog.Debugf("ws connected")
 	defer func() {
 		c.mu.Lock()
 		c.conn = nil
 		c.mu.Unlock()
 		_ = conn.Close()
+		vlog.Debugf("ws closed")
 	}()
 
 	// Collect IP candidates and attach to the first heartbeat of this WS session.
@@ -338,6 +342,14 @@ func (c *Client) applyConfig(env agentapi.Envelope, fh *filehandler.Handler) {
 		st, _ := c.State.Load()
 		st.TelemetryIntervalSeconds = u.TelemetryIntervalSeconds
 		_ = c.State.Save(st)
+	}
+	if u.LogVerbose != nil {
+		prev := vlog.SetEnabled(*u.LogVerbose)
+		if prev != *u.LogVerbose {
+			// Always log the transition itself (regardless of new state)
+			// so journalctl shows when the switch was flipped.
+			log.Printf("log_verbose %v -> %v (server config push)", prev, *u.LogVerbose)
+		}
 	}
 	if u.FileSandboxEnabled != nil || u.FileSandboxPaths != nil {
 		st, _ := c.State.Load()

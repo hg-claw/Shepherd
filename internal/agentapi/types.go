@@ -33,6 +33,11 @@ type ConfigUpdate struct {
 	TelemetryIntervalSeconds int      `json:"telemetry_interval_seconds,omitempty"`
 	FileSandboxEnabled       *bool    `json:"file_sandbox_enabled,omitempty"`
 	FileSandboxPaths         []string `json:"file_sandbox_paths,omitempty"`
+	// LogVerbose toggles agent debug-level logging at runtime. Pointer so
+	// "field omitted" stays distinguishable from "set to false". Wired
+	// through vlog so flipping the admin-settings switch fans out to all
+	// online agents without restart.
+	LogVerbose *bool `json:"log_verbose,omitempty"`
 }
 
 type Heartbeat struct {

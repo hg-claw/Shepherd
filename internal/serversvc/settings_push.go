@@ -15,7 +15,12 @@ type SandboxPusher struct {
 func (p *SandboxPusher) Snapshot(ctx context.Context) agentapi.ConfigUpdate {
 	enabled := p.Settings.GetBool(ctx, "file_sandbox_enabled", true)
 	paths := p.Settings.GetLines(ctx, "file_sandbox_paths")
-	return agentapi.ConfigUpdate{FileSandboxEnabled: &enabled, FileSandboxPaths: paths}
+	verbose := p.Settings.GetBool(ctx, "agent_log_verbose", false)
+	return agentapi.ConfigUpdate{
+		FileSandboxEnabled: &enabled,
+		FileSandboxPaths:   paths,
+		LogVerbose:         &verbose,
+	}
 }
 
 func (p *SandboxPusher) PushOne(ctx context.Context, serverID int64) {

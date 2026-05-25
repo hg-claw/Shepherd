@@ -140,11 +140,24 @@ func (s *Service) LookupEnrollment(ctx context.Context, token string) (int64, er
 }
 
 // AuthenticateMachineToken returns server_id for a valid machine_token, or error.
+//
+// Side effect: if install_stage is still 'installing' for this server (and the
+// row's not somehow in a terminal state), flip it to 'done'. An agent that
+// can authenticate IS the strongest possible signal install succeeded — the
+// only way to get a valid machine_token is to have completed enrollment
+// successfully at least once. Pre-fix, rows where the agent already had a
+// token from a prior life skipped /enroll entirely and sat at 'installing'
+// forever, until SweepStuck flipped them to 'failed' after the watchdog.
 func (s *Service) AuthenticateMachineToken(ctx context.Context, token string) (int64, error) {
 	var sid int64
 	if err := s.DB.GetContext(ctx, &sid, "SELECT server_id FROM machine_tokens WHERE token=$1", token); err != nil {
 		return 0, ErrInvalidEnrollment
 	}
+	// Best-effort: don't block auth on this update. A constraint here would
+	// fail-open (agent connects either way); we just don't get the row fixed.
+	_, _ = s.DB.ExecContext(ctx,
+		`UPDATE servers SET install_stage='done', install_error=NULL
+		 WHERE id=$1 AND install_stage='installing'`, sid)
 	return sid, nil
 }
 

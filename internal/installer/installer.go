@@ -183,7 +183,25 @@ func buildAuth(c SSHCredentials) ([]ssh.AuthMethod, error) {
 		return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil
 	}
 	if c.Password != "" {
-		return []ssh.AuthMethod{ssh.Password(c.Password)}, nil
+		// Two methods, tried in order. Many sshd configurations advertise
+		// only "keyboard-interactive" for password auth (especially when
+		// PAM is in the loop) — the raw "password" method then gets a
+		// "no supported methods remain" rejection even when the password
+		// itself is correct. The KeyboardInteractive responder answers
+		// every server prompt with the same password, which is the
+		// standard CLI-equivalent of pasting it into an `ssh user@host`
+		// prompt and works for the PAM case.
+		kbAnswer := func(_, _ string, questions []string, _ []bool) ([]string, error) {
+			answers := make([]string, len(questions))
+			for i := range questions {
+				answers[i] = c.Password
+			}
+			return answers, nil
+		}
+		return []ssh.AuthMethod{
+			ssh.Password(c.Password),
+			ssh.KeyboardInteractive(kbAnswer),
+		}, nil
 	}
 	return nil, fmt.Errorf("no ssh credentials provided")
 }

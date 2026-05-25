@@ -369,14 +369,19 @@ export default function InboundsTab() {
                     : urlSupported
                     ? 'cannot build URL — missing fields'
                     : 'client URL not yet supported for this protocol'
-                  // TLS protocols that need a cert but have none: show warning
+                  // TLS protocols that need a cert but have none: show warning.
+                  // Forward-mode relays don't terminate the protocol on the
+                  // relay — the landing handles TLS — so the cert column is
+                  // irrelevant on those rows. Skip the warning there to avoid
+                  // a false-positive ⚠ on every forward relay.
                   const needsTLS = (
                     i.protocol.endsWith('-tls') ||
                     i.protocol === 'hysteria2' ||
                     i.protocol === 'tuic-v5' ||
                     i.protocol === 'anytls'
                   )
-                  const missingCert = needsTLS && i.cert_id == null
+                  const isForwardRelay = i.role === 'relay' && i.relay_mode === 'forward'
+                  const missingCert = needsTLS && !isForwardRelay && i.cert_id == null
                   const isActive = activeMap.get(i.tag) === true
 
                   return (

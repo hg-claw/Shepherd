@@ -255,6 +255,7 @@ function ScriptInstallForm() {
   const [publicGroup, setPublicGroup] = useState('')
   const [countryCode, setCountryCode] = useState('')
   const [showOnPublic, setShowOnPublic] = useState(false)
+  const [cnMirror, setCNMirror] = useState(false)
   const [result, setResult] = useState<{ command: string; expires_at: string } | null>(null)
 
   const submit = async () => {
@@ -269,6 +270,7 @@ function ScriptInstallForm() {
         public_group: publicGroup || undefined,
         country_code: countryCode || undefined,
         show_on_public: showOnPublic,
+        cn: cnMirror,
       })
       setResult({ command: r.command, expires_at: r.expires_at })
     } catch (e: unknown) {
@@ -335,6 +337,16 @@ function ScriptInstallForm() {
             />
             <Label htmlFor="script-public" className="text-[12.5px]">
               {t('servernew.show_on_public', 'Show on public wall')}
+            </Label>
+          </div>
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={cnMirror}
+              onCheckedChange={setCNMirror}
+              id="script-cn"
+            />
+            <Label htmlFor="script-cn" className="text-[12.5px]">
+              {t('servernew.cn_mirror', 'CN mirror (gh-proxy.com — for mainland-China hosts)')}
             </Label>
           </div>
           <div className="flex justify-end pt-1">

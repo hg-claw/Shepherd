@@ -207,11 +207,15 @@ export default function ServerList() {
     }
   }
 
+  // CN mirror toggle for the batch update path. Session-local — flips
+  // back to off after every batch (operator opts in per action).
+  const [batchCN, setBatchCN] = useState(false)
+
   const handleBatchUpdate = async () => {
     const ids = Array.from(selected)
     if (ids.length === 0) return
     try {
-      const res = await batchUpdate.mutateAsync(ids)
+      const res = await batchUpdate.mutateAsync({ server_ids: ids, cn: batchCN })
       const failed = res.results.filter((r) => !r.ok)
       if (failed.length === 0) {
         toast('success', t('server.batch_update_started', 'Started update for {{n}} agents', { n: ids.length }))
@@ -347,6 +351,10 @@ export default function ServerList() {
               ? t('server.updating', 'Updating…')
               : t('server.batch_update_agents', 'Update {{n}} agents', { n: selected.size })}
           </Button>
+          <label className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground cursor-pointer select-none">
+            <input type="checkbox" checked={batchCN} onChange={(e) => setBatchCN(e.target.checked)} />
+            {t('server.cn_mirror', 'CN mirror')}
+          </label>
           <button
             type="button"
             onClick={() => setSelected(new Set())}

@@ -255,6 +255,7 @@ func TestBuildInstallCommand(t *testing.T) {
 		buildVersion   string
 		publicURL      string
 		token          string
+		cn             bool
 		wantContains   []string
 		wantNotContain []string
 	}{
@@ -274,7 +275,7 @@ func TestBuildInstallCommand(t *testing.T) {
 				"systemd-run --quiet --collect --unit=shepherd-agent-update",
 				"setsid", // fallback path for hosts without systemd-run
 			},
-			wantNotContain: []string{"main"},
+			wantNotContain: []string{"main", "gh-proxy.com", "--cn"},
 		},
 		{
 			name:         "dev build → main branch + --version main",
@@ -288,12 +289,27 @@ func TestBuildInstallCommand(t *testing.T) {
 			},
 			// Negative checks have to be precise — naive substrings like "dev"
 			// false-match against the `/dev/null` redirect in the detach shim.
-			wantNotContain: []string{"v0.5.0", "--version dev"},
+			wantNotContain: []string{"v0.5.0", "--version dev", "gh-proxy.com", "--cn"},
+		},
+		{
+			name:         "cn=true → script URL wrapped in gh-proxy + --cn flag",
+			buildVersion: "v0.8.4",
+			publicURL:    "https://shepherd.example.com",
+			token:        "T_cn",
+			cn:           true,
+			wantContains: []string{
+				// Mirror prefix applied to the script URL itself (host
+				// needs to reach raw.githubusercontent.com too).
+				"https://gh-proxy.com/https://raw.githubusercontent.com/hg-claw/Shepherd/v0.8.4/scripts/install-agent.sh",
+				// --cn propagates so the script applies the same prefix
+				// to subsequent asset downloads.
+				"--cn",
+			},
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := buildInstallCommand(c.buildVersion, c.publicURL, c.token)
+			got := buildInstallCommand(c.buildVersion, c.publicURL, c.token, c.cn)
 			for _, sub := range c.wantContains {
 				if !strings.Contains(got, sub) {
 					t.Errorf("missing %q in: %s", sub, got)

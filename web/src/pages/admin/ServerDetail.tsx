@@ -62,6 +62,12 @@ export default function AdminServerDetail() {
   const [interval, setIntervalSecs] = useState(30)
   const [repairToken, setRepairToken] = useState<{ token: string; expires: string } | null>(null)
   const [installPanel, setInstallPanel] = useState<{ command: string; expires_at: string } | null>(null)
+  // CN mirror toggle. Affects both "Install command" and "Update agent"
+  // — when on, the script URL + asset downloads go through
+  // https://gh-proxy.com/ for mainland-China-friendly routing.
+  // Session-local (deliberately not persisted on the server row):
+  // operators flip it per action.
+  const [cnMirror, setCNMirror] = useState(false)
 
   if (!s) return <div>{t('common.loading')}</div>
 
@@ -215,7 +221,7 @@ export default function AdminServerDetail() {
           disabled={installCmd.isPending}
           onClick={async () => {
             try {
-              const r = await installCmd.mutateAsync()
+              const r = await installCmd.mutateAsync({ cn: cnMirror })
               setInstallPanel({ command: r.command, expires_at: r.expires_at })
             } catch (e) {
               toast('error', (e as Error).message ?? 'failed')
@@ -230,7 +236,7 @@ export default function AdminServerDetail() {
           disabled={updateAgent.isPending}
           onClick={async () => {
             try {
-              const r = await updateAgent.mutateAsync()
+              const r = await updateAgent.mutateAsync({ cn: cnMirror })
               setTargetVersion(r.target_version)
               toast('success', t('server.update_started', 'Update started → {{v}}', { v: r.target_version }))
             } catch (e: any) {
@@ -241,6 +247,13 @@ export default function AdminServerDetail() {
           <ArrowUpCircle className="h-4 w-4 mr-1" />
           {updateAgent.isPending ? t('server.updating', 'Updating…') : t('server.update_agent', 'Update agent')}
         </Button>
+        {/* CN mirror toggle — applies to both Install command and
+            Update agent on this page. Routes script + asset downloads
+            through gh-proxy.com for hosts that can't reach github.com. */}
+        <label className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground ml-1 cursor-pointer select-none">
+          <input type="checkbox" checked={cnMirror} onChange={(e) => setCNMirror(e.target.checked)} />
+          CN mirror
+        </label>
       </div>
 
       {installPanel && (

@@ -134,6 +134,10 @@ export interface ScriptInstallInput {
   public_group?: string
   country_code?: string
   show_on_public: boolean
+  // When the target host is in mainland China and can't reach
+  // github.com directly, set cn=true. Routes both the script URL and
+  // the install-time release-asset downloads through https://gh-proxy.com/.
+  cn?: boolean
 }
 
 export interface ScriptInstallResult {
@@ -188,8 +192,14 @@ export function useRepair(id: number) {
 
 export function useServerInstallCommand(id: number) {
   return useMutation({
-    mutationFn: () =>
-      api.post<ScriptInstallResult>(`/api/servers/${id}/install-command`, {}),
+    // cn is a query param, not body, because the server-side handler
+    // already takes it that way (`?cn=1`). Mutation accepts an optional
+    // {cn} so existing callers without it keep compiling.
+    mutationFn: (opts?: { cn?: boolean }) =>
+      api.post<ScriptInstallResult>(
+        `/api/servers/${id}/install-command${opts?.cn ? '?cn=1' : ''}`,
+        {},
+      ),
   })
 }
 
@@ -209,8 +219,11 @@ export interface UpdateAgentResult {
 export function useUpdateAgent(id: number) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: () =>
-      api.post<UpdateAgentResult>(`/api/servers/${id}/update-agent`, {}),
+    mutationFn: (opts?: { cn?: boolean }) =>
+      api.post<UpdateAgentResult>(
+        `/api/servers/${id}/update-agent${opts?.cn ? '?cn=1' : ''}`,
+        {},
+      ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['server', id] }),
   })
 }
@@ -222,8 +235,8 @@ export interface BatchUpdateAgentResult {
 export function useBatchUpdateAgent() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (serverIDs: number[]) =>
-      api.post<BatchUpdateAgentResult>('/api/servers/update-agent', { server_ids: serverIDs }),
+    mutationFn: (input: { server_ids: number[]; cn?: boolean }) =>
+      api.post<BatchUpdateAgentResult>('/api/servers/update-agent', input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['servers'] }),
   })
 }

@@ -21,6 +21,12 @@ type Releaser struct {
 	BaseURL  string // https://github.com/XTLS/Xray-core (override for tests)
 	CacheDir string // typically deps.DataDir + "/cache"
 	HTTP     *http.Client
+	// MirrorPrefix, when non-empty, is prepended to the github.com asset
+	// download + digest URLs just before httpGet. Routes the binary
+	// fetch through a relay (typically https://gh-proxy.com/) for
+	// mainland-China hosts. The /releases listing call still goes to
+	// api.github.com (proxy doesn't reliably mirror the API).
+	MirrorPrefix string
 }
 
 func defaultClient() *http.Client {
@@ -98,6 +104,12 @@ func (r *Releaser) Fetch(ctx context.Context, version, osName, arch string) (Bin
 
 	zipURL := fmt.Sprintf("%s/releases/download/v%s/Xray-%s-%s.zip", r.base(), version, xrayOS(osName), xrayArch(arch))
 	dgstURL := zipURL + ".dgst"
+	// CN-mirror prefix applied to BOTH the zip and the digest. .dgst
+	// is also a github.com URL so it goes through the same relay.
+	if r.MirrorPrefix != "" {
+		zipURL = r.MirrorPrefix + zipURL
+		dgstURL = r.MirrorPrefix + dgstURL
+	}
 	httpc := r.HTTP
 	if httpc == nil {
 		httpc = defaultClient()

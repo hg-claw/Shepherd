@@ -49,7 +49,13 @@ func (p *Plugin) DeployToHost(ctx context.Context, deps plugins.Deps, serverID i
 
 	r := p.releaser
 	if r == nil {
-		r = &Releaser{CacheDir: deps.DataDir + "/cache"}
+		// CN-mirror toggle from the global settings table. Reads on every
+		// deploy so flipping the setting takes effect on the next attempt
+		// without a server restart. Empty string when off = pass-through.
+		r = &Releaser{
+			CacheDir:     deps.DataDir + "/cache",
+			MirrorPrefix: plugins.LoadCNMirror(ctx, deps.DB),
+		}
 	}
 	bin, err := r.Fetch(ctx, version, osName, arch)
 	if err != nil {

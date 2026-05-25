@@ -30,6 +30,8 @@ var allowedSettingKeys = map[string]bool{
 	"pty_max_concurrent_per_admin": true,
 	"file_upload_max_bytes":        true,
 	"file_chunk_bytes":             true,
+	// Phase 3 (CN mirror for plugin binary downloads)
+	"cn_mirror_enabled": true,
 }
 
 // Keys that, when changed, require a sandbox re-push to online agents.

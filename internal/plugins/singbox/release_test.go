@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -194,6 +195,60 @@ func TestSingboxAssetName(t *testing.T) {
 		if got != c.want {
 			t.Errorf("singboxAssetName(1.13.10, %s, %s) = %q want %q", c.osName, c.arch, got, c.want)
 		}
+	}
+}
+
+func TestReleaser_MirrorPrefixWrapsDownloadURL(t *testing.T) {
+	// When MirrorPrefix is set, the actual asset GET must hit
+	// <prefix><real-github-url>. resolveAssetURL still hits the
+	// api.github.com path unchanged (gh-proxy doesn't reliably mirror
+	// API endpoints — that's the contract we documented on the field).
+	const version = "1.13.12"
+	fakeBin := []byte("BIN")
+	tarBuf := makeTarGz(t, version, "linux", "amd64", fakeBin)
+	assetName := singboxAssetName(version, "linux", "amd64")
+	realDownloadURL := "https://github.com/example/repo/releases/download/" + releaseTag(version) + "/" + assetName
+
+	var sawPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sawPath = r.URL.Path
+		switch {
+		case r.URL.Path == "/repos/example/repo/releases/tags/"+releaseTag(version):
+			rel := map[string]any{
+				"tag_name": releaseTag(version),
+				"assets": []map[string]any{
+					{"name": assetName, "browser_download_url": realDownloadURL},
+				},
+			}
+			_ = json.NewEncoder(w).Encode(rel)
+		case strings.HasSuffix(r.URL.Path, realDownloadURL):
+			// Mirror path: prefix path is "/<full-url>". httptest only
+			// gives us the path; we just confirm the real URL is at the tail.
+			_, _ = w.Write(tarBuf)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	rel := &Releaser{
+		BaseURL:      srv.URL,
+		Repo:         "example/repo",
+		CacheDir:     t.TempDir(),
+		HTTP:         srv.Client(),
+		MirrorPrefix: srv.URL + "/",
+	}
+	bin, err := rel.Fetch(context.Background(), version, "linux", "amd64")
+	if err != nil {
+		t.Fatalf("Fetch: %v (saw path %q)", err, sawPath)
+	}
+	if bin.Path == "" {
+		t.Fatal("empty bin path")
+	}
+	// Final hit was the mirror-wrapped URL; the path on the test server
+	// will be "/<full-github-url>" — i.e. it ends with the realDownloadURL.
+	if !strings.HasSuffix(sawPath, realDownloadURL) {
+		t.Errorf("last request path %q does not end with %q", sawPath, realDownloadURL)
 	}
 }
 

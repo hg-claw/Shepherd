@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/hg-claw/Shepherd/internal/agent/vlog"
 	"github.com/hg-claw/Shepherd/internal/agentapi"
 )
 
@@ -50,6 +51,7 @@ func (h *Handler) HandleUploadBegin(req agentapi.FileUploadBegin) {
 		hash: sha256.New(), f: f,
 	}
 	h.transfers.Store(req.Sid, x)
+	vlog.Debugf("upload begin sid=%s path=%s size=%d mode=%o", req.Sid, req.Path, req.Size, mode)
 	h.sendUploadAckOK(req.Sid)
 }
 
@@ -106,6 +108,7 @@ func (h *Handler) HandleUploadEnd(req agentapi.FileUploadEnd) {
 		h.sendUploadAck(req.Sid, err)
 		return
 	}
+	vlog.Debugf("upload end sid=%s path=%s wrote=%d sha=%s", req.Sid, x.target, x.written, got)
 	h.sendUploadAckOK(req.Sid)
 }
 

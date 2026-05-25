@@ -32,12 +32,17 @@ var allowedSettingKeys = map[string]bool{
 	"file_chunk_bytes":             true,
 	// Phase 3 (CN mirror for plugin binary downloads)
 	"cn_mirror_enabled": true,
+	// Phase 4 (agent verbose log toggle, runtime push to online agents)
+	"agent_log_verbose": true,
 }
 
-// Keys that, when changed, require a sandbox re-push to online agents.
+// Keys that, when changed, require a re-push of the agent config snapshot
+// to online agents. ConfigUpdate carries the union of these keys, so any of
+// them flipping fans out the whole snapshot via SandboxPusher.PushAll.
 var sandboxPushKeys = map[string]bool{
 	"file_sandbox_enabled": true,
 	"file_sandbox_paths":   true,
+	"agent_log_verbose":    true,
 }
 
 func (a *SettingsAPI) GetAll(w http.ResponseWriter, r *http.Request) {

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"net/http"
 	"strconv"
@@ -291,6 +292,100 @@ func installerCreds(in installReq) installer.SSHCredentials {
 		creds.PrivateKey = []byte(in.SSHKey)
 	}
 	return creds
+}
+
+// reinstallReq carries fresh SSH credentials to retry the agent install on
+// an EXISTING server row. ssh_host/ssh_user/ssh_port are optional — they
+// default to what's stored on the server (set at create time). The common
+// case is "password auth was disabled server-side; retry with a key" where
+// only ssh_key changes.
+type reinstallReq struct {
+	SSHHost     string `json:"ssh_host"`
+	SSHPort     int    `json:"ssh_port"`
+	SSHUser     string `json:"ssh_user"`
+	SSHPassword string `json:"ssh_password"`
+	SSHKey      string `json:"ssh_key"`
+	Arch        string `json:"arch"`
+}
+
+// Reinstall re-runs the SSH installer against an existing server row with
+// fresh credentials. Unlike Install it does NOT create a new server, so a
+// failed install (wrong/disabled auth) can be retried with a private key
+// without delete-and-recreate.
+func (a *ServersAPI) Reinstall(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID2(r, "/api/servers/", "/reinstall")
+	if !ok {
+		writeError(w, 400, "bad path")
+		return
+	}
+	srv, err := a.Servers.Get(r.Context(), id)
+	if errors.Is(err, serversvc.ErrNotFound) {
+		writeError(w, 404, "not found")
+		return
+	}
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	if srv.InstallStage == "installing" {
+		writeError(w, 409, "install already in progress")
+		return
+	}
+
+	var in reinstallReq
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, 400, "bad json")
+		return
+	}
+	if in.SSHPassword == "" && in.SSHKey == "" {
+		writeError(w, 400, "one of ssh_password or ssh_key required")
+		return
+	}
+
+	// Fill SSH target from the stored row when the request omits it.
+	host := strings.TrimSpace(in.SSHHost)
+	if host == "" {
+		host = srv.SSHHost.String
+	}
+	user := strings.TrimSpace(in.SSHUser)
+	if user == "" {
+		user = srv.SSHUser.String
+	}
+	port := in.SSHPort
+	if port == 0 {
+		port = srv.SSHPort
+	}
+	if port == 0 {
+		port = 22
+	}
+	if host == "" || user == "" {
+		writeError(w, 400, "ssh_host and ssh_user required (none stored on this server)")
+		return
+	}
+
+	arch := strings.ToLower(strings.TrimSpace(in.Arch))
+	if arch == "" {
+		arch = srv.AgentArch.String
+	}
+	if arch != "amd64" && arch != "arm64" {
+		arch = "amd64"
+	}
+
+	// Persist a corrected target so later SSH ops (repair/update-agent) use it.
+	if err := a.Servers.UpdateSSHTarget(r.Context(), id, host, user, port); err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	srv.SSHHost = sql.NullString{String: host, Valid: true}
+	srv.SSHUser = sql.NullString{String: user, Valid: true}
+	srv.SSHPort = port
+
+	creds := installer.SSHCredentials{Host: host, Port: port, User: user, Password: in.SSHPassword}
+	if in.SSHKey != "" {
+		creds.PrivateKey = []byte(in.SSHKey)
+	}
+	a.InstallManager.Start(serversvc.InstallRequest{Server: srv, Creds: creds, Arch: arch})
+	writeJSON(w, 202, map[string]any{"server_id": srv.ID})
 }
 
 // Repair regenerates an enrollment token; the admin can use it to re-pair an agent

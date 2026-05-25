@@ -137,6 +137,20 @@ func (s *Service) Patch(ctx context.Context, id int64, in PatchInput) (*Server, 
 	return s.Get(ctx, id)
 }
 
+// UpdateSSHTarget persists the SSH host/user/port for a server. Used by
+// the re-install flow so a corrected user/host (e.g. the original install
+// targeted the wrong account) sticks for later SSH-based operations
+// (repair, update-agent) instead of silently reverting to the stale row.
+func (s *Service) UpdateSSHTarget(ctx context.Context, id int64, host, user string, port int) error {
+	if port == 0 {
+		port = 22
+	}
+	_, err := s.DB.ExecContext(ctx,
+		"UPDATE servers SET ssh_host=$1, ssh_user=$2, ssh_port=$3 WHERE id=$4",
+		nullable(host), nullable(user), port, id)
+	return err
+}
+
 func (s *Service) Delete(ctx context.Context, id int64) error {
 	res, err := s.DB.ExecContext(ctx, "DELETE FROM servers WHERE id=$1", id)
 	if err != nil {

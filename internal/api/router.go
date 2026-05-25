@@ -94,6 +94,7 @@ func (r *Router) Handler() http.Handler {
 
 	admin.HandleFunc("GET /api/admin/scripts", r.Scripts.List)
 	admin.HandleFunc("POST /api/admin/scripts", r.Scripts.Create)
+	admin.HandleFunc("GET /api/admin/scripts/{id}", r.Scripts.Get)
 	admin.HandleFunc("PATCH /api/admin/scripts/{id}", r.Scripts.Update)
 	admin.HandleFunc("DELETE /api/admin/scripts/{id}", r.Scripts.Delete)
 	admin.HandleFunc("POST /api/admin/scripts/{id}/run", r.Scripts.Run)

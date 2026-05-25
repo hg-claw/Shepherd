@@ -24,6 +24,11 @@ const schema = z.object({
   pty_recording_enabled: z.boolean(),
   pty_max_concurrent_per_admin: z.coerce.number<number>().int().min(1).max(64),
   file_upload_max_mb: z.coerce.number<number>().min(0.1).max(4096),
+  // When on, the singbox/xray plugin Releaser fetches route through
+  // https://gh-proxy.com/ for the actual asset download. List/lookup
+  // calls (api.github.com) stay direct — the proxy doesn't reliably
+  // mirror API endpoints.
+  cn_mirror_enabled: z.boolean(),
 })
 type FormVals = z.infer<typeof schema>
 
@@ -59,6 +64,7 @@ export default function Settings() {
       pty_recording_enabled: false,
       pty_max_concurrent_per_admin: 5,
       file_upload_max_mb: 100,
+      cn_mirror_enabled: false,
     },
   })
 
@@ -77,6 +83,7 @@ export default function Settings() {
       pty_recording_enabled: settings.data.pty_recording_enabled === 'true',
       pty_max_concurrent_per_admin: Number(settings.data.pty_max_concurrent_per_admin ?? 5),
       file_upload_max_mb: uploadBytes / (1024 * 1024),
+      cn_mirror_enabled: settings.data.cn_mirror_enabled === 'true',
     })
   }, [settings.data, form])
 
@@ -94,6 +101,7 @@ export default function Settings() {
         pty_recording_enabled: String(vals.pty_recording_enabled),
         pty_max_concurrent_per_admin: String(vals.pty_max_concurrent_per_admin),
         file_upload_max_bytes: String(Math.round(vals.file_upload_max_mb * 1024 * 1024)),
+        cn_mirror_enabled: String(vals.cn_mirror_enabled),
       })
       toast('success', t('admin.saved'))
     } catch (err: any) {
@@ -136,7 +144,7 @@ export default function Settings() {
           {tab === 'about' && <AboutTab />}
 
           {tab === 'storage' && (
-            <StorageTab register={form.register} errors={form.formState.errors} />
+            <StorageTab register={form.register} errors={form.formState.errors} form={form} />
           )}
 
           {tab === 'keys' && <KeysTab />}
@@ -200,10 +208,13 @@ function AboutTab() {
 function StorageTab({
   register,
   errors,
+  form,
 }: {
   register: ReturnType<typeof useForm<FormVals>>['register']
   errors: Record<string, { message?: string } | undefined>
+  form: ReturnType<typeof useForm<FormVals>>
 }) {
+  const cnOn = form.watch('cn_mirror_enabled')
   return (
     <div className="space-y-4">
       <div className="border rounded-lg bg-elev overflow-hidden">
@@ -268,6 +279,23 @@ function StorageTab({
               {errors.default_telemetry_interval_seconds.message}
             </p>
           )}
+        </div>
+      </div>
+
+      <div className="border rounded-lg bg-elev overflow-hidden">
+        <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
+          <span className="text-foreground font-medium text-[12.5px]">CN mirror</span>
+          <span className="text-fg-dim font-mono text-[11px] ml-auto">
+            gh-proxy.com relay · binary downloads only
+          </span>
+        </div>
+        <div className="p-4">
+          <ToggleRow
+            label="Route plugin binary downloads via gh-proxy.com"
+            hint="Applies to sing-box and xray release fetches on deploy. GitHub API calls (listing tags, resolving assets) still go direct — the relay doesn't mirror api.github.com."
+            value={cnOn}
+            onChange={(v) => form.setValue('cn_mirror_enabled', v)}
+          />
         </div>
       </div>
     </div>

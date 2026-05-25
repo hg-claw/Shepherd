@@ -30,6 +30,13 @@ type Releaser struct {
 	Repo     string       // override for tests; default "hg-claw/Shepherd"
 	CacheDir string       // directory to cache extracted binaries
 	HTTP     *http.Client // override for tests; default 120s-timeout client
+	// MirrorPrefix, when non-empty, is prepended to the github.com asset
+	// download URL just before httpGet. Lets mainland-China hosts route
+	// the actual binary fetch through a relay (typically
+	// https://gh-proxy.com/) without changing the upstream API path —
+	// list/lookup still hit api.github.com directly because the proxy
+	// doesn't reliably mirror those endpoints.
+	MirrorPrefix string
 }
 
 const (
@@ -144,6 +151,13 @@ func (r *Releaser) Fetch(ctx context.Context, version, osName, arch string) (Bin
 	dlURL, err := r.resolveAssetURL(ctx, version, assetName)
 	if err != nil {
 		return Binary{}, fmt.Errorf("resolve asset URL: %w", err)
+	}
+
+	// CN-mirror prefix on the actual download. resolveAssetURL above
+	// stays on api.github.com (gh-proxy.com doesn't reliably mirror API
+	// endpoints); only the binary fetch gets routed through.
+	if r.MirrorPrefix != "" {
+		dlURL = r.MirrorPrefix + dlURL
 	}
 
 	// Download the tar.gz.

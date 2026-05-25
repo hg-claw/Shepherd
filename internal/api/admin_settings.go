@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+	"log"
 	"net/http"
+	"sort"
 
 	"github.com/hg-claw/Shepherd/internal/serversvc"
 )
@@ -67,6 +69,7 @@ func (a *SettingsAPI) Patch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	pushSandbox := false
+	pushTriggers := []string{}
 	for k, v := range in {
 		if err := a.Settings.Set(r.Context(), k, v); err != nil {
 			writeError(w, 500, err.Error())
@@ -74,9 +77,12 @@ func (a *SettingsAPI) Patch(w http.ResponseWriter, r *http.Request) {
 		}
 		if sandboxPushKeys[k] {
 			pushSandbox = true
+			pushTriggers = append(pushTriggers, k+"="+v)
 		}
 	}
 	if pushSandbox && a.OnSandboxChange != nil {
+		sort.Strings(pushTriggers)
+		log.Printf("settings: agent config push triggered by %v", pushTriggers)
 		a.OnSandboxChange(r.Context())
 	}
 	a.GetAll(w, r)

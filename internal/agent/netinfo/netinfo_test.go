@@ -3,6 +3,8 @@ package netinfo
 import (
 	"context"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -31,6 +33,58 @@ func TestClassify(t *testing.T) {
 		if got != c.want {
 			t.Errorf("classify(%s, %s) = %q want %q", c.ip, c.ifName, got, c.want)
 		}
+	}
+}
+
+func TestFetchPublicIP_ParsesPlainText(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// ip.me + ipify both serve plain text; trailing newline is
+		// standard. ParseIP needs the trim that fetchPublicIP does.
+		_, _ = w.Write([]byte("203.0.113.42\n"))
+	}))
+	defer srv.Close()
+	got := fetchPublicIP(context.Background(), srv.URL)
+	if got != "203.0.113.42" {
+		t.Errorf("fetchPublicIP = %q want 203.0.113.42", got)
+	}
+}
+
+func TestFetchPublicIP_RejectsHTMLOrNonsense(t *testing.T) {
+	// Some services serve an HTML page when User-Agent doesn't match
+	// curl/wget. Defensive: ParseIP must reject; we already cap the body
+	// at 64 bytes so a huge HTML response can't OOM.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("<html><body>not an IP</body></html>"))
+	}))
+	defer srv.Close()
+	if got := fetchPublicIP(context.Background(), srv.URL); got != "" {
+		t.Errorf("fetchPublicIP on HTML = %q want empty", got)
+	}
+}
+
+func TestPublicIPv4_FallsThroughFailures(t *testing.T) {
+	// Swap the probe list to a doomed primary + a working secondary.
+	// Verifies the fall-through logic without hitting the real internet,
+	// which is the actual production failure shape (ip.me blocked, the
+	// second probe answers).
+	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(500)
+	}))
+	defer dead.Close()
+	alive := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("198.51.100.7"))
+	}))
+	defer alive.Close()
+
+	orig := publicProbes
+	t.Cleanup(func() { publicProbes = orig })
+	publicProbes = []struct{ name, url string }{
+		{"dead", dead.URL},
+		{"alive", alive.URL},
+	}
+	addr, src := publicIPv4(context.Background())
+	if addr != "198.51.100.7" || src != "alive" {
+		t.Errorf("got (%q, %q); want (198.51.100.7, alive)", addr, src)
 	}
 }
 

@@ -104,13 +104,14 @@ func getVersionsHandler(deps plugins.Deps) http.HandlerFunc {
 
 // deployToHostFunc is a package-level var that tests override to avoid real
 // binary fetching. Production impl calls Plugin.DeployToHost.
-var deployToHostFunc = func(ctx context.Context, deps plugins.Deps, serverID int64, version string) error {
+var deployToHostFunc = func(ctx context.Context, deps plugins.Deps, serverID int64, version string, useMirror bool) error {
 	p := &Plugin{}
-	return p.DeployToHost(ctx, deps, serverID, version, []byte("{}"))
+	return p.DeployToHost(ctx, deps, serverID, version, []byte("{}"), useMirror)
 }
 
 type patchSBVersionBody struct {
-	Version string `json:"version"`
+	Version   string `json:"version"`
+	UseMirror bool   `json:"use_mirror,omitempty"`
 }
 
 // patchSBServerVersionHandler handles PATCH /servers/{id}.
@@ -149,7 +150,7 @@ func patchSBServerVersionHandler(deps plugins.Deps) http.HandlerFunc {
 		// Async: push new binary + restart, then reassemble config.
 		go func() {
 			ctx := context.Background()
-			if err := deployToHostFunc(ctx, deps, sid, body.Version); err != nil {
+			if err := deployToHostFunc(ctx, deps, sid, body.Version, body.UseMirror); err != nil {
 				_, _ = deps.DB.ExecContext(ctx,
 					`UPDATE plugin_hosts SET status='failed', last_error=$1
 					 WHERE plugin_id='singbox' AND server_id=$2`,

@@ -161,12 +161,18 @@ jobs:
           Build tags: ${{ steps.tags.outputs.tags }}
           EOF
           tar czf "${name}.tar.gz" "$name"
+          # SHA256 sidecar — sha256sum format ("<hex>  <filename>\n").
+          # The Shepherd server fetches this before instructing agents
+          # to download the tar.gz; agents verify locally before install.
+          sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: shepherd-singbox-${{ needs.decide.outputs.version }}-v2rayapi-linux-${{ matrix.arch }}
-          path: shepherd-singbox-${{ needs.decide.outputs.version }}-v2rayapi-linux-${{ matrix.arch }}.tar.gz
+          path: |
+            shepherd-singbox-${{ needs.decide.outputs.version }}-v2rayapi-linux-${{ matrix.arch }}.tar.gz
+            shepherd-singbox-${{ needs.decide.outputs.version }}-v2rayapi-linux-${{ matrix.arch }}.tar.gz.sha256
           retention-days: 7
 
   release:
@@ -194,4 +200,5 @@ jobs:
             --repo "${{ github.repository }}" \
             --title "sing-box ${VERSION} + v2ray-api" \
             --notes "Auto-built from sagernet/sing-box at ${VERSION} with the with_v2ray_api build tag, plus the rest of upstream's DEFAULT_BUILD_TAGS minus with_naive_outbound. Consumed by Shepherd server's release fetcher." \
-            artifacts/*.tar.gz
+            artifacts/*.tar.gz \
+            artifacts/*.tar.gz.sha256

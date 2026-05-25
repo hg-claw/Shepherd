@@ -1,43 +1,38 @@
 package singbox
 
 import (
-	"archive/tar"
-	"bytes"
-	"compress/gzip"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 )
 
-// Releaser downloads and caches sing-box release binaries from GitHub.
+// Releaser resolves shepherd-singbox release metadata (asset URL + sha256
+// sidecar) from GitHub. The agent does the actual download — the server
+// only hits api.github.com for the small JSON lookups.
 //
 // Shepherd ships its own sing-box build (with the with_v2ray_api tag so the
 // agent's gRPC stats sampler has counters to read — upstream's release
 // binaries are compiled without it). The build pipeline lives in
 // .github/workflows/sing-box-build.yml; binaries are published as releases
 // on this repo with tag pattern `singbox-vX.Y.Z-v2rayapi` and asset names
-// `shepherd-singbox-vX.Y.Z-v2rayapi-linux-{arch}.tar.gz`.
+// `shepherd-singbox-vX.Y.Z-v2rayapi-linux-{arch}.tar.gz`. Each asset
+// has a sibling `.sha256` text file (single hex digest line).
 type Releaser struct {
-	BaseURL  string       // override for tests; default https://api.github.com
-	Repo     string       // override for tests; default "hg-claw/Shepherd"
-	CacheDir string       // directory to cache extracted binaries
-	HTTP     *http.Client // override for tests; default 120s-timeout client
-	// MirrorPrefix, when non-empty, is prepended to the github.com asset
-	// download URL just before httpGet. Lets mainland-China hosts route
-	// the actual binary fetch through a relay (typically
-	// https://gh-proxy.com/) without changing the upstream API path —
-	// list/lookup still hit api.github.com directly because the proxy
-	// doesn't reliably mirror those endpoints.
-	MirrorPrefix string
+	BaseURL string       // override for tests; default https://api.github.com
+	Repo    string       // override for tests; default "hg-claw/Shepherd"
+	HTTP    *http.Client // override for tests; default 30s-timeout client
 }
+
+// CNMirrorPrefix is prepended to the github.com asset URL when a deploy
+// asks for the CN mirror. Kept here so swapping mirrors is a one-line
+// change. The same constant lives in xray's Releaser for symmetry.
+const CNMirrorPrefix = "https://gh-proxy.com/"
 
 const (
 	defaultSingboxRepo = "hg-claw/Shepherd"
@@ -48,22 +43,11 @@ const (
 	releaseTagSuffix = "-v2rayapi"
 )
 
-// Binary describes one cached sing-box binary on disk.
-type Binary struct {
-	Version      string
-	OS           string
-	Arch         string
-	SizeBytes    int64
-	Sha256       string    // SHA256 of the downloaded tar.gz
-	Path         string    // path to the extracted binary
-	DownloadedAt time.Time
-}
-
 func (r *Releaser) client() *http.Client {
 	if r.HTTP != nil {
 		return r.HTTP
 	}
-	return &http.Client{Timeout: 120 * time.Second}
+	return &http.Client{Timeout: 30 * time.Second}
 }
 
 func (r *Releaser) apiBase() string {
@@ -109,90 +93,76 @@ func singboxAssetName(version, osName, arch string) string {
 	return fmt.Sprintf("shepherd-singbox-v%s-v2rayapi-%s-%s.tar.gz", version, osName, a)
 }
 
-// cachedPath returns the path where the extracted binary is stored.
+// ResolveFetchSpec returns the FileFetch payload that, when sent to an
+// agent, causes it to download and install shepherd-singbox at version
+// for (osName, arch). The server only hits api.github.com here — the
+// tarball never touches the Shepherd server's disk.
 //
-// The version segment is the full release tag ("singbox-vX.Y.Z-v2rayapi")
-// rather than just "vX.Y.Z" so the cache key naturally invalidates when
-// the build flavor changes. Earlier versions of Shepherd cached upstream
-// sing-box binaries under "v<version>/sing-box"; after the switch to our
-// self-built shepherd-singbox-…-v2rayapi releases (PR #45), a cache hit
-// on the old key would have pushed an upstream binary against a config
-// that needed with_v2ray_api — sing-box fatal-fails. The new key cannot
-// collide with the old one, so the bad cache entries are orphaned
-// (occupying disk until manually cleared) but never returned.
-func (r *Releaser) cachedPath(version, osName, arch string) string {
-	return filepath.Join(r.CacheDir, osName+"-"+arch, releaseTag(version), "sing-box")
-}
-
-// Fetch returns the binary, downloading and extracting it if not already cached.
-// The Sha256 field in the returned Binary is the SHA256 of the downloaded tar.gz.
-func (r *Releaser) Fetch(ctx context.Context, version, osName, arch string) (Binary, error) {
-	dest := r.cachedPath(version, osName, arch)
-
-	// Cache hit: binary already extracted on disk.
-	if fi, err := os.Stat(dest); err == nil && fi.Size() > 0 {
-		sum, err := sha256File(dest)
-		if err != nil {
-			return Binary{}, fmt.Errorf("sha256 cached file: %w", err)
-		}
-		return Binary{
-			Version:      version,
-			OS:           osName,
-			Arch:         arch,
-			SizeBytes:    fi.Size(),
-			Sha256:       sum,
-			Path:         dest,
-			DownloadedAt: fi.ModTime(),
-		}, nil
-	}
-
-	// Resolve asset download URL from the GitHub releases list.
+// useMirror=true wraps the asset URL with CNMirrorPrefix so mainland-China
+// agents can fetch via the gh-proxy relay. The .sha256 sidecar URL is
+// wrapped too (it's also on github.com). The api.github.com lookup stays
+// direct because gh-proxy doesn't reliably mirror the API.
+func (r *Releaser) ResolveFetchSpec(ctx context.Context, version, osName, arch string, useMirror bool) (agentapi.FileFetch, error) {
 	assetName := singboxAssetName(version, osName, arch)
 	dlURL, err := r.resolveAssetURL(ctx, version, assetName)
 	if err != nil {
-		return Binary{}, fmt.Errorf("resolve asset URL: %w", err)
+		return agentapi.FileFetch{}, fmt.Errorf("resolve asset URL: %w", err)
 	}
-
-	// CN-mirror prefix on the actual download. resolveAssetURL above
-	// stays on api.github.com (gh-proxy.com doesn't reliably mirror API
-	// endpoints); only the binary fetch gets routed through.
-	if r.MirrorPrefix != "" {
-		dlURL = r.MirrorPrefix + dlURL
+	shaURL := dlURL + ".sha256"
+	if useMirror {
+		dlURL = CNMirrorPrefix + dlURL
+		shaURL = CNMirrorPrefix + shaURL
 	}
-
-	// Download the tar.gz.
-	tarBuf, err := httpGet(ctx, r.client(), dlURL)
-	if err != nil {
-		return Binary{}, fmt.Errorf("download %s: %w", dlURL, err)
-	}
-
-	// Compute SHA256 of the tar.gz before extraction.
-	h := sha256.Sum256(tarBuf)
-	tarSHA := hex.EncodeToString(h[:])
-
-	// Extract the sing-box binary from inside the versioned directory.
-	binBytes, err := extractSingbox(tarBuf, "sing-box")
-	if err != nil {
-		return Binary{}, fmt.Errorf("extract sing-box from tar.gz: %w", err)
-	}
-
-	// Write extracted binary to cache.
-	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
-		return Binary{}, fmt.Errorf("mkdir cache: %w", err)
-	}
-	if err := os.WriteFile(dest, binBytes, 0755); err != nil {
-		return Binary{}, fmt.Errorf("write cached binary: %w", err)
-	}
-
-	return Binary{
-		Version:      version,
-		OS:           osName,
-		Arch:         arch,
-		SizeBytes:    int64(len(binBytes)),
-		Sha256:       tarSHA,
-		Path:         dest,
-		DownloadedAt: time.Now().UTC(),
+	// Sidecar fetch is best-effort. Older shepherd-singbox releases
+	// (pre-build-pipeline-update) don't ship .sha256; in that case we
+	// pass SHA256="" so the agent skips verification and TLS is the
+	// only integrity check.
+	sha, _ := fetchSHA256Sidecar(ctx, r.client(), shaURL)
+	return agentapi.FileFetch{
+		URL:    dlURL,
+		Path:   singboxBinaryRemotePath,
+		Mode:   0o755,
+		SHA256: sha,
+		Extract: &agentapi.FetchExtract{
+			Kind:      "tar.gz",
+			EntryGlob: "*/sing-box",
+		},
 	}, nil
+}
+
+// fetchSHA256Sidecar GETs a .sha256 text file (single hex digest line,
+// optionally with a filename suffix in sha256sum format) and returns the
+// hex digest. Tolerates trailing whitespace. Empty string + nil error
+// when 404 — older releases simply don't have one.
+func fetchSHA256Sidecar(ctx context.Context, c *http.Client, u string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := c.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusNotFound {
+		return "", nil
+	}
+	if resp.StatusCode/100 != 2 {
+		return "", fmt.Errorf("sha256 sidecar HTTP %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	// sha256sum format: "<hex>  <filename>" — take the first field.
+	line := strings.TrimSpace(string(body))
+	if i := strings.IndexAny(line, " \t"); i > 0 {
+		line = line[:i]
+	}
+	if len(line) != 64 {
+		return "", fmt.Errorf("sha256 sidecar has %d hex chars, want 64", len(line))
+	}
+	return strings.ToLower(line), nil
 }
 
 // ListLatestTags returns up to limit recent shepherd-singbox release versions
@@ -278,42 +248,6 @@ func (r *Releaser) resolveAssetURL(ctx context.Context, version, assetName strin
 	return "", fmt.Errorf("asset %q not found in release %q", assetName, want)
 }
 
-// extractSingbox searches the tar.gz for a file named targetName (base name)
-// at any path depth (e.g., sing-box-1.10.0-linux-amd64/sing-box) and returns
-// its contents with the executable bit preserved.
-func extractSingbox(tarGzData []byte, targetName string) ([]byte, error) {
-	gr, err := gzip.NewReader(bytes.NewReader(tarGzData))
-	if err != nil {
-		return nil, fmt.Errorf("gzip reader: %w", err)
-	}
-	defer func() { _ = gr.Close() }()
-
-	tr := tar.NewReader(gr)
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("tar read: %w", err)
-		}
-		// Skip directories and non-regular files.
-		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != 0 {
-			continue
-		}
-		base := filepath.Base(hdr.Name)
-		// Match "sing-box" or "sing-box.exe" (Windows).
-		if base == targetName || strings.TrimSuffix(base, ".exe") == targetName {
-			data, err := io.ReadAll(tr)
-			if err != nil {
-				return nil, fmt.Errorf("read entry %s: %w", hdr.Name, err)
-			}
-			return data, nil
-		}
-	}
-	return nil, fmt.Errorf("entry %q not found in tar.gz", targetName)
-}
-
 // httpGet performs a GET request and returns the response body.
 // Returns an error for non-2xx status codes.
 func httpGet(ctx context.Context, c *http.Client, u string) ([]byte, error) {
@@ -330,18 +264,4 @@ func httpGet(ctx context.Context, c *http.Client, u string) ([]byte, error) {
 		return nil, fmt.Errorf("HTTP %d for %s", resp.StatusCode, u)
 	}
 	return io.ReadAll(resp.Body)
-}
-
-// sha256File computes the SHA256 hex digest of a file's contents.
-func sha256File(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = f.Close() }()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
 }

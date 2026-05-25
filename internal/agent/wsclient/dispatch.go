@@ -107,6 +107,14 @@ func (c *Client) dispatchControl(ctx context.Context, env agentapi.Envelope, fh 
 		if err := env.Decode(&p); err == nil {
 			fh.HandleUploadEnd(p)
 		}
+	case agentapi.TypeFileFetch:
+		var p agentapi.FileFetch
+		if err := env.Decode(&p); err == nil {
+			// Run in a goroutine — HandleFetch blocks on HTTP (up to
+			// 15 min for a slow CN link); keeping it on the dispatch
+			// goroutine would stall every other inbound frame.
+			go fh.HandleFetch(ctx, p)
+		}
 	case agentapi.TypeFileDownloadBegin:
 		var p agentapi.FileDownloadBegin
 		if err := env.Decode(&p); err == nil {

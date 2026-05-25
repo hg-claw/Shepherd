@@ -50,6 +50,13 @@ func (h *HubHostExec) PushFile(ctx context.Context, serverID int64, path string,
 	return h.Files.Upload(ctx, serverID, path, mode, int64(len(content)), sha256hex, reader)
 }
 
+// FetchURL asks the agent at serverID to download spec.URL directly and
+// install it at spec.Path. The WS link only carries the spec frame and
+// the agent's ack; the binary bytes never go through Shepherd's hub.
+func (h *HubHostExec) FetchURL(ctx context.Context, serverID int64, spec agentapi.FileFetch) error {
+	return h.Files.Fetch(ctx, serverID, spec)
+}
+
 // RunCmd runs name with args on serverID, collects all PTY output, and waits
 // for the process to exit. It returns stdout (merged with stderr — PTY
 // limitation), an empty stderr slice, the process exit code, and any

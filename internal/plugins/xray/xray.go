@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
-	"os"
 
 	"github.com/jmoiron/sqlx"
 
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 	"github.com/hg-claw/Shepherd/internal/plugins/deploy"
@@ -21,17 +21,20 @@ var unitLinux []byte
 var unitDarwin []byte
 
 const (
-	binaryRemotePathUnix = "/usr/local/bin/shepherd-xray"
-	configRemotePathUnix = "/etc/shepherd-xray/config.json"
-	unitRemotePathLinux  = "/etc/systemd/system/shepherd-xray.service"
-	unitRemotePathDarwin = "/Library/LaunchDaemons/com.shepherd.xray.plist"
-	unitNameLinux        = "shepherd-xray"
-	unitNameDarwin       = "com.shepherd.xray"
+	// xrayBinaryRemotePathUnix is the install destination on the agent host.
+	// Exported (within package) so release.go's ResolveFetchSpec can stamp
+	// it into the FileFetch payload sent to the agent.
+	xrayBinaryRemotePathUnix = "/usr/local/bin/shepherd-xray"
+	configRemotePathUnix     = "/etc/shepherd-xray/config.json"
+	unitRemotePathLinux      = "/etc/systemd/system/shepherd-xray.service"
+	unitRemotePathDarwin     = "/Library/LaunchDaemons/com.shepherd.xray.plist"
+	unitNameLinux            = "shepherd-xray"
+	unitNameDarwin           = "com.shepherd.xray"
 )
 
 // releaserIface lets tests inject a fake.
 type releaserIface interface {
-	Fetch(ctx context.Context, version, os, arch string) (Binary, error)
+	ResolveFetchSpec(ctx context.Context, version, os, arch string, useMirror bool) (agentapi.FileFetch, error)
 }
 
 type Plugin struct {
@@ -49,31 +52,26 @@ func (p *Plugin) Migrations(driver shepdb.Driver) []plugins.Migration { return l
 func (p *Plugin) OnEnable(_ context.Context, _ plugins.Deps) error  { return nil }
 func (p *Plugin) OnDisable(_ context.Context, _ plugins.Deps) error { return nil }
 
-// DeployToHost deploys xray to the given host.
-// configJSON is the rendered xray config (what ends up at
-// /etc/shepherd-xray/config.json on the host). version is the xray release
-// tag (no leading "v") used to fetch the binary.
-func (p *Plugin) DeployToHost(ctx context.Context, deps plugins.Deps, serverID int64, version string, configJSON []byte) error {
+// DeployToHost tells the agent to fetch the xray binary directly from
+// the XTLS release (optionally via the CN mirror), then pushes config
+// and unit and starts the service. useMirror selects per-deploy whether
+// the agent goes through gh-proxy.com.
+func (p *Plugin) DeployToHost(ctx context.Context, deps plugins.Deps, serverID int64, version string, configJSON []byte, useMirror bool) error {
 	if version == "" {
 		return fmt.Errorf("version required")
+	}
+	if err := plugins.RequireAgentVersionAtLeast(ctx, deps.DB, serverID, plugins.MinAgentVersionForFetch); err != nil {
+		return err
 	}
 	osName, arch := hostOSArch(ctx, deps.DB, serverID)
 
 	r := p.releaser
 	if r == nil {
-		// CN-mirror prefix from the global setting. Empty = pass-through.
-		r = &Releaser{
-			CacheDir:     deps.DataDir + "/cache",
-			MirrorPrefix: plugins.LoadCNMirror(ctx, deps.DB),
-		}
+		r = &Releaser{}
 	}
-	bin, err := r.Fetch(ctx, version, osName, arch)
+	spec, err := r.ResolveFetchSpec(ctx, version, osName, arch, useMirror)
 	if err != nil {
-		return fmt.Errorf("fetch binary: %w", err)
-	}
-	binBytes, err := os.ReadFile(bin.Path)
-	if err != nil {
-		return fmt.Errorf("read binary: %w", err)
+		return fmt.Errorf("resolve fetch spec: %w", err)
 	}
 	cfgBytes, err := NormaliseRaw(configJSON)
 	if err != nil {
@@ -90,11 +88,10 @@ func (p *Plugin) DeployToHost(ctx context.Context, deps plugins.Deps, serverID i
 	}
 
 	pusher := &deploy.Pusher{Exec: deps.HostExec}
-	return pusher.DeployService(ctx, deploy.DeployParams{
+	return pusher.DeployServiceFetch(ctx, deploy.DeployFetchParams{
 		OS:          osName,
 		ServerID:    serverID,
-		BinaryPath:  binaryRemotePathUnix,
-		BinaryBytes: binBytes,
+		BinaryFetch: spec,
 		ConfigPath:  configRemotePathUnix,
 		ConfigBytes: cfgBytes,
 		UnitPath:    unitPath,

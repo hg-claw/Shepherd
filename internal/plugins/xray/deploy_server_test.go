@@ -6,13 +6,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 	shepdb "github.com/hg-claw/Shepherd/internal/db"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 )
 
 type fakeHostExec struct {
-	pushed map[string][]byte
-	cmds   [][]string
+	pushed  map[string][]byte
+	fetched []agentapi.FileFetch
+	cmds    [][]string
 }
 
 func (f *fakeHostExec) PushFile(_ context.Context, _ int64, path string, _ uint32, content []byte) error {
@@ -20,6 +22,10 @@ func (f *fakeHostExec) PushFile(_ context.Context, _ int64, path string, _ uint3
 		f.pushed = map[string][]byte{}
 	}
 	f.pushed[path] = append([]byte(nil), content...)
+	return nil
+}
+func (f *fakeHostExec) FetchURL(_ context.Context, _ int64, spec agentapi.FileFetch) error {
+	f.fetched = append(f.fetched, spec)
 	return nil
 }
 func (f *fakeHostExec) RunCmd(_ context.Context, _ int64, name string, args ...string) ([]byte, []byte, int, error) {

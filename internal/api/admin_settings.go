@@ -32,8 +32,6 @@ var allowedSettingKeys = map[string]bool{
 	"pty_max_concurrent_per_admin": true,
 	"file_upload_max_bytes":        true,
 	"file_chunk_bytes":             true,
-	// Phase 3 (CN mirror for plugin binary downloads)
-	"cn_mirror_enabled": true,
 	// Phase 4 (agent verbose log toggle, runtime push to online agents)
 	"agent_log_verbose": true,
 }

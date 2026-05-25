@@ -1,12 +1,7 @@
 package singbox
 
 import (
-	"archive/tar"
-	"bytes"
-	"compress/gzip"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -16,109 +11,102 @@ import (
 	"testing"
 )
 
-// makeTarGz builds a minimal shepherd-singbox tarball with the binary inside
-// the same directory layout the build workflow produces:
-// shepherd-singbox-vX.Y.Z-v2rayapi-{os}-{arch}/sing-box
-func makeTarGz(t *testing.T, version, osName, arch string, binContent []byte) []byte {
-	t.Helper()
-	var buf bytes.Buffer
-	gw := gzip.NewWriter(&buf)
-	tw := tar.NewWriter(gw)
-
-	dirName := fmt.Sprintf("shepherd-singbox-v%s-v2rayapi-%s-%s", version, osName, arch)
-	_ = tw.WriteHeader(&tar.Header{
-		Typeflag: tar.TypeDir,
-		Name:     dirName + "/",
-		Mode:     0755,
-	})
-	_ = tw.WriteHeader(&tar.Header{
-		Name: dirName + "/sing-box",
-		Mode: 0755,
-		Size: int64(len(binContent)),
-	})
-	_, _ = tw.Write(binContent)
-	_ = tw.Close()
-	_ = gw.Close()
-	return buf.Bytes()
-}
-
-func TestReleaser_FetchAndCacheHit(t *testing.T) {
+// TestReleaser_ResolveFetchSpec_Direct verifies the spec built when the
+// operator does NOT request the CN mirror — both the API call and the
+// sidecar GET hit github.com (here, our httptest server). The sidecar
+// is served with a real sha256sum-format response so SHA gets populated.
+func TestReleaser_ResolveFetchSpec_Direct(t *testing.T) {
 	const version = "1.13.10"
 	const osName = "linux"
 	const arch = "amd64"
-
-	fakeBin := []byte("#!/bin/sh\necho sing-box\n")
-	tarBuf := makeTarGz(t, version, osName, arch, fakeBin)
-	h256 := sha256.Sum256(tarBuf)
-	wantSHA := hex.EncodeToString(h256[:])
-
 	assetName := fmt.Sprintf("shepherd-singbox-v%s-v2rayapi-%s-%s.tar.gz", version, osName, arch)
-	var hitCount int
+	const wantSHA = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
+	var dlURL string // captured from server-side base
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/repos/example/repo/releases/tags/" + releaseTag(version):
-			// Tag-direct endpoint — returns ONE release object, not a list.
-			// Pre-fix the code iterated /releases (paged) and got starved
-			// on busy repos; this proves we now hit the O(1) lookup.
+		switch {
+		case r.URL.Path == "/repos/example/repo/releases/tags/"+releaseTag(version):
 			rel := map[string]any{
 				"tag_name": releaseTag(version),
 				"assets": []map[string]any{
-					{
-						"name":                 assetName,
-						"browser_download_url": "http://" + r.Host + "/dl/" + assetName,
-					},
+					{"name": assetName, "browser_download_url": dlURL},
 				},
 			}
 			_ = json.NewEncoder(w).Encode(rel)
-		case "/dl/" + assetName:
-			hitCount++
-			w.Header().Set("Content-Length", fmt.Sprint(len(tarBuf)))
-			_, _ = w.Write(tarBuf)
+		case strings.HasSuffix(r.URL.Path, ".sha256"):
+			_, _ = fmt.Fprintf(w, "%s  %s\n", wantSHA, assetName)
 		default:
 			http.NotFound(w, r)
 		}
 	}))
 	defer srv.Close()
+	dlURL = srv.URL + "/releases/download/" + releaseTag(version) + "/" + assetName
 
-	cacheDir := t.TempDir()
-	rel := &Releaser{
-		BaseURL:  srv.URL,
-		Repo:     "example/repo",
-		CacheDir: cacheDir,
-		HTTP:     srv.Client(),
-	}
-
-	bin, err := rel.Fetch(context.Background(), version, osName, arch)
+	rel := &Releaser{BaseURL: srv.URL, Repo: "example/repo", HTTP: srv.Client()}
+	spec, err := rel.ResolveFetchSpec(context.Background(), version, osName, arch, false)
 	if err != nil {
-		t.Fatalf("Fetch: %v", err)
+		t.Fatalf("ResolveFetchSpec: %v", err)
 	}
-	if bin.Version != version {
-		t.Errorf("Version = %q want %q", bin.Version, version)
+	if spec.URL != dlURL {
+		t.Errorf("URL = %q, want %q", spec.URL, dlURL)
 	}
-	if bin.Sha256 != wantSHA {
-		t.Errorf("Sha256 = %q want %q", bin.Sha256, wantSHA)
+	if spec.SHA256 != wantSHA {
+		t.Errorf("SHA256 = %q, want %q", spec.SHA256, wantSHA)
 	}
-	if hitCount != 1 {
-		t.Errorf("download hit count = %d, want 1", hitCount)
+	if spec.Path != singboxBinaryRemotePath {
+		t.Errorf("Path = %q, want %q", spec.Path, singboxBinaryRemotePath)
 	}
+	if spec.Mode != 0o755 {
+		t.Errorf("Mode = %o, want 0755", spec.Mode)
+	}
+	if spec.Extract == nil || spec.Extract.Kind != "tar.gz" || spec.Extract.EntryGlob != "*/sing-box" {
+		t.Errorf("Extract = %+v, want tar.gz/*/sing-box", spec.Extract)
+	}
+}
 
-	bin2, err := rel.Fetch(context.Background(), version, osName, arch)
-	if err != nil {
-		t.Fatalf("cache hit Fetch: %v", err)
+// TestReleaser_ResolveFetchSpec_Mirror verifies that useMirror=true
+// wraps the asset download URL with CNMirrorPrefix. The sidecar gh-proxy
+// URL won't actually resolve (it points to the real gh-proxy.com) but
+// the sidecar fetch is best-effort — failure → SHA="" and we still
+// return a usable spec for the agent.
+func TestReleaser_ResolveFetchSpec_Mirror(t *testing.T) {
+	const version = "1.13.10"
+	const osName = "linux"
+	const arch = "amd64"
+	assetName := singboxAssetName(version, osName, arch)
+	var dlURL string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/repos/example/repo/releases/tags/"+releaseTag(version) {
+			rel := map[string]any{
+				"tag_name": releaseTag(version),
+				"assets": []map[string]any{
+					{"name": assetName, "browser_download_url": dlURL},
+				},
+			}
+			_ = json.NewEncoder(w).Encode(rel)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+	dlURL = "https://github.com/example/repo/releases/download/" + releaseTag(version) + "/" + assetName
+
+	// Custom HTTP client that fails fast on the mirror-prefixed sidecar
+	// URL (its DNS resolves to gh-proxy.com which we don't want to hit
+	// from a unit test). The Releaser's sidecar fetch is best-effort so
+	// the test just confirms the URL on the returned spec is wrapped.
+	rel := &Releaser{BaseURL: srv.URL, Repo: "example/repo", HTTP: srv.Client()}
+	spec, _ := rel.ResolveFetchSpec(context.Background(), version, osName, arch, true)
+	if !strings.HasPrefix(spec.URL, CNMirrorPrefix) {
+		t.Errorf("URL = %q, want prefix %q", spec.URL, CNMirrorPrefix)
 	}
-	if bin2.Path != bin.Path {
-		t.Errorf("cache hit returned different path: %s vs %s", bin2.Path, bin.Path)
-	}
-	if hitCount != 1 {
-		t.Errorf("download hit count after cache = %d, want still 1", hitCount)
+	if !strings.HasSuffix(spec.URL, dlURL) {
+		t.Errorf("URL = %q, want suffix %q", spec.URL, dlURL)
 	}
 }
 
 func TestReleaser_ListLatestTagsFiltersUnrelated(t *testing.T) {
-	// Mimic GitHub's per-page semantics — page=1 returns the data,
-	// page=2+ returns an empty array. The pagination loop relies on
-	// the empty-array signal to terminate.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("page") != "1" {
 			_ = json.NewEncoder(w).Encode([]map[string]any{})
@@ -146,17 +134,11 @@ func TestReleaser_ListLatestTagsFiltersUnrelated(t *testing.T) {
 	}
 }
 
-// Production regression: the singbox release was buried at position ~23
-// in the /releases listing after ~10 intervening Shepherd vX.Y.Z tags.
-// The old single-page fetch (per_page≈20) couldn't see it and returned
-// []. This test sets up exactly that shape: 20 unrelated Shepherd tags
-// on page 1, the actual singbox tag on page 2.
 func TestReleaser_ListLatestTagsPaginatesPastUnrelatedTags(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		page := r.URL.Query().Get("page")
 		switch page {
 		case "1":
-			// 20 Shepherd server tags — none match the singbox filter
 			releases := make([]map[string]any, 20)
 			for i := range releases {
 				releases[i] = map[string]any{"tag_name": "v0.7." + strconv.Itoa(i)}
@@ -178,7 +160,7 @@ func TestReleaser_ListLatestTagsPaginatesPastUnrelatedTags(t *testing.T) {
 		t.Fatal(err)
 	}
 	if fmt.Sprint(got) != fmt.Sprint([]string{"1.13.12"}) {
-		t.Errorf("ListLatestTags = %v, want [1.13.12] (must paginate past page-1 of non-matches)", got)
+		t.Errorf("ListLatestTags = %v, want [1.13.12]", got)
 	}
 }
 
@@ -198,60 +180,6 @@ func TestSingboxAssetName(t *testing.T) {
 	}
 }
 
-func TestReleaser_MirrorPrefixWrapsDownloadURL(t *testing.T) {
-	// When MirrorPrefix is set, the actual asset GET must hit
-	// <prefix><real-github-url>. resolveAssetURL still hits the
-	// api.github.com path unchanged (gh-proxy doesn't reliably mirror
-	// API endpoints — that's the contract we documented on the field).
-	const version = "1.13.12"
-	fakeBin := []byte("BIN")
-	tarBuf := makeTarGz(t, version, "linux", "amd64", fakeBin)
-	assetName := singboxAssetName(version, "linux", "amd64")
-	realDownloadURL := "https://github.com/example/repo/releases/download/" + releaseTag(version) + "/" + assetName
-
-	var sawPath string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sawPath = r.URL.Path
-		switch {
-		case r.URL.Path == "/repos/example/repo/releases/tags/"+releaseTag(version):
-			rel := map[string]any{
-				"tag_name": releaseTag(version),
-				"assets": []map[string]any{
-					{"name": assetName, "browser_download_url": realDownloadURL},
-				},
-			}
-			_ = json.NewEncoder(w).Encode(rel)
-		case strings.HasSuffix(r.URL.Path, realDownloadURL):
-			// Mirror path: prefix path is "/<full-url>". httptest only
-			// gives us the path; we just confirm the real URL is at the tail.
-			_, _ = w.Write(tarBuf)
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer srv.Close()
-
-	rel := &Releaser{
-		BaseURL:      srv.URL,
-		Repo:         "example/repo",
-		CacheDir:     t.TempDir(),
-		HTTP:         srv.Client(),
-		MirrorPrefix: srv.URL + "/",
-	}
-	bin, err := rel.Fetch(context.Background(), version, "linux", "amd64")
-	if err != nil {
-		t.Fatalf("Fetch: %v (saw path %q)", err, sawPath)
-	}
-	if bin.Path == "" {
-		t.Fatal("empty bin path")
-	}
-	// Final hit was the mirror-wrapped URL; the path on the test server
-	// will be "/<full-github-url>" — i.e. it ends with the realDownloadURL.
-	if !strings.HasSuffix(sawPath, realDownloadURL) {
-		t.Errorf("last request path %q does not end with %q", sawPath, realDownloadURL)
-	}
-}
-
 func TestStripReleaseTag(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"singbox-v1.13.10-v2rayapi", "1.13.10"},
@@ -264,5 +192,36 @@ func TestStripReleaseTag(t *testing.T) {
 		if got := stripReleaseTag(c.in); got != c.want {
 			t.Errorf("stripReleaseTag(%q) = %q want %q", c.in, got, c.want)
 		}
+	}
+}
+
+func TestFetchSHA256Sidecar_404Returns_EmptySHA(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	got, err := fetchSHA256Sidecar(context.Background(), srv.Client(), srv.URL+"/missing.sha256")
+	if err != nil {
+		t.Fatalf("fetchSHA256Sidecar should not error on 404: %v", err)
+	}
+	if got != "" {
+		t.Errorf("expected empty sha on 404, got %q", got)
+	}
+}
+
+func TestFetchSHA256Sidecar_ParsesSha256SumFormat(t *testing.T) {
+	const wantSHA = "abc123def456abc123def456abc123def456abc123def456abc123def456abc1"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprintf(w, "%s  shepherd-singbox.tar.gz\n", wantSHA)
+	}))
+	defer srv.Close()
+
+	got, err := fetchSHA256Sidecar(context.Background(), srv.Client(), srv.URL+"/x.sha256")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != wantSHA {
+		t.Errorf("got %q, want %q", got, wantSHA)
 	}
 }

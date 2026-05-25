@@ -64,7 +64,7 @@ func TestPatchServerVersion_TriggersBinaryPushAndRestart(t *testing.T) {
 	// Override deployFunc to record that it was called (avoid real Releaser).
 	origDeploy := deployToHostFunc
 	deployCalled := make(chan string, 1)
-	deployToHostFunc = func(_ context.Context, d plugins.Deps, serverID int64, version string) error {
+	deployToHostFunc = func(_ context.Context, d plugins.Deps, serverID int64, version string, useMirror bool) error {
 		deployCalled <- version
 		return nil
 	}

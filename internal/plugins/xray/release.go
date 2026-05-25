@@ -1,47 +1,31 @@
 package xray
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 )
 
-// Releaser downloads and caches xray release binaries from GitHub.
+// Releaser resolves xray release metadata. The actual zip download
+// happens on the agent — server-side methods only do the small API
+// lookups and .dgst sidecar fetch.
 type Releaser struct {
-	BaseURL  string // https://github.com/XTLS/Xray-core (override for tests)
-	CacheDir string // typically deps.DataDir + "/cache"
-	HTTP     *http.Client
-	// MirrorPrefix, when non-empty, is prepended to the github.com asset
-	// download + digest URLs just before httpGet. Routes the binary
-	// fetch through a relay (typically https://gh-proxy.com/) for
-	// mainland-China hosts. The /releases listing call still goes to
-	// api.github.com (proxy doesn't reliably mirror the API).
-	MirrorPrefix string
+	BaseURL string // https://github.com/XTLS/Xray-core (override for tests)
+	HTTP    *http.Client
 }
+
+// CNMirrorPrefix is prepended to the github.com asset URL when a deploy
+// asks for the CN mirror. Kept symmetric with singbox.CNMirrorPrefix.
+const CNMirrorPrefix = "https://gh-proxy.com/"
 
 func defaultClient() *http.Client {
 	return &http.Client{Timeout: 60 * time.Second}
-}
-
-// Binary describes one cached xray binary on disk.
-type Binary struct {
-	Version      string
-	OS           string
-	Arch         string
-	SizeBytes    int64
-	Sha256       string
-	Path         string
-	DownloadedAt time.Time
 }
 
 // xrayOS maps Go runtime.GOOS to xray's release-asset OS token.
@@ -80,69 +64,45 @@ func (r *Releaser) base() string {
 	return strings.TrimRight(r.BaseURL, "/")
 }
 
-func (r *Releaser) cachedBinaryPath(version, osName, arch string) string {
-	return filepath.Join(r.CacheDir, osName+"-"+arch, "v"+version, "xray")
+// buildAssetURLs returns the (download, digest) URLs for a given version.
+// useMirror wraps both with CNMirrorPrefix. Split out so URL construction
+// is testable without round-tripping the digest fetch.
+func (r *Releaser) buildAssetURLs(version, osName, arch string, useMirror bool) (zipURL, dgstURL string) {
+	zipURL = fmt.Sprintf("%s/releases/download/v%s/Xray-%s-%s.zip", r.base(), version, xrayOS(osName), xrayArch(arch))
+	dgstURL = zipURL + ".dgst"
+	if useMirror {
+		zipURL = CNMirrorPrefix + zipURL
+		dgstURL = CNMirrorPrefix + dgstURL
+	}
+	return
 }
 
-// Fetch returns a cached binary or downloads + verifies + extracts it.
-func (r *Releaser) Fetch(ctx context.Context, version, osName, arch string) (Binary, error) {
-	out := r.cachedBinaryPath(version, osName, arch)
-	if st, err := os.Stat(out); err == nil {
-		sum, err := sha256File(out)
-		if err == nil {
-			return Binary{
-				Version: version, OS: osName, Arch: arch,
-				SizeBytes: st.Size(), Sha256: sum, Path: out,
-				DownloadedAt: st.ModTime(),
-			}, nil
-		}
-	}
-
-	if err := os.MkdirAll(filepath.Dir(out), 0755); err != nil {
-		return Binary{}, err
-	}
-
-	zipURL := fmt.Sprintf("%s/releases/download/v%s/Xray-%s-%s.zip", r.base(), version, xrayOS(osName), xrayArch(arch))
-	dgstURL := zipURL + ".dgst"
-	// CN-mirror prefix applied to BOTH the zip and the digest. .dgst
-	// is also a github.com URL so it goes through the same relay.
-	if r.MirrorPrefix != "" {
-		zipURL = r.MirrorPrefix + zipURL
-		dgstURL = r.MirrorPrefix + dgstURL
-	}
+// ResolveFetchSpec returns the FileFetch payload that, sent to an agent,
+// causes it to download and install Xray version (osName, arch). Server
+// fetches the small .dgst sidecar from XTLS to populate SHA256 — Xray
+// has always published per-release digests so this is mandatory.
+//
+// useMirror=true wraps both the zip URL and the .dgst URL with
+// CNMirrorPrefix. API endpoints stay direct.
+func (r *Releaser) ResolveFetchSpec(ctx context.Context, version, osName, arch string, useMirror bool) (agentapi.FileFetch, error) {
+	zipURL, dgstURL := r.buildAssetURLs(version, osName, arch, useMirror)
 	httpc := r.HTTP
 	if httpc == nil {
 		httpc = defaultClient()
 	}
-
 	expectedSha, err := fetchDigest(ctx, httpc, dgstURL)
 	if err != nil {
-		_ = os.RemoveAll(filepath.Dir(out))
-		return Binary{}, fmt.Errorf("fetch digest: %w", err)
+		return agentapi.FileFetch{}, fmt.Errorf("fetch digest: %w", err)
 	}
-
-	zipBody, err := httpGet(ctx, httpc, zipURL)
-	if err != nil {
-		_ = os.RemoveAll(filepath.Dir(out))
-		return Binary{}, fmt.Errorf("fetch zip: %w", err)
-	}
-	actual := sha256.Sum256(zipBody)
-	actualHex := hex.EncodeToString(actual[:])
-	if !strings.EqualFold(actualHex, expectedSha) {
-		_ = os.RemoveAll(filepath.Dir(filepath.Dir(out)))
-		return Binary{}, fmt.Errorf("sha256 mismatch: want %s got %s", expectedSha, actualHex)
-	}
-
-	if err := extractXray(zipBody, out); err != nil {
-		_ = os.RemoveAll(filepath.Dir(filepath.Dir(out)))
-		return Binary{}, fmt.Errorf("extract: %w", err)
-	}
-
-	st, _ := os.Stat(out)
-	return Binary{
-		Version: version, OS: osName, Arch: arch,
-		SizeBytes: st.Size(), Sha256: actualHex,
-		Path: out, DownloadedAt: time.Now().UTC(),
+	return agentapi.FileFetch{
+		URL:    zipURL,
+		Path:   xrayBinaryRemotePathUnix,
+		Mode:   0o755,
+		SHA256: expectedSha,
+		Extract: &agentapi.FetchExtract{
+			Kind:      "zip",
+			EntryGlob: "xray",
+		},
 	}, nil
 }
 
@@ -184,19 +144,6 @@ func fetchDigest(ctx context.Context, c *http.Client, u string) (string, error) 
 	return "", fmt.Errorf("no SHA2-256 entry in dgst body")
 }
 
-func sha256File(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = f.Close() }()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
 type releaseEntry struct {
 	TagName string `json:"tag_name"`
 }
@@ -232,31 +179,3 @@ func (r *Releaser) ListLatestTags(ctx context.Context, limit int) ([]string, err
 	return out, nil
 }
 
-func extractXray(zipBytes []byte, outPath string) error {
-	zr, err := zip.NewReader(bytes.NewReader(zipBytes), int64(len(zipBytes)))
-	if err != nil {
-		return err
-	}
-	for _, f := range zr.File {
-		base := filepath.Base(f.Name)
-		if base != "xray" && base != "xray.exe" {
-			continue
-		}
-		rc, err := f.Open()
-		if err != nil {
-			return err
-		}
-		w, err := os.OpenFile(outPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0755)
-		if err != nil {
-			_ = rc.Close()
-			return err
-		}
-		_, err = io.Copy(w, rc)
-		_ = rc.Close()
-		if cerr := w.Close(); err == nil {
-			err = cerr
-		}
-		return err
-	}
-	return fmt.Errorf("no xray binary found in zip")
-}

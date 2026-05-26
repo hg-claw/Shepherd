@@ -1,7 +1,5 @@
 package subgen
 
-import "sort"
-
 type Group struct {
 	Name    string
 	Type    string // "select" | "url-test"
@@ -9,56 +7,74 @@ type Group struct {
 }
 
 type Intermediate struct {
-	Nodes  []Node
-	Groups []Group
-	Rules  []string // FINAL last
+	Nodes   []Node
+	Groups  []Group
+	Rules   []string // FINAL last
+	General string   // raw [General] body; empty → renderer default
+	MITM    string   // raw [MITM] body; empty → section omitted
 }
 
 const autoSelectGroup = "Auto Select"
 const mainProxyGroup = "PROXY"
 
-// Assemble builds the target-agnostic model. Groups: the main manual
-// "PROXY" select (members = auto + per-country groups + all node names),
-// an "Auto Select" url-test over all nodes, and one url-test per country
-// when GroupByCountry. Rules: custom rules first, then category rules,
-// then FINAL.
+// Assemble builds the target-agnostic model.
+//
+// Groups, in order: the main "PROXY" select (members = optional "Auto Select"
+// then every node name), an "Auto Select" url-test (only if IncludeAutoSelect),
+// then one switchable "select" group per category. A category group is named
+// after the category; its members are the configured policy (first → the
+// default selection), PROXY, DIRECT, REJECT, then every node — de-duplicated.
+//
+// Rules: custom rules first (verbatim, explicit policy), then one rule per
+// category routed to the category's GROUP by name (so clients can re-route it),
+// then FINAL. The free-text General/MITM blocks ride along to the renderer.
 func Assemble(nodes []Node, spec TemplateSpec, target, rulesetBase string) Intermediate {
-	im := Intermediate{Nodes: nodes}
+	im := Intermediate{Nodes: nodes, General: spec.General, MITM: spec.MITM}
+
 	allNames := make([]string, 0, len(nodes))
-	byCountry := map[string][]string{}
 	for _, n := range nodes {
 		allNames = append(allNames, n.Name)
-		byCountry[n.Country] = append(byCountry[n.Country], n.Name)
 	}
 
 	mainMembers := []string{}
 	if spec.IncludeAutoSelect {
-		im.Groups = append(im.Groups, Group{Name: autoSelectGroup, Type: "url-test", Members: allNames})
 		mainMembers = append(mainMembers, autoSelectGroup)
 	}
-	if spec.GroupByCountry {
-		countries := make([]string, 0, len(byCountry))
-		for c := range byCountry {
-			if c != "" {
-				countries = append(countries, c)
-			}
-		}
-		sort.Strings(countries)
-		for _, c := range countries {
-			gname := countryFlag(c) + " " + c
-			im.Groups = append(im.Groups, Group{Name: gname, Type: "url-test", Members: byCountry[c]})
-			mainMembers = append(mainMembers, gname)
-		}
-	}
 	mainMembers = append(mainMembers, allNames...)
-	im.Groups = append([]Group{{Name: mainProxyGroup, Type: "select", Members: mainMembers}}, im.Groups...)
+	im.Groups = append(im.Groups, Group{Name: mainProxyGroup, Type: "select", Members: mainMembers})
+	if spec.IncludeAutoSelect {
+		im.Groups = append(im.Groups, Group{Name: autoSelectGroup, Type: "url-test", Members: allNames})
+	}
+
+	for _, c := range spec.Categories {
+		members := dedupeStrings(append([]string{c.Policy, mainProxyGroup, "DIRECT", "REJECT"}, allNames...))
+		im.Groups = append(im.Groups, Group{Name: c.Name, Type: "select", Members: members})
+	}
 
 	for _, r := range spec.CustomRules {
 		im.Rules = append(im.Rules, r.Match+","+r.Policy)
 	}
 	for _, c := range spec.Categories {
-		im.Rules = append(im.Rules, ResolveRuleLines(c.Name, c.Policy, target, rulesetBase)...)
+		// Pass the category name as the rule target so the last field is the
+		// group name (RULE-SET,<url>,Telegram / GEOIP,CN,Location:CN).
+		im.Rules = append(im.Rules, ResolveRuleLines(c.Name, c.Name, target, rulesetBase)...)
 	}
 	im.Rules = append(im.Rules, "FINAL,"+spec.Final)
 	return im
+}
+
+// dedupeStrings drops later duplicates, preserving first-seen order. Keeps a
+// category group's default policy from repeating when it equals one of the
+// standard PROXY/DIRECT/REJECT members.
+func dedupeStrings(in []string) []string {
+	seen := make(map[string]bool, len(in))
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		if seen[s] {
+			continue
+		}
+		seen[s] = true
+		out = append(out, s)
+	}
+	return out
 }

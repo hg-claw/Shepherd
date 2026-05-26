@@ -40,3 +40,25 @@ func TestSurge_RendersProtocolsGroupsRules(t *testing.T) {
 		}
 	}
 }
+
+func TestSurge_ProxyLine_VmessTrojanTuic(t *testing.T) {
+	im := Intermediate{
+		Nodes: []Node{
+			{Name: "vm1", Protocol: "vmess", Server: "1.1.1.1", Port: 443, UUID: "uu", SNI: "v.com", Transport: "ws", Path: "/p", Host: "v.com"},
+			{Name: "tj1", Protocol: "trojan", Server: "2.2.2.2", Port: 443, Password: "tp", SNI: "t.com"},
+			{Name: "tu1", Protocol: "tuic", Server: "3.3.3.3", Port: 443, Password: "up", UUID: "uid", SNI: "u.com", Extra: map[string]any{"congestion_control": "bbr"}},
+		},
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"vm1"}}},
+		Rules:  []string{"FINAL,PROXY"},
+	}
+	out := (&SurgeRenderer{}).Render(im, "https://x/sub/t?target=surge")
+	for _, want := range []string{
+		"vm1 = vmess, 1.1.1.1, 443, username=uu, vmess-aead=true, tls=true, sni=v.com, ws=true, ws-path=/p, ws-headers=Host:v.com",
+		"tj1 = trojan, 2.2.2.2, 443, password=tp, sni=t.com",
+		"tu1 = tuic, 3.3.3.3, 443, password=up, uuid=uid, sni=u.com, congestion-controller=bbr",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q\n---\n%s", want, out)
+		}
+	}
+}

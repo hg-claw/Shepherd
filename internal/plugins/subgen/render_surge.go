@@ -58,6 +58,9 @@ func (r *SurgeRenderer) proxyLine(n Node) string {
 		if n.RealityPublicKey != "" {
 			b.WriteString(", public-key=" + n.RealityPublicKey + ", short-id=" + n.RealityShortID)
 		}
+		if n.Insecure {
+			b.WriteString(", skip-cert-verify=true")
+		}
 		if n.Flow != "" {
 			b.WriteString(", flow=" + n.Flow)
 		}
@@ -120,5 +123,6 @@ func (r *SurgeRenderer) groupLine(g Group) string {
 	if g.Type == "url-test" {
 		return fmt.Sprintf("%s = url-test, %s, url=http://www.gstatic.com/generate_204, interval=300", g.Name, members)
 	}
+	// select groups append DIRECT as the conventional fallback member.
 	return fmt.Sprintf("%s = select, %s, DIRECT", g.Name, members)
 }

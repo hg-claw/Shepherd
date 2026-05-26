@@ -55,7 +55,7 @@ func TestService_PreviewTemplate(t *testing.T) {
 	}
 	// The two sample nodes (🇺🇸 / 🇭🇰) appear in [Proxy] and in each category group.
 	if !strings.Contains(out, "🇺🇸") || !strings.Contains(out, "🇭🇰") {
-		t.Fatalf("expected per-country groups:\n%s", out)
+		t.Fatalf("expected sample-node flags in output:\n%s", out)
 	}
 
 	// unknown target → ErrBadTarget

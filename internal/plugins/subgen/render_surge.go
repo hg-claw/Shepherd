@@ -127,10 +127,21 @@ func (r *SurgeRenderer) Render(im Intermediate, subURL string) string {
 }
 
 func (r *SurgeRenderer) groupLine(g Group) string {
-	members := strings.Join(g.Members, ", ")
 	if g.Type == "url-test" {
-		return fmt.Sprintf("%s = url-test, %s, url=http://www.gstatic.com/generate_204, interval=300", g.Name, members)
+		return fmt.Sprintf("%s = url-test, %s, url=http://www.gstatic.com/generate_204, interval=300", g.Name, strings.Join(g.Members, ", "))
 	}
-	// select groups append DIRECT as the conventional fallback member.
-	return fmt.Sprintf("%s = select, %s, DIRECT", g.Name, members)
+	// select groups carry DIRECT as the conventional fallback member — append
+	// it only when the group doesn't already include it (category groups do).
+	members := g.Members
+	hasDirect := false
+	for _, m := range members {
+		if m == "DIRECT" {
+			hasDirect = true
+			break
+		}
+	}
+	if !hasDirect {
+		members = append(append([]string{}, members...), "DIRECT")
+	}
+	return fmt.Sprintf("%s = select, %s", g.Name, strings.Join(members, ", "))
 }

@@ -73,6 +73,29 @@ func TestSurge_GeneralAndMITM(t *testing.T) {
 	}
 }
 
+func TestSurge_SelectGroupDirectFallback(t *testing.T) {
+	// A select group WITHOUT DIRECT gets it appended (conventional fallback).
+	im := Intermediate{
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"Auto Select", "n1"}}},
+	}
+	out := (&SurgeRenderer{}).Render(im, "x")
+	if !strings.Contains(out, "PROXY = select, Auto Select, n1, DIRECT\n") {
+		t.Fatalf("missing DIRECT fallback:\n%s", out)
+	}
+
+	// A select group that ALREADY contains DIRECT must not duplicate it.
+	im2 := Intermediate{
+		Groups: []Group{{Name: "Telegram", Type: "select", Members: []string{"PROXY", "DIRECT", "REJECT", "n1"}}},
+	}
+	out2 := (&SurgeRenderer{}).Render(im2, "x")
+	if !strings.Contains(out2, "Telegram = select, PROXY, DIRECT, REJECT, n1\n") {
+		t.Fatalf("Telegram group wrong:\n%s", out2)
+	}
+	if strings.Contains(out2, "REJECT, n1, DIRECT") {
+		t.Fatalf("DIRECT duplicated:\n%s", out2)
+	}
+}
+
 func TestSurge_ProxyLine_VmessTrojanTuic(t *testing.T) {
 	im := Intermediate{
 		Nodes: []Node{

@@ -30,6 +30,7 @@ func (p *Plugin) registerRoutes(mux plugins.Mux) {
 	// Templates
 	mux.HandleFunc("GET /templates", p.listTemplates)
 	mux.HandleFunc("POST /templates", p.createTemplate)
+	mux.HandleFunc("POST /templates/preview", p.previewTemplate)
 	mux.HandleFunc("PATCH /templates/{id}", p.updateTemplate)
 	mux.HandleFunc("DELETE /templates/{id}", p.deleteTemplate)
 
@@ -340,6 +341,31 @@ func (p *Plugin) updateTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, toTemplateView(tpl))
+}
+
+type previewTemplateBody struct {
+	RulesJSON string `json:"rules_json"`
+	Target    string `json:"target"`
+}
+
+// previewTemplate renders an unsaved template's rules_json against sample nodes
+// so the editor can show a live preview. Every failure here is client-side (bad
+// target or malformed rules), so they all map to 400.
+func (p *Plugin) previewTemplate(w http.ResponseWriter, r *http.Request) {
+	var b previewTemplateBody
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	svc := &Service{Store: p.store(), Now: p.deps.Now, RulesetBase: DefaultRulesetBase}
+	body, ct, err := svc.PreviewTemplate(b.RulesJSON, b.Target)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	w.Header().Set("Content-Type", ct)
+	w.WriteHeader(200)
+	_, _ = w.Write([]byte(body))
 }
 
 func (p *Plugin) deleteTemplate(w http.ResponseWriter, r *http.Request) {

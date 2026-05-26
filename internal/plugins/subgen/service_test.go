@@ -2,6 +2,7 @@ package subgen
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -31,6 +32,39 @@ func TestService_GenerateByToken(t *testing.T) {
 	}
 	if !strings.Contains(out, "vless, 1.1.1.1, 443") || !strings.Contains(out, "RULE-SET,") {
 		t.Fatalf("output:\n%s", out)
+	}
+}
+
+func TestService_PreviewTemplate(t *testing.T) {
+	svc := &Service{Now: time.Now, RulesetBase: DefaultRulesetBase}
+	rules := `{"categories":[{"name":"Telegram","policy":"PROXY"}],"final":"PROXY","group_by_country":true}`
+
+	out, ct, err := svc.PreviewTemplate(rules, "surge")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(ct, "text/plain") {
+		t.Fatalf("content-type=%s", ct)
+	}
+	// Sample nodes render into [Proxy], the category becomes a RULE-SET line,
+	// and the FINAL rule trails. Sample nodes never get skipped.
+	for _, want := range []string{"[Proxy]", "= trojan,", "= ss,", "RULE-SET,", "FINAL,PROXY"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("preview missing %q:\n%s", want, out)
+		}
+	}
+	// group_by_country yields the two sample-country groups.
+	if !strings.Contains(out, "🇺🇸") || !strings.Contains(out, "🇭🇰") {
+		t.Fatalf("expected per-country groups:\n%s", out)
+	}
+
+	// unknown target → ErrBadTarget
+	if _, _, err := svc.PreviewTemplate(rules, "clash"); !errors.Is(err, ErrBadTarget) {
+		t.Fatalf("want ErrBadTarget got %v", err)
+	}
+	// malformed rules (unknown category) → a parse error, not ErrBadTarget
+	if _, _, err := svc.PreviewTemplate(`{"categories":[{"name":"Nope","policy":"PROXY"}]}`, "surge"); err == nil {
+		t.Fatal("expected error for unknown category")
 	}
 }
 

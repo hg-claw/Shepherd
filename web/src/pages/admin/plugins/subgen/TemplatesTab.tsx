@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Plus, Copy as CopyIcon, Trash2 } from 'lucide-react'
 import {
@@ -7,6 +7,7 @@ import {
   createSubgenTemplate,
   updateSubgenTemplate,
   deleteSubgenTemplate,
+  previewSubgenTemplate,
   type SubgenTemplate,
   type SubgenCategory,
 } from '@/api/subgen'
@@ -177,6 +178,8 @@ export default function TemplatesTab() {
 
 // ── Template editor ──────────────────────────────────────────────────────────
 
+type PreviewTarget = 'surge' | 'shadowrocket'
+
 function TemplateEditor({
   editing, categories, onClose, onSaved,
 }: {
@@ -189,6 +192,7 @@ function TemplateEditor({
 
   const initial = parseRules(editing.rules)
   const [name, setName] = useState(editing.name)
+  const [mode, setMode] = useState<'form' | 'raw'>('form')
   // map category name → policy; absence = unchecked
   const [catPolicies, setCatPolicies] = useState<Record<string, Policy>>(
     () => Object.fromEntries(initial.categories.map((c) => [c.name, c.policy])),
@@ -197,6 +201,7 @@ function TemplateEditor({
   const [final, setFinal] = useState<string>(initial.final)
   const [groupByCountry, setGroupByCountry] = useState(initial.group_by_country)
   const [includeAutoSelect, setIncludeAutoSelect] = useState(initial.include_auto_select)
+  const [rawJson, setRawJson] = useState('')
 
   const toggleCat = (name: string, defaultPolicy: string) => {
     setCatPolicies((prev) => {
@@ -209,114 +214,206 @@ function TemplateEditor({
   const setCatPolicy = (name: string, policy: Policy) =>
     setCatPolicies((prev) => ({ ...prev, [name]: policy }))
 
-  const serialize = (): string => {
-    const model: RulesModel = {
-      categories: Object.entries(catPolicies).map(([name, policy]) => ({ name, policy })),
-      custom_rules: textToCustomRules(customText),
-      final,
-      group_by_country: groupByCountry,
-      include_auto_select: includeAutoSelect,
-    }
-    return JSON.stringify(model)
+  const buildModel = (): RulesModel => ({
+    categories: Object.entries(catPolicies).map(([name, policy]) => ({ name, policy })),
+    custom_rules: textToCustomRules(customText),
+    final,
+    group_by_country: groupByCountry,
+    include_auto_select: includeAutoSelect,
+  })
+
+  // The rules_json we save and preview: the raw text in raw mode, otherwise the
+  // form serialized. As a plain string it stays referentially stable across
+  // renders when nothing changed, so it's safe as an effect dependency.
+  const rules = mode === 'raw' ? rawJson : JSON.stringify(buildModel())
+
+  const switchToRaw = () => {
+    setRawJson(JSON.stringify(buildModel(), null, 2))
+    setMode('raw')
+  }
+  const switchToForm = () => {
+    // Re-read whatever's in the raw box back into the form. Invalid JSON falls
+    // back to an empty model (parseRules swallows the parse error).
+    const m = parseRules(rawJson)
+    setCatPolicies(Object.fromEntries(m.categories.map((c) => [c.name, c.policy])))
+    setCustomText(customRulesToText(m.custom_rules))
+    setFinal(m.final)
+    setGroupByCountry(m.group_by_country)
+    setIncludeAutoSelect(m.include_auto_select)
+    setMode('form')
   }
 
+  // ── live preview ───────────────────────────────────────────────────────────
+  const [previewTarget, setPreviewTarget] = useState<PreviewTarget>('surge')
+  const [previewText, setPreviewText] = useState('')
+  const [previewErr, setPreviewErr] = useState<string | null>(null)
+  const [previewing, setPreviewing] = useState(false)
+
+  useEffect(() => {
+    const ctrl = new AbortController()
+    // Debounce so each keystroke in raw mode doesn't fire a request.
+    const handle = setTimeout(() => {
+      setPreviewing(true)
+      previewSubgenTemplate(rules, previewTarget, { signal: ctrl.signal })
+        .then((txt) => { setPreviewText(txt); setPreviewErr(null) })
+        .catch((e) => { if (!ctrl.signal.aborted) setPreviewErr(String(e?.message ?? e)) })
+        .finally(() => { if (!ctrl.signal.aborted) setPreviewing(false) })
+    }, 400)
+    return () => { ctrl.abort(); clearTimeout(handle) }
+  }, [rules, previewTarget])
+
   const save = useMutation({
-    mutationFn: () => {
-      const rules = serialize()
-      return editing.id == null
+    mutationFn: () =>
+      editing.id == null
         ? createSubgenTemplate(name.trim(), rules)
-        : updateSubgenTemplate(editing.id, name.trim(), rules)
-    },
+        : updateSubgenTemplate(editing.id, name.trim(), rules),
     onSuccess: () => { toast('success', 'Template saved'); onSaved() },
     onError: (e: any) => toast('error', String(e?.message ?? e)),
   })
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>{editing.id == null ? 'New template' : 'Edit template'}</DialogTitle>
         </DialogHeader>
-        <div className="max-h-[65vh] overflow-y-auto space-y-4">
-          <div>
-            <Label className="text-[12px]">Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 mt-1" />
-          </div>
 
-          <div>
-            <Label className="text-[12px]">Categories</Label>
-            <p className="text-fg-dim text-[11px] mt-0.5 mb-2">
-              Check a category to route its rule-sets; pick a policy. Rule URLs are the GitHub subscription addresses shipped with each category.
-            </p>
-            <div className="space-y-2">
-              {categories.map((c) => {
-                const checked = c.name in catPolicies
-                return (
-                  <div key={c.name} className="rounded-md border bg-sunken/30 p-2">
-                    <div className="flex items-center gap-2 text-[12.5px]">
-                      <input type="checkbox" checked={checked}
-                        onChange={() => toggleCat(c.name, c.default_policy)} aria-label={`category ${c.name}`} />
-                      <span className="font-mono">{c.name}</span>
-                      {checked && (
-                        <select value={catPolicies[c.name]} onChange={(e) => setCatPolicy(c.name, e.target.value)}
-                          className="h-6 px-1.5 ml-auto rounded border bg-background text-[11.5px]">
-                          {POLICIES.map((p) => <option key={p} value={p}>{p}</option>)}
-                        </select>
-                      )}
-                      {!checked && (
-                        <span className="ml-auto text-fg-dim text-[11px]">default {c.default_policy}</span>
-                      )}
-                    </div>
-                    {c.rule_urls.length > 0 && (
-                      <ul className="mt-1 pl-6 space-y-0.5">
-                        {c.rule_urls.map((u) => (
-                          <li key={u} className="font-mono text-[10.5px] text-fg-dim break-all">{u}</li>
-                        ))}
-                      </ul>
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* ── editor column ─────────────────────────────────────────────── */}
+          <div className="max-h-[65vh] overflow-y-auto space-y-4 pr-1">
+            <div>
+              <Label className="text-[12px]">Name</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 mt-1" />
+            </div>
+
+            <div className="inline-flex rounded-md border bg-sunken/30 p-0.5 text-[12px]">
+              <button type="button"
+                onClick={() => { if (mode !== 'form') switchToForm() }}
+                className={`px-3 h-7 rounded ${mode === 'form' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}>
+                Form
+              </button>
+              <button type="button"
+                onClick={() => { if (mode !== 'raw') switchToRaw() }}
+                className={`px-3 h-7 rounded ${mode === 'raw' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}>
+                Raw JSON
+              </button>
+            </div>
+
+            {mode === 'form' ? (
+              <>
+                <div>
+                  <Label className="text-[12px]">Categories</Label>
+                  <p className="text-fg-dim text-[11px] mt-0.5 mb-2">
+                    Check a category to route its rule-sets; pick a policy. Rule URLs are the GitHub subscription addresses shipped with each category.
+                  </p>
+                  <div className="space-y-2">
+                    {categories.map((c) => {
+                      const checked = c.name in catPolicies
+                      return (
+                        <div key={c.name} className="rounded-md border bg-sunken/30 p-2">
+                          <div className="flex items-center gap-2 text-[12.5px]">
+                            <input type="checkbox" checked={checked}
+                              onChange={() => toggleCat(c.name, c.default_policy)} aria-label={`category ${c.name}`} />
+                            <span className="font-mono">{c.name}</span>
+                            {checked && (
+                              <select value={catPolicies[c.name]} onChange={(e) => setCatPolicy(c.name, e.target.value)}
+                                className="h-6 px-1.5 ml-auto rounded border bg-background text-[11.5px]">
+                                {POLICIES.map((p) => <option key={p} value={p}>{p}</option>)}
+                              </select>
+                            )}
+                            {!checked && (
+                              <span className="ml-auto text-fg-dim text-[11px]">default {c.default_policy}</span>
+                            )}
+                          </div>
+                          {c.rule_urls.length > 0 && (
+                            <ul className="mt-1 pl-6 space-y-0.5">
+                              {c.rule_urls.map((u) => (
+                                <li key={u} className="font-mono text-[10.5px] text-fg-dim break-all">{u}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )
+                    })}
+                    {categories.length === 0 && (
+                      <div className="text-fg-dim text-[12px]">No categories defined.</div>
                     )}
                   </div>
-                )
-              })}
-              {categories.length === 0 && (
-                <div className="text-fg-dim text-[12px]">No categories defined.</div>
-              )}
-            </div>
+                </div>
+
+                <div>
+                  <Label className="text-[12px]">Custom rules</Label>
+                  <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                    One <code>TYPE,VALUE,policy</code> per line (e.g. <code>DOMAIN-SUFFIX,example.com,DIRECT</code>).
+                  </p>
+                  <textarea
+                    value={customText}
+                    onChange={(e) => setCustomText(e.target.value)}
+                    rows={5}
+                    className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
+                    placeholder="DOMAIN-SUFFIX,example.com,DIRECT"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                  <label className="flex items-center gap-2 text-[12.5px]">
+                    <input type="checkbox" checked={groupByCountry}
+                      onChange={(e) => setGroupByCountry(e.target.checked)} />
+                    Group by country
+                  </label>
+                  <label className="flex items-center gap-2 text-[12.5px]">
+                    <input type="checkbox" checked={includeAutoSelect}
+                      onChange={(e) => setIncludeAutoSelect(e.target.checked)} />
+                    Include auto-select group
+                  </label>
+                  <div className="flex items-center gap-2 text-[12.5px]">
+                    <span>Final</span>
+                    <select value={final} onChange={(e) => setFinal(e.target.value)}
+                      className="h-7 px-1.5 rounded border bg-background text-[11.5px]">
+                      {POLICIES.map((p) => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div>
+                <Label className="text-[12px]">rules_json</Label>
+                <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                  Edit the raw template spec. Switching back to Form re-reads this JSON.
+                </p>
+                <textarea
+                  value={rawJson}
+                  onChange={(e) => setRawJson(e.target.value)}
+                  rows={20}
+                  spellCheck={false}
+                  className="w-full px-2 py-1.5 rounded-md border bg-background text-[11.5px] font-mono"
+                />
+              </div>
+            )}
           </div>
 
-          <div>
-            <Label className="text-[12px]">Custom rules</Label>
-            <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
-              One <code>TYPE,VALUE,policy</code> per line (e.g. <code>DOMAIN-SUFFIX,example.com,DIRECT</code>).
-            </p>
-            <textarea
-              value={customText}
-              onChange={(e) => setCustomText(e.target.value)}
-              rows={5}
-              className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
-              placeholder="DOMAIN-SUFFIX,example.com,DIRECT"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <label className="flex items-center gap-2 text-[12.5px]">
-              <input type="checkbox" checked={groupByCountry}
-                onChange={(e) => setGroupByCountry(e.target.checked)} />
-              Group by country
-            </label>
-            <label className="flex items-center gap-2 text-[12.5px]">
-              <input type="checkbox" checked={includeAutoSelect}
-                onChange={(e) => setIncludeAutoSelect(e.target.checked)} />
-              Include auto-select group
-            </label>
-            <div className="flex items-center gap-2 text-[12.5px]">
-              <span>Final</span>
-              <select value={final} onChange={(e) => setFinal(e.target.value)}
+          {/* ── preview column ────────────────────────────────────────────── */}
+          <div className="flex flex-col max-h-[65vh] min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <Label className="text-[12px]">Preview</Label>
+              <select value={previewTarget} onChange={(e) => setPreviewTarget(e.target.value as PreviewTarget)}
                 className="h-7 px-1.5 rounded border bg-background text-[11.5px]">
-                {POLICIES.map((p) => <option key={p} value={p}>{p}</option>)}
+                <option value="surge">surge</option>
+                <option value="shadowrocket">shadowrocket</option>
               </select>
+              {previewing && <span className="text-fg-dim text-[11px]">rendering…</span>}
             </div>
+            {previewErr ? (
+              <pre className="flex-1 overflow-auto rounded-md border bg-sunken/30 p-2 text-[11px] font-mono text-err whitespace-pre-wrap break-all">{previewErr}</pre>
+            ) : (
+              <pre className="flex-1 overflow-auto rounded-md border bg-sunken/30 p-2 text-[10.5px] font-mono whitespace-pre">{previewText}</pre>
+            )}
+            <p className="text-fg-dim text-[10.5px] mt-1">
+              Preview uses two sample nodes (🇺🇸 / 🇭🇰) — your subscription's real nodes are substituted at fetch time.
+            </p>
           </div>
         </div>
+
         <DialogFooter>
           <Button variant="outline" size="sm" className="h-8" onClick={onClose}>Cancel</Button>
           <Button size="sm" className="h-8" disabled={!name.trim() || save.isPending}

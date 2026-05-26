@@ -64,9 +64,39 @@ async function getText(path: string, opts?: ApiOptions): Promise<string> {
   return text
 }
 
+// postText POSTs a JSON body to a text/plain endpoint (e.g. a template render
+// preview) and returns the raw body without JSON-parsing it. Error responses
+// are still JSON ({"error": msg}), so surface that message when present.
+async function postText(path: string, body: unknown, opts?: ApiOptions): Promise<string> {
+  const res = await fetch(path, {
+    method: 'POST',
+    credentials: 'include',
+    signal: opts?.signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (res.status === 401) {
+    on401Handler()
+    throw new APIError(401, 'unauthorized')
+  }
+  const text = await res.text()
+  if (!res.ok) {
+    let msg = text || res.statusText
+    try {
+      const j = text ? JSON.parse(text) : null
+      if (j?.error) msg = j.error
+    } catch {
+      // not JSON — keep raw text
+    }
+    throw new APIError(res.status, msg)
+  }
+  return text
+}
+
 export const api = {
   get: <T>(path: string, opts?: ApiOptions) => request<T>('GET', path, undefined, opts),
   getText,
+  postText,
   post: <T>(path: string, body?: unknown, opts?: ApiOptions) => request<T>('POST', path, body, opts),
   put: <T>(path: string, body?: unknown, opts?: ApiOptions) => request<T>('PUT', path, body, opts),
   patch: <T>(path: string, body?: unknown, opts?: ApiOptions) => request<T>('PATCH', path, body, opts),

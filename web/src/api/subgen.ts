@@ -83,6 +83,15 @@ export const updateSubgenTemplate = (
 export const deleteSubgenTemplate = (id: number): Promise<void> =>
   api.del<void>(`${BASE}/templates/${id}`)
 
+// previewSubgenTemplate renders unsaved rules_json against sample nodes and
+// returns the raw config text for the given target (surge|shadowrocket).
+export const previewSubgenTemplate = (
+  rules_json: string,
+  target: string,
+  opts?: { signal?: AbortSignal },
+): Promise<string> =>
+  api.postText(`${BASE}/templates/preview`, { rules_json, target }, opts)
+
 // ── categories ────────────────────────────────────────────────────────────────
 
 export const listSubgenCategories = (): Promise<SubgenCategory[]> =>

@@ -242,6 +242,36 @@ func TestRoutes_SubscriptionLifecycle(t *testing.T) {
 	}
 }
 
+func TestRoutes_PreviewTemplate(t *testing.T) {
+	p, _ := testPlugin(t)
+
+	// valid → 200 with rendered text
+	w := p.do("POST", "/templates/preview", map[string]any{
+		"rules_json": `{"categories":[{"name":"Telegram","policy":"PROXY"}],"final":"PROXY"}`,
+		"target":     "surge",
+	})
+	if w.Code != 200 {
+		t.Fatalf("preview: want 200 got %d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "RULE-SET,") || !strings.Contains(w.Body.String(), "[Proxy]") {
+		t.Fatalf("preview body:\n%s", w.Body.String())
+	}
+
+	// unknown target → 400
+	if w := p.do("POST", "/templates/preview", map[string]any{
+		"rules_json": `{"final":"PROXY"}`, "target": "clash",
+	}); w.Code != 400 {
+		t.Fatalf("bad target: want 400 got %d body=%s", w.Code, w.Body.String())
+	}
+
+	// malformed rules → 400
+	if w := p.do("POST", "/templates/preview", map[string]any{
+		"rules_json": `{"categories":[{"name":"Nope","policy":"PROXY"}]}`, "target": "surge",
+	}); w.Code != 400 {
+		t.Fatalf("bad rules: want 400 got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestRoutes_Preview(t *testing.T) {
 	p, s := testPlugin(t)
 	ctx := context.Background()

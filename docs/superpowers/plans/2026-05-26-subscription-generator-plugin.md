@@ -394,13 +394,13 @@ func (s *Store) CreateTemplate(ctx context.Context, name string, builtin bool, r
 
 func (s *Store) UpdateTemplate(ctx context.Context, id int64, name, rulesJSON string) error {
 	_, err := s.DB.ExecContext(ctx,
-		`UPDATE subgen_templates SET name=$1, rules_json=$2, updated_at=$3 WHERE id=$4 AND builtin=0`,
+		`UPDATE subgen_templates SET name=$1, rules_json=$2, updated_at=$3 WHERE id=$4 AND builtin=false`,
 		name, rulesJSON, s.now(), id)
 	return err
 }
 
 func (s *Store) DeleteTemplate(ctx context.Context, id int64) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM subgen_templates WHERE id=$1 AND builtin=0`, id)
+	_, err := s.DB.ExecContext(ctx, `DELETE FROM subgen_templates WHERE id=$1 AND builtin=false`, id)
 	return err
 }
 
@@ -418,7 +418,7 @@ func (s *Store) Template(ctx context.Context, id int64) (Template, error) {
 
 func (s *Store) TemplateByName(ctx context.Context, name string) (Template, error) {
 	var t Template
-	err := s.DB.GetContext(ctx, &t, `SELECT * FROM subgen_templates WHERE name=$1 AND builtin=1`, name)
+	err := s.DB.GetContext(ctx, &t, `SELECT * FROM subgen_templates WHERE name=$1 AND builtin=true`, name)
 	return t, err
 }
 
@@ -1289,7 +1289,7 @@ func seedBuiltinTemplates(ctx context.Context, db *sqlx.DB) error {
 		// insert-if-absent by (name, builtin=1); never overwrite.
 		var n int
 		if err := db.GetContext(ctx, &n,
-			`SELECT COUNT(*) FROM subgen_templates WHERE name=$1 AND builtin=1`, setName); err != nil {
+			`SELECT COUNT(*) FROM subgen_templates WHERE name=$1 AND builtin=true`, setName); err != nil {
 			return err
 		}
 		if n > 0 {
@@ -1297,7 +1297,7 @@ func seedBuiltinTemplates(ctx context.Context, db *sqlx.DB) error {
 		}
 		if _, err := db.ExecContext(ctx,
 			`INSERT INTO subgen_templates(name, builtin, rules_json, created_at, updated_at)
-			 VALUES ($1,1,$2,$3,$3)`, setName, string(raw), now); err != nil {
+			 VALUES ($1,true,$2,$3,$3)`, setName, string(raw), now); err != nil {
 			return err
 		}
 	}

@@ -24,6 +24,23 @@ public token subscription endpoint; admin CRUD UI.
 sing-box client JSON, Quantumult X renderers; remote ruleset-URL
 templates; per-inbound public-host override; emoji/rename pipelines.
 
+**Deferred during v1 implementation (tracked for a follow-up):**
+- **sing-box `forward`-mode relays** are excluded from subscriptions
+  (skipped with a warning at collect time) — they reuse the landing's
+  params at the relay IP:port, which needs upstream-param resolution not
+  built yet. `landing` and `proxy`-mode relays work.
+- **`ruleset_base` runtime override** (CN mirror): the `Service` field
+  exists and defaults to GitHub raw, but reading it from the plugin
+  `config_json` + a UI editor is not wired — v1 always uses the default
+  base. (CN deployments can change the constant or set the field in
+  cmd/server until the config path lands.)
+- **Plugin-enabled gate on `/sub/{token}`**: disabling the subgen plugin
+  in admin does not stop the public endpoint from serving; the
+  subscription-level `enabled` flag is honored, the plugin-level one is
+  not yet.
+- The admin **preview** endpoint (`GET …/subscriptions/{id}/preview`) is
+  implemented + tested but not yet surfaced in the UI.
+
 **Non-goals:** running subconverter/sublink-worker; converting *inbound*
 subscriptions from external sources (we only emit from managed inbounds).
 

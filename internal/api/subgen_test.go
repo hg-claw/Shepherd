@@ -55,4 +55,16 @@ func TestSubgenPublic_TokenAuthAndTarget(t *testing.T) {
 	if w.Code != 200 || w.Header().Get("Content-Type") != "text/plain; charset=utf-8" {
 		t.Fatalf("valid: %d %s", w.Code, w.Header().Get("Content-Type"))
 	}
+
+	// Disabled subscription must return 404.
+	if err := st.UpdateSubscription(ctx, sub.ID, "s", tid, false); err != nil {
+		t.Fatalf("disable subscription: %v", err)
+	}
+	r = httptest.NewRequest("GET", "/sub/"+sub.Token+"?target=surge", nil)
+	r.SetPathValue("token", sub.Token)
+	w = httptest.NewRecorder()
+	api.GetSubscription(w, r)
+	if w.Code != 404 {
+		t.Fatalf("disabled sub: want 404, got %d", w.Code)
+	}
 }

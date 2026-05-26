@@ -2,6 +2,8 @@ package api
 
 import (
 	"errors"
+	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -39,9 +41,10 @@ func (a *SubgenAPI) GetSubscription(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	case err != nil:
-		writeError(w, 500, err.Error())
+		log.Printf("subgen: generate token=%.6s target=%s: %v", token, target, err)
+		writeError(w, 500, "internal error")
 		return
 	}
 	w.Header().Set("Content-Type", ct)
-	_, _ = w.Write([]byte(body))
+	_, _ = io.WriteString(w, body)
 }

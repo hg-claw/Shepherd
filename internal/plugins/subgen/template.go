@@ -25,6 +25,8 @@ type TemplateSpec struct {
 	Final             string        `json:"final"`
 	GroupByCountry    bool          `json:"group_by_country"`
 	IncludeAutoSelect bool          `json:"include_auto_select"`
+	General           string        `json:"general,omitempty"` // raw [General] body; empty → renderer default
+	MITM              string        `json:"mitm,omitempty"`     // raw [MITM] body; empty → section omitted
 }
 
 func validPolicy(p string) bool {

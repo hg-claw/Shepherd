@@ -40,3 +40,16 @@ func TestSeedBuiltinTemplatesIdempotent(t *testing.T) {
 		t.Fatalf("builtins=%d want %d", builtins, len(PredefinedTemplates))
 	}
 }
+
+func TestParseTemplate_GeneralAndMITM(t *testing.T) {
+	spec, err := ParseTemplate(`{"final":"PROXY","general":"dns-server = 1.1.1.1","mitm":"hostname = *.x.com"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.General != "dns-server = 1.1.1.1" {
+		t.Fatalf("general = %q", spec.General)
+	}
+	if spec.MITM != "hostname = *.x.com" {
+		t.Fatalf("mitm = %q", spec.MITM)
+	}
+}

@@ -48,8 +48,25 @@ async function request<T>(method: string, path: string, body?: unknown, opts?: A
   return text ? (JSON.parse(text) as T) : (undefined as T)
 }
 
+// getText fetches a text/plain endpoint (e.g. a run's execution log) and
+// returns the raw body without JSON-parsing it. Shares the auth/401
+// handling of request() but skips the JSON.parse the typed helpers do.
+async function getText(path: string, opts?: ApiOptions): Promise<string> {
+  const res = await fetch(path, { method: 'GET', credentials: 'include', signal: opts?.signal })
+  if (res.status === 401) {
+    on401Handler()
+    throw new APIError(401, 'unauthorized')
+  }
+  const text = await res.text()
+  if (!res.ok) {
+    throw new APIError(res.status, text || res.statusText)
+  }
+  return text
+}
+
 export const api = {
   get: <T>(path: string, opts?: ApiOptions) => request<T>('GET', path, undefined, opts),
+  getText,
   post: <T>(path: string, body?: unknown, opts?: ApiOptions) => request<T>('POST', path, body, opts),
   put: <T>(path: string, body?: unknown, opts?: ApiOptions) => request<T>('PUT', path, body, opts),
   patch: <T>(path: string, body?: unknown, opts?: ApiOptions) => request<T>('PATCH', path, body, opts),

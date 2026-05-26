@@ -1,6 +1,6 @@
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Terminal, PlayCircle, AlertTriangle } from 'lucide-react'
+import { Terminal, PlayCircle } from 'lucide-react'
 import { useScriptRunDetail } from '@/api/scripts'
 import { useServers } from '@/api/servers'
 import { openConsole } from '@/api/console'
@@ -8,6 +8,7 @@ import { useConsoleTabs } from '@/store/consoleTabs'
 import { Button } from '@/components/ui/button'
 import { Pill, type PillKind } from '@/components/Pill'
 import { OnlineDot } from '@/components/OnlineDot'
+import { RunLogDialog } from '@/components/RunLogDialog'
 import { cn } from '@/lib/utils'
 
 function statusKind(s: string): PillKind {
@@ -164,33 +165,41 @@ export default function ScriptRunDetailPage() {
                         </span>
                       </td>
                       <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                        {st === 'running' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2 text-[12px] gap-1"
-                            onClick={() => attach(tgt.server_id)}
-                          >
-                            <Terminal className="h-3 w-3" />
-                            {t('console.attach', 'Attach')}
-                          </Button>
-                        )}
-                        {tgt.pty_session_id && st !== 'running' && st !== 'failed' && (
-                          <Button size="sm" variant="ghost" asChild className="h-7 px-2 text-[12px] gap-1">
-                            <a href={`/admin/recordings/${tgt.pty_session_id}`}>
-                              <PlayCircle className="h-3 w-3" />
-                              {t('recording.replay', 'Replay')}
-                            </a>
-                          </Button>
-                        )}
-                        {st === 'failed' && (
-                          <Button size="sm" variant="ghost" asChild className="h-7 px-2 text-[12px] gap-1 text-err hover:text-err">
-                            <Link to={`/admin/script-runs/${id}/targets/${tgt.id}`}>
-                              <AlertTriangle className="h-3 w-3" />
-                              {t('scripts.view_error', 'View error')}
-                            </Link>
-                          </Button>
-                        )}
+                        <span className="inline-flex items-center gap-1">
+                          {st === 'running' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-[12px] gap-1"
+                              onClick={() => attach(tgt.server_id)}
+                            >
+                              <Terminal className="h-3 w-3" />
+                              {t('console.attach', 'Attach')}
+                            </Button>
+                          )}
+                          {/* Full execution log — available for every target
+                              with a recording, regardless of status. */}
+                          {tgt.pty_session_id && (
+                            <RunLogDialog
+                              ptySessionId={tgt.pty_session_id}
+                              running={st === 'running'}
+                              triggerClassName={cn(
+                                'inline-flex items-center gap-1 h-7 px-2 text-[12px] rounded-md hover:bg-sunken',
+                                st === 'failed' ? 'text-err' : 'text-muted-foreground',
+                              )}
+                              triggerLabel={t('scripts.view_log', 'View log')}
+                              title={`${t('scripts.execution_log', 'Execution log')} · ${name}`}
+                            />
+                          )}
+                          {tgt.pty_session_id && st !== 'running' && st !== 'failed' && (
+                            <Button size="sm" variant="ghost" asChild className="h-7 px-2 text-[12px] gap-1">
+                              <a href={`/admin/recordings/${tgt.pty_session_id}`}>
+                                <PlayCircle className="h-3 w-3" />
+                                {t('recording.replay', 'Replay')}
+                              </a>
+                            </Button>
+                          )}
+                        </span>
                       </td>
                     </tr>
                   )

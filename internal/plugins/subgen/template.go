@@ -23,10 +23,9 @@ type TemplateSpec struct {
 	Categories        []CategorySel `json:"categories"`
 	CustomRules       []CustomRule  `json:"custom_rules"`
 	Final             string        `json:"final"`
-	GroupByCountry    bool          `json:"group_by_country"`
 	IncludeAutoSelect bool          `json:"include_auto_select"`
 	General           string        `json:"general,omitempty"` // raw [General] body; empty → renderer default
-	MITM              string        `json:"mitm,omitempty"`     // raw [MITM] body; empty → section omitted
+	MITM              string        `json:"mitm,omitempty"`    // raw [MITM] body; empty → section omitted
 }
 
 func validPolicy(p string) bool {
@@ -63,7 +62,7 @@ func ParseTemplate(rulesJSON string) (TemplateSpec, error) {
 }
 
 func builtinSpec(setName string) TemplateSpec {
-	t := TemplateSpec{Final: "PROXY", GroupByCountry: true, IncludeAutoSelect: true}
+	t := TemplateSpec{Final: "PROXY", IncludeAutoSelect: true}
 	for _, name := range PredefinedTemplates[setName] {
 		c, _ := categoryByName(name)
 		t.Categories = append(t.Categories, CategorySel{Name: name, Policy: c.DefaultPolicy})

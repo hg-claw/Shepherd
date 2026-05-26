@@ -37,7 +37,7 @@ func TestService_GenerateByToken(t *testing.T) {
 
 func TestService_PreviewTemplate(t *testing.T) {
 	svc := &Service{Now: time.Now, RulesetBase: DefaultRulesetBase}
-	rules := `{"categories":[{"name":"Telegram","policy":"PROXY"}],"final":"PROXY","group_by_country":true}`
+	rules := `{"categories":[{"name":"Telegram","policy":"PROXY"}],"final":"PROXY"}`
 
 	out, ct, err := svc.PreviewTemplate(rules, "surge")
 	if err != nil {
@@ -53,7 +53,7 @@ func TestService_PreviewTemplate(t *testing.T) {
 			t.Fatalf("preview missing %q:\n%s", want, out)
 		}
 	}
-	// group_by_country yields the two sample-country groups.
+	// The two sample nodes (🇺🇸 / 🇭🇰) appear in [Proxy] and in each category group.
 	if !strings.Contains(out, "🇺🇸") || !strings.Contains(out, "🇭🇰") {
 		t.Fatalf("expected per-country groups:\n%s", out)
 	}

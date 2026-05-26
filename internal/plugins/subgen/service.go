@@ -53,9 +53,9 @@ func (s *Service) Generate(ctx context.Context, token, target string) (body, con
 
 // PreviewTemplate renders rulesJSON against a fixed set of sample nodes so the
 // admin can see the generated config while editing a template — before it is
-// saved or attached to any subscription. The sample nodes span two countries
-// to exercise GroupByCountry. All failures are client-side: ErrBadTarget for an
-// unknown target, or a parse error for malformed rulesJSON.
+// saved or attached to any subscription. The sample nodes span two countries so
+// category groups show multiple members. All failures are client-side:
+// ErrBadTarget for an unknown target, or a parse error for malformed rulesJSON.
 func (s *Service) PreviewTemplate(rulesJSON, target string) (body, contentType string, err error) {
 	r, ok := rendererFor(target)
 	if !ok {

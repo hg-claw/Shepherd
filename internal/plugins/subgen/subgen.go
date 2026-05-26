@@ -21,15 +21,12 @@ func (p *Plugin) Migrations(driver shepdb.Driver) []plugins.Migration {
 }
 func (p *Plugin) RegisterRoutes(mux plugins.Mux, deps plugins.Deps) {
 	p.deps = deps
-	p.registerRoutes(mux) // real impl lands in a later task
+	p.registerRoutes(mux) // real impl in routes.go
 }
 func (p *Plugin) OnEnable(ctx context.Context, deps plugins.Deps) error {
 	return seedBuiltinTemplates(ctx, deps.DB)
 }
 func (p *Plugin) OnDisable(_ context.Context, _ plugins.Deps) error { return nil }
-
-// temporary stub — replaced by a later task
-func (p *Plugin) registerRoutes(mux plugins.Mux) {}
 
 // LoadMigrationsForTest exposes loadMigrations to other packages' tests.
 func LoadMigrationsForTest(driver shepdb.Driver) []plugins.Migration { return loadMigrations(driver) }

@@ -41,6 +41,38 @@ func TestSurge_RendersProtocolsGroupsRules(t *testing.T) {
 	}
 }
 
+func TestSurge_GeneralAndMITM(t *testing.T) {
+	base := Intermediate{
+		Nodes:  []Node{{Name: "n1", Protocol: "trojan", Server: "1.1.1.1", Port: 443, Password: "p"}},
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"n1"}}},
+		Rules:  []string{"FINAL,PROXY"},
+	}
+
+	// Empty fields: default [General], no [MITM] section.
+	out := (&SurgeRenderer{}).Render(base, "https://x/sub/t?target=surge")
+	if !strings.Contains(out, "[General]\nbypass-system = true") {
+		t.Fatalf("default [General] missing:\n%s", out)
+	}
+	if strings.Contains(out, "[MITM]") {
+		t.Fatalf("[MITM] should be absent when unset:\n%s", out)
+	}
+
+	// Set fields: custom [General] replaces default, [MITM] appended.
+	im := base
+	im.General = "dns-server = 1.1.1.1\nskip-proxy = 10.0.0.0/8"
+	im.MITM = "hostname = *.googlevideo.com"
+	out = (&SurgeRenderer{}).Render(im, "https://x/sub/t?target=surge")
+	if !strings.Contains(out, "[General]\ndns-server = 1.1.1.1\nskip-proxy = 10.0.0.0/8") {
+		t.Fatalf("custom [General] missing:\n%s", out)
+	}
+	if strings.Contains(out, "bypass-system = true") {
+		t.Fatalf("default [General] should be replaced:\n%s", out)
+	}
+	if !strings.Contains(out, "[MITM]\nhostname = *.googlevideo.com") {
+		t.Fatalf("[MITM] missing:\n%s", out)
+	}
+}
+
 func TestSurge_ProxyLine_VmessTrojanTuic(t *testing.T) {
 	im := Intermediate{
 		Nodes: []Node{

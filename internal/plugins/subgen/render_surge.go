@@ -100,7 +100,12 @@ func (r *SurgeRenderer) Render(im Intermediate, subURL string) string {
 		fmt.Fprintf(&b, "# skipped %d node(s) not supported by surge: %s\n", len(skipped), strings.Join(skipped, ", "))
 	}
 
-	b.WriteString("[General]\nbypass-system = true\n\n")
+	b.WriteString("[General]\n")
+	if g := strings.TrimSpace(im.General); g != "" {
+		b.WriteString(g + "\n\n")
+	} else {
+		b.WriteString("bypass-system = true\n\n")
+	}
 	b.WriteString("[Proxy]\nDIRECT = direct\n")
 	for _, n := range im.Nodes {
 		if r.Supports(n.Protocol) {
@@ -114,6 +119,9 @@ func (r *SurgeRenderer) Render(im Intermediate, subURL string) string {
 	b.WriteString("\n[Rule]\n")
 	for _, rule := range im.Rules {
 		b.WriteString(rule + "\n")
+	}
+	if m := strings.TrimSpace(im.MITM); m != "" {
+		b.WriteString("\n[MITM]\n" + m + "\n")
 	}
 	return b.String()
 }

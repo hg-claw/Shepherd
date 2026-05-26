@@ -51,10 +51,10 @@ func newToken() string {
 
 // now returns the current UTC time via the injected clock or time.Now.
 func (s *Store) now() time.Time {
-	if s.Now != nil {
-		return s.Now().UTC()
+	if s.Now == nil {
+		return time.Now().UTC()
 	}
-	return time.Now().UTC()
+	return s.Now().UTC()
 }
 
 // ─── Templates ───────────────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ func (s *Store) UpdateTemplate(ctx context.Context, id int64, name, rulesJSON st
 	_, err := s.DB.ExecContext(ctx, `
 		UPDATE subgen_templates
 		SET name=$1, rules_json=$2, updated_at=$3
-		WHERE id=$4 AND builtin=0`,
+		WHERE id=$4 AND builtin=false`,
 		name, rulesJSON, now, id)
 	return err
 }
@@ -87,7 +87,7 @@ func (s *Store) UpdateTemplate(ctx context.Context, id int64, name, rulesJSON st
 // DeleteTemplate deletes a non-builtin template.
 func (s *Store) DeleteTemplate(ctx context.Context, id int64) error {
 	_, err := s.DB.ExecContext(ctx,
-		`DELETE FROM subgen_templates WHERE id=$1 AND builtin=0`, id)
+		`DELETE FROM subgen_templates WHERE id=$1 AND builtin=false`, id)
 	return err
 }
 
@@ -115,7 +115,7 @@ func (s *Store) TemplateByName(ctx context.Context, name string) (Template, erro
 	var t Template
 	err := s.DB.GetContext(ctx, &t,
 		`SELECT id, name, builtin, rules_json, created_at, updated_at
-		 FROM subgen_templates WHERE name=$1 AND builtin=1`, name)
+		 FROM subgen_templates WHERE name=$1 AND builtin=true`, name)
 	return t, err
 }
 
@@ -198,9 +198,9 @@ func (s *Store) SetInbounds(ctx context.Context, subID int64, sels []Selection) 
 	if err != nil {
 		return err
 	}
+	defer func() { _ = tx.Rollback() }()
 	if _, err := tx.ExecContext(ctx,
 		`DELETE FROM subgen_subscription_inbounds WHERE subscription_id=$1`, subID); err != nil {
-		_ = tx.Rollback()
 		return err
 	}
 	for _, sel := range sels {
@@ -208,7 +208,6 @@ func (s *Store) SetInbounds(ctx context.Context, subID int64, sels []Selection) 
 			`INSERT INTO subgen_subscription_inbounds (subscription_id, source, inbound_id)
 			 VALUES ($1, $2, $3)`,
 			subID, sel.Source, sel.InboundID); err != nil {
-			_ = tx.Rollback()
 			return err
 		}
 	}

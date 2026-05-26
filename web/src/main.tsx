@@ -11,6 +11,11 @@ import { setOn401 } from './api/client'
 import { useAuth } from './store/auth'
 import { Toaster as ShadcnToaster } from './components/ui/toaster'
 import { ToastBridge } from './components/ToastBridge'
+import { installChunkReload } from './lib/chunkReload'
+
+// Recover from stale lazy-chunk imports after a redeploy. Registered before
+// any route lazy-loads so the very first failed import is caught.
+installChunkReload()
 
 const stored = useUI.getState().lang
 i18n.changeLanguage(stored)

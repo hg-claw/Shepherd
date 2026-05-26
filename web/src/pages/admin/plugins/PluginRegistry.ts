@@ -54,6 +54,13 @@ export const PluginRegistry: Record<string, PluginUIEntry> = {
       { key: 'results', label: 'Results' },
     ],
   },
+  subgen: {
+    module: () => import('./subgen'),
+    tabs: [
+      { key: 'subscriptions', label: 'Subscriptions' },
+      { key: 'templates',     label: 'Templates' },
+    ],
+  },
 }
 
 export const lazyPluginPage = (id: string) => {

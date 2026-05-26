@@ -20,10 +20,13 @@ func TestCollectNodes_MapsAndSkipsMissingHost(t *testing.T) {
 	d.MustExec(`INSERT INTO xray_inbounds(id,server_id,tag,port,role,protocol,uuid)
 	            VALUES (11,2,'r',443,'landing','vless-reality','u')`)
 
-	nodes, warns := CollectNodes(ctx, d, []Selection{
+	nodes, warns, err := CollectNodes(ctx, d, []Selection{
 		{Source: "xray", InboundID: 10},
 		{Source: "xray", InboundID: 11},
 	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if len(nodes) != 1 || nodes[0].Server != "1.2.3.4" {
 		t.Fatalf("nodes = %+v", nodes)
 	}
@@ -43,8 +46,28 @@ func TestCollectNodes_Singbox(t *testing.T) {
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (1,'hk','9.9.9.9','HK')`)
 	d.MustExec(`INSERT INTO singbox_inbounds(id,server_id,tag,port,role,relay_mode,protocol,password,sni,extra_json)
 	            VALUES (20,1,'h',443,'landing','proxy','hysteria2','pw','h.example.com','{"up_mbps":100}')`)
-	nodes, warns := CollectNodes(ctx, d, []Selection{{Source: "singbox", InboundID: 20}})
+	nodes, warns, err := CollectNodes(ctx, d, []Selection{{Source: "singbox", InboundID: 20}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if len(nodes) != 1 || nodes[0].Protocol != "hysteria2" || nodes[0].Server != "9.9.9.9" {
 		t.Fatalf("nodes=%+v warns=%v", nodes, warns)
+	}
+}
+
+func TestCollectNodes_UnknownSource(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	nodes, warns, err := CollectNodes(ctx, s.DB, []Selection{
+		{Source: "bogus", InboundID: 99},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(nodes) != 0 {
+		t.Fatalf("expected 0 nodes, got %v", nodes)
+	}
+	if len(warns) != 1 {
+		t.Fatalf("expected 1 warning, got %v", warns)
 	}
 }

@@ -3,35 +3,42 @@ package subgen
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
 )
 
-func CollectNodes(ctx context.Context, db *sqlx.DB, sels []Selection) ([]Node, []string) {
+func CollectNodes(ctx context.Context, db *sqlx.DB, sels []Selection) ([]Node, []string, error) {
 	var nodes []Node
 	var warns []string
 	for _, sel := range sels {
 		switch sel.Source {
 		case "xray":
-			n, ok, w := collectXray(ctx, db, sel.InboundID)
+			n, w, err := collectXray(ctx, db, sel.InboundID)
+			if err != nil {
+				return nil, nil, err
+			}
 			if w != "" {
 				warns = append(warns, w)
-			}
-			if ok {
+			} else {
 				nodes = append(nodes, n)
 			}
 		case "singbox":
-			n, ok, w := collectSingbox(ctx, db, sel.InboundID)
+			n, w, err := collectSingbox(ctx, db, sel.InboundID)
+			if err != nil {
+				return nil, nil, err
+			}
 			if w != "" {
 				warns = append(warns, w)
-			}
-			if ok {
+			} else {
 				nodes = append(nodes, n)
 			}
+		default:
+			warns = append(warns, fmt.Sprintf("unknown source %q for inbound %d", sel.Source, sel.InboundID))
 		}
 	}
-	return nodes, warns
+	return nodes, warns, nil
 }
 
 type xrayRow struct {
@@ -50,7 +57,7 @@ type xrayRow struct {
 	SrvCountry sql.NullString `db:"srv_country"`
 }
 
-func collectXray(ctx context.Context, db *sqlx.DB, id int64) (Node, bool, string) {
+func collectXray(ctx context.Context, db *sqlx.DB, id int64) (Node, string, error) {
 	var r xrayRow
 	err := db.GetContext(ctx, &r, `
 		SELECT i.tag, i.port, i.protocol, i.uuid, i.sni, i.public_key, i.short_id,
@@ -58,10 +65,13 @@ func collectXray(ctx context.Context, db *sqlx.DB, id int64) (Node, bool, string
 		       s.name AS srv_name, s.ssh_host AS srv_host, s.country_code AS srv_country
 		  FROM xray_inbounds i JOIN servers s ON s.id=i.server_id WHERE i.id=$1`, id)
 	if err != nil {
-		return Node{}, false, fmt.Sprintf("xray inbound %d not found", id)
+		if errors.Is(err, sql.ErrNoRows) {
+			return Node{}, fmt.Sprintf("xray inbound %d not found", id), nil
+		}
+		return Node{}, "", err
 	}
 	if !r.SrvHost.Valid || r.SrvHost.String == "" {
-		return Node{}, false, fmt.Sprintf("xray %s on %s: no ssh_host, skipped", r.Tag, r.SrvName)
+		return Node{}, fmt.Sprintf("xray %s on %s: no ssh_host, skipped", r.Tag, r.SrvName), nil
 	}
 	n := xrayInboundToNode(xrayLite{
 		Tag: r.Tag, Port: r.Port, Protocol: r.Protocol,
@@ -69,7 +79,7 @@ func collectXray(ctx context.Context, db *sqlx.DB, id int64) (Node, bool, string
 		ShortID: r.ShortID.String, WSPath: r.WSPath.String,
 		SSMethod: r.SSMethod.String, SSPassword: r.SSPassword.String,
 	}, serverLite{Name: r.SrvName, Host: r.SrvHost.String, Country: r.SrvCountry.String})
-	return n, true, ""
+	return n, "", nil
 }
 
 type singboxRow struct {
@@ -101,7 +111,7 @@ func ns(v sql.NullString) *string {
 	return nil
 }
 
-func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, bool, string) {
+func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, string, error) {
 	var r singboxRow
 	err := db.GetContext(ctx, &r, `
 		SELECT i.tag, i.port, i.protocol, i.role, i.relay_mode, i.uuid, i.flow, i.password, i.sni,
@@ -110,10 +120,13 @@ func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, bool, str
 		       s.name AS srv_name, s.ssh_host AS srv_host, s.country_code AS srv_country
 		  FROM singbox_inbounds i JOIN servers s ON s.id=i.server_id WHERE i.id=$1`, id)
 	if err != nil {
-		return Node{}, false, fmt.Sprintf("singbox inbound %d not found", id)
+		if errors.Is(err, sql.ErrNoRows) {
+			return Node{}, fmt.Sprintf("singbox inbound %d not found", id), nil
+		}
+		return Node{}, "", err
 	}
 	if !r.SrvHost.Valid || r.SrvHost.String == "" {
-		return Node{}, false, fmt.Sprintf("singbox %s on %s: no ssh_host, skipped", r.Tag, r.SrvName)
+		return Node{}, fmt.Sprintf("singbox %s on %s: no ssh_host, skipped", r.Tag, r.SrvName), nil
 	}
 	n := singboxInboundToNode(singboxLite{
 		Tag: r.Tag, Port: r.Port, Protocol: r.Protocol, Role: r.Role, RelayMode: r.RelayMode,
@@ -122,5 +135,5 @@ func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, bool, str
 		TransportPath: ns(r.TransportPath), TransportHost: ns(r.TransportHost),
 		SSMethod: ns(r.SSMethod), ExtraJSON: ns(r.ExtraJSON),
 	}, serverLite{Name: r.SrvName, Host: r.SrvHost.String, Country: r.SrvCountry.String})
-	return n, true, ""
+	return n, "", nil
 }

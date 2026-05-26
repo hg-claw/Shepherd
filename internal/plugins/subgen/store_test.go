@@ -57,6 +57,27 @@ func TestStore_TemplateAndSubscriptionCRUD(t *testing.T) {
 	}
 }
 
+func TestStore_CreateSubscriptionEnabledByDefault(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	tid, err := s.CreateTemplate(ctx, "t", false, `{}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sub, err := s.CreateSubscription(ctx, "s", tid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Read it back through the store to guard the inserted boolean value.
+	got, err := s.Subscription(ctx, sub.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Enabled {
+		t.Fatalf("freshly created subscription must be enabled, got Enabled=%v", got.Enabled)
+	}
+}
+
 func TestStore_UpdateTemplate(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()

@@ -128,6 +128,9 @@ func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, string, e
 	if !r.SrvHost.Valid || r.SrvHost.String == "" {
 		return Node{}, fmt.Sprintf("singbox %s on %s: no ssh_host, skipped", r.Tag, r.SrvName), nil
 	}
+	if r.Role == "relay" && r.RelayMode == "forward" {
+		return Node{}, fmt.Sprintf("singbox %s on %s: forward-mode relay not supported in subscriptions, skipped", r.Tag, r.SrvName), nil
+	}
 	n := singboxInboundToNode(singboxLite{
 		Tag: r.Tag, Port: r.Port, Protocol: r.Protocol, Role: r.Role, RelayMode: r.RelayMode,
 		UUID: ns(r.UUID), Flow: ns(r.Flow), Password: ns(r.Password), SNI: ns(r.SNI),

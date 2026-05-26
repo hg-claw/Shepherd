@@ -55,6 +55,29 @@ func TestCollectNodes_Singbox(t *testing.T) {
 	}
 }
 
+func TestCollectNodes_SkipsForwardRelay(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	d := s.DB
+	d.MustExec(`CREATE TABLE singbox_inbounds (
+		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, port INTEGER, role TEXT, relay_mode TEXT, protocol TEXT,
+		uuid TEXT, flow TEXT, password TEXT, sni TEXT, reality_public_key TEXT, reality_short_id TEXT,
+		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT)`)
+	d.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (1,'hk','9.9.9.9','HK')`)
+	d.MustExec(`INSERT INTO singbox_inbounds(id,server_id,tag,port,role,relay_mode,protocol)
+	            VALUES (30,1,'fwd',443,'relay','forward','hysteria2')`)
+	nodes, warns, err := CollectNodes(ctx, d, []Selection{{Source: "singbox", InboundID: 30}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(nodes) != 0 {
+		t.Fatalf("expected 0 nodes for forward relay, got %+v", nodes)
+	}
+	if len(warns) != 1 {
+		t.Fatalf("expected 1 skip warning, got %v", warns)
+	}
+}
+
 func TestCollectNodes_UnknownSource(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()

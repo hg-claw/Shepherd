@@ -128,7 +128,7 @@ func (s *Store) CreateSubscription(ctx context.Context, name string, templateID 
 	var id int64
 	if err := s.DB.QueryRowxContext(ctx, `
 		INSERT INTO subgen_subscriptions (name, token, template_id, enabled, created_at, updated_at)
-		VALUES ($1, $2, $3, 1, $4, $5)
+		VALUES ($1, $2, $3, true, $4, $5)
 		RETURNING id`,
 		name, token, templateID, now, now).Scan(&id); err != nil {
 		return Subscription{}, err

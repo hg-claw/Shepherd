@@ -1841,7 +1841,10 @@ func (s *Service) Generate(ctx context.Context, token, target string) (body, con
 		return "", "", err
 	}
 	sels, _ := s.Store.InboundsFor(ctx, sub.ID)
-	nodes, _ := CollectNodes(ctx, s.Store.DB, sels)
+	nodes, _, err := CollectNodes(ctx, s.Store.DB, sels)
+	if err != nil {
+		return "", "", err
+	}
 	im := Assemble(nodes, spec, target, s.base())
 	subURL := fmt.Sprintf("%s/sub/%s?target=%s", s.PublicURL, token, target)
 	return r.Render(im, subURL), "text/plain; charset=utf-8", nil

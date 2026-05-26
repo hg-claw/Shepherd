@@ -34,8 +34,9 @@ interface RulesModel {
   categories: CategoryRule[]
   custom_rules: CustomRule[]
   final: string
-  group_by_country: boolean
   include_auto_select: boolean
+  general: string
+  mitm: string
 }
 
 function parseRules(rules_json: string): RulesModel {
@@ -49,8 +50,9 @@ function parseRules(rules_json: string): RulesModel {
       ? raw.custom_rules.map((c: any) => ({ match: String(c.match ?? ''), policy: String(c.policy ?? 'PROXY') }))
       : [],
     final: String(raw.final ?? 'PROXY'),
-    group_by_country: Boolean(raw.group_by_country),
     include_auto_select: Boolean(raw.include_auto_select),
+    general: String(raw.general ?? ''),
+    mitm: String(raw.mitm ?? ''),
   }
 }
 
@@ -199,8 +201,9 @@ function TemplateEditor({
   )
   const [customText, setCustomText] = useState(customRulesToText(initial.custom_rules))
   const [final, setFinal] = useState<string>(initial.final)
-  const [groupByCountry, setGroupByCountry] = useState(initial.group_by_country)
   const [includeAutoSelect, setIncludeAutoSelect] = useState(initial.include_auto_select)
+  const [general, setGeneral] = useState(initial.general)
+  const [mitm, setMitm] = useState(initial.mitm)
   const [rawJson, setRawJson] = useState('')
 
   const toggleCat = (name: string, defaultPolicy: string) => {
@@ -218,8 +221,9 @@ function TemplateEditor({
     categories: Object.entries(catPolicies).map(([name, policy]) => ({ name, policy })),
     custom_rules: textToCustomRules(customText),
     final,
-    group_by_country: groupByCountry,
     include_auto_select: includeAutoSelect,
+    general,
+    mitm,
   })
 
   // The rules_json we save and preview: the raw text in raw mode, otherwise the
@@ -238,8 +242,9 @@ function TemplateEditor({
     setCatPolicies(Object.fromEntries(m.categories.map((c) => [c.name, c.policy])))
     setCustomText(customRulesToText(m.custom_rules))
     setFinal(m.final)
-    setGroupByCountry(m.group_by_country)
     setIncludeAutoSelect(m.include_auto_select)
+    setGeneral(m.general)
+    setMitm(m.mitm)
     setMode('form')
   }
 
@@ -304,7 +309,7 @@ function TemplateEditor({
                 <div>
                   <Label className="text-[12px]">Categories</Label>
                   <p className="text-fg-dim text-[11px] mt-0.5 mb-2">
-                    Check a category to route its rule-sets; pick a policy. Rule URLs are the GitHub subscription addresses shipped with each category.
+                    Check a category to route its rule-sets. Each becomes a switchable proxy group; the policy you pick is the group's default member (clients can change it). Rule URLs are the GitHub subscription addresses shipped with each category.
                   </p>
                   <div className="space-y-2">
                     {categories.map((c) => {
@@ -350,17 +355,43 @@ function TemplateEditor({
                     value={customText}
                     onChange={(e) => setCustomText(e.target.value)}
                     rows={5}
+                    spellCheck={false}
                     className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
                     placeholder="DOMAIN-SUFFIX,example.com,DIRECT"
                   />
                 </div>
 
+                <div>
+                  <Label className="text-[12px]">[General]</Label>
+                  <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                    Raw Surge <code>[General]</code> directives. Leave empty for the default (<code>bypass-system = true</code>).
+                  </p>
+                  <textarea
+                    value={general}
+                    onChange={(e) => setGeneral(e.target.value)}
+                    rows={4}
+                    spellCheck={false}
+                    className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
+                    placeholder="dns-server = 119.29.29.29, 223.5.5.5"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-[12px]">[MITM]</Label>
+                  <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                    Raw Surge <code>[MITM]</code> directives. Leave empty to omit the section.
+                  </p>
+                  <textarea
+                    value={mitm}
+                    onChange={(e) => setMitm(e.target.value)}
+                    rows={3}
+                    spellCheck={false}
+                    className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
+                    placeholder="hostname = *.googlevideo.com"
+                  />
+                </div>
+
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                  <label className="flex items-center gap-2 text-[12.5px]">
-                    <input type="checkbox" checked={groupByCountry}
-                      onChange={(e) => setGroupByCountry(e.target.checked)} />
-                    Group by country
-                  </label>
                   <label className="flex items-center gap-2 text-[12.5px]">
                     <input type="checkbox" checked={includeAutoSelect}
                       onChange={(e) => setIncludeAutoSelect(e.target.checked)} />

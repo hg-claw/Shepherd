@@ -1,6 +1,9 @@
 package subgen
 
-import "strings"
+import (
+	"encoding/json"
+	"strings"
+)
 
 type Node struct {
 	Name     string
@@ -89,6 +92,73 @@ func nodeName(country, server, proto string) string {
 		return flag + " " + server + " " + proto
 	}
 	return server + " " + proto
+}
+
+type singboxLite struct {
+	Tag              string
+	Port             int
+	Protocol         string
+	Role             string
+	RelayMode        string
+	UUID             *string
+	Flow             *string
+	Password         *string
+	SNI              *string
+	RealityPublicKey *string
+	RealityShortID   *string
+	TransportPath    *string
+	TransportHost    *string
+	SSMethod         *string
+	ExtraJSON        *string
+}
+
+func deref(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
+
+func transportOf(proto string) string {
+	switch {
+	case strings.Contains(proto, "-ws-"), strings.HasSuffix(proto, "-ws"):
+		return "ws"
+	case strings.Contains(proto, "-h2-"), strings.HasSuffix(proto, "-h2"):
+		return "h2"
+	case strings.Contains(proto, "-httpupgrade-"), strings.HasSuffix(proto, "-httpupgrade"):
+		return "httpupgrade"
+	default:
+		return ""
+	}
+}
+
+func singboxInboundToNode(in singboxLite, srv serverLite) Node {
+	n := Node{
+		Protocol:  baseScheme(in.Protocol),
+		Server:    srv.Host,
+		Port:      in.Port,
+		Country:   srv.Country,
+		UUID:      deref(in.UUID),
+		Password:  deref(in.Password),
+		SNI:       deref(in.SNI),
+		Flow:      deref(in.Flow),
+		SSMethod:  deref(in.SSMethod),
+		Transport: transportOf(in.Protocol),
+		Path:      deref(in.TransportPath),
+		Host:      deref(in.TransportHost),
+	}
+	if in.Protocol == "vless-reality" {
+		n.RealityPublicKey = deref(in.RealityPublicKey)
+		n.RealityShortID = deref(in.RealityShortID)
+	}
+	if e := deref(in.ExtraJSON); e != "" {
+		var m map[string]any
+		if json.Unmarshal([]byte(e), &m) == nil {
+			n.Extra = m
+		}
+	}
+	n.Name = nodeName(srv.Country, srv.Name, n.Protocol)
+	return n
 }
 
 func xrayInboundToNode(in xrayLite, srv serverLite) Node {

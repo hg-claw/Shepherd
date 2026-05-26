@@ -56,9 +56,10 @@ structure.
   no-op). Plain plugin, **not** HostAware. Category `"proxy"`.
 - `node.go` — `Node` intermediate model + `xrayInboundToNode`,
   `singboxInboundToNode` mappers.
-- `catalog.go` — embedded `UNIFIED_CATEGORIES` (name → geosite/geoip
-  sources + default policy) and `PREDEFINED_TEMPLATES`
-  (minimal/balanced/comprehensive).
+- `catalog.go` — embedded `UNIFIED_CATEGORIES` (name → blackmatrix7
+  ruleset folder(s) or a native directive + default policy) and
+  `PREDEFINED_TEMPLATES` (minimal/balanced/comprehensive). Resolves a
+  category + target format + `ruleset_base` into the `RULE-SET` URL line.
 - `template.go` — template schema (`rules_json`) + validation.
 - `base.go` — `Base.Assemble(nodes, template) Intermediate` (builds
   proxy groups, country grouping, auto-select, rule list).
@@ -137,14 +138,63 @@ existing per-driver migration convention.
   The motivating example `内网 10.0.0.0/24 走某节点` is a custom rule.
 - `final` is the default outbound for unmatched traffic.
 
-### `UNIFIED_CATEGORIES` (embedded catalog, ported from sublink-worker)
+### Routing = remote `RULE-SET` references (not inlined rules)
 
-Each entry: `{Name, SiteRules []string (geosite), IPRules []string
-(geoip), DefaultPolicy}`. Initial set: Ad Block (REJECT), AI Services,
-Bilibili, Youtube, Google, Private (DIRECT), Location:CN (DIRECT),
-Telegram, Github, Microsoft, Apple, Social Media, Streaming, Gaming,
-Non-China. Predefined templates:
-- `minimal`: Location:CN, Private, Non-China
+Categories are emitted as **remote rule-set subscriptions**, not baked-in
+domain/IP lists. For each selected category the renderer writes one line
+referencing a GitHub-hosted `.list` so the client fetches and
+auto-updates the rules itself, e.g. (Surge / ShadowRocket):
+
+```
+RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Telegram/Telegram.list,🚀 Proxy
+```
+
+This is the whole point of the design: Shepherd ships node membership +
+policy mapping; the heavy, frequently-changing rule data lives on GitHub
+and the client subscribes to it directly. Shepherd never has to maintain
+or update domain lists.
+
+**Rule-set source:** [blackmatrix7/ios_rule_script](https://github.com/blackmatrix7/ios_rule_script)
+(`rule/Surge/<Name>/<Name>.list`; ShadowRocket consumes the Surge
+format). The base URL is a plugin setting `subgen_ruleset_base`
+(default `https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master`).
+Mainland-China deployments can point it at a CDN/mirror
+(`https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master` or a
+gh-proxy mirror) — same motivation as the v0.9.0 CN-mirror work.
+
+Categories backed by a directive the client resolves natively (CN by
+geoip, LAN/private) emit that directive instead of a remote set
+(`GEOIP,CN,DIRECT`, `RULE-SET,SYSTEM,DIRECT` / `IP-CIDR,10.0.0.0/8` etc.),
+so they cost no extra fetch.
+
+### `UNIFIED_CATEGORIES` (embedded catalog)
+
+Each entry: `{Name, Ruleset string (blackmatrix7 folder, e.g. "Telegram"),
+Native string (a built-in directive when no remote set is needed, e.g.
+"GEOIP,CN"), DefaultPolicy}`. A category sets either `Ruleset` (→
+`RULE-SET,<base>/rule/<format>/<Ruleset>/<Ruleset>.list,<policy>`) or
+`Native`. Initial set:
+
+| Category      | Ruleset / Native            | Default policy |
+|---------------|-----------------------------|----------------|
+| Ad Block      | AdvertisingLite             | REJECT         |
+| AI Services   | OpenAI                      | PROXY          |
+| Telegram      | Telegram                    | PROXY          |
+| Google        | Google                      | PROXY          |
+| Youtube       | YouTube                     | PROXY          |
+| Github        | GitHub                      | PROXY          |
+| Microsoft     | Microsoft                   | PROXY          |
+| Apple         | Apple                       | PROXY          |
+| Streaming     | Netflix, Disney, HBO…       | PROXY          |
+| Social Media  | Facebook, Twitter, TikTok…  | PROXY          |
+| Location:CN   | `GEOIP,CN` (native)         | DIRECT         |
+| Private/LAN   | `RULE-SET,SYSTEM` (native)  | DIRECT         |
+
+(A category may carry multiple rulesets; the renderer emits one
+`RULE-SET` line per ruleset, all pointing at the same policy.)
+
+Predefined templates:
+- `minimal`: Location:CN, Private, Ad Block
 - `balanced`: + Github, Google, Youtube, AI Services, Telegram
 - `comprehensive`: all categories
 
@@ -211,9 +261,14 @@ All **admin CRUD** stays on the gated admin mux via the plugin's
   `POST …/subscriptions/{id}/rotate-token`.
 - `GET/POST …/templates`, `PATCH/DELETE …/templates/{id}` (builtin rows
   reject PATCH/DELETE; clone via POST).
-- `GET …/categories` — the `UNIFIED_CATEGORIES` catalog for the UI.
+- `GET …/categories` — the `UNIFIED_CATEGORIES` catalog (incl. each
+  category's resolved rule-set URL) for the UI.
 - `GET …/subscriptions/{id}/preview?target=surge` — admin-side render
   preview.
+- `ruleset_base` is stored in the plugin's `config_json` and edited via
+  the generic `GET/PUT /api/admin/plugins/subgen/config`. `Service`
+  reads it (falling back to the GitHub-raw default) when resolving
+  `RULE-SET` URLs.
 
 ## Frontend
 
@@ -226,9 +281,13 @@ two tabs:
   `surge`/`shadowrocket` target buttons; rotate-token action.
 - **Templates**: list (built-in read-only + clonable, custom editable);
   editor = category checklist with a per-category policy dropdown
-  (PROXY/DIRECT/REJECT/group), custom-rules textarea (`TYPE,VALUE,policy`
-  per line), and toggles for `group_by_country` / `include_auto_select`
-  + a `final` dropdown.
+  (PROXY/DIRECT/REJECT/group); each checked category shows its resolved
+  GitHub rule-set URL(s) (read-only, so the operator sees exactly what the
+  client will subscribe to). Plus a custom-rules textarea
+  (`TYPE,VALUE,policy` per line), toggles for `group_by_country` /
+  `include_auto_select`, and a `final` dropdown.
+- **Rule-set base** field (plugin config): edits `ruleset_base`; a
+  "use jsDelivr CDN (CN)" preset button fills the mirror URL.
 
 ## Protocol × format coverage (v1)
 
@@ -237,14 +296,16 @@ two tabs:
 | shadowsocks  | ✓     | ✓            |
 | vmess        | ✓     | ✓            |
 | trojan       | ✓     | ✓            |
-| vless/reality| best-effort (Surge 5+) | ✓ |
+| vless/reality| ✓     | ✓            |
 | hysteria2    | ✓     | ✓            |
 | tuic (v5)    | ✓     | ✓            |
-| anytls       | ✗     | ✗            |
+| anytls       | ✓     | ✓            |
 
-Each renderer exposes `supports(protocol) bool`. Unsupported nodes are
+Both targets cover all of Shepherd's protocols in v1. The
+`supports(protocol) bool` hook is kept anyway so a future format (or a
+protocol a client later drops) degrades gracefully: unsupported nodes are
 omitted from that target's output and listed in a `#` comment header
-(e.g. `# skipped 2 anytls node(s): not supported by surge`). Generation
+(e.g. `# skipped 1 node(s): proto not supported by <target>`). Generation
 never hard-fails on an unsupported protocol.
 
 ## Error handling
@@ -261,10 +322,13 @@ never hard-fails on an unsupported protocol.
 - `node_test.go` — table-driven xray/singbox inbound → Node, incl.
   forward-relay reuse and ss/reality/transport field mapping.
 - `catalog_test.go` — predefined templates reference only known
-  categories; default policies correct.
+  categories; default policies correct; category → `RULE-SET` URL
+  resolution honours `ruleset_base` (default + mirror).
 - `template_test.go` — `rules_json` validation (good/bad cases).
 - `render_surge_test.go`, `render_shadowrocket_test.go` — golden-file
-  output per protocol + groups + rules + the skip-unsupported path.
+  output per protocol (incl. anytls) + groups + `RULE-SET` rule lines
+  pointing at the resolved GitHub URLs + native directives + the
+  skip-unsupported path.
 - `service_test.go` — Generate dispatch by target, unknown target,
   unknown/disabled token.
 - `routes_test.go` — admin CRUD incl. builtin-template immutability +

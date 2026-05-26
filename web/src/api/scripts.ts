@@ -92,3 +92,15 @@ export function useScriptRunDetail(id: number | undefined, refetchInterval?: num
     refetchInterval,
   })
 }
+
+// useTargetLog fetches the plain-text execution log for one run target,
+// keyed by its pty_session_id (the recording the PTY service captured).
+// refetchInterval lets callers poll while the target is still running.
+export function useTargetLog(ptySessionId: number | null | undefined, refetchInterval?: number) {
+  return useQuery({
+    queryKey: ['target-log', ptySessionId],
+    queryFn: () => api.getText(`/api/admin/recordings/${ptySessionId}/log`),
+    enabled: !!ptySessionId,
+    refetchInterval,
+  })
+}

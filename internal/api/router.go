@@ -112,6 +112,7 @@ func (r *Router) Handler() http.Handler {
 
 	admin.HandleFunc("GET /api/admin/audit", r.Audit.List)
 	admin.HandleFunc("GET /api/admin/recordings/{id}/cast", r.Recordings.Cast)
+	admin.HandleFunc("GET /api/admin/recordings/{id}/log", r.Recordings.Log)
 
 	// Plugin routes — only registered when WithPlugins has been called.
 	if r.Plugins != nil {

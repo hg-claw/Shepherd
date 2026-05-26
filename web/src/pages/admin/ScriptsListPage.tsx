@@ -6,6 +6,7 @@ import { useScripts, useDeleteScript, useScriptRuns, useScriptRunDetail } from '
 import { useServers } from '@/api/servers'
 import { KpiCard } from '@/components/KpiCard'
 import { Pill } from '@/components/Pill'
+import { RunLogDialog } from '@/components/RunLogDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -361,15 +362,17 @@ function ExpandedRunTargets({
           <span className="font-mono text-fg-dim tabular-nums">
             {t('scripts.exit', 'exit')} {tgt.exit_code ?? '—'}
           </span>
-          {tgt.status === 'failed' && (
-            <Link
-              to={`/admin/script-runs/${runId}/targets/${tgt.id}`}
-              className="text-err hover:underline ml-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {t('scripts.view_error', 'View error')}
-            </Link>
-          )}
+          <span className="ml-auto">
+            <RunLogDialog
+              ptySessionId={tgt.pty_session_id}
+              running={tgt.status === 'running'}
+              triggerClassName={cn(
+                'text-[12px] hover:underline',
+                tgt.status === 'failed' ? 'text-err' : 'text-muted-foreground',
+              )}
+              title={`${t('scripts.execution_log', 'Execution log')} · ${serverName(tgt.server_id)}`}
+            />
+          </span>
         </div>
       ))}
       <Link

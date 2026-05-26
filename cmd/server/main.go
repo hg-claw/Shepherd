@@ -22,12 +22,12 @@ import (
 	"github.com/hg-claw/Shepherd/internal/filesvc"
 	"github.com/hg-claw/Shepherd/internal/installer"
 	"github.com/hg-claw/Shepherd/internal/plugins"
-	_ "github.com/hg-claw/Shepherd/internal/plugins/cloudflare"          // registers via init()
+	_ "github.com/hg-claw/Shepherd/internal/plugins/cloudflare"                // registers via init()
 	netqualityplugin "github.com/hg-claw/Shepherd/internal/plugins/netquality" // registers via init() + WS push helper
-	singboxplugin "github.com/hg-claw/Shepherd/internal/plugins/singbox" // registers via init()
-	xrayplugin "github.com/hg-claw/Shepherd/internal/plugins/xray"       // registers via init() + Migrate0003
+	singboxplugin "github.com/hg-claw/Shepherd/internal/plugins/singbox"       // registers via init()
+	_ "github.com/hg-claw/Shepherd/internal/plugins/subgen"                    // registers via init()
+	xrayplugin "github.com/hg-claw/Shepherd/internal/plugins/xray"             // registers via init() + Migrate0003
 
-	"github.com/jmoiron/sqlx"
 	"github.com/hg-claw/Shepherd/internal/ptysvc"
 	"github.com/hg-claw/Shepherd/internal/scriptsvc"
 	"github.com/hg-claw/Shepherd/internal/serversvc"
@@ -35,6 +35,7 @@ import (
 	"github.com/hg-claw/Shepherd/internal/singbox/certmgr"
 	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
 	shepweb "github.com/hg-claw/Shepherd/internal/web"
+	"github.com/jmoiron/sqlx"
 )
 
 func main() {
@@ -444,9 +445,9 @@ func deriveServerURL(cfg config.Config) string {
 //
 //   - both envs set         → use them (deterministic, useful for IaC)
 //   - either env missing    → fall back to username "admin" and a random
-//                             24-byte URL-safe password, logged ONCE in a
-//                             loud banner that users can grep from
-//                             `docker compose logs`.
+//     24-byte URL-safe password, logged ONCE in a
+//     loud banner that users can grep from
+//     `docker compose logs`.
 //
 // If the admins table already has rows, this is a no-op.
 func bootstrapInitialAdmin(ctx context.Context, d *sqlx.DB, store *auth.Store, envUser, envPass string) {

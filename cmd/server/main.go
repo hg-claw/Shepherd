@@ -25,7 +25,7 @@ import (
 	_ "github.com/hg-claw/Shepherd/internal/plugins/cloudflare"                // registers via init()
 	netqualityplugin "github.com/hg-claw/Shepherd/internal/plugins/netquality" // registers via init() + WS push helper
 	singboxplugin "github.com/hg-claw/Shepherd/internal/plugins/singbox"       // registers via init()
-	_ "github.com/hg-claw/Shepherd/internal/plugins/subgen"                    // registers via init()
+	subgen "github.com/hg-claw/Shepherd/internal/plugins/subgen"               // registers via init() + public /sub wiring
 	xrayplugin "github.com/hg-claw/Shepherd/internal/plugins/xray"             // registers via init() + Migrate0003
 
 	"github.com/hg-claw/Shepherd/internal/ptysvc"
@@ -331,10 +331,20 @@ func main() {
 	eventsAPI := &api.PluginEventsAPI{DB: d}
 	logsAPI := &api.PluginLogsAPI{HostExec: hostExec, Deps: pluginsDeps}
 
+	subgenStore := &subgen.Store{DB: d, Now: time.Now}
+	subgenSvc := &subgen.Service{
+		Store:       subgenStore,
+		Now:         time.Now,
+		RulesetBase: subgen.DefaultRulesetBase,
+		PublicURL:   deriveServerURL(cfg),
+	}
+	subgenAPI := &api.SubgenAPI{Service: subgenSvc}
+	subgenAPI.InitRateLimit(60, time.Minute)
+
 	router := api.NewRouter(authAPI, authH.RequireAdmin,
 		servers, settings, public, agentAPI,
 		consoleAPI, scriptsAPI, filesAPI, auditAPI, recAPI,
-		shepweb.Handler()).
+		shepweb.Handler(), subgenAPI).
 		WithPlugins(pluginsAPI, eventsAPI, logsAPI)
 
 	srv := &http.Server{

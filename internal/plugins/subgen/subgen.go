@@ -30,3 +30,6 @@ func (p *Plugin) OnDisable(_ context.Context, _ plugins.Deps) error { return nil
 
 // temporary stub — replaced by a later task
 func (p *Plugin) registerRoutes(mux plugins.Mux) {}
+
+// LoadMigrationsForTest exposes loadMigrations to other packages' tests.
+func LoadMigrationsForTest(driver shepdb.Driver) []plugins.Migration { return loadMigrations(driver) }

@@ -18,6 +18,7 @@ type Router struct {
 	Files      *FilesAPI
 	Audit      *AuditAPI
 	Recordings *RecordingsAPI
+	Subgen     *SubgenAPI
 	Web        http.Handler
 
 	// Plugin APIs — optional; set via WithPlugins.
@@ -31,10 +32,11 @@ type Router struct {
 func NewRouter(authAPI *AuthAPI, requireAdmin func(http.Handler) http.Handler,
 	servers *ServersAPI, settings *SettingsAPI, public *PublicAPI, agent *AgentAPI,
 	console *ConsoleAPI, scripts *ScriptsAPI, files *FilesAPI, audit *AuditAPI, recs *RecordingsAPI,
-	web http.Handler) *Router {
+	web http.Handler, subgenAPI *SubgenAPI) *Router {
 	return &Router{
 		Auth: authAPI, Servers: servers, Settings: settings, Public: public, Agent: agent,
 		Console: console, Scripts: scripts, Files: files, Audit: audit, Recordings: recs,
+		Subgen:       subgenAPI,
 		Web:          web,
 		requireAdmin: requireAdmin,
 	}
@@ -54,6 +56,13 @@ func (r *Router) Handler() http.Handler {
 	// health
 	mux.HandleFunc("GET /healthz", r.Public.Healthz)
 	mux.HandleFunc("GET /api/version", r.Public.Version)
+
+	// PUBLIC subscription endpoint (token is the secret; no admin cookie).
+	// Registered on the root mux, OUTSIDE requireAdmin and NOT under /api/, so
+	// the /api/ catch-all closure below never intercepts it.
+	if r.Subgen != nil {
+		mux.HandleFunc("GET /sub/{token}", r.Subgen.GetSubscription)
+	}
 
 	// public
 	mux.HandleFunc("GET /api/public/servers", r.Public.Servers_ListPublic)

@@ -27,6 +27,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { useUI } from '@/store/ui'
+import { copyText } from '@/lib/clipboard'
 
 type Target = 'surge' | 'shadowrocket'
 
@@ -83,7 +84,7 @@ export default function SubscriptionsTab() {
 
   const copy = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(text)
+      await copyText(text)
       toast('success', 'Copied to clipboard')
     } catch {
       toast('error', 'Copy failed')

@@ -16,6 +16,7 @@ type Inbound struct {
 	ID                int64     `db:"id"`
 	ServerID          int64     `db:"server_id"`
 	Tag               string    `db:"tag"`
+	Alias             string    `db:"alias"`
 	Port              int       `db:"port"`
 	Role              string    `db:"role"`
 	Protocol          string    `db:"protocol"`
@@ -54,6 +55,7 @@ type InboundView struct {
 // because they are immutable post-create.
 type InboundPatch struct {
 	Port       *int
+	Alias      *string
 	UUID       *string
 	SNI        *string
 	PublicKey  *string
@@ -90,13 +92,13 @@ func (s *InboundStore) Insert(ctx context.Context, in Inbound) (int64, error) {
 	var id int64
 	if err := s.DB.QueryRowxContext(ctx, `
 		INSERT INTO xray_inbounds (
-		  server_id, tag, port, role, protocol,
+		  server_id, tag, alias, port, role, protocol,
 		  uuid, sni, public_key, private_key, short_id,
 		  ws_path, ss_method, ss_password,
 		  upstream_inbound_id, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 		RETURNING id`,
-		in.ServerID, in.Tag, in.Port, in.Role, in.Protocol,
+		in.ServerID, in.Tag, in.Alias, in.Port, in.Role, in.Protocol,
 		in.UUID, in.SNI, in.PublicKey, in.PrivateKey, in.ShortID,
 		in.WSPath, in.SSMethod, in.SSPassword,
 		in.UpstreamInboundID, now, now).Scan(&id); err != nil {
@@ -123,7 +125,7 @@ func (s *InboundStore) ListAllWithUpstream(ctx context.Context) ([]InboundView, 
 	rows := []InboundView{}
 	err := s.DB.SelectContext(ctx, &rows, `
 		SELECT
-		  i.id, i.server_id, i.tag, i.port, i.role, i.protocol,
+		  i.id, i.server_id, i.tag, i.alias, i.port, i.role, i.protocol,
 		  i.uuid, i.sni, i.public_key, i.private_key, i.short_id,
 		  i.ws_path, i.ss_method, i.ss_password,
 		  i.upstream_inbound_id, i.created_at, i.updated_at,
@@ -158,6 +160,10 @@ func (s *InboundStore) Update(ctx context.Context, id int64, patch InboundPatch)
 	if patch.Port != nil {
 		set = append(set, "port=?")
 		args = append(args, *patch.Port)
+	}
+	if patch.Alias != nil {
+		set = append(set, "alias=?")
+		args = append(args, *patch.Alias)
 	}
 	if patch.UUID != nil {
 		set = append(set, "uuid=?")

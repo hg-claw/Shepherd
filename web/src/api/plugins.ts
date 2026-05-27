@@ -280,7 +280,7 @@ export interface SingboxInbound {
   server_id: number
   server_name: string
   tag: string
-  alias?: string
+  alias: string
   port: number
   role: 'landing' | 'relay'
   protocol: SingboxProtocol

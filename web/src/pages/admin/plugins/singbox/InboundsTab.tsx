@@ -329,12 +329,13 @@ export default function InboundsTab() {
                   <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Role</th>
                   <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Protocol</th>
                   <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Port</th>
+                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Alias</th>
                   <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {inbounds.length === 0 && (
-                  <tr><td colSpan={5} className="px-3 py-4 text-center text-muted-foreground text-[12.5px]">
+                  <tr><td colSpan={6} className="px-3 py-4 text-center text-muted-foreground text-[12.5px]">
                     No inbounds on this server.
                   </td></tr>
                 )}
@@ -413,6 +414,7 @@ export default function InboundsTab() {
                       </td>
                       <td className="px-3 py-2 font-mono text-[12.5px]">{i.protocol}</td>
                       <td className="px-3 py-2 font-mono text-[12.5px]">{i.port}</td>
+                      <td className="px-3 py-2 font-mono text-[12.5px] text-muted-foreground">{i.alias || '—'}</td>
                       <td className="px-3 py-2 text-right whitespace-nowrap">
                         {isLanding && (
                           <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"

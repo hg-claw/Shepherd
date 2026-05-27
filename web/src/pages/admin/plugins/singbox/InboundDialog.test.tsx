@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import InboundDialog from './InboundDialog'
+import * as pluginsAPI from '@/api/plugins'
 
 vi.mock('@/api/plugins', () => ({
   listSingboxCerts:     vi.fn().mockResolvedValue([
@@ -79,6 +80,7 @@ describe('singbox/InboundDialog', () => {
       server_id: 1,
       server_name: 'S1',
       tag: 'landing-abc',
+      alias: '',
       port: 443,
       role: 'landing' as const,
       protocol: 'trojan-tls' as const,
@@ -116,5 +118,24 @@ describe('singbox/InboundDialog', () => {
       expect(screen.queryByLabelText(/short id/i)).toBeNull()
       expect(screen.getByLabelText(/password/i)).toBeTruthy()
     })
+  })
+
+  it('passes alias to createSingboxInbound when filled', async () => {
+    const spy = vi.spyOn(pluginsAPI, 'createSingboxInbound')
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    const aliasInput = screen.getByLabelText(/alias/i)
+    fireEvent.change(aliasInput, { target: { value: 'my-node' } })
+
+    const createBtn = screen.getByRole('button', { name: /create/i })
+    fireEvent.click(createBtn)
+
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({ alias: 'my-node' }),
+      )
+    )
   })
 })

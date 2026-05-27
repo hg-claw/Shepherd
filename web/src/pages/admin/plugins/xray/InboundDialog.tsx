@@ -98,8 +98,8 @@ export default function InboundDialog(props: Props) {
         public_key: publicKey !== editing.public_key ? publicKey : undefined,
         private_key: privateKey || undefined,
         short_id: shortID !== editing.short_id ? shortID : undefined,
-        ss_method: ssMethod !== editing.ss_method ? ssMethod : undefined,
-        ss_password: ssPassword || undefined,
+        ss_method: protocol === 'shadowsocks' && ssMethod !== editing.ss_method ? ssMethod : undefined,
+        ss_password: protocol === 'shadowsocks' ? (ssPassword || undefined) : undefined,
       })
     },
     onSuccess: () => {

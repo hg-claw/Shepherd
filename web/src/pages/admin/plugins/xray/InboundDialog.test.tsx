@@ -87,6 +87,19 @@ describe('InboundDialog (edit)', () => {
     const serverSelect = screen.getByLabelText(/server/i) as HTMLSelectElement
     expect(serverSelect.disabled).toBe(true)
   })
+
+  it('editing a vless-reality inbound does NOT send ss_method in patch body', async () => {
+    const spy = vi.spyOn(pluginsAPI, 'patchXrayInbound').mockResolvedValue({} as never)
+    // landing fixture has ss_method: '' and protocol: 'vless-reality'
+    wrap(<InboundDialog open={true} onOpenChange={() => {}} mode="edit"
+      inbound={landing} allInbounds={[landing]} />)
+    // Click Save without changing anything
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    await waitFor(() => expect(spy).toHaveBeenCalled())
+    const patchBody = spy.mock.calls[0][1]
+    expect(patchBody.ss_method).toBeUndefined()
+    expect(patchBody.ss_password).toBeUndefined()
+  })
 })
 
 describe('InboundDialog (shadowsocks)', () => {

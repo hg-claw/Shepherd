@@ -53,6 +53,7 @@
 
 - **`[General]`**（仅 Surge / ShadowRocket）—— 原始 Surge 指令，例如 `dns-server = 119.29.29.29, 223.5.5.5`。留空 → 默认 `bypass-system = true`。
 - **`[MITM]`**（仅 Surge / ShadowRocket）—— 原始 Surge MITM 指令，例如 `hostname = *.googlevideo.com`。留空 → 省略该段。Clash 没有 MITM，因此 `clash` 目标会忽略它。
+- **`[URL Rewrite]`**（仅 Surge / ShadowRocket）—— 原始 Surge URL Rewrite 规则，每行 `正则 替换 模式`（模式如 `header`/`302`/`reject`），例如 `^https://example.com/x $1 header`。留空 → 省略该段。Clash 无对应,会忽略它。
 - **`[Clash] general`**（仅 Clash）—— 原始 Clash YAML 顶层键，例如：
   ```yaml
   mode: rule

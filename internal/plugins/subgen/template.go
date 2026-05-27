@@ -33,6 +33,7 @@ type TemplateSpec struct {
 	IncludeAutoSelect bool          `json:"include_auto_select"`
 	General           string        `json:"general,omitempty"`       // Surge [General] body
 	MITM              string        `json:"mitm,omitempty"`          // Surge [MITM] body
+	URLRewrite        string        `json:"url_rewrite,omitempty"`   // Surge [URL Rewrite] body
 	ClashGeneral      string        `json:"clash_general,omitempty"` // Clash YAML preamble (top-level keys)
 	CustomNodes       string        `json:"custom_nodes,omitempty"`  // newline-separated proxy share links
 	CustomGroups      []CustomGroup `json:"custom_groups,omitempty"`

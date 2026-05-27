@@ -24,6 +24,7 @@ type Intermediate struct {
 	Rules        []Rule
 	General      string // Surge [General] body; empty → renderer default
 	MITM         string // Surge [MITM] body; empty → section omitted
+	URLRewrite   string // Surge [URL Rewrite] body; empty → section omitted
 	ClashGeneral string // Clash YAML preamble; empty → {mode: rule}
 }
 
@@ -46,7 +47,7 @@ func Assemble(nodes []Node, spec TemplateSpec) Intermediate {
 	if custom, _ := ParseShareLinks(spec.CustomNodes); len(custom) > 0 {
 		nodes = append(nodes, custom...)
 	}
-	im := Intermediate{Nodes: nodes, General: spec.General, MITM: spec.MITM, ClashGeneral: spec.ClashGeneral}
+	im := Intermediate{Nodes: nodes, General: spec.General, MITM: spec.MITM, URLRewrite: spec.URLRewrite, ClashGeneral: spec.ClashGeneral}
 
 	allNames := make([]string, 0, len(nodes))
 	for _, n := range nodes {

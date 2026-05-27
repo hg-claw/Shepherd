@@ -38,6 +38,7 @@ interface RulesModel {
   include_auto_select: boolean
   general: string
   mitm: string
+  url_rewrite: string
   clash_general: string
   custom_nodes: string
   custom_groups: CustomGroupModel[]
@@ -57,6 +58,7 @@ function parseRules(rules_json: string): RulesModel {
     include_auto_select: Boolean(raw.include_auto_select),
     general: String(raw.general ?? ''),
     mitm: String(raw.mitm ?? ''),
+    url_rewrite: String(raw.url_rewrite ?? ''),
     clash_general: String(raw.clash_general ?? ''),
     custom_nodes: String(raw.custom_nodes ?? ''),
     custom_groups: Array.isArray(raw.custom_groups)
@@ -236,6 +238,7 @@ function TemplateEditor({
   const [includeAutoSelect, setIncludeAutoSelect] = useState(initial.include_auto_select)
   const [general, setGeneral] = useState(initial.general)
   const [mitm, setMitm] = useState(initial.mitm)
+  const [urlRewrite, setUrlRewrite] = useState(initial.url_rewrite)
   const [clashGeneral, setClashGeneral] = useState(initial.clash_general)
   const [customNodes, setCustomNodes] = useState(initial.custom_nodes)
   const [customGroupsText, setCustomGroupsText] = useState(customGroupsToText(initial.custom_groups))
@@ -259,6 +262,7 @@ function TemplateEditor({
     include_auto_select: includeAutoSelect,
     general,
     mitm,
+    url_rewrite: urlRewrite,
     clash_general: clashGeneral,
     custom_nodes: customNodes,
     custom_groups: textToCustomGroups(customGroupsText),
@@ -283,6 +287,7 @@ function TemplateEditor({
     setIncludeAutoSelect(m.include_auto_select)
     setGeneral(m.general)
     setMitm(m.mitm)
+    setUrlRewrite(m.url_rewrite)
     setClashGeneral(m.clash_general)
     setCustomNodes(m.custom_nodes)
     setCustomGroupsText(customGroupsToText(m.custom_groups))
@@ -429,6 +434,21 @@ function TemplateEditor({
                     spellCheck={false}
                     className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
                     placeholder="hostname = *.googlevideo.com"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-[12px]">[URL Rewrite]</Label>
+                  <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                    Raw Surge <code>[URL Rewrite]</code> lines (Surge / ShadowRocket only; Clash ignores). Leave empty to omit.
+                  </p>
+                  <textarea
+                    value={urlRewrite}
+                    onChange={(e) => setUrlRewrite(e.target.value)}
+                    rows={3}
+                    spellCheck={false}
+                    className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
+                    placeholder="^https://example.com/x $1 header"
                   />
                 </div>
 

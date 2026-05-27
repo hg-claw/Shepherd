@@ -155,6 +155,9 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 		}
 		b.WriteString(surgeRuleLine(rule, rulesetBase) + "\n")
 	}
+	if u := strings.TrimSpace(im.URLRewrite); u != "" {
+		b.WriteString("\n[URL Rewrite]\n" + u + "\n")
+	}
 	if m := strings.TrimSpace(im.MITM); m != "" {
 		b.WriteString("\n[MITM]\n" + m + "\n")
 	}

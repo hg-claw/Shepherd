@@ -143,3 +143,21 @@ func TestClash_CustomRulesetTextFormat(t *testing.T) {
 		}
 	}
 }
+
+func TestClash_FiltersDevice(t *testing.T) {
+	im := Intermediate{
+		Groups: []Group{{Name: "Home", Type: "select", Members: []string{"DEVICE:HomeMac", "DIRECT"}, Verbatim: true}},
+		Rules:  []Rule{{Match: "IP-CIDR,192.168.1.0/24", Target: "DEVICE:HomeMac"}, {Final: true, Target: "PROXY"}},
+	}
+	out := (&ClashRenderer{}).Render(im, "", DefaultRulesetBase)
+	if strings.Contains(out, "DEVICE:") {
+		t.Fatalf("clash must drop DEVICE refs:\n%s", out)
+	}
+	var doc map[string]any
+	if err := yaml.Unmarshal([]byte(out), &doc); err != nil {
+		t.Fatalf("invalid yaml: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "name: Home") {
+		t.Fatalf("Home group missing:\n%s", out)
+	}
+}

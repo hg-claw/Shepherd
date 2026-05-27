@@ -43,7 +43,11 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, rulesetBase string) st
 
 	groups := []map[string]any{}
 	for _, g := range im.Groups {
-		m := map[string]any{"name": g.Name, "type": g.Type, "proxies": g.Members}
+		members := dropDevicePolicies(g.Members) // Clash has no Ponte
+		if len(members) == 0 {
+			continue
+		}
+		m := map[string]any{"name": g.Name, "type": g.Type, "proxies": members}
 		if g.Type == "url-test" {
 			m["url"] = "http://www.gstatic.com/generate_204"
 			m["interval"] = 300
@@ -57,6 +61,9 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, rulesetBase string) st
 	providers := map[string]any{}
 	rules := []string{}
 	for _, rl := range im.Rules {
+		if strings.HasPrefix(rl.Target, "DEVICE:") {
+			continue
+		}
 		switch {
 		case rl.Final:
 			rules = append(rules, "MATCH,"+rl.Target)

@@ -17,9 +17,14 @@ func TestSurge_RendersProtocolsGroupsRules(t *testing.T) {
 			{Name: "PROXY", Type: "select", Members: []string{"Auto Select", "ss1"}},
 			{Name: "Auto Select", Type: "url-test", Members: []string{"ss1", "re1"}},
 		},
-		Rules: []string{"IP-CIDR,10.0.0.0/24,PROXY", "GEOIP,CN,DIRECT", "FINAL,PROXY"},
+		Rules: []Rule{
+			{Match: "IP-CIDR,10.0.0.0/24", Target: "PROXY"},
+			{Ruleset: "Telegram", Target: "Telegram"},
+			{Native: "GEOIP,CN", Target: "DIRECT"},
+			{Final: true, Target: "PROXY"},
+		},
 	}
-	out := (&SurgeRenderer{}).Render(im, "https://x/sub/abc?target=surge")
+	out := (&SurgeRenderer{}).Render(im, "https://x/sub/abc?target=surge", DefaultRulesetBase)
 	for _, want := range []string{
 		"#!MANAGED-CONFIG https://x/sub/abc?target=surge",
 		"[Proxy]", "DIRECT = direct",
@@ -32,6 +37,7 @@ func TestSurge_RendersProtocolsGroupsRules(t *testing.T) {
 		"Auto Select = url-test, ss1, re1, url=http://www.gstatic.com/generate_204, interval=300",
 		"[Rule]",
 		"IP-CIDR,10.0.0.0/24,PROXY",
+		"RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Telegram/Telegram.list,Telegram",
 		"GEOIP,CN,DIRECT",
 		"FINAL,PROXY",
 	} {
@@ -45,11 +51,10 @@ func TestSurge_GeneralAndMITM(t *testing.T) {
 	base := Intermediate{
 		Nodes:  []Node{{Name: "n1", Protocol: "trojan", Server: "1.1.1.1", Port: 443, Password: "p"}},
 		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"n1"}}},
-		Rules:  []string{"FINAL,PROXY"},
+		Rules:  []Rule{{Final: true, Target: "PROXY"}},
 	}
 
-	// Empty fields: default [General], no [MITM] section.
-	out := (&SurgeRenderer{}).Render(base, "https://x/sub/t?target=surge")
+	out := (&SurgeRenderer{}).Render(base, "https://x/sub/t?target=surge", DefaultRulesetBase)
 	if !strings.Contains(out, "[General]\nbypass-system = true") {
 		t.Fatalf("default [General] missing:\n%s", out)
 	}
@@ -57,11 +62,10 @@ func TestSurge_GeneralAndMITM(t *testing.T) {
 		t.Fatalf("[MITM] should be absent when unset:\n%s", out)
 	}
 
-	// Set fields: custom [General] replaces default, [MITM] appended.
 	im := base
 	im.General = "dns-server = 1.1.1.1\nskip-proxy = 10.0.0.0/8"
 	im.MITM = "hostname = *.googlevideo.com"
-	out = (&SurgeRenderer{}).Render(im, "https://x/sub/t?target=surge")
+	out = (&SurgeRenderer{}).Render(im, "https://x/sub/t?target=surge", DefaultRulesetBase)
 	if !strings.Contains(out, "[General]\ndns-server = 1.1.1.1\nskip-proxy = 10.0.0.0/8") {
 		t.Fatalf("custom [General] missing:\n%s", out)
 	}
@@ -74,20 +78,18 @@ func TestSurge_GeneralAndMITM(t *testing.T) {
 }
 
 func TestSurge_SelectGroupDirectFallback(t *testing.T) {
-	// A select group WITHOUT DIRECT gets it appended (conventional fallback).
 	im := Intermediate{
 		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"Auto Select", "n1"}}},
 	}
-	out := (&SurgeRenderer{}).Render(im, "x")
+	out := (&SurgeRenderer{}).Render(im, "x", DefaultRulesetBase)
 	if !strings.Contains(out, "PROXY = select, Auto Select, n1, DIRECT\n") {
 		t.Fatalf("missing DIRECT fallback:\n%s", out)
 	}
 
-	// A select group that ALREADY contains DIRECT must not duplicate it.
 	im2 := Intermediate{
 		Groups: []Group{{Name: "Telegram", Type: "select", Members: []string{"PROXY", "DIRECT", "REJECT", "n1"}}},
 	}
-	out2 := (&SurgeRenderer{}).Render(im2, "x")
+	out2 := (&SurgeRenderer{}).Render(im2, "x", DefaultRulesetBase)
 	if !strings.Contains(out2, "Telegram = select, PROXY, DIRECT, REJECT, n1\n") {
 		t.Fatalf("Telegram group wrong:\n%s", out2)
 	}
@@ -104,9 +106,9 @@ func TestSurge_ProxyLine_VmessTrojanTuic(t *testing.T) {
 			{Name: "tu1", Protocol: "tuic", Server: "3.3.3.3", Port: 443, Password: "up", UUID: "uid", SNI: "u.com", Extra: map[string]any{"congestion_control": "bbr"}},
 		},
 		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"vm1"}}},
-		Rules:  []string{"FINAL,PROXY"},
+		Rules:  []Rule{{Final: true, Target: "PROXY"}},
 	}
-	out := (&SurgeRenderer{}).Render(im, "https://x/sub/t?target=surge")
+	out := (&SurgeRenderer{}).Render(im, "https://x/sub/t?target=surge", DefaultRulesetBase)
 	for _, want := range []string{
 		"vm1 = vmess, 1.1.1.1, 443, username=uu, vmess-aead=true, tls=true, sni=v.com, ws=true, ws-path=/p, ws-headers=Host:v.com",
 		"tj1 = trojan, 2.2.2.2, 443, password=tp, sni=t.com",

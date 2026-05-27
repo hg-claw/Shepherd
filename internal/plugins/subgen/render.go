@@ -3,7 +3,7 @@ package subgen
 type Renderer interface {
 	Target() string
 	Supports(protocol string) bool
-	Render(im Intermediate, subURL string) string
+	Render(im Intermediate, subURL, rulesetBase string) string
 }
 
 func rendererFor(target string) (Renderer, bool) {

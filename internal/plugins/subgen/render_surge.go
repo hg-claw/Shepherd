@@ -86,7 +86,7 @@ func (r *SurgeRenderer) proxyLine(n Node) string {
 	return b.String()
 }
 
-func (r *SurgeRenderer) Render(im Intermediate, subURL string) string {
+func (r *SurgeRenderer) Render(im Intermediate, subURL, rulesetBase string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "#!MANAGED-CONFIG %s interval=43200 strict=false\n\n", subURL)
 
@@ -118,7 +118,7 @@ func (r *SurgeRenderer) Render(im Intermediate, subURL string) string {
 	}
 	b.WriteString("\n[Rule]\n")
 	for _, rule := range im.Rules {
-		b.WriteString(rule + "\n")
+		b.WriteString(surgeRuleLine(rule, rulesetBase) + "\n")
 	}
 	if m := strings.TrimSpace(im.MITM); m != "" {
 		b.WriteString("\n[MITM]\n" + m + "\n")
@@ -144,4 +144,18 @@ func (r *SurgeRenderer) groupLine(g Group) string {
 		members = append(append([]string{}, members...), "DIRECT")
 	}
 	return fmt.Sprintf("%s = select, %s", g.Name, strings.Join(members, ", "))
+}
+
+// surgeRuleLine formats one semantic Rule as a Surge [Rule] line.
+func surgeRuleLine(r Rule, rulesetBase string) string {
+	switch {
+	case r.Final:
+		return "FINAL," + r.Target
+	case r.Ruleset != "":
+		return "RULE-SET," + rulesetURL(r.Ruleset, "surge", rulesetBase) + "," + r.Target
+	case r.Native != "":
+		return r.Native + "," + r.Target
+	default:
+		return r.Match + "," + r.Target
+	}
 }

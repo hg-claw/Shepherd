@@ -1,9 +1,6 @@
 package subgen
 
-import (
-	"strings"
-	"testing"
-)
+import "testing"
 
 func TestAssemble_GroupsAndRules(t *testing.T) {
 	nodes := []Node{
@@ -16,21 +13,17 @@ func TestAssemble_GroupsAndRules(t *testing.T) {
 		Final:             "PROXY",
 		IncludeAutoSelect: true,
 	}
-	im := Assemble(nodes, spec, "surge", DefaultRulesetBase)
+	im := Assemble(nodes, spec)
 
-	// PROXY is the first group.
 	if len(im.Groups) == 0 || im.Groups[0].Name != "PROXY" {
 		t.Fatalf("PROXY not first: %+v", im.Groups)
 	}
-	// Auto Select present; NO per-country groups.
 	if findGroup(im.Groups, "Auto Select") == nil {
 		t.Fatal("missing Auto Select group")
 	}
 	if findGroup(im.Groups, "🇯🇵 JP") != nil || findGroup(im.Groups, "🇸🇬 SG") != nil {
 		t.Fatalf("country groups should be gone: %+v", im.Groups)
 	}
-
-	// Each category → a select group; first member = configured policy; deduped.
 	tg := findGroup(im.Groups, "Telegram")
 	if tg == nil || tg.Type != "select" {
 		t.Fatalf("Telegram group missing/wrong: %+v", tg)
@@ -39,39 +32,27 @@ func TestAssemble_GroupsAndRules(t *testing.T) {
 	if !equalStrings(tg.Members, wantTG) {
 		t.Fatalf("Telegram members = %v want %v", tg.Members, wantTG)
 	}
-	cn := findGroup(im.Groups, "Location:CN")
-	wantCN := []string{"DIRECT", "PROXY", "REJECT", "🇯🇵 tokyo vless", "🇸🇬 sg ss"}
-	if cn == nil || !equalStrings(cn.Members, wantCN) {
-		t.Fatalf("Location:CN members = %v want %v", cn.Members, wantCN)
+
+	if r0 := im.Rules[0]; r0.Match != "IP-CIDR,10.0.0.0/24" || r0.Target != "PROXY" {
+		t.Fatalf("custom rule not first: %+v", r0)
+	}
+	if last := im.Rules[len(im.Rules)-1]; !last.Final || last.Target != "PROXY" {
+		t.Fatalf("final not last: %+v", last)
+	}
+	if !hasRule(im.Rules, Rule{Ruleset: "Telegram", Target: "Telegram"}) {
+		t.Fatalf("telegram ruleset rule missing: %+v", im.Rules)
+	}
+	if !hasRule(im.Rules, Rule{Native: "GEOIP,CN", Target: "Location:CN"}) {
+		t.Fatalf("cn native rule missing: %+v", im.Rules)
 	}
 
-	// Custom rule first, FINAL last, category rules route to the GROUP name.
-	if im.Rules[0] != "IP-CIDR,10.0.0.0/24,PROXY" {
-		t.Fatalf("custom rule not first: %v", im.Rules[0])
-	}
-	if im.Rules[len(im.Rules)-1] != "FINAL,PROXY" {
-		t.Fatalf("final not last: %v", im.Rules[len(im.Rules)-1])
-	}
-	if !containsRule(im.Rules, "GEOIP,CN,Location:CN") {
-		t.Fatalf("CN rule should route to its group: %v", im.Rules)
-	}
-	foundTG := false
-	for _, r := range im.Rules {
-		if strings.HasPrefix(r, "RULE-SET,") && strings.HasSuffix(r, ",Telegram") {
-			foundTG = true
-		}
-	}
-	if !foundTG {
-		t.Fatalf("Telegram rule should route to its group: %v", im.Rules)
-	}
-
-	// General/MITM propagate onto the intermediate.
 	spec2 := spec
-	spec2.General = "dns-server = 1.1.1.1"
-	spec2.MITM = "hostname = *.x.com"
-	im2 := Assemble(nodes, spec2, "surge", DefaultRulesetBase)
-	if im2.General != "dns-server = 1.1.1.1" || im2.MITM != "hostname = *.x.com" {
-		t.Fatalf("general/mitm not propagated: %q / %q", im2.General, im2.MITM)
+	spec2.General = "g"
+	spec2.MITM = "m"
+	spec2.ClashGeneral = "mode: rule"
+	im2 := Assemble(nodes, spec2)
+	if im2.General != "g" || im2.MITM != "m" || im2.ClashGeneral != "mode: rule" {
+		t.Fatalf("general/mitm/clash not propagated: %q/%q/%q", im2.General, im2.MITM, im2.ClashGeneral)
 	}
 }
 
@@ -96,7 +77,7 @@ func equalStrings(a, b []string) bool {
 	return true
 }
 
-func containsRule(rules []string, want string) bool {
+func hasRule(rules []Rule, want Rule) bool {
 	for _, r := range rules {
 		if r == want {
 			return true

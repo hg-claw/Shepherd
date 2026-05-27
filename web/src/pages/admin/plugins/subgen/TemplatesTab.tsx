@@ -37,6 +37,7 @@ interface RulesModel {
   include_auto_select: boolean
   general: string
   mitm: string
+  clash_general: string
 }
 
 function parseRules(rules_json: string): RulesModel {
@@ -53,6 +54,7 @@ function parseRules(rules_json: string): RulesModel {
     include_auto_select: Boolean(raw.include_auto_select),
     general: String(raw.general ?? ''),
     mitm: String(raw.mitm ?? ''),
+    clash_general: String(raw.clash_general ?? ''),
   }
 }
 
@@ -180,7 +182,7 @@ export default function TemplatesTab() {
 
 // ── Template editor ──────────────────────────────────────────────────────────
 
-type PreviewTarget = 'surge' | 'shadowrocket'
+type PreviewTarget = 'surge' | 'shadowrocket' | 'clash'
 
 function TemplateEditor({
   editing, categories, onClose, onSaved,
@@ -204,6 +206,7 @@ function TemplateEditor({
   const [includeAutoSelect, setIncludeAutoSelect] = useState(initial.include_auto_select)
   const [general, setGeneral] = useState(initial.general)
   const [mitm, setMitm] = useState(initial.mitm)
+  const [clashGeneral, setClashGeneral] = useState(initial.clash_general)
   const [rawJson, setRawJson] = useState('')
 
   const toggleCat = (name: string, defaultPolicy: string) => {
@@ -224,6 +227,7 @@ function TemplateEditor({
     include_auto_select: includeAutoSelect,
     general,
     mitm,
+    clash_general: clashGeneral,
   })
 
   // The rules_json we save and preview: the raw text in raw mode, otherwise the
@@ -245,6 +249,7 @@ function TemplateEditor({
     setIncludeAutoSelect(m.include_auto_select)
     setGeneral(m.general)
     setMitm(m.mitm)
+    setClashGeneral(m.clash_general)
     setMode('form')
   }
 
@@ -391,6 +396,21 @@ function TemplateEditor({
                   />
                 </div>
 
+                <div>
+                  <Label className="text-[12px]">[Clash] general</Label>
+                  <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                    Raw Clash YAML top-level keys (<code>dns</code>, <code>mode</code>…); used only for the clash target. Leave empty for <code>mode: rule</code>.
+                  </p>
+                  <textarea
+                    value={clashGeneral}
+                    onChange={(e) => setClashGeneral(e.target.value)}
+                    rows={4}
+                    spellCheck={false}
+                    className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
+                    placeholder="mode: rule"
+                  />
+                </div>
+
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                   <label className="flex items-center gap-2 text-[12.5px]">
                     <input type="checkbox" checked={includeAutoSelect}
@@ -431,6 +451,7 @@ function TemplateEditor({
                 className="h-7 px-1.5 rounded border bg-background text-[11.5px]">
                 <option value="surge">surge</option>
                 <option value="shadowrocket">shadowrocket</option>
+                <option value="clash">clash</option>
               </select>
               {previewing && <span className="text-fg-dim text-[11px]">rendering…</span>}
             </div>

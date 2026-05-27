@@ -29,7 +29,7 @@ import {
 import { useUI } from '@/store/ui'
 import { copyText } from '@/lib/clipboard'
 
-type Target = 'surge' | 'shadowrocket'
+type Target = 'surge' | 'shadowrocket' | 'clash'
 
 function subUrl(token: string, target: Target): string {
   return `${location.origin}/sub/${token}?target=${target}`
@@ -75,7 +75,7 @@ export default function SubscriptionsTab() {
     onError: (e: any) => toast('error', String(e?.message ?? e)),
   })
 
-  // per-row display target (surge/shadowrocket)
+  // per-row display target (surge / shadowrocket / clash)
   const [targets, setTargets] = useState<Record<number, Target>>({})
   const targetOf = (id: number): Target => targets[id] ?? 'surge'
 
@@ -145,6 +145,7 @@ export default function SubscriptionsTab() {
                       >
                         <option value="surge">surge</option>
                         <option value="shadowrocket">shadowrocket</option>
+                        <option value="clash">clash</option>
                       </select>
                       <code className="font-mono text-[11px] text-fg-dim truncate max-w-[22rem]">{url}</code>
                       <Button variant="ghost" size="sm" className="h-6 w-6 p-0"

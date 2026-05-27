@@ -12,6 +12,8 @@ func rendererFor(target string) (Renderer, bool) {
 		return &SurgeRenderer{}, true
 	case "shadowrocket":
 		return &ShadowRocketRenderer{}, true
+	case "clash":
+		return &ClashRenderer{}, true
 	default:
 		return nil, false
 	}

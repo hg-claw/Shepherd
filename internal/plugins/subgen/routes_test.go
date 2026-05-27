@@ -259,7 +259,7 @@ func TestRoutes_PreviewTemplate(t *testing.T) {
 
 	// unknown target → 400
 	if w := p.do("POST", "/templates/preview", map[string]any{
-		"rules_json": `{"final":"PROXY"}`, "target": "clash",
+		"rules_json": `{"final":"PROXY"}`, "target": "quantumultx",
 	}); w.Code != 400 {
 		t.Fatalf("bad target: want 400 got %d body=%s", w.Code, w.Body.String())
 	}
@@ -295,7 +295,7 @@ func TestRoutes_Preview(t *testing.T) {
 	}
 
 	// bad target → 400
-	if w := p.do("GET", "/subscriptions/"+idStr+"/preview?target=clash", nil); w.Code != 400 {
+	if w := p.do("GET", "/subscriptions/"+idStr+"/preview?target=quantumultx", nil); w.Code != 400 {
 		t.Fatalf("bad target: want 400 got %d", w.Code)
 	}
 

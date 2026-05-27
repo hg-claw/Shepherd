@@ -58,8 +58,17 @@ func TestService_PreviewTemplate(t *testing.T) {
 		t.Fatalf("expected sample-node flags in output:\n%s", out)
 	}
 
+	// clash target now renders YAML
+	cy, _, err := svc.PreviewTemplate(rules, "clash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cy, "proxies:") || !strings.Contains(cy, "MATCH,") {
+		t.Fatalf("clash preview:\n%s", cy)
+	}
+
 	// unknown target → ErrBadTarget
-	if _, _, err := svc.PreviewTemplate(rules, "clash"); !errors.Is(err, ErrBadTarget) {
+	if _, _, err := svc.PreviewTemplate(rules, "quantumultx"); !errors.Is(err, ErrBadTarget) {
 		t.Fatalf("want ErrBadTarget got %v", err)
 	}
 	// malformed rules (unknown category) → a parse error, not ErrBadTarget
@@ -75,7 +84,7 @@ func TestService_UnknownTokenAndTarget(t *testing.T) {
 		t.Fatal("expected error for unknown token")
 	}
 	// bad target with any token string → ErrBadTarget
-	if _, _, err := svc.Generate(context.Background(), "whatever", "clash"); err == nil {
+	if _, _, err := svc.Generate(context.Background(), "whatever", "quantumultx"); err == nil {
 		t.Fatal("expected error for unknown target")
 	}
 }

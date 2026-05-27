@@ -139,6 +139,47 @@ describe('singbox/InboundDialog', () => {
     )
   })
 
+  it('password new button fills the password input with a non-empty value (trojan-tls)', async () => {
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    // Switch to trojan-tls (no UUID field, so the only "new" button belongs to password)
+    const select = screen.getByRole('combobox', { name: /protocol/i })
+    fireEvent.change(select, { target: { value: 'trojan-tls' } })
+
+    await waitFor(() => expect(screen.getByLabelText('password')).toBeTruthy())
+
+    const pwInput = screen.getByLabelText('password') as HTMLInputElement
+    const newBtn  = screen.getByRole('button', { name: /^new$/i })
+    fireEvent.click(newBtn)
+
+    expect(pwInput.value).not.toBe('')
+  })
+
+  it('SS new button fills ss password with a base64 key of correct length for aes-128-gcm', async () => {
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    const select = screen.getByRole('combobox', { name: /protocol/i })
+    fireEvent.change(select, { target: { value: 'shadowsocks-2022' } })
+
+    await waitFor(() => expect(screen.getByLabelText('ss password')).toBeTruthy())
+
+    // Method defaults to 2022-blake3-aes-128-gcm; set it explicitly
+    const methodSelect = screen.getByRole('combobox', { name: /method/i })
+    fireEvent.change(methodSelect, { target: { value: '2022-blake3-aes-128-gcm' } })
+
+    const ssPwInput = screen.getByLabelText('ss password') as HTMLInputElement
+    const newBtn    = screen.getByRole('button', { name: /^new$/i })
+    fireEvent.click(newBtn)
+
+    expect(ssPwInput.value).not.toBe('')
+    // aes-128-gcm key must decode to exactly 16 bytes
+    expect(atob(ssPwInput.value).length).toBe(16)
+  })
+
   it('sends alias: "" to patchSingboxInbound when alias is cleared in edit mode', async () => {
     const spy = vi.spyOn(pluginsAPI, 'patchSingboxInbound').mockResolvedValue({ id: 5 } as never)
     const inbound = {

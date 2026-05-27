@@ -12,7 +12,12 @@ import {
   createXrayInbound, patchXrayInbound, generateX25519, generateShortID,
   type XrayInbound,
 } from '@/api/plugins'
-import { randomPort, randomUUID } from './templates'
+import { randomPort, randomUUID, randomSSKey } from './templates'
+
+const XRAY_SS_METHODS = [
+  'aes-256-gcm', 'aes-128-gcm', 'chacha20-poly1305', 'xchacha20-poly1305',
+  '2022-blake3-aes-128-gcm', '2022-blake3-aes-256-gcm', '2022-blake3-chacha20-poly1305',
+]
 
 type Role = 'landing' | 'relay'
 type Protocol = 'vless-reality' | 'vmess-ws' | 'shadowsocks'
@@ -53,6 +58,8 @@ export default function InboundDialog(props: Props) {
   const [privateKey, setPrivateKey] = useState<string>('') // never preloaded from edit (it's redacted)
   const [shortID, setShortID] = useState<string>(editing?.short_id ?? '')
   const [wsPath, setWSPath] = useState<string>(editing?.ws_path ?? '/ws')
+  const [ssMethod, setSSMethod] = useState<string>(editing?.ss_method ?? 'aes-256-gcm')
+  const [ssPassword, setSSPassword] = useState<string>('')
   const [alias, setAlias] = useState<string>(editing?.alias ?? '')
   const [error, setError] = useState<string | null>(null)
 
@@ -66,6 +73,8 @@ export default function InboundDialog(props: Props) {
         server_id: Number(serverID), port, alias: alias || undefined, role, protocol,
         uuid, sni, public_key: publicKey, private_key: privateKey, short_id: shortID,
         ws_path: protocol === 'vmess-ws' ? wsPath : undefined,
+        ss_method: protocol === 'shadowsocks' ? ssMethod : undefined,
+        ss_password: protocol === 'shadowsocks' ? ssPassword : undefined,
         upstream_inbound_id: role === 'relay' ? Number(upstreamID) : undefined,
       })
     },
@@ -89,6 +98,8 @@ export default function InboundDialog(props: Props) {
         public_key: publicKey !== editing.public_key ? publicKey : undefined,
         private_key: privateKey || undefined,
         short_id: shortID !== editing.short_id ? shortID : undefined,
+        ss_method: protocol === 'shadowsocks' && ssMethod !== editing.ss_method ? ssMethod : undefined,
+        ss_password: protocol === 'shadowsocks' ? (ssPassword || undefined) : undefined,
       })
     },
     onSuccess: () => {
@@ -180,15 +191,17 @@ export default function InboundDialog(props: Props) {
             </div>
           </div>
 
-          <div>
-            <Label className="text-[12px]">UUID</Label>
-            <div className="flex gap-2 mt-1">
-              <Input value={uuid} onChange={(e) => setUUID(e.target.value)}
-                className="h-8 font-mono text-[12px]" />
-              <Button type="button" variant="outline" size="sm" className="h-8"
-                onClick={() => setUUID(randomUUID())}>new</Button>
+          {protocol !== 'shadowsocks' && (
+            <div>
+              <Label className="text-[12px]">UUID</Label>
+              <div className="flex gap-2 mt-1">
+                <Input value={uuid} onChange={(e) => setUUID(e.target.value)}
+                  className="h-8 font-mono text-[12px]" />
+                <Button type="button" variant="outline" size="sm" className="h-8"
+                  onClick={() => setUUID(randomUUID())}>new</Button>
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <Label className="text-[12px]" htmlFor="ind-alias">Alias</Label>
@@ -242,6 +255,33 @@ export default function InboundDialog(props: Props) {
               <Input value={wsPath} onChange={(e) => setWSPath(e.target.value)}
                 className="h-8 font-mono mt-1" />
             </div>
+          )}
+
+          {protocol === 'shadowsocks' && (
+            <>
+              <div>
+                <Label className="text-[12px]" htmlFor="ind-ss-method">Method</Label>
+                <select id="ind-ss-method"
+                  aria-label="method"
+                  value={ssMethod}
+                  onChange={(e) => setSSMethod(e.target.value)}
+                  className="mt-1 h-8 px-2 rounded-md border bg-background text-[13px] font-mono w-full disabled:opacity-60">
+                  {XRAY_SS_METHODS.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label className="text-[12px]">Password</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input aria-label="ss password" value={ssPassword}
+                    onChange={(e) => setSSPassword(e.target.value)}
+                    className="h-8 font-mono text-[12px]" />
+                  <Button type="button" variant="outline" size="sm" className="h-8"
+                    onClick={() => setSSPassword(randomSSKey(ssMethod))}>new</Button>
+                </div>
+              </div>
+            </>
           )}
 
           {error && <p className="text-err text-[12px]">{error}</p>}

@@ -87,4 +87,41 @@ describe('InboundDialog (edit)', () => {
     const serverSelect = screen.getByLabelText(/server/i) as HTMLSelectElement
     expect(serverSelect.disabled).toBe(true)
   })
+
+  it('editing a vless-reality inbound does NOT send ss_method in patch body', async () => {
+    const spy = vi.spyOn(pluginsAPI, 'patchXrayInbound').mockResolvedValue({} as never)
+    // landing fixture has ss_method: '' and protocol: 'vless-reality'
+    wrap(<InboundDialog open={true} onOpenChange={() => {}} mode="edit"
+      inbound={landing} allInbounds={[landing]} />)
+    // Click Save without changing anything
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    await waitFor(() => expect(spy).toHaveBeenCalled())
+    const patchBody = spy.mock.calls[0][1]
+    expect(patchBody.ss_method).toBeUndefined()
+    expect(patchBody.ss_password).toBeUndefined()
+  })
+})
+
+describe('InboundDialog (shadowsocks)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('shadowsocks: renders method+password and submits ss_* on create', async () => {
+    const create = vi.spyOn(pluginsAPI, 'createXrayInbound').mockResolvedValue({} as never)
+    wrap(<InboundDialog open={true} onOpenChange={() => {}} mode="create"
+      defaultServerID={11} allInbounds={[landing]} />)
+    // switch protocol to shadowsocks
+    const protocolSelect = screen.getByDisplayValue('VLESS + REALITY')
+    fireEvent.change(protocolSelect, { target: { value: 'shadowsocks' } })
+    // method and password fields should now be visible
+    expect(screen.getByLabelText(/method/i)).toBeInTheDocument()
+    // click the 'new' button to fill the SS password
+    fireEvent.click(screen.getByRole('button', { name: /^new$/i }))
+    // submit
+    fireEvent.click(screen.getByRole('button', { name: /create/i }))
+    await waitFor(() => expect(create).toHaveBeenCalled())
+    const body = create.mock.calls[0][0]
+    expect(body).toMatchObject({ protocol: 'shadowsocks' })
+    expect(typeof body.ss_method).toBe('string')
+    expect((body.ss_password as string).length).toBeGreaterThan(0)
+  })
 })

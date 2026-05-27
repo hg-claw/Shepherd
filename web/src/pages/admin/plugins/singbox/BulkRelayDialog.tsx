@@ -12,21 +12,13 @@ import {
   type SingboxInbound, type CreateSingboxInboundBody,
 } from '@/api/plugins'
 import { useUI } from '@/store/ui'
-import { randomPort, randomUUID } from '../xray/templates'
+import { randomPassword, randomPort, randomUUID } from '../xray/templates'
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   landingInbound: SingboxInbound
   allInbounds: SingboxInbound[]
-}
-
-// Generate a 32-character url-safe-base64 random password (no padding).
-function randomPassword(): string {
-  const bytes = new Uint8Array(24)
-  crypto.getRandomValues(bytes)
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
 }
 
 interface RelayDraft {

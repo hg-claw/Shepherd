@@ -12,21 +12,13 @@ import {
   type XrayInbound, type CreateXrayInboundBody,
 } from '@/api/plugins'
 import { useUI } from '@/store/ui'
-import { randomPort, randomUUID } from './templates'
+import { randomPassword, randomPort, randomUUID } from './templates'
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   landingInbound: XrayInbound   // selected landing inbound
   allInbounds: XrayInbound[]    // for port-conflict hints per-server
-}
-
-// Generate a 32-character url-safe-base64 random password (no padding).
-function randomPassword(): string {
-  const bytes = new Uint8Array(24)
-  crypto.getRandomValues(bytes)
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
 }
 
 interface RelayDraft {

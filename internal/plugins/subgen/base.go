@@ -1,9 +1,10 @@
 package subgen
 
 type Group struct {
-	Name    string
-	Type    string // "select" | "url-test"
-	Members []string
+	Name     string
+	Type     string // "select" | "url-test"
+	Members  []string
+	Verbatim bool // user-defined: render members exactly, no auto-DIRECT fallback
 }
 
 // Rule is one routing entry in target-agnostic form. Exactly one of Ruleset /
@@ -60,6 +61,10 @@ func Assemble(nodes []Node, spec TemplateSpec) Intermediate {
 	im.Groups = append(im.Groups, Group{Name: mainProxyGroup, Type: "select", Members: mainMembers})
 	if spec.IncludeAutoSelect {
 		im.Groups = append(im.Groups, Group{Name: autoSelectGroup, Type: "url-test", Members: allNames})
+	}
+	for _, cg := range spec.CustomGroups {
+		members := append([]string(nil), cg.Members...)
+		im.Groups = append(im.Groups, Group{Name: cg.Name, Type: cg.Type, Members: members, Verbatim: true})
 	}
 
 	for _, c := range spec.Categories {

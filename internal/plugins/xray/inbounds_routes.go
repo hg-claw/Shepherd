@@ -26,6 +26,7 @@ type postInboundBody struct {
 	SSMethod          string `json:"ss_method"`
 	SSPassword        string `json:"ss_password"`
 	UpstreamInboundID *int64 `json:"upstream_inbound_id"`
+	Alias             string `json:"alias"`
 }
 
 func writeJSONResp(w http.ResponseWriter, code int, body any) {
@@ -44,6 +45,7 @@ func inboundToMap(v InboundView) map[string]any {
 		"server_id":   v.ServerID,
 		"server_name": v.ServerName,
 		"tag":         v.Tag,
+		"alias":       v.Alias,
 		"port":        v.Port,
 		"role":        v.Role,
 		"protocol":    v.Protocol,
@@ -112,7 +114,7 @@ func postInboundHandler(deps plugins.Deps) http.HandlerFunc {
 			UUID: body.UUID, SNI: body.SNI,
 			PublicKey: body.PublicKey, PrivateKey: body.PrivateKey, ShortID: body.ShortID,
 			WSPath: body.WSPath, SSMethod: body.SSMethod, SSPassword: body.SSPassword,
-			UpstreamInboundID: body.UpstreamInboundID,
+			UpstreamInboundID: body.UpstreamInboundID, Alias: body.Alias,
 		}
 		id, err := store.Insert(r.Context(), in)
 		if err != nil { writeRouteError(w, 500, err.Error()); return }
@@ -164,6 +166,9 @@ func patchInboundHandler(deps plugins.Deps) http.HandlerFunc {
 		if v, ok := body["ws_path"].(string);     ok { patch.WSPath = &v }
 		if v, ok := body["ss_method"].(string);   ok { patch.SSMethod = &v }
 		if v, ok := body["ss_password"].(string); ok { patch.SSPassword = &v }
+		if v, ok := body["alias"].(string); ok {
+			patch.Alias = &v
+		}
 
 		store := &InboundStore{DB: deps.DB}
 		row, err := store.GetByID(r.Context(), id)

@@ -196,5 +196,59 @@ func TestPatchServerVersion_TriggersBinaryPushAndRestart(t *testing.T) {
 	if v != "1.8.11" { t.Fatalf("deployed_version=%q", v) }
 }
 
+func TestRoutes_InboundAlias(t *testing.T) {
+	_, deps := newRoutesDB(t)
+
+	// POST: create inbound with alias
+	createBody := map[string]any{
+		"server_id": 1, "port": 443, "role": "landing", "protocol": "vless-reality",
+		"uuid": "u", "sni": "www.lovelive-anime.jp",
+		"public_key": "P", "private_key": "K", "short_id": "aa",
+		"alias": "🇭🇰 HK 01",
+	}
+	b, _ := json.Marshal(createBody)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/inbounds", bytes.NewReader(b))
+	postInboundHandler(deps)(w, req)
+	if w.Code != 201 {
+		t.Fatalf("create status = %d body=%s", w.Code, w.Body.String())
+	}
+	var created map[string]any
+	_ = json.NewDecoder(w.Body).Decode(&created)
+	if created["alias"] != "🇭🇰 HK 01" {
+		t.Fatalf("create: alias = %v, want 🇭🇰 HK 01", created["alias"])
+	}
+
+	// Determine created id
+	id := int64(created["id"].(float64))
+
+	// PATCH: rename alias
+	patchBody := map[string]any{"alias": "🇭🇰 HK renamed"}
+	bp, _ := json.Marshal(patchBody)
+	wp := httptest.NewRecorder()
+	reqp := httptest.NewRequest("PATCH", "/inbounds/"+strconv.FormatInt(id, 10), bytes.NewReader(bp))
+	reqp.SetPathValue("id", strconv.FormatInt(id, 10))
+	patchInboundHandler(deps)(wp, reqp)
+	if wp.Code != 200 {
+		t.Fatalf("patch status = %d body=%s", wp.Code, wp.Body.String())
+	}
+
+	// GET list: confirm alias persisted
+	wg := httptest.NewRecorder()
+	reqg := httptest.NewRequest("GET", "/inbounds?server_id=1", nil)
+	getInboundsHandler(deps)(wg, reqg)
+	if wg.Code != 200 {
+		t.Fatalf("list status = %d body=%s", wg.Code, wg.Body.String())
+	}
+	var list []map[string]any
+	_ = json.NewDecoder(wg.Body).Decode(&list)
+	if len(list) == 0 {
+		t.Fatal("list: no inbounds returned")
+	}
+	if list[0]["alias"] != "🇭🇰 HK renamed" {
+		t.Fatalf("list: alias = %v, want 🇭🇰 HK renamed", list[0]["alias"])
+	}
+}
+
 // silence unused-import / unused-var compiler errors
 var _ = http.StatusOK

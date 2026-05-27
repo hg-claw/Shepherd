@@ -53,3 +53,18 @@ func TestParseTemplate_GeneralAndMITM(t *testing.T) {
 		t.Fatalf("mitm = %q", spec.MITM)
 	}
 }
+
+func TestParseTemplate_ClashGeneral(t *testing.T) {
+	// valid YAML object accepted
+	if _, err := ParseTemplate(`{"final":"PROXY","clash_general":"mode: rule\ndns:\n  enable: true"}`); err != nil {
+		t.Fatalf("valid clash_general rejected: %v", err)
+	}
+	// malformed YAML rejected
+	if _, err := ParseTemplate(`{"final":"PROXY","clash_general":"x: [1, 2"}`); err == nil {
+		t.Fatal("malformed clash_general accepted")
+	}
+	// non-object YAML (bare scalar) rejected
+	if _, err := ParseTemplate(`{"final":"PROXY","clash_general":"just a string"}`); err == nil {
+		t.Fatal("scalar clash_general accepted")
+	}
+}

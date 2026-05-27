@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"gopkg.in/yaml.v3"
 )
 
 type CategorySel struct {
@@ -24,8 +25,9 @@ type TemplateSpec struct {
 	CustomRules       []CustomRule  `json:"custom_rules"`
 	Final             string        `json:"final"`
 	IncludeAutoSelect bool          `json:"include_auto_select"`
-	General           string        `json:"general,omitempty"` // raw [General] body; empty → renderer default
-	MITM              string        `json:"mitm,omitempty"`    // raw [MITM] body; empty → section omitted
+	General           string        `json:"general,omitempty"`       // Surge [General] body
+	MITM              string        `json:"mitm,omitempty"`          // Surge [MITM] body
+	ClashGeneral      string        `json:"clash_general,omitempty"` // Clash YAML preamble (top-level keys)
 }
 
 func validPolicy(p string) bool {
@@ -44,6 +46,12 @@ func ParseTemplate(rulesJSON string) (TemplateSpec, error) {
 	}
 	if t.Final == "" {
 		t.Final = "PROXY"
+	}
+	if t.ClashGeneral != "" {
+		var m map[string]any
+		if err := yaml.Unmarshal([]byte(t.ClashGeneral), &m); err != nil {
+			return t, fmt.Errorf("bad clash_general: %w", err)
+		}
 	}
 	for _, c := range t.Categories {
 		if _, ok := categoryByName(c.Name); !ok {

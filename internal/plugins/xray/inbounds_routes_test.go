@@ -24,6 +24,11 @@ func newRoutesDB(t *testing.T) (interface {
 	dsn := "file:" + filepath.Join(t.TempDir(), "r.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
 	t.Cleanup(func() { _ = d.Close() })
+	// Disable the background deploy so it can't race against t.Cleanup closing
+	// the DB (or another handler's deploy) under `go test -race`.
+	prev := asyncDeploy
+	asyncDeploy = func(plugins.Deps, int64) {}
+	t.Cleanup(func() { asyncDeploy = prev })
 	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
 	_ = plugins.RunPluginMigrations(context.Background(), d, "xray", loadMigrations(shepdb.DriverSQLite))
 	for _, id := range []int64{1, 2, 3} {

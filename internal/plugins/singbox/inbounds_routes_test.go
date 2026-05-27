@@ -191,3 +191,57 @@ func TestRoute_DeleteWithDependents(t *testing.T) {
 		t.Fatalf("want 409, got %d: %s", rr.Code, rr.Body)
 	}
 }
+
+func TestRoutes_InboundAlias(t *testing.T) {
+	deps := newRouteDeps(t)
+	h := postInboundHandler(deps)
+
+	// POST create with alias
+	rCreate := postJSON(t, h, map[string]any{
+		"server_id": 1, "port": 443, "role": "landing", "protocol": "vmess-tcp",
+		"uuid": "uuidAlias1", "alias": "🇸🇬 SG 01",
+	})
+	if rCreate.Code != 201 {
+		t.Fatalf("create: want 201, got %d: %s", rCreate.Code, rCreate.Body)
+	}
+	var created map[string]any
+	_ = json.NewDecoder(rCreate.Body).Decode(&created)
+	if created["alias"] != "🇸🇬 SG 01" {
+		t.Errorf("create: alias not echoed, got %v", created["alias"])
+	}
+	id := int64(created["id"].(float64))
+
+	// PATCH alias
+	patchBody, _ := json.Marshal(map[string]any{"alias": "🇸🇬 SG renamed"})
+	reqPatch := httptest.NewRequest("PATCH", "/inbounds/"+fmt.Sprint(id), bytes.NewReader(patchBody))
+	reqPatch.SetPathValue("id", fmt.Sprint(id))
+	reqPatch.Header.Set("Content-Type", "application/json")
+	rrPatch := httptest.NewRecorder()
+	patchInboundHandler(deps)(rrPatch, reqPatch)
+	if rrPatch.Code != 200 {
+		t.Fatalf("patch: want 200, got %d: %s", rrPatch.Code, rrPatch.Body)
+	}
+
+	// GET list and verify alias persisted
+	reqGet := httptest.NewRequest("GET", "/inbounds?server_id=1", nil)
+	rrGet := httptest.NewRecorder()
+	getInboundsHandler(deps)(rrGet, reqGet)
+	if rrGet.Code != 200 {
+		t.Fatalf("get: want 200, got %d: %s", rrGet.Code, rrGet.Body)
+	}
+	var list []map[string]any
+	_ = json.NewDecoder(rrGet.Body).Decode(&list)
+	var found bool
+	for _, item := range list {
+		if int64(item["id"].(float64)) == id {
+			if item["alias"] != "🇸🇬 SG renamed" {
+				t.Errorf("list: alias not updated, got %v", item["alias"])
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("list: inbound id=%d not found in response", id)
+	}
+}

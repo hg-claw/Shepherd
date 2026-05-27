@@ -53,6 +53,7 @@ export default function InboundDialog(props: Props) {
   const [privateKey, setPrivateKey] = useState<string>('') // never preloaded from edit (it's redacted)
   const [shortID, setShortID] = useState<string>(editing?.short_id ?? '')
   const [wsPath, setWSPath] = useState<string>(editing?.ws_path ?? '/ws')
+  const [alias, setAlias] = useState<string>(editing?.alias ?? '')
   const [error, setError] = useState<string | null>(null)
 
   const landings = props.allInbounds.filter((i) => i.role === 'landing')
@@ -62,7 +63,7 @@ export default function InboundDialog(props: Props) {
       if (!serverID) throw new Error('select a server')
       if (role === 'relay' && !upstreamID) throw new Error('relay requires upstream landing')
       return createXrayInbound({
-        server_id: Number(serverID), port, role, protocol,
+        server_id: Number(serverID), port, alias: alias || undefined, role, protocol,
         uuid, sni, public_key: publicKey, private_key: privateKey, short_id: shortID,
         ws_path: protocol === 'vmess-ws' ? wsPath : undefined,
         upstream_inbound_id: role === 'relay' ? Number(upstreamID) : undefined,
@@ -82,6 +83,7 @@ export default function InboundDialog(props: Props) {
       if (!editing) throw new Error('not in edit mode')
       return patchXrayInbound(editing.id, {
         port,
+        alias: alias !== editing.alias ? alias : undefined,
         uuid: uuid !== editing.uuid ? uuid : undefined,
         sni: sni !== editing.sni ? sni : undefined,
         public_key: publicKey !== editing.public_key ? publicKey : undefined,
@@ -186,6 +188,13 @@ export default function InboundDialog(props: Props) {
               <Button type="button" variant="outline" size="sm" className="h-8"
                 onClick={() => setUUID(randomUUID())}>new</Button>
             </div>
+          </div>
+
+          <div>
+            <Label className="text-[12px]" htmlFor="ind-alias">Alias</Label>
+            <Input id="ind-alias" value={alias} onChange={(e) => setAlias(e.target.value)}
+              placeholder="可选：节点别名，留空用默认命名"
+              className="h-8 font-mono mt-1" />
           </div>
 
           {protocol === 'vless-reality' && (

@@ -114,6 +114,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
   // ── Form state ──
   const [protocol, setProtocol] = useState<SingboxProtocol>(initial?.protocol ?? 'vless-reality')
   const [port, setPort]         = useState<string>(String(initial?.port ?? randomPort()))
+  const [alias, setAlias]       = useState<string>(initial?.alias ?? '')
 
   // UUID
   const [uuid, setUUID] = useState<string>(initial?.uuid ?? randomUUID())
@@ -153,6 +154,8 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
         port:      Number(port),
         protocol,
       }
+
+      body.alias = alias
 
       if (needsUUID(protocol))       body.uuid = uuid
       if (needsPassword(protocol))   body.password = password
@@ -270,6 +273,14 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* ── Alias (optional) ── */}
+          <div>
+            <Label className={labelCls} htmlFor="ib-alias">Alias (optional)</Label>
+            <Input id="ib-alias" className={inputCls}
+              value={alias} onChange={(e) => setAlias(e.target.value)}
+              placeholder="可选：节点别名，留空用默认命名" />
           </div>
 
           {/* ── UUID (vless / vmess / tuic) ── */}

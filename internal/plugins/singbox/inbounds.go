@@ -19,6 +19,7 @@ type Inbound struct {
 	ID                     int64      `db:"id"`
 	ServerID               int64      `db:"server_id"`
 	Tag                    string     `db:"tag"`
+	Alias                  string     `db:"alias"`
 	Port                   int        `db:"port"`
 	Role                   string     `db:"role"`     // "landing" | "relay"
 	Protocol               string     `db:"protocol"` // e.g. "vless-reality", "hysteria2"
@@ -76,6 +77,7 @@ type InboundView struct {
 // Immutable post-create: server_id, tag, role, protocol, upstream_inbound_id.
 type InboundPatch struct {
 	Port                   *int
+	Alias                  *string
 	UUID                   *string
 	Flow                   *string
 	Password               *string
@@ -127,16 +129,16 @@ func (s *InboundStore) Insert(ctx context.Context, in Inbound) (int64, error) {
 	var id int64
 	if err := s.DB.QueryRowxContext(ctx, `
 		INSERT INTO singbox_inbounds (
-		  server_id, tag, port, role, protocol,
+		  server_id, tag, alias, port, role, protocol,
 		  uuid, flow, password, sni, cert_id,
 		  reality_private_key, reality_public_key, reality_short_id,
 		  reality_handshake_server, reality_handshake_port,
 		  transport_path, transport_host, alter_id, ss_method,
 		  upstream_inbound_id, relay_mode, extra_json,
 		  created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5, $6,$7,$8,$9,$10, $11,$12,$13, $14,$15, $16,$17,$18,$19, $20,$21,$22, $23,$24)
+		) VALUES ($1,$2,$3,$4,$5,$6, $7,$8,$9,$10,$11, $12,$13,$14, $15,$16, $17,$18,$19,$20, $21,$22,$23, $24,$25)
 		RETURNING id`,
-		in.ServerID, in.Tag, in.Port, in.Role, in.Protocol,
+		in.ServerID, in.Tag, in.Alias, in.Port, in.Role, in.Protocol,
 		in.UUID, in.Flow, in.Password, in.SNI, in.CertID,
 		in.RealityPrivateKey, in.RealityPublicKey, in.RealityShortID,
 		in.RealityHandshakeServer, in.RealityHandshakePort,
@@ -169,7 +171,7 @@ func (s *InboundStore) ListAllWithUpstream(ctx context.Context) ([]InboundView, 
 	var rows []InboundView
 	err := s.DB.SelectContext(ctx, &rows, `
 		SELECT
-		  i.id, i.server_id, i.tag, i.port, i.role, i.protocol,
+		  i.id, i.server_id, i.tag, i.alias, i.port, i.role, i.protocol,
 		  i.uuid, i.flow, i.password, i.sni, i.cert_id,
 		  i.reality_private_key, i.reality_public_key, i.reality_short_id,
 		  i.reality_handshake_server, i.reality_handshake_port,
@@ -217,6 +219,7 @@ func (s *InboundStore) Update(ctx context.Context, id int64, patch InboundPatch)
 	app := func(col string, val any) { set = append(set, col+"=?"); args = append(args, val) }
 
 	if patch.Port != nil                   { app("port", *patch.Port) }
+	if patch.Alias != nil                  { app("alias", *patch.Alias) }
 	if patch.UUID != nil                   { app("uuid", *patch.UUID) }
 	if patch.Flow != nil                   { app("flow", *patch.Flow) }
 	if patch.Password != nil               { app("password", *patch.Password) }

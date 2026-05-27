@@ -32,6 +32,12 @@
 - **Final** —— 兜底策略（Surge 为 `FINAL`，Clash 为 `MATCH`）。
 - **包含自动选择组（Include auto-select group）** —— 增加一个对所有节点做 url-test 的 `Auto Select` 组；主 `PROXY` 组会把它列在第一位。
 
+## 节点命名与别名
+
+默认情况下，订阅里每个节点名按 `<国旗> <服务器名> <协议>` 生成（如 `🇺🇸 Tokyo vless`）。在 xray / sing-box 的 inbound 上设置 **别名（Alias）** 后，该节点在所有订阅里直接用别名命名（原样输出，国旗/协议都不再自动添加，需要的话自己写进别名）。留空则回退默认命名。别名是 inbound 自身的属性，使用该 inbound 的所有订阅共用。
+
+若多个节点解析出相同名字（别名重复，或别名与自动名撞车），渲染时自动追加 ` 2`/` 3` 去重，避免客户端因重名报错；去重覆盖入站节点和模板里的自定义分享链接节点。
+
 ## 自定义节点（分享链接）
 
 模板里可以贴入**自定义节点** —— 每行一条分享链接，会被解析成节点，并与订阅选中的入站节点合并（一起进分组/分流，Surge 与 Clash 都会渲染）。支持 `vless://`、`ss://`、`vmess://`、`trojan://`、`hysteria2://`（或 `hy2://`）、`tuic://`、`anytls://`、`wg://`（或 `wireguard://`）。WireGuard 在 Clash 渲染为 `type: wireguard`，在 Surge 渲染为独立 `[WireGuard]` 段，在 ShadowRocket 渲染为内联 `[Proxy]` 行。链接 `#` 之后的名称作为节点名。在模板编辑器的 **Custom nodes (share links)** 文本框粘贴即可——解析成功的节点会立刻出现在实时预览里（没出现就说明那行没解析成功）。

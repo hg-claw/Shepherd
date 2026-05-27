@@ -2,6 +2,7 @@ package subgen
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 )
 
@@ -39,6 +40,7 @@ type serverLite struct {
 
 type xrayLite struct {
 	Tag        string
+	Alias      string
 	Port       int
 	Protocol   string
 	UUID       string
@@ -94,8 +96,48 @@ func nodeName(country, server, proto string) string {
 	return server + " " + proto
 }
 
+// aliasOrDefault returns a trimmed non-empty alias verbatim, else the
+// auto-generated "<flag> <server> <proto>" name.
+func aliasOrDefault(alias string, srv serverLite, proto string) string {
+	if a := strings.TrimSpace(alias); a != "" {
+		return a
+	}
+	return nodeName(srv.Country, srv.Name, proto)
+}
+
+// dedupeNodeNames makes Node.Name unique across the slice, in place,
+// preserving order. The first occurrence of a name is kept; later
+// collisions get " 2", " 3", … A generated suffix never overwrites a name
+// that some other node already carries (so an explicit "X 2" survives even
+// if two "X" nodes collide).
+func dedupeNodeNames(nodes []Node) {
+	// Reserve every original name so a generated suffix can't steal one.
+	reserved := make(map[string]bool, 2*len(nodes))
+	for i := range nodes {
+		reserved[nodes[i].Name] = true
+	}
+	used := make(map[string]bool, 2*len(nodes))
+	for i := range nodes {
+		name := nodes[i].Name
+		if !used[name] {
+			used[name] = true
+			continue
+		}
+		for n := 2; ; n++ {
+			cand := fmt.Sprintf("%s %d", name, n)
+			if !reserved[cand] && !used[cand] {
+				nodes[i].Name = cand
+				reserved[cand] = true
+				used[cand] = true
+				break
+			}
+		}
+	}
+}
+
 type singboxLite struct {
 	Tag              string
+	Alias            string
 	Port             int
 	Protocol         string
 	Role             string
@@ -157,7 +199,7 @@ func singboxInboundToNode(in singboxLite, srv serverLite) Node {
 			n.Extra = m
 		}
 	}
-	n.Name = nodeName(srv.Country, srv.Name, n.Protocol)
+	n.Name = aliasOrDefault(in.Alias, srv, n.Protocol)
 	return n
 }
 
@@ -181,6 +223,6 @@ func xrayInboundToNode(in xrayLite, srv serverLite) Node {
 		n.SSMethod = in.SSMethod
 		n.Password = in.SSPassword
 	}
-	n.Name = nodeName(srv.Country, srv.Name, n.Protocol)
+	n.Name = aliasOrDefault(in.Alias, srv, n.Protocol)
 	return n
 }

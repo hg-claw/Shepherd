@@ -1,0 +1,1 @@
+ALTER TABLE xray_inbounds ADD COLUMN alias TEXT NOT NULL DEFAULT '';

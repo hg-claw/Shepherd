@@ -21,6 +21,7 @@ func loadMigrations(driver shepdb.Driver) []plugins.Migration {
 		"0002_topology.up.sql",
 		"0003_multi_inbound.up.sql",
 		"0004_traffic.up.sql",
+		"0005_inbound_alias.up.sql",
 	}
 	subdir := "sqlite"
 	if driver == shepdb.DriverPostgres {

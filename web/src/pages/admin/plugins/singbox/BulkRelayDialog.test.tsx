@@ -27,7 +27,7 @@ vi.mock('@/store/ui', () => ({
 }))
 
 const landingVlessReality: pluginsAPI.SingboxInbound = {
-  id: 1, server_id: 10, server_name: 'tokyo-1', tag: 'landing-aa', port: 443,
+  id: 1, server_id: 10, server_name: 'tokyo-1', tag: 'landing-aa', alias: '', port: 443,
   role: 'landing', protocol: 'vless-reality',
   uuid: 'ul', sni: 'www.lovelive-anime.jp',
   reality_public_key: 'PL', reality_private_key: '[REDACTED]', reality_short_id: 'aa',
@@ -37,7 +37,7 @@ const landingVlessReality: pluginsAPI.SingboxInbound = {
 }
 
 const landingTrojanTLS: pluginsAPI.SingboxInbound = {
-  id: 2, server_id: 10, server_name: 'tokyo-1', tag: 'landing-bb', port: 443,
+  id: 2, server_id: 10, server_name: 'tokyo-1', tag: 'landing-bb', alias: '', port: 443,
   role: 'landing', protocol: 'trojan-tls',
   password: 'landing-pass', sni: 'example.com', cert_id: 7,
   upstream_inbound_id: null, upstream_tag: null, upstream_server_id: null, upstream_server_name: null,
@@ -45,7 +45,7 @@ const landingTrojanTLS: pluginsAPI.SingboxInbound = {
 }
 
 const landingShadowsocks: pluginsAPI.SingboxInbound = {
-  id: 3, server_id: 10, server_name: 'tokyo-1', tag: 'landing-cc', port: 8388,
+  id: 3, server_id: 10, server_name: 'tokyo-1', tag: 'landing-cc', alias: '', port: 8388,
   role: 'landing', protocol: 'shadowsocks-2022',
   ss_method: '2022-blake3-aes-128-gcm', ss_password: 'some-password',
   upstream_inbound_id: null, upstream_tag: null, upstream_server_id: null, upstream_server_name: null,

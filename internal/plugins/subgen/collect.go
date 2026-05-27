@@ -43,6 +43,7 @@ func CollectNodes(ctx context.Context, db *sqlx.DB, sels []Selection) ([]Node, [
 
 type xrayRow struct {
 	Tag        string         `db:"tag"`
+	Alias      string         `db:"alias"`
 	Port       int            `db:"port"`
 	Protocol   string         `db:"protocol"`
 	UUID       sql.NullString `db:"uuid"`
@@ -60,7 +61,7 @@ type xrayRow struct {
 func collectXray(ctx context.Context, db *sqlx.DB, id int64) (Node, string, error) {
 	var r xrayRow
 	err := db.GetContext(ctx, &r, `
-		SELECT i.tag, i.port, i.protocol, i.uuid, i.sni, i.public_key, i.short_id,
+		SELECT i.tag, COALESCE(i.alias,'') AS alias, i.port, i.protocol, i.uuid, i.sni, i.public_key, i.short_id,
 		       i.ws_path, i.ss_method, i.ss_password,
 		       s.name AS srv_name, s.ssh_host AS srv_host, s.country_code AS srv_country
 		  FROM xray_inbounds i JOIN servers s ON s.id=i.server_id WHERE i.id=$1`, id)
@@ -74,7 +75,7 @@ func collectXray(ctx context.Context, db *sqlx.DB, id int64) (Node, string, erro
 		return Node{}, fmt.Sprintf("xray %s on %s: no ssh_host, skipped", r.Tag, r.SrvName), nil
 	}
 	n := xrayInboundToNode(xrayLite{
-		Tag: r.Tag, Port: r.Port, Protocol: r.Protocol,
+		Tag: r.Tag, Alias: r.Alias, Port: r.Port, Protocol: r.Protocol,
 		UUID: r.UUID.String, SNI: r.SNI.String, PublicKey: r.PublicKey.String,
 		ShortID: r.ShortID.String, WSPath: r.WSPath.String,
 		SSMethod: r.SSMethod.String, SSPassword: r.SSPassword.String,
@@ -84,6 +85,7 @@ func collectXray(ctx context.Context, db *sqlx.DB, id int64) (Node, string, erro
 
 type singboxRow struct {
 	Tag           string         `db:"tag"`
+	Alias         string         `db:"alias"`
 	Port          int            `db:"port"`
 	Protocol      string         `db:"protocol"`
 	Role          string         `db:"role"`
@@ -114,7 +116,7 @@ func ns(v sql.NullString) *string {
 func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, string, error) {
 	var r singboxRow
 	err := db.GetContext(ctx, &r, `
-		SELECT i.tag, i.port, i.protocol, i.role, i.relay_mode, i.uuid, i.flow, i.password, i.sni,
+		SELECT i.tag, COALESCE(i.alias,'') AS alias, i.port, i.protocol, i.role, i.relay_mode, i.uuid, i.flow, i.password, i.sni,
 		       i.reality_public_key, i.reality_short_id, i.transport_path, i.transport_host,
 		       i.ss_method, i.extra_json,
 		       s.name AS srv_name, s.ssh_host AS srv_host, s.country_code AS srv_country
@@ -132,7 +134,7 @@ func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, string, e
 		return Node{}, fmt.Sprintf("singbox %s on %s: forward-mode relay not supported in subscriptions, skipped", r.Tag, r.SrvName), nil
 	}
 	n := singboxInboundToNode(singboxLite{
-		Tag: r.Tag, Port: r.Port, Protocol: r.Protocol, Role: r.Role, RelayMode: r.RelayMode,
+		Tag: r.Tag, Alias: r.Alias, Port: r.Port, Protocol: r.Protocol, Role: r.Role, RelayMode: r.RelayMode,
 		UUID: ns(r.UUID), Flow: ns(r.Flow), Password: ns(r.Password), SNI: ns(r.SNI),
 		RealityPublicKey: ns(r.RealityPub), RealityShortID: ns(r.RealitySID),
 		TransportPath: ns(r.TransportPath), TransportHost: ns(r.TransportHost),

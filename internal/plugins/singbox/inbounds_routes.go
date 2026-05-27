@@ -56,6 +56,7 @@ type postInboundBody struct {
 	SSMethod               *string `json:"ss_method"`
 	Extra                  *string `json:"extra"`
 	UpstreamInboundID      *int64  `json:"upstream_inbound_id"`
+	Alias                  string  `json:"alias"`
 	// RelayMode is honored only when role="relay". Values: "proxy"
 	// (legacy dual-termination), "forward" (transparent sing-box
 	// direct inbound). Empty defaults to "proxy" for backward
@@ -134,6 +135,7 @@ func inboundToMap(v InboundView) map[string]any {
 		"server_id":   v.ServerID,
 		"server_name": v.ServerName,
 		"tag":         v.Tag,
+		"alias":       v.Alias,
 		"port":        v.Port,
 		"role":        v.Role,
 		"protocol":    v.Protocol,
@@ -185,6 +187,7 @@ func postInboundHandler(deps plugins.Deps) http.HandlerFunc {
 		in := Inbound{
 			ServerID:               body.ServerID,
 			Tag:                    store.GenerateTag(body.Role),
+			Alias:                  body.Alias,
 			Port:                   body.Port,
 			Role:                   body.Role,
 			Protocol:               body.Protocol,
@@ -302,6 +305,9 @@ func patchInboundHandler(deps plugins.Deps) http.HandlerFunc {
 		}
 		if v, ok := body["extra"].(string); ok {
 			patch.ExtraJSON = &v
+		}
+		if v, ok := body["alias"].(string); ok {
+			patch.Alias = &v
 		}
 		// Skip the REDACTED placeholder AND empty string — the dialog
 		// starts the field empty and a save without touching it must

@@ -11,7 +11,7 @@ func TestCollectNodes_MapsAndSkipsMissingHost(t *testing.T) {
 	d := s.DB
 	// xray_inbounds table — minimal columns collect.go selects
 	d.MustExec(`CREATE TABLE xray_inbounds (
-		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, port INTEGER, role TEXT, protocol TEXT,
+		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, alias TEXT, port INTEGER, role TEXT, protocol TEXT,
 		uuid TEXT, sni TEXT, public_key TEXT, short_id TEXT, ws_path TEXT, ss_method TEXT, ss_password TEXT)`)
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (1,'tokyo','1.2.3.4','JP')`)
 	d.MustExec(`INSERT INTO servers(id,name,country_code) VALUES (2,'nohost','US')`) // ssh_host NULL
@@ -40,7 +40,7 @@ func TestCollectNodes_Singbox(t *testing.T) {
 	ctx := context.Background()
 	d := s.DB
 	d.MustExec(`CREATE TABLE singbox_inbounds (
-		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, port INTEGER, role TEXT, relay_mode TEXT, protocol TEXT,
+		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, alias TEXT, port INTEGER, role TEXT, relay_mode TEXT, protocol TEXT,
 		uuid TEXT, flow TEXT, password TEXT, sni TEXT, reality_public_key TEXT, reality_short_id TEXT,
 		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT)`)
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (1,'hk','9.9.9.9','HK')`)
@@ -60,7 +60,7 @@ func TestCollectNodes_SkipsForwardRelay(t *testing.T) {
 	ctx := context.Background()
 	d := s.DB
 	d.MustExec(`CREATE TABLE singbox_inbounds (
-		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, port INTEGER, role TEXT, relay_mode TEXT, protocol TEXT,
+		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, alias TEXT, port INTEGER, role TEXT, relay_mode TEXT, protocol TEXT,
 		uuid TEXT, flow TEXT, password TEXT, sni TEXT, reality_public_key TEXT, reality_short_id TEXT,
 		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT)`)
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (1,'hk','9.9.9.9','HK')`)
@@ -75,6 +75,32 @@ func TestCollectNodes_SkipsForwardRelay(t *testing.T) {
 	}
 	if len(warns) != 1 {
 		t.Fatalf("expected 1 skip warning, got %v", warns)
+	}
+}
+
+func TestCollectNodes_UsesAlias(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	d := s.DB
+	d.MustExec(`CREATE TABLE xray_inbounds (
+		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, alias TEXT, port INTEGER, role TEXT, protocol TEXT,
+		uuid TEXT, sni TEXT, public_key TEXT, short_id TEXT, ws_path TEXT, ss_method TEXT, ss_password TEXT)`)
+	d.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (1,'Tokyo','1.2.3.4','US')`)
+	d.MustExec(`INSERT INTO xray_inbounds(id,server_id,tag,alias,port,role,protocol,uuid,sni,public_key,short_id)
+	            VALUES (10,1,'r','🇭🇰 HK Custom',443,'landing','vless-reality','u','sni','PBK','aa')`)
+
+	nodes, warns, err := CollectNodes(ctx, d, []Selection{{Source: "xray", InboundID: 10}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(warns) != 0 {
+		t.Fatalf("unexpected warns: %v", warns)
+	}
+	if len(nodes) != 1 {
+		t.Fatalf("expected 1 node, got %d: %+v", len(nodes), nodes)
+	}
+	if nodes[0].Name != "🇭🇰 HK Custom" {
+		t.Fatalf("expected Name %q, got %q", "🇭🇰 HK Custom", nodes[0].Name)
 	}
 }
 

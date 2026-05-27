@@ -160,5 +160,52 @@ func TestInboundStore_Delete_RestrictsLandingWithRelay(t *testing.T) {
 	}
 }
 
+func TestInbound_AliasRoundTrip(t *testing.T) {
+	s := newInboundStore(t)
+	ctx := context.Background()
+
+	// Insert with alias
+	id, err := s.Insert(ctx, Inbound{
+		ServerID: 1, Role: "landing", Protocol: "vless-reality", Port: 443,
+		Alias: "🇭🇰 HK 01",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetByID(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Alias != "🇭🇰 HK 01" {
+		t.Fatalf("Alias after Insert: got %q, want %q", got.Alias, "🇭🇰 HK 01")
+	}
+
+	// Update alias
+	newAlias := "🇭🇰 HK renamed"
+	if err := s.Update(ctx, id, InboundPatch{Alias: &newAlias}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = s.GetByID(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Alias != newAlias {
+		t.Fatalf("Alias after Update: got %q, want %q", got.Alias, newAlias)
+	}
+
+	// Patching an unrelated field must NOT clobber alias
+	port := 8443
+	if err := s.Update(ctx, id, InboundPatch{Port: &port}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = s.GetByID(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Alias != newAlias {
+		t.Fatalf("Alias clobbered by unrelated patch: got %q, want %q", got.Alias, newAlias)
+	}
+}
+
 func ptrInt(v int) *int             { return &v }
 func ptrString(v string) *string { return &v }

@@ -47,6 +47,7 @@ func Assemble(nodes []Node, spec TemplateSpec) Intermediate {
 	if custom, _ := ParseShareLinks(spec.CustomNodes); len(custom) > 0 {
 		nodes = append(nodes, custom...)
 	}
+	dedupeNodeNames(nodes)
 	im := Intermediate{Nodes: nodes, General: spec.General, MITM: spec.MITM, URLRewrite: spec.URLRewrite, ClashGeneral: spec.ClashGeneral}
 
 	allNames := make([]string, 0, len(nodes))

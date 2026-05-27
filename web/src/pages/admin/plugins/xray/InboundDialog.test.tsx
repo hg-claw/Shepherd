@@ -22,7 +22,7 @@ vi.mock('@/api/servers', () => ({
 }))
 
 const landing: pluginsAPI.XrayInbound = {
-  id: 1, server_id: 10, server_name: 'tokyo-1', tag: 'landing-aa', port: 443,
+  id: 1, server_id: 10, server_name: 'tokyo-1', tag: 'landing-aa', alias: '', port: 443,
   role: 'landing', protocol: 'vless-reality',
   uuid: 'ul', sni: 'www.lovelive-anime.jp', public_key: 'PL', private_key: '[REDACTED]', short_id: 'aa',
   ws_path: '', ss_method: '',
@@ -59,6 +59,20 @@ describe('InboundDialog (create)', () => {
     const body = (pluginsAPI.createXrayInbound as any).mock.calls[0][0]
     expect(body.server_id).toBe(11)
     expect(body.role).toBe('landing')
+  })
+
+  it('alias input renders and is submitted on create', async () => {
+    const spy = vi.spyOn(pluginsAPI, 'createXrayInbound')
+    wrap(<InboundDialog open={true} onOpenChange={() => {}} mode="create"
+      defaultServerID={11} allInbounds={[landing]} />)
+    const aliasInput = screen.getByLabelText(/alias/i)
+    fireEvent.change(aliasInput, { target: { value: 'my-node' } })
+    fireEvent.click(screen.getByRole('button', { name: /create/i }))
+    await waitFor(() => {
+      expect(spy).toHaveBeenCalled()
+    })
+    const body = spy.mock.calls[0][0]
+    expect(body).toMatchObject({ alias: 'my-node' })
   })
 })
 

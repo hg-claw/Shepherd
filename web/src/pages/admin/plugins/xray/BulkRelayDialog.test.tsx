@@ -27,7 +27,7 @@ vi.mock('@/store/ui', () => ({
 }))
 
 const landingVlessReality: pluginsAPI.XrayInbound = {
-  id: 1, server_id: 10, server_name: 'tokyo-1', tag: 'landing-aa', port: 443,
+  id: 1, server_id: 10, server_name: 'tokyo-1', tag: 'landing-aa', alias: '', port: 443,
   role: 'landing', protocol: 'vless-reality',
   uuid: 'ul', sni: 'www.lovelive-anime.jp', public_key: 'PL', private_key: '[REDACTED]', short_id: 'aa',
   ws_path: '', ss_method: '',
@@ -36,7 +36,7 @@ const landingVlessReality: pluginsAPI.XrayInbound = {
 }
 
 const landingVmessWs: pluginsAPI.XrayInbound = {
-  id: 2, server_id: 10, server_name: 'tokyo-1', tag: 'landing-bb', port: 80,
+  id: 2, server_id: 10, server_name: 'tokyo-1', tag: 'landing-bb', alias: '', port: 80,
   role: 'landing', protocol: 'vmess-ws',
   uuid: 'vmess-uuid', sni: '', public_key: '', private_key: '', short_id: '',
   ws_path: '/ws',
@@ -46,7 +46,7 @@ const landingVmessWs: pluginsAPI.XrayInbound = {
 }
 
 const landingShadowsocks: pluginsAPI.XrayInbound = {
-  id: 3, server_id: 10, server_name: 'tokyo-1', tag: 'landing-cc', port: 8388,
+  id: 3, server_id: 10, server_name: 'tokyo-1', tag: 'landing-cc', alias: '', port: 8388,
   role: 'landing', protocol: 'shadowsocks',
   uuid: '', sni: '', public_key: '', private_key: '', short_id: '',
   ws_path: '', ss_method: 'aes-256-gcm',

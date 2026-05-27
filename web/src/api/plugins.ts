@@ -130,6 +130,7 @@ export interface XrayInbound {
   server_id: number
   server_name: string
   tag: string
+  alias: string
   port: number
   role: 'landing' | 'relay'
   protocol: 'vless-reality' | 'vmess-ws' | 'shadowsocks'
@@ -151,6 +152,7 @@ export interface XrayInbound {
 export interface CreateXrayInboundBody {
   server_id: number
   port: number
+  alias?: string
   role: 'landing' | 'relay'
   protocol: 'vless-reality' | 'vmess-ws' | 'shadowsocks'
   uuid?: string
@@ -166,6 +168,7 @@ export interface CreateXrayInboundBody {
 
 export interface PatchXrayInboundBody {
   port?: number
+  alias?: string
   uuid?: string
   sni?: string
   public_key?: string
@@ -277,6 +280,7 @@ export interface SingboxInbound {
   server_id: number
   server_name: string
   tag: string
+  alias?: string
   port: number
   role: 'landing' | 'relay'
   protocol: SingboxProtocol
@@ -310,6 +314,7 @@ export interface SingboxInbound {
 export interface CreateSingboxInboundBody {
   server_id: number
   port: number
+  alias?: string
   role: 'landing' | 'relay'
   protocol: SingboxProtocol
   uuid?: string
@@ -340,6 +345,7 @@ export interface CreateSingboxInboundBody {
 
 export interface PatchSingboxInboundBody {
   port?: number
+  alias?: string
   uuid?: string
   password?: string
   sni?: string

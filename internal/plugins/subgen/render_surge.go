@@ -11,7 +11,7 @@ func (*SurgeRenderer) Target() string { return "surge" }
 
 func (*SurgeRenderer) Supports(p string) bool {
 	switch p {
-	case "shadowsocks", "vmess", "trojan", "vless", "hysteria2", "tuic", "anytls":
+	case "shadowsocks", "vmess", "trojan", "vless", "hysteria2", "tuic", "anytls", "wireguard":
 		return true
 	}
 	return false
@@ -87,6 +87,13 @@ func (r *SurgeRenderer) proxyLine(n Node) string {
 }
 
 func (r *SurgeRenderer) Render(im Intermediate, subURL, rulesetBase string) string {
+	return r.render(im, subURL, rulesetBase, false)
+}
+
+// render builds the Surge-family .conf. wgInline selects WireGuard handling:
+// false → a [WireGuard <section>] block + a section-name proxy reference (Surge);
+// true → a single inline [Proxy] line (ShadowRocket).
+func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase string, wgInline bool) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "#!MANAGED-CONFIG %s interval=43200 strict=false\n\n", subURL)
 
@@ -106,12 +113,30 @@ func (r *SurgeRenderer) Render(im Intermediate, subURL, rulesetBase string) stri
 	} else {
 		b.WriteString("bypass-system = true\n\n")
 	}
+
 	b.WriteString("[Proxy]\nDIRECT = direct\n")
-	for _, n := range im.Nodes {
-		if r.Supports(n.Protocol) {
-			b.WriteString(r.proxyLine(n) + "\n")
-		}
+	type wgSec struct {
+		n   Node
+		sec string
 	}
+	var wgSecs []wgSec
+	for _, n := range im.Nodes {
+		if !r.Supports(n.Protocol) {
+			continue
+		}
+		if n.Protocol == "wireguard" {
+			if wgInline {
+				b.WriteString(shadowrocketWGLine(n) + "\n")
+			} else {
+				sec := fmt.Sprintf("wg%d", len(wgSecs))
+				fmt.Fprintf(&b, "%s = wireguard, section-name=%s\n", n.Name, sec)
+				wgSecs = append(wgSecs, wgSec{n, sec})
+			}
+			continue
+		}
+		b.WriteString(r.proxyLine(n) + "\n")
+	}
+
 	b.WriteString("\n[Proxy Group]\n")
 	for _, g := range im.Groups {
 		b.WriteString(r.groupLine(g) + "\n")
@@ -122,6 +147,49 @@ func (r *SurgeRenderer) Render(im Intermediate, subURL, rulesetBase string) stri
 	}
 	if m := strings.TrimSpace(im.MITM); m != "" {
 		b.WriteString("\n[MITM]\n" + m + "\n")
+	}
+	for _, w := range wgSecs {
+		b.WriteString("\n" + surgeWGSection(w.n, w.sec))
+	}
+	return b.String()
+}
+
+// surgeWGSection renders a Surge [WireGuard <sec>] block. reserved has no Surge
+// field and is dropped.
+func surgeWGSection(n Node, sec string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "[WireGuard %s]\n", sec)
+	fmt.Fprintf(&b, "private-key = %s\n", wgField(n, "private_key"))
+	if ip := wgField(n, "ip"); ip != "" {
+		fmt.Fprintf(&b, "self-ip = %s\n", ip)
+	}
+	if mtu, ok := n.Extra["mtu"].(int); ok && mtu > 0 {
+		fmt.Fprintf(&b, "mtu = %d\n", mtu)
+	}
+	fmt.Fprintf(&b, `peer = (public-key = %s, allowed-ips = "0.0.0.0/0, ::/0", endpoint = %s:%d`, wgField(n, "public_key"), n.Server, n.Port)
+	if psk := wgField(n, "preshared_key"); psk != "" {
+		b.WriteString(", preshared-key = " + psk)
+	}
+	b.WriteString(")\n")
+	return b.String()
+}
+
+// shadowrocketWGLine renders a ShadowRocket inline [Proxy] WireGuard line.
+func shadowrocketWGLine(n Node) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s = wireguard, %s, %d, privateKey=%s, publicKey=%s", n.Name, n.Server, n.Port, wgField(n, "private_key"), wgField(n, "public_key"))
+	if ip := wgField(n, "ip"); ip != "" {
+		b.WriteString(", ip=" + ip)
+	}
+	b.WriteString(", udp=1")
+	if psk := wgField(n, "preshared_key"); psk != "" {
+		b.WriteString(", presharedKey=" + psk)
+	}
+	if mtu, ok := n.Extra["mtu"].(int); ok && mtu > 0 {
+		fmt.Fprintf(&b, ", mtu=%d", mtu)
+	}
+	if res := wgField(n, "reserved"); res != "" {
+		b.WriteString(", reserved=" + strings.ReplaceAll(res, ",", "/"))
 	}
 	return b.String()
 }

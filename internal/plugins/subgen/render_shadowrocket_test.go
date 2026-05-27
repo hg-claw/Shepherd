@@ -5,6 +5,25 @@ import (
 	"testing"
 )
 
+func TestShadowRocket_WireGuard(t *testing.T) {
+	im := Intermediate{
+		Nodes: []Node{{
+			Name: "🇨🇳 WG", Protocol: "wireguard", Server: "home.hg.ht", Port: 51820,
+			Extra: map[string]any{"private_key": "PRIV", "public_key": "PUB", "preshared_key": "PSK", "ip": "10.254.253.3", "reserved": "0,0,0", "udp": true},
+		}},
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"🇨🇳 WG"}}},
+		Rules:  []Rule{{Final: true, Target: "PROXY"}},
+	}
+	out := (&ShadowRocketRenderer{}).Render(im, "https://x?target=shadowrocket", DefaultRulesetBase)
+	want := "🇨🇳 WG = wireguard, home.hg.ht, 51820, privateKey=PRIV, publicKey=PUB, ip=10.254.253.3, udp=1, presharedKey=PSK, reserved=0/0/0"
+	if !strings.Contains(out, want) {
+		t.Fatalf("shadowrocket missing inline WG line:\n%s", out)
+	}
+	if strings.Contains(out, "[WireGuard") {
+		t.Fatalf("shadowrocket must NOT emit a [WireGuard] section:\n%s", out)
+	}
+}
+
 func TestShadowRocket_RendersAndReportsTarget(t *testing.T) {
 	r := &ShadowRocketRenderer{}
 	if r.Target() != "shadowrocket" {

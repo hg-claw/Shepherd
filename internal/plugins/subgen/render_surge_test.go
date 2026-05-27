@@ -98,6 +98,32 @@ func TestSurge_SelectGroupDirectFallback(t *testing.T) {
 	}
 }
 
+func TestSurge_WireGuard(t *testing.T) {
+	im := Intermediate{
+		Nodes: []Node{{
+			Name: "🇨🇳 WG", Protocol: "wireguard", Server: "home.hg.ht", Port: 51820,
+			Extra: map[string]any{"private_key": "PRIV", "public_key": "PUB", "preshared_key": "PSK", "ip": "10.254.253.3", "reserved": "0,0,0", "udp": true},
+		}},
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"🇨🇳 WG"}}},
+		Rules:  []Rule{{Final: true, Target: "PROXY"}},
+	}
+	out := (&SurgeRenderer{}).Render(im, "https://x?target=surge", DefaultRulesetBase)
+	for _, want := range []string{
+		"🇨🇳 WG = wireguard, section-name=wg0",
+		"[WireGuard wg0]",
+		"private-key = PRIV",
+		"self-ip = 10.254.253.3",
+		`peer = (public-key = PUB, allowed-ips = "0.0.0.0/0, ::/0", endpoint = home.hg.ht:51820, preshared-key = PSK)`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("surge WG missing %q\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "reserved") {
+		t.Errorf("surge should drop reserved\n%s", out)
+	}
+}
+
 func TestSurge_ProxyLine_VmessTrojanTuic(t *testing.T) {
 	im := Intermediate{
 		Nodes: []Node{

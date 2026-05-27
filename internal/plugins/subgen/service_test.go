@@ -77,6 +77,20 @@ func TestService_PreviewTemplate(t *testing.T) {
 	}
 }
 
+func TestService_PreviewTemplate_CustomNodes(t *testing.T) {
+	svc := &Service{Now: time.Now, RulesetBase: DefaultRulesetBase}
+	rules := `{"final":"PROXY","custom_nodes":"trojan://pw@9.9.9.9:443?sni=x.com#MyNode"}`
+	for _, target := range []string{"surge", "clash"} {
+		out, _, err := svc.PreviewTemplate(rules, target)
+		if err != nil {
+			t.Fatalf("%s: %v", target, err)
+		}
+		if !strings.Contains(out, "MyNode") {
+			t.Fatalf("%s preview missing custom node:\n%s", target, out)
+		}
+	}
+}
+
 func TestService_UnknownTokenAndTarget(t *testing.T) {
 	s := newStore(t)
 	svc := &Service{Store: s, Now: time.Now}

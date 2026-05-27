@@ -28,6 +28,7 @@ type TemplateSpec struct {
 	General           string        `json:"general,omitempty"`       // Surge [General] body
 	MITM              string        `json:"mitm,omitempty"`          // Surge [MITM] body
 	ClashGeneral      string        `json:"clash_general,omitempty"` // Clash YAML preamble (top-level keys)
+	CustomNodes       string        `json:"custom_nodes,omitempty"`  // newline-separated proxy share links
 }
 
 func validPolicy(p string) bool {

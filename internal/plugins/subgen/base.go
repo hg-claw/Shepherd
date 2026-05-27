@@ -42,6 +42,9 @@ const mainProxyGroup = "PROXY"
 // The free-text General/MITM/ClashGeneral blocks ride along to the renderer,
 // which resolves rule-set URLs for its own target.
 func Assemble(nodes []Node, spec TemplateSpec) Intermediate {
+	if custom, _ := ParseShareLinks(spec.CustomNodes); len(custom) > 0 {
+		nodes = append(nodes, custom...)
+	}
 	im := Intermediate{Nodes: nodes, General: spec.General, MITM: spec.MITM, ClashGeneral: spec.ClashGeneral}
 
 	allNames := make([]string, 0, len(nodes))

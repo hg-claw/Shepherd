@@ -85,3 +85,20 @@ func hasRule(rules []Rule, want Rule) bool {
 	}
 	return false
 }
+
+func TestAssemble_AppendsCustomNodes(t *testing.T) {
+	spec := TemplateSpec{
+		Final:       "PROXY",
+		CustomNodes: "trojan://pw@9.9.9.9:443?sni=x.com#🌟 Custom",
+	}
+	im := Assemble(nil, spec)
+	found := false
+	for _, n := range im.Nodes {
+		if n.Name == "🌟 Custom" && n.Protocol == "trojan" && n.Server == "9.9.9.9" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("custom node not appended: %+v", im.Nodes)
+	}
+}

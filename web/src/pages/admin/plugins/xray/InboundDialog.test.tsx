@@ -88,3 +88,27 @@ describe('InboundDialog (edit)', () => {
     expect(serverSelect.disabled).toBe(true)
   })
 })
+
+describe('InboundDialog (shadowsocks)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('shadowsocks: renders method+password and submits ss_* on create', async () => {
+    const create = vi.spyOn(pluginsAPI, 'createXrayInbound').mockResolvedValue({} as never)
+    wrap(<InboundDialog open={true} onOpenChange={() => {}} mode="create"
+      defaultServerID={11} allInbounds={[landing]} />)
+    // switch protocol to shadowsocks
+    const protocolSelect = screen.getByDisplayValue('VLESS + REALITY')
+    fireEvent.change(protocolSelect, { target: { value: 'shadowsocks' } })
+    // method and password fields should now be visible
+    expect(screen.getByLabelText(/method/i)).toBeInTheDocument()
+    // click the 'new' button to fill the SS password
+    fireEvent.click(screen.getByRole('button', { name: /^new$/i }))
+    // submit
+    fireEvent.click(screen.getByRole('button', { name: /create/i }))
+    await waitFor(() => expect(create).toHaveBeenCalled())
+    const body = create.mock.calls[0][0]
+    expect(body).toMatchObject({ protocol: 'shadowsocks' })
+    expect(typeof body.ss_method).toBe('string')
+    expect((body.ss_password as string).length).toBeGreaterThan(0)
+  })
+})

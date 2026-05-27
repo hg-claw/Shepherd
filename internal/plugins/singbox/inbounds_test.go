@@ -197,6 +197,59 @@ func TestInboundStore_Delete_RestrictLandingWithRelay(t *testing.T) {
 	}
 }
 
+func TestInbound_AliasRoundTrip(t *testing.T) {
+	s := newInboundStore(t)
+	ctx := context.Background()
+
+	// Insert with alias.
+	id, err := s.Insert(ctx, Inbound{
+		ServerID: 1, Tag: s.GenerateTag("landing"), Role: "landing",
+		Protocol: "anytls", Port: 443,
+		Alias: "🇸🇬 SG 01",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Retrieve and check alias.
+	row, err := s.GetByID(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.Alias != "🇸🇬 SG 01" {
+		t.Fatalf("want alias %q, got %q", "🇸🇬 SG 01", row.Alias)
+	}
+
+	// Update alias.
+	newAlias := "🇸🇬 SG renamed"
+	if err := s.Update(ctx, id, InboundPatch{Alias: &newAlias}); err != nil {
+		t.Fatal(err)
+	}
+	row, err = s.GetByID(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.Alias != newAlias {
+		t.Fatalf("want alias %q after update, got %q", newAlias, row.Alias)
+	}
+
+	// Update an unrelated field; alias must not be clobbered.
+	port := 8443
+	if err := s.Update(ctx, id, InboundPatch{Port: &port}); err != nil {
+		t.Fatal(err)
+	}
+	row, err = s.GetByID(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.Alias != newAlias {
+		t.Fatalf("nil-alias patch clobbered alias: got %q, want %q", row.Alias, newAlias)
+	}
+	if row.Port != 8443 {
+		t.Fatalf("port not updated: got %d", row.Port)
+	}
+}
+
 func ptrStr(s string) *string { return &s }
 func ptrI64(i int64) *int64   { return &i }
 func ptrInt(i int) *int        { return &i }

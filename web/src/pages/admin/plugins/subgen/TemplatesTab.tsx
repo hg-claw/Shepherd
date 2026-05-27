@@ -38,6 +38,7 @@ interface RulesModel {
   general: string
   mitm: string
   clash_general: string
+  custom_nodes: string
 }
 
 function parseRules(rules_json: string): RulesModel {
@@ -55,6 +56,7 @@ function parseRules(rules_json: string): RulesModel {
     general: String(raw.general ?? ''),
     mitm: String(raw.mitm ?? ''),
     clash_general: String(raw.clash_general ?? ''),
+    custom_nodes: String(raw.custom_nodes ?? ''),
   }
 }
 
@@ -207,6 +209,7 @@ function TemplateEditor({
   const [general, setGeneral] = useState(initial.general)
   const [mitm, setMitm] = useState(initial.mitm)
   const [clashGeneral, setClashGeneral] = useState(initial.clash_general)
+  const [customNodes, setCustomNodes] = useState(initial.custom_nodes)
   const [rawJson, setRawJson] = useState('')
 
   const toggleCat = (name: string, defaultPolicy: string) => {
@@ -228,6 +231,7 @@ function TemplateEditor({
     general,
     mitm,
     clash_general: clashGeneral,
+    custom_nodes: customNodes,
   })
 
   // The rules_json we save and preview: the raw text in raw mode, otherwise the
@@ -250,6 +254,7 @@ function TemplateEditor({
     setGeneral(m.general)
     setMitm(m.mitm)
     setClashGeneral(m.clash_general)
+    setCustomNodes(m.custom_nodes)
     setMode('form')
   }
 
@@ -408,6 +413,21 @@ function TemplateEditor({
                     spellCheck={false}
                     className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
                     placeholder="mode: rule"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-[12px]">Custom nodes (share links)</Label>
+                  <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                    One proxy share link per line (<code>vless://</code>, <code>ss://</code>, <code>vmess://</code>, <code>trojan://</code>, <code>hysteria2://</code>, <code>tuic://</code>, <code>anytls://</code>). The name after <code>#</code> becomes the node name; parsed nodes appear in the preview.
+                  </p>
+                  <textarea
+                    value={customNodes}
+                    onChange={(e) => setCustomNodes(e.target.value)}
+                    rows={4}
+                    spellCheck={false}
+                    className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
+                    placeholder="vless://uuid@host:443?security=reality&pbk=...#🇺🇸 US"
                   />
                 </div>
 

@@ -13,7 +13,7 @@ func TestService_GenerateByToken(t *testing.T) {
 	ctx := context.Background()
 	// minimal xray_inbounds table (collect.go reads these columns)
 	s.DB.MustExec(`CREATE TABLE xray_inbounds (
-		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, port INTEGER, role TEXT, protocol TEXT,
+		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, alias TEXT, port INTEGER, role TEXT, protocol TEXT,
 		uuid TEXT, sni TEXT, public_key TEXT, short_id TEXT, ws_path TEXT, ss_method TEXT, ss_password TEXT)`)
 	s.DB.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (1,'jp','1.1.1.1','JP')`)
 	s.DB.MustExec(`INSERT INTO xray_inbounds(id,server_id,tag,port,role,protocol,uuid,sni,public_key,short_id)

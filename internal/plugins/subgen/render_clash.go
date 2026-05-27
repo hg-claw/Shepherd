@@ -1,6 +1,7 @@
 package subgen
 
 import (
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -12,7 +13,7 @@ func (*ClashRenderer) Target() string { return "clash" }
 
 func (*ClashRenderer) Supports(p string) bool {
 	switch p {
-	case "shadowsocks", "vmess", "trojan", "vless", "hysteria2", "tuic", "anytls":
+	case "shadowsocks", "vmess", "trojan", "vless", "hysteria2", "tuic", "anytls", "wireguard":
 		return true
 	}
 	return false
@@ -185,6 +186,24 @@ func clashProxy(n Node) map[string]any {
 		if n.Insecure {
 			p["skip-cert-verify"] = true
 		}
+	case "wireguard":
+		p["type"] = "wireguard"
+		p["private-key"] = wgField(n, "private_key")
+		p["public-key"] = wgField(n, "public_key")
+		if psk := wgField(n, "preshared_key"); psk != "" {
+			p["pre-shared-key"] = psk
+		}
+		if ip := wgField(n, "ip"); ip != "" {
+			p["ip"] = wgIPCIDR(ip)
+		}
+		p["allowed-ips"] = []string{"0.0.0.0/0", "::/0"}
+		if res := wgReserved(wgField(n, "reserved")); res != nil {
+			p["reserved"] = res
+		}
+		if mtu, ok := n.Extra["mtu"].(int); ok && mtu > 0 {
+			p["mtu"] = mtu
+		}
+		p["udp"] = true
 	default:
 		return nil
 	}
@@ -197,4 +216,38 @@ func clashWSOpts(n Node) map[string]any {
 		o["headers"] = map[string]any{"Host": n.Host}
 	}
 	return o
+}
+
+// wgField reads a WireGuard string field from Node.Extra.
+func wgField(n Node, key string) string {
+	s, _ := n.Extra[key].(string)
+	return s
+}
+
+// wgIPCIDR ensures the WireGuard self-ip has a CIDR mask (mihomo expects one).
+func wgIPCIDR(ip string) string {
+	if strings.Contains(ip, "/") {
+		return ip
+	}
+	return ip + "/32"
+}
+
+// wgReserved parses a "a,b,c" reserved string into a 3-element []int, or nil.
+func wgReserved(s string) []int {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	if len(parts) != 3 {
+		return nil
+	}
+	out := make([]int, 0, 3)
+	for _, p := range parts {
+		v, err := strconv.Atoi(strings.TrimSpace(p))
+		if err != nil {
+			return nil
+		}
+		out = append(out, v)
+	}
+	return out
 }

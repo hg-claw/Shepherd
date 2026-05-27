@@ -79,6 +79,33 @@ func TestClash_RendersYAML(t *testing.T) {
 	}
 }
 
+func TestClash_WireGuard(t *testing.T) {
+	im := Intermediate{
+		Nodes: []Node{{
+			Name: "🇨🇳 WG", Protocol: "wireguard", Server: "home.hg.ht", Port: 51820,
+			Extra: map[string]any{
+				"private_key": "PRIV", "public_key": "PUB", "preshared_key": "PSK",
+				"ip": "10.254.253.3", "reserved": "0,0,0", "udp": true,
+			},
+		}},
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"🇨🇳 WG"}}},
+		Rules:  []Rule{{Final: true, Target: "PROXY"}},
+	}
+	out := (&ClashRenderer{}).Render(im, "", DefaultRulesetBase)
+	var doc map[string]any
+	if err := yaml.Unmarshal([]byte(out), &doc); err != nil {
+		t.Fatalf("invalid yaml: %v\n%s", err, out)
+	}
+	for _, want := range []string{
+		"type: wireguard", "private-key: PRIV", "public-key: PUB",
+		"pre-shared-key: PSK", "ip: 10.254.253.3/32", "udp: true", "reserved:",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("clash WG missing %q\n%s", want, out)
+		}
+	}
+}
+
 func TestClash_DoesNotCorruptBackslashValues(t *testing.T) {
 	im := Intermediate{
 		Nodes:  []Node{{Name: "n1", Protocol: "trojan", Server: "1.1.1.1", Port: 443, Password: `secretAx`, SNI: "x.com"}},

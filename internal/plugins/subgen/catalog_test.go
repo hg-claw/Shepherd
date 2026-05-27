@@ -19,6 +19,19 @@ func TestResolveRuleLines_RemoteAndNative(t *testing.T) {
 	}
 }
 
+func TestRulesetURL_SurgeAndClash(t *testing.T) {
+	base := "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master"
+	if got := rulesetURL("Telegram", "surge", base); got != base+"/rule/Surge/Telegram/Telegram.list" {
+		t.Fatalf("surge url = %s", got)
+	}
+	if got := rulesetURL("Telegram", "shadowrocket", base); got != base+"/rule/Surge/Telegram/Telegram.list" {
+		t.Fatalf("shadowrocket url = %s", got)
+	}
+	if got := rulesetURL("Telegram", "clash", base); got != base+"/rule/Clash/Telegram/Telegram.yaml" {
+		t.Fatalf("clash url = %s", got)
+	}
+}
+
 func TestPredefinedTemplatesReferenceKnownCategories(t *testing.T) {
 	known := map[string]bool{}
 	for _, c := range UnifiedCategories {

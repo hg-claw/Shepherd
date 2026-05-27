@@ -48,14 +48,25 @@ func categoryByName(name string) (Category, bool) {
 }
 
 // rulesetDir maps a target to the blackmatrix7 rule directory + file ext.
-// Surge and ShadowRocket both consume Surge-format .list files.
+// Surge and ShadowRocket both consume Surge-format .list files; Clash consumes
+// .yaml rule-provider files.
 func rulesetDir(target string) (dir, ext string) {
+	if target == "clash" {
+		return "Clash", "yaml"
+	}
 	return "Surge", "list"
 }
 
+// rulesetURL builds the blackmatrix7 raw URL for one folder + target.
+func rulesetURL(folder, target, base string) string {
+	dir, ext := rulesetDir(target)
+	base = strings.TrimRight(base, "/")
+	return base + "/rule/" + dir + "/" + folder + "/" + folder + "." + ext
+}
+
 // ResolveRuleLines turns one category + policy into the rule line(s) for a
-// target. Remote rulesets become RULE-SET URLs; native categories emit
-// their directive verbatim with the policy appended.
+// target — remote categories become RULE-SET URLs, native ones their directive.
+// Used by the /categories admin endpoint to show each category's rule lines.
 func ResolveRuleLines(category, policy, target, base string) []string {
 	c, ok := categoryByName(category)
 	if !ok {
@@ -64,12 +75,9 @@ func ResolveRuleLines(category, policy, target, base string) []string {
 	if c.Native != "" {
 		return []string{c.Native + "," + policy}
 	}
-	dir, ext := rulesetDir(target)
-	base = strings.TrimRight(base, "/")
 	var out []string
 	for _, rs := range c.Rulesets {
-		url := base + "/rule/" + dir + "/" + rs + "/" + rs + "." + ext
-		out = append(out, "RULE-SET,"+url+","+policy)
+		out = append(out, "RULE-SET,"+rulesetURL(rs, target, base)+","+policy)
 	}
 	return out
 }

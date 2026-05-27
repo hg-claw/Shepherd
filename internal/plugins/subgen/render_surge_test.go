@@ -156,3 +156,20 @@ func TestSurge_CustomRulesetURL(t *testing.T) {
 		t.Fatalf("surge AI rule missing:\n%s", out)
 	}
 }
+
+func TestSurge_CustomGroupVerbatimKeepsDevice(t *testing.T) {
+	im := Intermediate{
+		Groups: []Group{{Name: "Home", Type: "select", Members: []string{"DEVICE:HomeMac", "PROXY"}, Verbatim: true}},
+		Rules:  []Rule{{Match: "IP-CIDR,192.168.1.0/24", Target: "DEVICE:HomeMac"}, {Final: true, Target: "PROXY"}},
+	}
+	out := (&SurgeRenderer{}).Render(im, "x", DefaultRulesetBase)
+	if !strings.Contains(out, "Home = select, DEVICE:HomeMac, PROXY\n") {
+		t.Fatalf("surge verbatim group:\n%s", out)
+	}
+	if strings.Contains(out, "DEVICE:HomeMac, PROXY, DIRECT") {
+		t.Fatalf("verbatim group must not get auto-DIRECT:\n%s", out)
+	}
+	if !strings.Contains(out, "IP-CIDR,192.168.1.0/24,DEVICE:HomeMac") {
+		t.Fatalf("surge keeps DEVICE rule:\n%s", out)
+	}
+}

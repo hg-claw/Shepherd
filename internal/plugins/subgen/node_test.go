@@ -54,3 +54,42 @@ func TestSingboxInboundToNode_VlessWsTls(t *testing.T) {
 		t.Fatalf("vless-ws fields: %+v", n)
 	}
 }
+
+func TestInboundToNode_AliasReplacesName(t *testing.T) {
+	srv := serverLite{Name: "Tokyo", Host: "1.2.3.4", Country: "US"}
+
+	// xray: alias set → verbatim; empty → default
+	if got := xrayInboundToNode(xrayLite{Protocol: "vless-reality", Alias: "🇭🇰 香港 CIA 01"}, srv).Name; got != "🇭🇰 香港 CIA 01" {
+		t.Errorf("xray alias: got %q", got)
+	}
+	if got := xrayInboundToNode(xrayLite{Protocol: "vless-reality", Alias: "  "}, srv).Name; got != "🇺🇸 Tokyo vless" {
+		t.Errorf("xray blank alias fallback: got %q", got)
+	}
+
+	// singbox: alias set → verbatim; empty → default
+	if got := singboxInboundToNode(singboxLite{Protocol: "anytls", Alias: "Home AnyTLS"}, srv).Name; got != "Home AnyTLS" {
+		t.Errorf("singbox alias: got %q", got)
+	}
+	if got := singboxInboundToNode(singboxLite{Protocol: "anytls"}, srv).Name; got != "🇺🇸 Tokyo anytls" {
+		t.Errorf("singbox empty alias fallback: got %q", got)
+	}
+}
+
+func TestDedupeNodeNames(t *testing.T) {
+	nodes := []Node{{Name: "X"}, {Name: "X"}, {Name: "X"}, {Name: "Y"}}
+	dedupeNodeNames(nodes)
+	got := []string{nodes[0].Name, nodes[1].Name, nodes[2].Name, nodes[3].Name}
+	want := []string{"X", "X 2", "X 3", "Y"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("idx %d: got %q want %q", i, got[i], want[i])
+		}
+	}
+
+	// a name that already ends in a taken suffix is skipped
+	nodes2 := []Node{{Name: "A"}, {Name: "A 2"}, {Name: "A"}}
+	dedupeNodeNames(nodes2)
+	if nodes2[2].Name != "A 3" {
+		t.Errorf("collision with pre-taken suffix: got %q want %q", nodes2[2].Name, "A 3")
+	}
+}

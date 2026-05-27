@@ -1,6 +1,9 @@
 package subgen
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestAssemble_GroupsAndRules(t *testing.T) {
 	nodes := []Node{
@@ -110,6 +113,25 @@ func groupIndex(gs []Group, name string) int {
 		}
 	}
 	return -1
+}
+
+func TestAssemble_DedupesNodeNames(t *testing.T) {
+	nodes := []Node{
+		{Name: "🇭🇰 香港", Protocol: "anytls"},
+		{Name: "🇭🇰 香港", Protocol: "vless"},
+	}
+	im := Assemble(nodes, TemplateSpec{Final: "PROXY"})
+	if im.Nodes[0].Name != "🇭🇰 香港" || im.Nodes[1].Name != "🇭🇰 香港 2" {
+		t.Fatalf("dedupe in Assemble: got %q, %q", im.Nodes[0].Name, im.Nodes[1].Name)
+	}
+	// PROXY group members must reference the de-duplicated names
+	if im.Groups[0].Name != "PROXY" {
+		t.Fatalf("expected PROXY first, got %q", im.Groups[0].Name)
+	}
+	joined := strings.Join(im.Groups[0].Members, ",")
+	if !strings.Contains(joined, "🇭🇰 香港 2") {
+		t.Fatalf("PROXY members miss deduped name: %q", joined)
+	}
 }
 
 func TestAssemble_AppendsCustomNodes(t *testing.T) {

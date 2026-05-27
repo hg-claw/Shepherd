@@ -32,7 +32,7 @@ func TestSubgenPublic_TokenAuthAndTarget(t *testing.T) {
 	tid, _ := st.CreateTemplate(ctx, "t", false, `{"final":"PROXY"}`)
 	sub, _ := st.CreateSubscription(ctx, "s", tid)
 
-	r := httptest.NewRequest("GET", "/sub/"+sub.Token+"?target=clash", nil)
+	r := httptest.NewRequest("GET", "/sub/"+sub.Token+"?target=quantumultx", nil)
 	r.SetPathValue("token", sub.Token)
 	w := httptest.NewRecorder()
 	api.GetSubscription(w, r)

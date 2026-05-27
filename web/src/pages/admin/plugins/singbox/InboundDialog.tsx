@@ -12,7 +12,7 @@ import {
   generateX25519, generateShortID,
   type SingboxInbound, type SingboxProtocol,
 } from '@/api/plugins'
-import { randomUUID, randomPort } from '../xray/templates'
+import { randomUUID, randomPort, randomPassword, randomSSKey } from '../xray/templates'
 
 // ─── Protocol list ───────────────────────────────────────────────────────────
 
@@ -300,8 +300,12 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
           {needsPassword(protocol) && (
             <div>
               <Label className={labelCls} htmlFor="ib-pw">Password</Label>
-              <Input id="ib-pw" aria-label="password" className={inputCls}
-                value={password} onChange={(e) => setPassword(e.target.value)} />
+              <div className="flex gap-2">
+                <Input id="ib-pw" aria-label="password" className={inputCls + ' flex-1'}
+                  value={password} onChange={(e) => setPassword(e.target.value)} />
+                <Button type="button" variant="outline" size="sm" className="h-8"
+                  onClick={() => setPassword(randomPassword())}>new</Button>
+              </div>
             </div>
           )}
 
@@ -432,8 +436,12 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
               </div>
               <div>
                 <Label className={labelCls} htmlFor="ib-sspw">Password (base64)</Label>
-                <Input id="ib-sspw" aria-label="ss password" className={inputCls}
-                  value={ssPassword} onChange={(e) => setSSPassword(e.target.value)} />
+                <div className="flex gap-2">
+                  <Input id="ib-sspw" aria-label="ss password" className={inputCls + ' flex-1'}
+                    value={ssPassword} onChange={(e) => setSSPassword(e.target.value)} />
+                  <Button type="button" variant="outline" size="sm" className="h-8"
+                    onClick={() => setSSPassword(randomSSKey(ssMethod))}>new</Button>
+                </div>
               </div>
             </>
           )}

@@ -68,3 +68,24 @@ func TestParseTemplate_ClashGeneral(t *testing.T) {
 		t.Fatal("scalar clash_general accepted")
 	}
 }
+
+func TestParseTemplate_CustomGroups(t *testing.T) {
+	ok := `{"final":"PROXY","custom_groups":[{"name":"Home","type":"select","members":["DEVICE:HomeMac","DIRECT"]}]}`
+	spec, err := ParseTemplate(ok)
+	if err != nil {
+		t.Fatalf("valid rejected: %v", err)
+	}
+	if len(spec.CustomGroups) != 1 || spec.CustomGroups[0].Name != "Home" ||
+		spec.CustomGroups[0].Type != "select" || len(spec.CustomGroups[0].Members) != 2 {
+		t.Fatalf("parsed = %+v", spec.CustomGroups)
+	}
+	for _, bad := range []string{
+		`{"custom_groups":[{"name":"","type":"select","members":["x"]}]}`,
+		`{"custom_groups":[{"name":"H","type":"fallback","members":["x"]}]}`,
+		`{"custom_groups":[{"name":"H","type":"select","members":[]}]}`,
+	} {
+		if _, err := ParseTemplate(bad); err == nil {
+			t.Fatalf("bad custom group accepted: %s", bad)
+		}
+	}
+}

@@ -20,6 +20,12 @@ type CustomRule struct {
 	Policy string `json:"policy"`
 }
 
+type CustomGroup struct {
+	Name    string   `json:"name"`
+	Type    string   `json:"type"` // select | url-test
+	Members []string `json:"members"`
+}
+
 type TemplateSpec struct {
 	Categories        []CategorySel `json:"categories"`
 	CustomRules       []CustomRule  `json:"custom_rules"`
@@ -29,6 +35,7 @@ type TemplateSpec struct {
 	MITM              string        `json:"mitm,omitempty"`          // Surge [MITM] body
 	ClashGeneral      string        `json:"clash_general,omitempty"` // Clash YAML preamble (top-level keys)
 	CustomNodes       string        `json:"custom_nodes,omitempty"`  // newline-separated proxy share links
+	CustomGroups      []CustomGroup `json:"custom_groups,omitempty"`
 }
 
 func validPolicy(p string) bool {
@@ -65,6 +72,17 @@ func ParseTemplate(rulesJSON string) (TemplateSpec, error) {
 	for _, r := range t.CustomRules {
 		if r.Match == "" || !validPolicy(r.Policy) {
 			return t, fmt.Errorf("bad custom rule %+v", r)
+		}
+	}
+	for _, g := range t.CustomGroups {
+		if g.Name == "" {
+			return t, fmt.Errorf("custom group: empty name")
+		}
+		if g.Type != "select" && g.Type != "url-test" {
+			return t, fmt.Errorf("custom group %q: bad type %q (want select|url-test)", g.Name, g.Type)
+		}
+		if len(g.Members) == 0 {
+			return t, fmt.Errorf("custom group %q: needs at least one member", g.Name)
 		}
 	}
 	return t, nil

@@ -57,3 +57,25 @@ export function randomUUID(): string {
     return v.toString(16)
   })
 }
+
+// randomPassword returns 24 random bytes as URL-safe base64 (no padding).
+// Suitable for arbitrary-string passwords (trojan/hysteria2/tuic/anytls and
+// legacy shadowsocks methods).
+export function randomPassword(): string {
+  const bytes = new Uint8Array(24)
+  crypto.getRandomValues(bytes)
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+}
+
+// randomSSKey returns a Shadowsocks key appropriate for the given method.
+// SS2022 methods (2022-blake3-*) need an exact-length standard-base64 key:
+// 16 bytes for aes-128, 32 bytes otherwise. Legacy methods accept any string,
+// so they reuse randomPassword().
+export function randomSSKey(method: string): string {
+  if (!method.startsWith('2022-blake3-')) return randomPassword()
+  const n = method.includes('aes-128') ? 16 : 32
+  const bytes = new Uint8Array(n)
+  crypto.getRandomValues(bytes)
+  return btoa(String.fromCharCode(...bytes)) // standard base64, with padding
+}

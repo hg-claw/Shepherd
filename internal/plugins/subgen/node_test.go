@@ -92,4 +92,15 @@ func TestDedupeNodeNames(t *testing.T) {
 	if nodes2[2].Name != "A 3" {
 		t.Errorf("collision with pre-taken suffix: got %q want %q", nodes2[2].Name, "A 3")
 	}
+
+	// an explicit name that collides with a generated suffix must survive
+	nodes3 := []Node{{Name: "X"}, {Name: "X"}, {Name: "X 2"}}
+	dedupeNodeNames(nodes3)
+	got3 := []string{nodes3[0].Name, nodes3[1].Name, nodes3[2].Name}
+	want3 := []string{"X", "X 3", "X 2"}
+	for i := range want3 {
+		if got3[i] != want3[i] {
+			t.Errorf("suffix-collision idx %d: got %q want %q", i, got3[i], want3[i])
+		}
+	}
 }

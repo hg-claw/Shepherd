@@ -107,20 +107,28 @@ func aliasOrDefault(alias string, srv serverLite, proto string) string {
 
 // dedupeNodeNames makes Node.Name unique across the slice, in place,
 // preserving order. The first occurrence of a name is kept; later
-// collisions get " 2", " 3", … (skipping any suffix already taken).
+// collisions get " 2", " 3", … A generated suffix never overwrites a name
+// that some other node already carries (so an explicit "X 2" survives even
+// if two "X" nodes collide).
 func dedupeNodeNames(nodes []Node) {
-	seen := make(map[string]bool, len(nodes))
+	// Reserve every original name so a generated suffix can't steal one.
+	reserved := make(map[string]bool, 2*len(nodes))
+	for i := range nodes {
+		reserved[nodes[i].Name] = true
+	}
+	used := make(map[string]bool, 2*len(nodes))
 	for i := range nodes {
 		name := nodes[i].Name
-		if !seen[name] {
-			seen[name] = true
+		if !used[name] {
+			used[name] = true
 			continue
 		}
 		for n := 2; ; n++ {
 			cand := fmt.Sprintf("%s %d", name, n)
-			if !seen[cand] {
+			if !reserved[cand] && !used[cand] {
 				nodes[i].Name = cand
-				seen[cand] = true
+				reserved[cand] = true
+				used[cand] = true
 				break
 			}
 		}

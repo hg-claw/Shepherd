@@ -132,6 +132,9 @@ func TestAssemble_DedupesNodeNames(t *testing.T) {
 	if !strings.Contains(joined, "🇭🇰 香港 2") {
 		t.Fatalf("PROXY members miss deduped name: %q", joined)
 	}
+	if !strings.Contains(joined, "🇭🇰 香港,") && !strings.HasSuffix(joined, "🇭🇰 香港") {
+		t.Fatalf("PROXY members miss original name: %q", joined)
+	}
 }
 
 func TestAssemble_AppendsCustomNodes(t *testing.T) {

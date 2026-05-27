@@ -38,6 +38,15 @@
 
 注意：自定义节点属于**模板**，使用同一模板的所有订阅会共享这批节点。
 
+## 自定义代理组（Custom groups）
+
+模板可定义自己的命名代理组,每行 `名字 = 类型, 成员1, 成员2`(类型 = `select` 或 `url-test`)。成员是自由文本:节点名、`PROXY`/`DIRECT`/`REJECT`、`DEVICE:Name`(Surge Ponte 内网设备)、或其它组名。组成员**原样渲染**(不自动追加 DIRECT)。用自定义规则指向组名即可路由,例如:
+
+- 组:`Home = select, DEVICE:HomeMac, DIRECT`
+- 规则:`IP-CIDR,192.168.1.0/24,Home`
+
+`DEVICE:` 是 **Surge 专有**(Ponte);**Clash 与 ShadowRocket 会自动过滤** `DEVICE:` 成员与以 `DEVICE:` 为策略的规则。跨格式使用的组请至少保留一个非 `DEVICE:` 成员(如 `DIRECT`)。
+
 ## 按格式区分的段落
 
 不同客户端的配置段不同，因此这些字段彼此独立：

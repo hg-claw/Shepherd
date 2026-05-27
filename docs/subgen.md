@@ -1,81 +1,59 @@
-# Subscriptions (subgen)
+# 订阅 (subgen)
 
-The **Subscriptions** plugin generates client subscription configs from your
-existing xray and sing-box inbounds, with category-based routing. Clients poll a
-per-subscription URL; you control routing and output format with templates.
+**订阅(Subscriptions)** 插件根据你已有的 xray 和 sing-box 入站，生成带分类分流的客户端订阅配置。客户端轮询每个订阅的 URL；你通过模板控制分流与输出格式。
 
-## Subscriptions
+## 订阅
 
-A subscription bundles a set of inbound nodes + a template + a token. Create one
-under **Plugins → Subscriptions**, then:
+一个订阅 = 一组入站节点 + 一个模板 + 一个 token。在 **插件 → Subscriptions** 下创建后：
 
-- **Edit nodes** — pick which xray/sing-box inbounds it exposes.
-- **Subscription URL** — `/sub/<token>?target=<format>`. Copy it into your client.
-- **Rotate token** — invalidates the old URL and issues a new one.
-- **Enabled** — a disabled subscription returns 404.
+- **选择节点（Edit nodes）** —— 选择它暴露哪些 xray/sing-box 入站。
+- **订阅 URL** —— `/sub/<token>?target=<format>`，复制到客户端导入。
+- **轮换 token（Rotate token）** —— 使旧 URL 失效并生成新的。
+- **启用（Enabled）** —— 已禁用的订阅返回 404。
 
-## Output formats
+## 输出格式
 
-Set the `target` query parameter:
+设置 `target` 查询参数：
 
-| `target` | Client | Format |
-|----------|--------|--------|
+| `target` | 客户端 | 格式 |
+|----------|--------|------|
 | `surge` | Surge | Surge `.conf` |
-| `shadowrocket` | ShadowRocket | Surge `.conf` (ShadowRocket reads it) |
+| `shadowrocket` | ShadowRocket | Surge `.conf`（ShadowRocket 兼容读取） |
 | `clash` | Clash.Meta / mihomo | YAML |
 
-Example: `https://your-host/sub/abcdef…?target=clash`
+示例：`https://your-host/sub/abcdef…?target=clash`
 
-## Templates
+## 模板
 
-A template describes how traffic is routed. Built-in templates are read-only —
-clone one to customize. The editor has a **Form** mode and a **Raw JSON** mode,
-plus a live **Preview** pane (pick a target to see the rendered config).
+模板描述流量如何分流。内置模板只读 —— 克隆一份再自定义。编辑器有 **表单（Form）** 模式和 **原始 JSON（Raw JSON）** 模式，外加一个实时 **预览（Preview）** 面板（选择目标格式即可查看渲染结果）。
 
-- **Categories** — check a category (Telegram, Streaming, Location:CN, …) to
-  route its rule-sets. Each selected category becomes a **switchable proxy
-  group** named after it; the **policy** you pick is the group's default member,
-  and clients can switch it (e.g. send Telegram via DIRECT). Each category ships
-  the blackmatrix7 GitHub rule-set addresses it uses.
-- **Custom rules** — one `TYPE,VALUE,policy` per line, e.g.
-  `DOMAIN-SUFFIX,example.com,DIRECT` or `IP-CIDR,10.0.0.0/24,PROXY`. These keep
-  their explicit policy (no group is generated).
-- **Final** — the catch-all policy (Surge `FINAL`, Clash `MATCH`).
-- **Include auto-select group** — adds an `Auto Select` url-test group over all
-  nodes; the main `PROXY` group lists it first.
+- **分类（Categories）** —— 勾选某分类（Telegram、Streaming、Location:CN …）以分流其规则集。每个所选分类会生成一个 **以该分类命名的可切换代理组**；你选的 **策略（policy）** 是该组的默认成员，客户端可随时切换（例如把 Telegram 改走 DIRECT）。每个分类附带它所用的 blackmatrix7 GitHub 规则集地址。
+- **自定义规则（Custom rules）** —— 每行一条 `TYPE,VALUE,policy`，例如 `DOMAIN-SUFFIX,example.com,DIRECT` 或 `IP-CIDR,10.0.0.0/24,PROXY`。这些保留各自的显式策略（不生成组）。
+- **Final** —— 兜底策略（Surge 为 `FINAL`，Clash 为 `MATCH`）。
+- **包含自动选择组（Include auto-select group）** —— 增加一个对所有节点做 url-test 的 `Auto Select` 组；主 `PROXY` 组会把它列在第一位。
 
-## Per-format sections
+## 按格式区分的段落
 
-Different clients have different config sections, so these are kept separate:
+不同客户端的配置段不同，因此这些字段彼此独立：
 
-- **`[General]`** (Surge / ShadowRocket only) — raw Surge directives, e.g.
-  `dns-server = 119.29.29.29, 223.5.5.5`. Empty → default `bypass-system = true`.
-- **`[MITM]`** (Surge / ShadowRocket only) — raw Surge MITM directives, e.g.
-  `hostname = *.googlevideo.com`. Empty → the section is omitted. Clash has no
-  MITM, so this is ignored for the `clash` target.
-- **`[Clash] general`** (Clash only) — raw Clash YAML top-level keys, e.g.:
+- **`[General]`**（仅 Surge / ShadowRocket）—— 原始 Surge 指令，例如 `dns-server = 119.29.29.29, 223.5.5.5`。留空 → 默认 `bypass-system = true`。
+- **`[MITM]`**（仅 Surge / ShadowRocket）—— 原始 Surge MITM 指令，例如 `hostname = *.googlevideo.com`。留空 → 省略该段。Clash 没有 MITM，因此 `clash` 目标会忽略它。
+- **`[Clash] general`**（仅 Clash）—— 原始 Clash YAML 顶层键，例如：
   ```yaml
   mode: rule
   dns:
     enable: true
     nameserver: [223.5.5.5, 119.29.29.29]
   ```
-  Empty → default `mode: rule`. This is ignored for the Surge/ShadowRocket
-  targets.
+  留空 → 默认 `mode: rule`。Surge/ShadowRocket 目标会忽略它。
 
-## Routing categories
+## 分流分类
 
-Categories map to remote rule-sets from
-[blackmatrix7/ios_rule_script](https://github.com/blackmatrix7/ios_rule_script):
-Surge targets reference `.../rule/Surge/<Name>/<Name>.list`; the Clash target
-defines `rule-providers` pointing at `.../rule/Clash/<Name>/<Name>.yaml`
-(`behavior: classical`). `Location:CN` and `Private` use native matchers
-(`GEOIP,CN`; Clash maps `Private` to `GEOIP,PRIVATE`).
+分类映射到 [blackmatrix7/ios_rule_script](https://github.com/blackmatrix7/ios_rule_script) 的远程规则集：Surge 目标引用 `.../rule/Surge/<Name>/<Name>.list`；Clash 目标定义 `rule-providers` 指向 `.../rule/Clash/<Name>/<Name>.yaml`（`behavior: classical`）。`Location:CN` 和 `Private` 使用原生匹配器（`GEOIP,CN`；Clash 把 `Private` 映射为 `GEOIP,PRIVATE`）。
 
-## Example
+## 示例
 
-A template selecting `Telegram` (PROXY) and `Location:CN` (DIRECT), with
-`include_auto_select` on, renders for **Surge**:
+一个选了 `Telegram`（PROXY）和 `Location:CN`（DIRECT）、并开启 `include_auto_select` 的模板，渲染为 **Surge**：
 
 ```
 [Proxy Group]
@@ -89,7 +67,7 @@ GEOIP,CN,Location:CN
 FINAL,PROXY
 ```
 
-…and for **Clash** (YAML, abridged):
+…渲染为 **Clash**（YAML，节选）：
 
 ```yaml
 proxy-groups:

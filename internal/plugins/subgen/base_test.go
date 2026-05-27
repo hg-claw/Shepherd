@@ -86,6 +86,32 @@ func hasRule(rules []Rule, want Rule) bool {
 	return false
 }
 
+func TestAssemble_AppendsCustomGroups(t *testing.T) {
+	spec := TemplateSpec{
+		Final:             "PROXY",
+		IncludeAutoSelect: true,
+		Categories:        []CategorySel{{Name: "Telegram", Policy: "PROXY"}},
+		CustomGroups:      []CustomGroup{{Name: "Home", Type: "select", Members: []string{"DEVICE:HomeMac", "DIRECT"}}},
+	}
+	im := Assemble(nil, spec)
+	g := findGroup(im.Groups, "Home")
+	if g == nil || g.Type != "select" || !g.Verbatim || !equalStrings(g.Members, []string{"DEVICE:HomeMac", "DIRECT"}) {
+		t.Fatalf("Home group = %+v", g)
+	}
+	if hi, ti := groupIndex(im.Groups, "Home"), groupIndex(im.Groups, "Telegram"); hi < 0 || ti < 0 || hi > ti {
+		t.Fatalf("custom group should precede category group: Home@%d Telegram@%d", hi, ti)
+	}
+}
+
+func groupIndex(gs []Group, name string) int {
+	for i := range gs {
+		if gs[i].Name == name {
+			return i
+		}
+	}
+	return -1
+}
+
 func TestAssemble_AppendsCustomNodes(t *testing.T) {
 	spec := TemplateSpec{
 		Final:       "PROXY",

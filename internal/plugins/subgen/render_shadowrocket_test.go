@@ -44,3 +44,17 @@ func TestShadowRocket_RendersAndReportsTarget(t *testing.T) {
 		}
 	}
 }
+
+func TestShadowRocket_FiltersDevice(t *testing.T) {
+	im := Intermediate{
+		Groups: []Group{{Name: "Home", Type: "select", Members: []string{"DEVICE:HomeMac", "DIRECT"}, Verbatim: true}},
+		Rules:  []Rule{{Match: "IP-CIDR,192.168.1.0/24", Target: "DEVICE:HomeMac"}, {Final: true, Target: "PROXY"}},
+	}
+	out := (&ShadowRocketRenderer{}).Render(im, "x", DefaultRulesetBase)
+	if !strings.Contains(out, "Home = select, DIRECT\n") {
+		t.Fatalf("shadowrocket should filter DEVICE member:\n%s", out)
+	}
+	if strings.Contains(out, "DEVICE:") {
+		t.Fatalf("shadowrocket must drop all DEVICE refs:\n%s", out)
+	}
+}

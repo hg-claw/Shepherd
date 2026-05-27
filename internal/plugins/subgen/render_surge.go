@@ -87,13 +87,15 @@ func (r *SurgeRenderer) proxyLine(n Node) string {
 }
 
 func (r *SurgeRenderer) Render(im Intermediate, subURL, rulesetBase string) string {
-	return r.render(im, subURL, rulesetBase, false)
+	return r.render(im, subURL, rulesetBase, "surge")
 }
 
-// render builds the Surge-family .conf. wgInline selects WireGuard handling:
-// false → a [WireGuard <section>] block + a section-name proxy reference (Surge);
-// true → a single inline [Proxy] line (ShadowRocket).
-func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase string, wgInline bool) string {
+// render builds the Surge-family .conf for target "surge" or "shadowrocket".
+// ShadowRocket gets inline WireGuard ([Proxy] line) and, having no Ponte, filters
+// out Surge-only DEVICE: members/rules; Surge keeps them.
+func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target string) string {
+	wgInline := target == "shadowrocket"
+	filterDevice := target != "surge"
 	var b strings.Builder
 	fmt.Fprintf(&b, "#!MANAGED-CONFIG %s interval=43200 strict=false\n\n", subURL)
 
@@ -139,11 +141,22 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase string, wgIn
 
 	b.WriteString("\n[Proxy Group]\n")
 	for _, g := range im.Groups {
+		if filterDevice {
+			if g.Members = dropDevicePolicies(g.Members); len(g.Members) == 0 {
+				continue
+			}
+		}
 		b.WriteString(r.groupLine(g) + "\n")
 	}
 	b.WriteString("\n[Rule]\n")
 	for _, rule := range im.Rules {
+		if filterDevice && strings.HasPrefix(rule.Target, "DEVICE:") {
+			continue
+		}
 		b.WriteString(surgeRuleLine(rule, rulesetBase) + "\n")
+	}
+	if u := strings.TrimSpace(im.URLRewrite); u != "" {
+		b.WriteString("\n[URL Rewrite]\n" + u + "\n")
 	}
 	if m := strings.TrimSpace(im.MITM); m != "" {
 		b.WriteString("\n[MITM]\n" + m + "\n")
@@ -198,18 +211,20 @@ func (r *SurgeRenderer) groupLine(g Group) string {
 	if g.Type == "url-test" {
 		return fmt.Sprintf("%s = url-test, %s, url=http://www.gstatic.com/generate_204, interval=300", g.Name, strings.Join(g.Members, ", "))
 	}
-	// select groups carry DIRECT as the conventional fallback member — append
-	// it only when the group doesn't already include it (category groups do).
+	// Auto-generated select groups carry DIRECT as the conventional fallback;
+	// user-defined (Verbatim) groups render their members exactly.
 	members := g.Members
-	hasDirect := false
-	for _, m := range members {
-		if m == "DIRECT" {
-			hasDirect = true
-			break
+	if !g.Verbatim {
+		hasDirect := false
+		for _, m := range members {
+			if m == "DIRECT" {
+				hasDirect = true
+				break
+			}
 		}
-	}
-	if !hasDirect {
-		members = append(append([]string{}, members...), "DIRECT")
+		if !hasDirect {
+			members = append(append([]string{}, members...), "DIRECT")
+		}
 	}
 	return fmt.Sprintf("%s = select, %s", g.Name, strings.Join(members, ", "))
 }

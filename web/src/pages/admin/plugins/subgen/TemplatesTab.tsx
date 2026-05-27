@@ -30,6 +30,7 @@ type Policy = (typeof POLICIES)[number] | string
 // Working model parsed out of / serialized back into rules_json.
 interface CategoryRule { name: string; policy: Policy }
 interface CustomRule { match: string; policy: Policy }
+interface CustomGroupModel { name: string; type: string; members: string[] }
 interface RulesModel {
   categories: CategoryRule[]
   custom_rules: CustomRule[]
@@ -37,8 +38,10 @@ interface RulesModel {
   include_auto_select: boolean
   general: string
   mitm: string
+  url_rewrite: string
   clash_general: string
   custom_nodes: string
+  custom_groups: CustomGroupModel[]
 }
 
 function parseRules(rules_json: string): RulesModel {
@@ -55,8 +58,16 @@ function parseRules(rules_json: string): RulesModel {
     include_auto_select: Boolean(raw.include_auto_select),
     general: String(raw.general ?? ''),
     mitm: String(raw.mitm ?? ''),
+    url_rewrite: String(raw.url_rewrite ?? ''),
     clash_general: String(raw.clash_general ?? ''),
     custom_nodes: String(raw.custom_nodes ?? ''),
+    custom_groups: Array.isArray(raw.custom_groups)
+      ? raw.custom_groups.map((g: any) => ({
+          name: String(g.name ?? ''),
+          type: String(g.type ?? 'select'),
+          members: Array.isArray(g.members) ? g.members.map((m: any) => String(m)) : [],
+        }))
+      : [],
   }
 }
 
@@ -75,6 +86,25 @@ function textToCustomRules(text: string): CustomRule[] {
     const policy = parts[parts.length - 1].trim()
     const match = parts.slice(0, parts.length - 1).map((p) => p.trim()).join(',')
     out.push({ match, policy })
+  }
+  return out
+}
+
+function customGroupsToText(groups: CustomGroupModel[]): string {
+  return groups.map((g) => `${g.name} = ${g.type}, ${g.members.join(', ')}`).join('\n')
+}
+
+function textToCustomGroups(text: string): CustomGroupModel[] {
+  const out: CustomGroupModel[] = []
+  for (const line of text.split('\n')) {
+    const t = line.trim()
+    if (!t) continue
+    const eq = t.indexOf('=')
+    if (eq < 0) continue
+    const name = t.slice(0, eq).trim()
+    const parts = t.slice(eq + 1).split(',').map((p) => p.trim()).filter(Boolean)
+    if (!name || parts.length < 2) continue // need a type + at least one member
+    out.push({ name, type: parts[0], members: parts.slice(1) })
   }
   return out
 }
@@ -208,8 +238,10 @@ function TemplateEditor({
   const [includeAutoSelect, setIncludeAutoSelect] = useState(initial.include_auto_select)
   const [general, setGeneral] = useState(initial.general)
   const [mitm, setMitm] = useState(initial.mitm)
+  const [urlRewrite, setUrlRewrite] = useState(initial.url_rewrite)
   const [clashGeneral, setClashGeneral] = useState(initial.clash_general)
   const [customNodes, setCustomNodes] = useState(initial.custom_nodes)
+  const [customGroupsText, setCustomGroupsText] = useState(customGroupsToText(initial.custom_groups))
   const [rawJson, setRawJson] = useState('')
 
   const toggleCat = (name: string, defaultPolicy: string) => {
@@ -230,8 +262,10 @@ function TemplateEditor({
     include_auto_select: includeAutoSelect,
     general,
     mitm,
+    url_rewrite: urlRewrite,
     clash_general: clashGeneral,
     custom_nodes: customNodes,
+    custom_groups: textToCustomGroups(customGroupsText),
   })
 
   // The rules_json we save and preview: the raw text in raw mode, otherwise the
@@ -253,8 +287,10 @@ function TemplateEditor({
     setIncludeAutoSelect(m.include_auto_select)
     setGeneral(m.general)
     setMitm(m.mitm)
+    setUrlRewrite(m.url_rewrite)
     setClashGeneral(m.clash_general)
     setCustomNodes(m.custom_nodes)
+    setCustomGroupsText(customGroupsToText(m.custom_groups))
     setMode('form')
   }
 
@@ -402,6 +438,21 @@ function TemplateEditor({
                 </div>
 
                 <div>
+                  <Label className="text-[12px]">[URL Rewrite]</Label>
+                  <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                    Raw Surge <code>[URL Rewrite]</code> lines (Surge / ShadowRocket only; Clash ignores). Leave empty to omit.
+                  </p>
+                  <textarea
+                    value={urlRewrite}
+                    onChange={(e) => setUrlRewrite(e.target.value)}
+                    rows={3}
+                    spellCheck={false}
+                    className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
+                    placeholder="^https://example.com/x $1 header"
+                  />
+                </div>
+
+                <div>
                   <Label className="text-[12px]">[Clash] general</Label>
                   <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
                     Raw Clash YAML top-level keys (<code>dns</code>, <code>mode</code>…); used only for the clash target. Leave empty for <code>mode: rule</code>.
@@ -428,6 +479,21 @@ function TemplateEditor({
                     spellCheck={false}
                     className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
                     placeholder="vless://uuid@host:443?security=reality&pbk=...#🇺🇸 US"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-[12px]">Custom groups</Label>
+                  <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                    One group per line: <code>Name = type, member1, member2</code> (type = select or url-test). Members are free text (node names, PROXY/DIRECT/REJECT, <code>DEVICE:Name</code> for Surge Ponte, or other group names). Target a group from a custom rule. <code>DEVICE:</code> members render only for Surge.
+                  </p>
+                  <textarea
+                    value={customGroupsText}
+                    onChange={(e) => setCustomGroupsText(e.target.value)}
+                    rows={3}
+                    spellCheck={false}
+                    className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
+                    placeholder="Home = select, DEVICE:HomeMac, DIRECT"
                   />
                 </div>
 

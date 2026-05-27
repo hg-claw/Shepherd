@@ -145,3 +145,57 @@ func TestSurge_ProxyLine_VmessTrojanTuic(t *testing.T) {
 		}
 	}
 }
+
+func TestSurge_CustomRulesetURL(t *testing.T) {
+	im := Intermediate{
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"n1"}}},
+		Rules:  []Rule{{Ruleset: "AI", Target: "AI Services"}},
+	}
+	out := (&SurgeRenderer{}).Render(im, "x", DefaultRulesetBase)
+	if !strings.Contains(out, "RULE-SET,https://raw.githubusercontent.com/iab0x00/ProxyRules/main/Rule/AI.txt,AI Services") {
+		t.Fatalf("surge AI rule missing:\n%s", out)
+	}
+}
+
+func TestSurge_CustomGroupVerbatimKeepsDevice(t *testing.T) {
+	im := Intermediate{
+		Groups: []Group{{Name: "Home", Type: "select", Members: []string{"DEVICE:HomeMac", "PROXY"}, Verbatim: true}},
+		Rules:  []Rule{{Match: "IP-CIDR,192.168.1.0/24", Target: "DEVICE:HomeMac"}, {Final: true, Target: "PROXY"}},
+	}
+	out := (&SurgeRenderer{}).Render(im, "x", DefaultRulesetBase)
+	if !strings.Contains(out, "Home = select, DEVICE:HomeMac, PROXY\n") {
+		t.Fatalf("surge verbatim group:\n%s", out)
+	}
+	if strings.Contains(out, "DEVICE:HomeMac, PROXY, DIRECT") {
+		t.Fatalf("verbatim group must not get auto-DIRECT:\n%s", out)
+	}
+	if !strings.Contains(out, "IP-CIDR,192.168.1.0/24,DEVICE:HomeMac") {
+		t.Fatalf("surge keeps DEVICE rule:\n%s", out)
+	}
+}
+
+func TestSurge_URLRewrite(t *testing.T) {
+	base := Intermediate{
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"n1"}}},
+		Rules:  []Rule{{Final: true, Target: "PROXY"}},
+	}
+	// empty → no section
+	if out := (&SurgeRenderer{}).Render(base, "x", DefaultRulesetBase); strings.Contains(out, "[URL Rewrite]") {
+		t.Fatalf("URL Rewrite should be absent when empty:\n%s", out)
+	}
+	// set → section emitted, before [MITM]
+	im := base
+	im.URLRewrite = "^https://example.com/x $1 header"
+	im.MITM = "hostname = *.example.com"
+	out := (&SurgeRenderer{}).Render(im, "x", DefaultRulesetBase)
+	if !strings.Contains(out, "[URL Rewrite]\n^https://example.com/x $1 header") {
+		t.Fatalf("URL Rewrite section missing:\n%s", out)
+	}
+	if ui, mi := strings.Index(out, "[URL Rewrite]"), strings.Index(out, "[MITM]"); ui < 0 || mi < 0 || ui > mi {
+		t.Fatalf("expected [URL Rewrite] before [MITM]:\n%s", out)
+	}
+	// ShadowRocket inherits the section
+	if out2 := (&ShadowRocketRenderer{}).Render(im, "x", DefaultRulesetBase); !strings.Contains(out2, "[URL Rewrite]\n^https://example.com/x $1 header") {
+		t.Fatalf("shadowrocket URL Rewrite missing:\n%s", out2)
+	}
+}

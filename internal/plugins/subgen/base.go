@@ -1,9 +1,10 @@
 package subgen
 
 type Group struct {
-	Name    string
-	Type    string // "select" | "url-test"
-	Members []string
+	Name     string
+	Type     string // "select" | "url-test"
+	Members  []string
+	Verbatim bool // user-defined: render members exactly, no auto-DIRECT fallback
 }
 
 // Rule is one routing entry in target-agnostic form. Exactly one of Ruleset /
@@ -23,6 +24,7 @@ type Intermediate struct {
 	Rules        []Rule
 	General      string // Surge [General] body; empty → renderer default
 	MITM         string // Surge [MITM] body; empty → section omitted
+	URLRewrite   string // Surge [URL Rewrite] body; empty → section omitted
 	ClashGeneral string // Clash YAML preamble; empty → {mode: rule}
 }
 
@@ -45,7 +47,7 @@ func Assemble(nodes []Node, spec TemplateSpec) Intermediate {
 	if custom, _ := ParseShareLinks(spec.CustomNodes); len(custom) > 0 {
 		nodes = append(nodes, custom...)
 	}
-	im := Intermediate{Nodes: nodes, General: spec.General, MITM: spec.MITM, ClashGeneral: spec.ClashGeneral}
+	im := Intermediate{Nodes: nodes, General: spec.General, MITM: spec.MITM, URLRewrite: spec.URLRewrite, ClashGeneral: spec.ClashGeneral}
 
 	allNames := make([]string, 0, len(nodes))
 	for _, n := range nodes {
@@ -60,6 +62,10 @@ func Assemble(nodes []Node, spec TemplateSpec) Intermediate {
 	im.Groups = append(im.Groups, Group{Name: mainProxyGroup, Type: "select", Members: mainMembers})
 	if spec.IncludeAutoSelect {
 		im.Groups = append(im.Groups, Group{Name: autoSelectGroup, Type: "url-test", Members: allNames})
+	}
+	for _, cg := range spec.CustomGroups {
+		members := append([]string(nil), cg.Members...)
+		im.Groups = append(im.Groups, Group{Name: cg.Name, Type: cg.Type, Members: members, Verbatim: true})
 	}
 
 	for _, c := range spec.Categories {

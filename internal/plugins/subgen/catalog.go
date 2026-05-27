@@ -11,7 +11,7 @@ type Category struct {
 
 var UnifiedCategories = []Category{
 	{Name: "Ad Block", Rulesets: []string{"AdvertisingLite"}, DefaultPolicy: "REJECT"},
-	{Name: "AI Services", Rulesets: []string{"OpenAI"}, DefaultPolicy: "PROXY"},
+	{Name: "AI Services", Rulesets: []string{"AI"}, DefaultPolicy: "PROXY"},
 	{Name: "Telegram", Rulesets: []string{"Telegram"}, DefaultPolicy: "PROXY"},
 	{Name: "Google", Rulesets: []string{"Google"}, DefaultPolicy: "PROXY"},
 	{Name: "Youtube", Rulesets: []string{"YouTube"}, DefaultPolicy: "PROXY"},
@@ -57,11 +57,23 @@ func rulesetDir(target string) (dir, ext string) {
 	return "Surge", "list"
 }
 
-// rulesetURL builds the blackmatrix7 raw URL for one folder + target.
-func rulesetURL(folder, target, base string) string {
+// customRulesetURLs maps a ruleset name to an absolute URL that replaces the
+// blackmatrix7 folder convention. The target file is a classical rule list
+// usable by every target (Surge/ShadowRocket RULE-SET + Clash text rule-provider).
+var customRulesetURLs = map[string]string{
+	"AI": "https://raw.githubusercontent.com/iab0x00/ProxyRules/main/Rule/AI.txt",
+}
+
+// rulesetURL resolves a ruleset name to its remote URL. Custom names map to a
+// fixed absolute URL (same for every target); everything else follows the
+// blackmatrix7 folder convention, per-target.
+func rulesetURL(name, target, base string) string {
+	if u, ok := customRulesetURLs[name]; ok {
+		return u
+	}
 	dir, ext := rulesetDir(target)
 	base = strings.TrimRight(base, "/")
-	return base + "/rule/" + dir + "/" + folder + "/" + folder + "." + ext
+	return base + "/rule/" + dir + "/" + name + "/" + name + "." + ext
 }
 
 // ResolveRuleLines turns one category + policy into the rule line(s) for a

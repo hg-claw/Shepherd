@@ -32,6 +32,20 @@ func TestRulesetURL_SurgeAndClash(t *testing.T) {
 	}
 }
 
+func TestRulesetURL_CustomAbsolute(t *testing.T) {
+	const want = "https://raw.githubusercontent.com/iab0x00/ProxyRules/main/Rule/AI.txt"
+	for _, target := range []string{"surge", "shadowrocket", "clash"} {
+		if got := rulesetURL("AI", target, DefaultRulesetBase); got != want {
+			t.Fatalf("%s: rulesetURL(AI) = %s", target, got)
+		}
+	}
+	// AI Services now references the custom "AI" ruleset, not blackmatrix7 OpenAI.
+	c, _ := categoryByName("AI Services")
+	if len(c.Rulesets) != 1 || c.Rulesets[0] != "AI" {
+		t.Fatalf("AI Services rulesets = %v", c.Rulesets)
+	}
+}
+
 func TestPredefinedTemplatesReferenceKnownCategories(t *testing.T) {
 	known := map[string]bool{}
 	for _, c := range UnifiedCategories {

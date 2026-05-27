@@ -62,12 +62,19 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, rulesetBase string) st
 			rules = append(rules, "MATCH,"+rl.Target)
 		case rl.Ruleset != "":
 			if _, ok := providers[rl.Ruleset]; !ok {
+				url := rulesetURL(rl.Ruleset, "clash", rulesetBase)
+				// blackmatrix7 ships .yaml rule-providers; custom URLs (e.g. a
+				// classical .txt list) use the text format.
+				format, ext := "yaml", "yaml"
+				if !strings.HasSuffix(url, ".yaml") && !strings.HasSuffix(url, ".yml") {
+					format, ext = "text", "txt"
+				}
 				providers[rl.Ruleset] = map[string]any{
 					"type":     "http",
 					"behavior": "classical",
-					"format":   "yaml",
-					"url":      rulesetURL(rl.Ruleset, "clash", rulesetBase),
-					"path":     "./ruleset/" + rl.Ruleset + ".yaml",
+					"format":   format,
+					"url":      url,
+					"path":     "./ruleset/" + rl.Ruleset + "." + ext,
 					"interval": 86400,
 				}
 			}

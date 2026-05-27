@@ -145,3 +145,14 @@ func TestSurge_ProxyLine_VmessTrojanTuic(t *testing.T) {
 		}
 	}
 }
+
+func TestSurge_CustomRulesetURL(t *testing.T) {
+	im := Intermediate{
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"n1"}}},
+		Rules:  []Rule{{Ruleset: "AI", Target: "AI Services"}},
+	}
+	out := (&SurgeRenderer{}).Render(im, "x", DefaultRulesetBase)
+	if !strings.Contains(out, "RULE-SET,https://raw.githubusercontent.com/iab0x00/ProxyRules/main/Rule/AI.txt,AI Services") {
+		t.Fatalf("surge AI rule missing:\n%s", out)
+	}
+}

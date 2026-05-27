@@ -126,3 +126,20 @@ func TestClash_DoesNotCorruptBackslashValues(t *testing.T) {
 		t.Fatalf("password corrupted: got %q want %q", pm["password"], `secretAx`)
 	}
 }
+
+func TestClash_CustomRulesetTextFormat(t *testing.T) {
+	im := Intermediate{
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"n1"}}},
+		Rules:  []Rule{{Ruleset: "AI", Target: "AI Services"}, {Final: true, Target: "PROXY"}},
+	}
+	out := (&ClashRenderer{}).Render(im, "", DefaultRulesetBase)
+	for _, want := range []string{
+		"RULE-SET,AI,AI Services",
+		"format: text",
+		"https://raw.githubusercontent.com/iab0x00/ProxyRules/main/Rule/AI.txt",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("clash custom ruleset missing %q\n%s", want, out)
+		}
+	}
+}

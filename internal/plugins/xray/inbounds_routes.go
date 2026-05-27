@@ -12,6 +12,14 @@ import (
 	"github.com/hg-claw/Shepherd/internal/plugins"
 )
 
+// asyncDeploy is the seam used by POST/PATCH/DELETE handlers to kick off
+// AssembleAndDeploy without blocking the HTTP response. Tests override it
+// with a no-op so the background goroutine doesn't race against t.Cleanup
+// closing the DB while it is mid-query (caught by `go test -race` in CI).
+var asyncDeploy = func(deps plugins.Deps, serverID int64) {
+	go func() { _ = AssembleAndDeploy(context.Background(), deps, serverID) }()
+}
+
 type postInboundBody struct {
 	ServerID          int64  `json:"server_id"`
 	Port              int    `json:"port"`
@@ -120,7 +128,7 @@ func postInboundHandler(deps plugins.Deps) http.HandlerFunc {
 		if err != nil { writeRouteError(w, 500, err.Error()); return }
 
 		// Trigger reassemble + restart in background
-		go func() { _ = AssembleAndDeploy(context.Background(), deps, body.ServerID) }()
+		asyncDeploy(deps, body.ServerID)
 
 		views, _ := store.ListAllWithUpstream(r.Context())
 		for _, v := range views {
@@ -186,7 +194,7 @@ func patchInboundHandler(deps plugins.Deps) http.HandlerFunc {
 		if err := store.Update(r.Context(), id, patch); err != nil {
 			writeRouteError(w, 500, err.Error()); return
 		}
-		go func() { _ = AssembleAndDeploy(context.Background(), deps, row.ServerID) }()
+		asyncDeploy(deps, row.ServerID)
 		views, _ := store.ListAllWithUpstream(r.Context())
 		for _, v := range views {
 			if v.ID == id { writeJSONResp(w, 200, inboundToMap(v)); return }
@@ -217,7 +225,7 @@ func deleteInboundHandler(deps plugins.Deps) http.HandlerFunc {
 		if err := store.Delete(r.Context(), id); err != nil {
 			writeRouteError(w, 500, err.Error()); return
 		}
-		go func() { _ = AssembleAndDeploy(context.Background(), deps, row.ServerID) }()
+		asyncDeploy(deps, row.ServerID)
 		writeJSONResp(w, 200, map[string]any{"ok": true})
 	}
 }

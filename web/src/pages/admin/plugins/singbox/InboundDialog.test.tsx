@@ -138,4 +138,46 @@ describe('singbox/InboundDialog', () => {
       )
     )
   })
+
+  it('sends alias: "" to patchSingboxInbound when alias is cleared in edit mode', async () => {
+    const spy = vi.spyOn(pluginsAPI, 'patchSingboxInbound').mockResolvedValue({ id: 5 } as never)
+    const inbound = {
+      id: 5,
+      server_id: 1,
+      server_name: 'S1',
+      tag: 'landing-abc',
+      alias: 'HK 01',
+      port: 443,
+      role: 'landing' as const,
+      protocol: 'trojan-tls' as const,
+      password: 'hunter2',
+      sni: 'example.com',
+      cert_id: 1,
+      upstream_inbound_id: null,
+      upstream_tag: null,
+      upstream_server_id: null,
+      upstream_server_name: null,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    }
+    render(
+      <InboundDialog serverID={1} initial={inbound} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+
+    // Clear the alias field
+    const aliasInput = screen.getByLabelText(/alias/i)
+    fireEvent.change(aliasInput, { target: { value: '' } })
+
+    // Submit via Save button
+    const saveBtn = screen.getByRole('button', { name: /^save$/i })
+    fireEvent.click(saveBtn)
+
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({ alias: '' }),
+      )
+    )
+  })
 })

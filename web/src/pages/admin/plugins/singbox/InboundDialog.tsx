@@ -155,7 +155,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
         protocol,
       }
 
-      body.alias = alias || undefined
+      body.alias = alias
 
       if (needsUUID(protocol))       body.uuid = uuid
       if (needsPassword(protocol))   body.password = password

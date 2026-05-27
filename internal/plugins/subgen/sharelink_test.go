@@ -2,6 +2,7 @@ package subgen
 
 import (
 	"encoding/base64"
+	"net/url"
 	"testing"
 )
 
@@ -48,6 +49,36 @@ func TestParseShareLinks_AllProtocols(t *testing.T) {
 	}
 	if at := by["AT"]; at.Protocol != "anytls" || at.Password != "atpass" || at.SNI != "at.com" {
 		t.Fatalf("anytls = %+v", at)
+	}
+}
+
+func TestParseShareLinks_WireGuard(t *testing.T) {
+	link := "wg://home.hg.ht:51820?publicKey=" + url.QueryEscape("PUB+KEY=") +
+		"&privateKey=" + url.QueryEscape("PRIV+KEY=") +
+		"&presharedKey=" + url.QueryEscape("PSK+=") +
+		"&ip=10.254.253.3&udp=1&reserved=0,0,0&flag=CN#WG"
+
+	nodes, warns := ParseShareLinks(link)
+	if len(warns) != 0 || len(nodes) != 1 {
+		t.Fatalf("nodes=%d warns=%v", len(nodes), warns)
+	}
+	n := nodes[0]
+	if n.Protocol != "wireguard" || n.Server != "home.hg.ht" || n.Port != 51820 {
+		t.Fatalf("endpoint = %+v", n)
+	}
+	if n.Name != "🇨🇳 WG" {
+		t.Fatalf("name = %q", n.Name)
+	}
+	if n.Extra["private_key"] != "PRIV+KEY=" || n.Extra["public_key"] != "PUB+KEY=" || n.Extra["preshared_key"] != "PSK+=" {
+		t.Fatalf("keys = %+v", n.Extra)
+	}
+	if n.Extra["ip"] != "10.254.253.3" || n.Extra["reserved"] != "0,0,0" || n.Extra["udp"] != true {
+		t.Fatalf("extra = %+v", n.Extra)
+	}
+
+	// missing keys → warning, skipped
+	if ns, ws := ParseShareLinks("wg://h:1?ip=1.2.3.4#X"); len(ns) != 0 || len(ws) != 1 {
+		t.Fatalf("missing-keys: nodes=%d warns=%d", len(ns), len(ws))
 	}
 }
 

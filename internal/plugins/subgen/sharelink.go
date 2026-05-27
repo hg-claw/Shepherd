@@ -48,6 +48,8 @@ func parseShareLink(line string) (Node, error) {
 		return parseURINode(line, "tuic")
 	case strings.HasPrefix(line, "anytls://"):
 		return parseURINode(line, "anytls")
+	case strings.HasPrefix(line, "wireguard://"), strings.HasPrefix(line, "wg://"):
+		return parseWireGuard(line)
 	default:
 		return Node{}, fmt.Errorf("unsupported or unparseable share link")
 	}
@@ -240,6 +242,69 @@ func parseURINode(line, proto string) (Node, error) {
 		n.Insecure = q.Get("insecure") == "1"
 	}
 	return n, nil
+}
+
+func parseWireGuard(line string) (Node, error) {
+	body, name := splitFragment(line)
+	u, err := url.Parse(body)
+	if err != nil {
+		return Node{}, fmt.Errorf("wireguard: parse error")
+	}
+	host := u.Hostname()
+	port, err := strconv.Atoi(u.Port())
+	if err != nil || host == "" {
+		return Node{}, fmt.Errorf("wireguard: missing host/port")
+	}
+	q := u.Query()
+	priv := firstNonEmpty(q.Get("privateKey"), q.Get("private_key"))
+	pub := firstNonEmpty(q.Get("publicKey"), q.Get("public_key"))
+	if priv == "" || pub == "" {
+		return Node{}, fmt.Errorf("wireguard: missing keys")
+	}
+	extra := map[string]any{
+		"private_key": priv,
+		"public_key":  pub,
+		"udp":         q.Get("udp") != "0",
+	}
+	if psk := firstNonEmpty(q.Get("presharedKey"), q.Get("preshared_key")); psk != "" {
+		extra["preshared_key"] = psk
+	}
+	if ip := firstNonEmpty(q.Get("ip"), q.Get("address")); ip != "" {
+		extra["ip"] = ip
+	}
+	if res := q.Get("reserved"); res != "" {
+		extra["reserved"] = res
+	}
+	if m := q.Get("mtu"); m != "" {
+		if mtu, err := strconv.Atoi(m); err == nil {
+			extra["mtu"] = mtu
+		}
+	}
+	return Node{
+		Protocol: "wireguard", Server: host, Port: port,
+		Name: nameOr(withFlag(q.Get("flag"), name), host, port), Extra: extra,
+	}, nil
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// withFlag prepends the country-flag emoji (from a 2-letter code) to name.
+func withFlag(flag, name string) string {
+	f := countryFlag(flag)
+	if f == "" {
+		return name
+	}
+	if name == "" {
+		return f
+	}
+	return f + " " + name
 }
 
 // splitHostPort handles IPv4/host and bracketed IPv6, returning host + numeric port.

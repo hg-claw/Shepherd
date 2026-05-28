@@ -96,6 +96,28 @@ func nodeName(country, server, proto string) string {
 	return server + " " + proto
 }
 
+// certMatchesSNI reports whether sni is covered by certDomain, case-insensitively.
+// True when they are exactly equal, or when certDomain is a "*.base" wildcard and
+// sni is a single-label subdomain of base (not the apex, not multi-label).
+func certMatchesSNI(certDomain, sni string) bool {
+	c := strings.ToLower(strings.TrimSpace(certDomain))
+	s := strings.ToLower(strings.TrimSpace(sni))
+	if c == "" || s == "" {
+		return false
+	}
+	if c == s {
+		return true
+	}
+	if strings.HasPrefix(c, "*.") {
+		base := c[1:] // ".example.com"
+		if strings.HasSuffix(s, base) {
+			label := s[:len(s)-len(base)]
+			return label != "" && !strings.Contains(label, ".")
+		}
+	}
+	return false
+}
+
 // aliasOrDefault returns a trimmed non-empty alias verbatim, else the
 // auto-generated "<flag> <server> <proto>" name.
 func aliasOrDefault(alias string, srv serverLite, proto string) string {
@@ -152,6 +174,7 @@ type singboxLite struct {
 	TransportHost    *string
 	SSMethod         *string
 	ExtraJSON        *string
+	Insecure         bool
 }
 
 func deref(p *string) string {
@@ -199,6 +222,7 @@ func singboxInboundToNode(in singboxLite, srv serverLite) Node {
 			n.Extra = m
 		}
 	}
+	n.Insecure = in.Insecure
 	n.Name = aliasOrDefault(in.Alias, srv, n.Protocol)
 	return n
 }

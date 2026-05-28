@@ -75,6 +75,28 @@ func TestInboundToNode_AliasReplacesName(t *testing.T) {
 	}
 }
 
+func TestCertMatchesSNI(t *testing.T) {
+	cases := []struct {
+		cert, sni string
+		want      bool
+	}{
+		{"vpn.example.com", "vpn.example.com", true},  // exact
+		{"VPN.Example.com", "vpn.example.COM", true},  // case-insensitive
+		{"vpn.example.com", "www.bing.com", false},    // mismatch (camouflage)
+		{"*.example.com", "a.example.com", true},      // wildcard single-label
+		{"*.example.com", "example.com", false},       // wildcard does NOT match apex
+		{"*.example.com", "a.b.example.com", false},   // wildcard does NOT match multi-label
+		{"*.example.com", "example.com.evil.com", false},
+		{"", "a.com", false},  // empty cert
+		{"a.com", "", false},  // empty sni
+	}
+	for _, c := range cases {
+		if got := certMatchesSNI(c.cert, c.sni); got != c.want {
+			t.Errorf("certMatchesSNI(%q,%q)=%v want %v", c.cert, c.sni, got, c.want)
+		}
+	}
+}
+
 func TestDedupeNodeNames(t *testing.T) {
 	nodes := []Node{{Name: "X"}, {Name: "X"}, {Name: "X"}, {Name: "Y"}}
 	dedupeNodeNames(nodes)

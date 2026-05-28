@@ -174,6 +174,25 @@ func TestSurge_CustomGroupVerbatimKeepsDevice(t *testing.T) {
 	}
 }
 
+func TestSurge_InsecureSkipCertVerify(t *testing.T) {
+	mk := func(proto string, insecure bool) string {
+		im := Intermediate{
+			Nodes:  []Node{{Name: "n", Protocol: proto, Server: "1.1.1.1", Port: 443, Password: "p", UUID: "u", SNI: "s.com", Insecure: insecure}},
+			Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"n"}}},
+			Rules:  []Rule{{Final: true, Target: "PROXY"}},
+		}
+		return (&SurgeRenderer{}).Render(im, "x", DefaultRulesetBase)
+	}
+	for _, proto := range []string{"anytls", "hysteria2", "tuic"} {
+		if out := mk(proto, true); !strings.Contains(out, "skip-cert-verify=true") {
+			t.Errorf("%s insecure: missing skip-cert-verify\n%s", proto, out)
+		}
+		if out := mk(proto, false); strings.Contains(out, "skip-cert-verify=true") {
+			t.Errorf("%s secure: unexpected skip-cert-verify\n%s", proto, out)
+		}
+	}
+}
+
 func TestSurge_URLRewrite(t *testing.T) {
 	base := Intermediate{
 		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"n1"}}},

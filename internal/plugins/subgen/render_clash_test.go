@@ -144,6 +144,18 @@ func TestClash_CustomRulesetTextFormat(t *testing.T) {
 	}
 }
 
+func TestClash_TUICInsecureSkipCertVerify(t *testing.T) {
+	im := Intermediate{
+		Nodes:  []Node{{Name: "t", Protocol: "tuic", Server: "1.1.1.1", Port: 443, Password: "p", UUID: "u", SNI: "s.com", Insecure: true}},
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"t"}}},
+		Rules:  []Rule{{Final: true, Target: "PROXY"}},
+	}
+	out := (&ClashRenderer{}).Render(im, "x", DefaultRulesetBase)
+	if !strings.Contains(out, "skip-cert-verify: true") {
+		t.Fatalf("tuic insecure: missing skip-cert-verify\n%s", out)
+	}
+}
+
 func TestClash_FiltersDevice(t *testing.T) {
 	im := Intermediate{
 		Groups: []Group{{Name: "Home", Type: "select", Members: []string{"DEVICE:HomeMac", "DIRECT"}, Verbatim: true}},

@@ -52,6 +52,10 @@ type Client struct {
 	// configures it directly.
 	NetqualitySampler *netqualitysampler.Sampler
 
+	// HostInventory is the static hardware inventory, collected once at startup
+	// and sent on each WS (re)connect.
+	HostInventory agentapi.HostInventory
+
 	mu      sync.Mutex
 	conn    *websocket.Conn
 	runners *runners
@@ -219,6 +223,9 @@ func (c *Client) dialAndRun(ctx context.Context) error {
 	})
 	if err := c.writeJSON(hb); err != nil {
 		return err
+	}
+	if env, err := agentapi.Frame(agentapi.TypeHostInventory, c.HostInventory); err == nil {
+		_ = c.writeJSON(env) // best-effort; static, re-sent on next connect
 	}
 
 	stop := make(chan struct{})

@@ -11,6 +11,7 @@ import (
 
 	"github.com/hg-claw/Shepherd/internal/agent/collector"
 	"github.com/hg-claw/Shepherd/internal/agent/fingerprint"
+	"github.com/hg-claw/Shepherd/internal/agent/hostinfo"
 	"github.com/hg-claw/Shepherd/internal/agent/netqualitysampler"
 	"github.com/hg-claw/Shepherd/internal/agent/singboxv2sampler"
 	"github.com/hg-claw/Shepherd/internal/agent/state"
@@ -76,6 +77,8 @@ func main() {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
+
+	client.HostInventory = hostinfo.Collect(ctx)
 
 	go col.Run(ctx)
 	if err := client.Run(ctx); err != nil {

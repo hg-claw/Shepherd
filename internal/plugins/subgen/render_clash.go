@@ -188,6 +188,9 @@ func clashProxy(n Node) map[string]any {
 		if n.SNI != "" {
 			p["sni"] = n.SNI
 		}
+		if n.Insecure {
+			p["skip-cert-verify"] = true
+		}
 		if cc, ok := n.Extra["congestion_control"].(string); ok && cc != "" {
 			p["congestion-controller"] = cc
 		}

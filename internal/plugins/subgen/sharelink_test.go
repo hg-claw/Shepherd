@@ -15,7 +15,7 @@ func TestParseShareLinks_AllProtocols(t *testing.T) {
 		"vless://uuid-1@2.2.2.2:443?security=reality&pbk=PBK&sid=SID&flow=xtls-rprx-vision&sni=example.com&type=ws&path=/w&host=v.com#🇺🇸 US\n" +
 		"trojan://tjpass@3.3.3.3:443?sni=t.com&type=ws&path=/p&host=h.com&allowInsecure=1#JP\n" +
 		"hysteria2://hy2pass@4.4.4.4:443?sni=h2.com&insecure=1#HY2\n" +
-		"tuic://uuid-2:tpass@5.5.5.5:443?congestion_control=bbr&sni=tu.com#TUIC\n" +
+		"tuic://uuid-2:tpass@5.5.5.5:443?congestion_control=bbr&sni=tu.com&insecure=1#TUIC\n" +
 		"anytls://atpass@6.6.6.6:443?sni=at.com#AT\n" +
 		"\n" +
 		"not-a-link\n"
@@ -44,7 +44,7 @@ func TestParseShareLinks_AllProtocols(t *testing.T) {
 	if hy := by["HY2"]; hy.Protocol != "hysteria2" || hy.Password != "hy2pass" || hy.SNI != "h2.com" || !hy.Insecure {
 		t.Fatalf("hy2 = %+v", hy)
 	}
-	if tu := by["TUIC"]; tu.Protocol != "tuic" || tu.UUID != "uuid-2" || tu.Password != "tpass" || tu.SNI != "tu.com" || tu.Extra["congestion_control"] != "bbr" {
+	if tu := by["TUIC"]; tu.Protocol != "tuic" || tu.UUID != "uuid-2" || tu.Password != "tpass" || tu.SNI != "tu.com" || tu.Extra["congestion_control"] != "bbr" || !tu.Insecure {
 		t.Fatalf("tuic = %+v", tu)
 	}
 	if at := by["AT"]; at.Protocol != "anytls" || at.Password != "atpass" || at.SNI != "at.com" {

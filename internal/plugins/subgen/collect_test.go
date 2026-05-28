@@ -42,7 +42,7 @@ func TestCollectNodes_Singbox(t *testing.T) {
 	d.MustExec(`CREATE TABLE singbox_inbounds (
 		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, alias TEXT, port INTEGER, role TEXT, relay_mode TEXT, protocol TEXT,
 		uuid TEXT, flow TEXT, password TEXT, sni TEXT, reality_public_key TEXT, reality_short_id TEXT,
-		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT)`)
+		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT, upstream_inbound_id INTEGER)`)
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (1,'hk','9.9.9.9','HK')`)
 	d.MustExec(`INSERT INTO singbox_inbounds(id,server_id,tag,port,role,relay_mode,protocol,password,sni,extra_json)
 	            VALUES (20,1,'h',443,'landing','proxy','hysteria2','pw','h.example.com','{"up_mbps":100}')`)
@@ -56,13 +56,14 @@ func TestCollectNodes_Singbox(t *testing.T) {
 }
 
 func TestCollectNodes_SkipsForwardRelay(t *testing.T) {
+	// forward relay with missing upstream is skipped
 	s := newStore(t)
 	ctx := context.Background()
 	d := s.DB
 	d.MustExec(`CREATE TABLE singbox_inbounds (
 		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, alias TEXT, port INTEGER, role TEXT, relay_mode TEXT, protocol TEXT,
 		uuid TEXT, flow TEXT, password TEXT, sni TEXT, reality_public_key TEXT, reality_short_id TEXT,
-		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT)`)
+		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT, upstream_inbound_id INTEGER)`)
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (1,'hk','9.9.9.9','HK')`)
 	d.MustExec(`INSERT INTO singbox_inbounds(id,server_id,tag,port,role,relay_mode,protocol)
 	            VALUES (30,1,'fwd',443,'relay','forward','hysteria2')`)
@@ -75,6 +76,40 @@ func TestCollectNodes_SkipsForwardRelay(t *testing.T) {
 	}
 	if len(warns) != 1 {
 		t.Fatalf("expected 1 skip warning, got %v", warns)
+	}
+}
+
+func TestCollectNodes_ForwardRelayUsesLandingCreds(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	d := s.DB
+	d.MustExec(`CREATE TABLE singbox_inbounds (
+		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, alias TEXT, port INTEGER, role TEXT, relay_mode TEXT, protocol TEXT,
+		uuid TEXT, flow TEXT, password TEXT, sni TEXT, reality_public_key TEXT, reality_short_id TEXT,
+		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT, upstream_inbound_id INTEGER)`)
+	d.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (1,'jp','1.1.1.1','JP')`)
+	d.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (2,'hk','2.2.2.2','HK')`)
+	d.MustExec(`INSERT INTO singbox_inbounds(id,server_id,tag,port,role,relay_mode,protocol,uuid,sni,reality_public_key,reality_short_id)
+	            VALUES (40,1,'land',8443,'landing','proxy','vless-reality','LU','landing.example.com','LPBK','ab')`)
+	d.MustExec(`INSERT INTO singbox_inbounds(id,server_id,tag,port,role,relay_mode,protocol,upstream_inbound_id)
+	            VALUES (41,2,'rly',443,'relay','forward','vless-reality',40)`)
+
+	nodes, warns, err := CollectNodes(ctx, d, []Selection{{Source: "singbox", InboundID: 41}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(warns) != 0 {
+		t.Fatalf("unexpected warns: %v", warns)
+	}
+	if len(nodes) != 1 {
+		t.Fatalf("expected 1 node, got %+v", nodes)
+	}
+	n := nodes[0]
+	if n.Server != "2.2.2.2" || n.Port != 443 {
+		t.Errorf("relay endpoint: got %s:%d", n.Server, n.Port)
+	}
+	if n.Protocol != "vless" || n.UUID != "LU" || n.SNI != "landing.example.com" || n.RealityPublicKey != "LPBK" || n.RealityShortID != "ab" {
+		t.Errorf("relay should use landing creds: %+v", n)
 	}
 }
 

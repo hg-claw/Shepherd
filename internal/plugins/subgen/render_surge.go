@@ -69,10 +69,16 @@ func (r *SurgeRenderer) proxyLine(n Node) string {
 		if n.SNI != "" {
 			b.WriteString(", sni=" + n.SNI)
 		}
+		if n.Insecure {
+			b.WriteString(", skip-cert-verify=true")
+		}
 	case "tuic":
 		fmt.Fprintf(&b, "%s = tuic, %s, %d, password=%s, uuid=%s", n.Name, n.Server, n.Port, n.Password, n.UUID)
 		if n.SNI != "" {
 			b.WriteString(", sni=" + n.SNI)
+		}
+		if n.Insecure {
+			b.WriteString(", skip-cert-verify=true")
 		}
 		if cc, ok := n.Extra["congestion_control"].(string); ok && cc != "" {
 			b.WriteString(", congestion-controller=" + cc)
@@ -81,6 +87,9 @@ func (r *SurgeRenderer) proxyLine(n Node) string {
 		fmt.Fprintf(&b, "%s = anytls, %s, %d, password=%s", n.Name, n.Server, n.Port, n.Password)
 		if n.SNI != "" {
 			b.WriteString(", sni=" + n.SNI)
+		}
+		if n.Insecure {
+			b.WriteString(", skip-cert-verify=true")
 		}
 	}
 	return b.String()

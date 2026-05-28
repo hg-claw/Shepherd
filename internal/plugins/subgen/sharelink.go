@@ -233,6 +233,7 @@ func parseURINode(line, proto string) (Node, error) {
 		n.UUID = u.User.Username()
 		n.Password, _ = u.User.Password()
 		n.SNI = q.Get("sni")
+		n.Insecure = q.Get("insecure") == "1"
 		if cc := q.Get("congestion_control"); cc != "" {
 			n.Extra = map[string]any{"congestion_control": cc}
 		}

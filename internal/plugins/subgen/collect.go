@@ -84,25 +84,36 @@ func collectXray(ctx context.Context, db *sqlx.DB, id int64) (Node, string, erro
 }
 
 type singboxRow struct {
-	Tag           string         `db:"tag"`
-	Alias         string         `db:"alias"`
-	Port          int            `db:"port"`
-	Protocol      string         `db:"protocol"`
-	Role          string         `db:"role"`
-	RelayMode     string         `db:"relay_mode"`
-	UUID          sql.NullString `db:"uuid"`
-	Flow          sql.NullString `db:"flow"`
-	Password      sql.NullString `db:"password"`
-	SNI           sql.NullString `db:"sni"`
-	RealityPub    sql.NullString `db:"reality_public_key"`
-	RealitySID    sql.NullString `db:"reality_short_id"`
-	TransportPath sql.NullString `db:"transport_path"`
-	TransportHost sql.NullString `db:"transport_host"`
-	SSMethod      sql.NullString `db:"ss_method"`
-	ExtraJSON     sql.NullString `db:"extra_json"`
-	SrvName       string         `db:"srv_name"`
-	SrvHost       sql.NullString `db:"srv_host"`
-	SrvCountry    sql.NullString `db:"srv_country"`
+	Tag             string         `db:"tag"`
+	Alias           string         `db:"alias"`
+	Port            int            `db:"port"`
+	Protocol        string         `db:"protocol"`
+	Role            string         `db:"role"`
+	RelayMode       string         `db:"relay_mode"`
+	UUID            sql.NullString `db:"uuid"`
+	Flow            sql.NullString `db:"flow"`
+	Password        sql.NullString `db:"password"`
+	SNI             sql.NullString `db:"sni"`
+	RealityPub      sql.NullString `db:"reality_public_key"`
+	RealitySID      sql.NullString `db:"reality_short_id"`
+	TransportPath   sql.NullString `db:"transport_path"`
+	TransportHost   sql.NullString `db:"transport_host"`
+	SSMethod        sql.NullString `db:"ss_method"`
+	ExtraJSON       sql.NullString `db:"extra_json"`
+	UpProtocol      sql.NullString `db:"upstream_protocol"`
+	UpUUID          sql.NullString `db:"upstream_uuid"`
+	UpFlow          sql.NullString `db:"upstream_flow"`
+	UpPassword      sql.NullString `db:"upstream_password"`
+	UpSNI           sql.NullString `db:"upstream_sni"`
+	UpRealityPub    sql.NullString `db:"upstream_reality_public_key"`
+	UpRealitySID    sql.NullString `db:"upstream_reality_short_id"`
+	UpTransportPath sql.NullString `db:"upstream_transport_path"`
+	UpTransportHost sql.NullString `db:"upstream_transport_host"`
+	UpSSMethod      sql.NullString `db:"upstream_ss_method"`
+	UpExtraJSON     sql.NullString `db:"upstream_extra_json"`
+	SrvName         string         `db:"srv_name"`
+	SrvHost         sql.NullString `db:"srv_host"`
+	SrvCountry      sql.NullString `db:"srv_country"`
 }
 
 func ns(v sql.NullString) *string {
@@ -119,8 +130,16 @@ func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, string, e
 		SELECT i.tag, COALESCE(i.alias,'') AS alias, i.port, i.protocol, i.role, i.relay_mode, i.uuid, i.flow, i.password, i.sni,
 		       i.reality_public_key, i.reality_short_id, i.transport_path, i.transport_host,
 		       i.ss_method, i.extra_json,
+		       u.protocol AS upstream_protocol, u.uuid AS upstream_uuid, u.flow AS upstream_flow,
+		       u.password AS upstream_password, u.sni AS upstream_sni,
+		       u.reality_public_key AS upstream_reality_public_key, u.reality_short_id AS upstream_reality_short_id,
+		       u.transport_path AS upstream_transport_path, u.transport_host AS upstream_transport_host,
+		       u.ss_method AS upstream_ss_method, u.extra_json AS upstream_extra_json,
 		       s.name AS srv_name, s.ssh_host AS srv_host, s.country_code AS srv_country
-		  FROM singbox_inbounds i JOIN servers s ON s.id=i.server_id WHERE i.id=$1`, id)
+		  FROM singbox_inbounds i
+		  JOIN servers s ON s.id=i.server_id
+		  LEFT JOIN singbox_inbounds u ON u.id=i.upstream_inbound_id
+		 WHERE i.id=$1`, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Node{}, fmt.Sprintf("singbox inbound %d not found", id), nil
@@ -131,7 +150,20 @@ func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, string, e
 		return Node{}, fmt.Sprintf("singbox %s on %s: no ssh_host, skipped", r.Tag, r.SrvName), nil
 	}
 	if r.Role == "relay" && r.RelayMode == "forward" {
-		return Node{}, fmt.Sprintf("singbox %s on %s: forward-mode relay not supported in subscriptions, skipped", r.Tag, r.SrvName), nil
+		// Forward relays are transparent forwarders: the client connects to the
+		// relay's host:port but speaks the LANDING's protocol/creds. Build the
+		// node from the upstream landing, keeping the relay's own server:port.
+		if !r.UpProtocol.Valid || r.UpProtocol.String == "" {
+			return Node{}, fmt.Sprintf("singbox %s on %s: forward relay upstream landing missing, skipped", r.Tag, r.SrvName), nil
+		}
+		n := singboxInboundToNode(singboxLite{
+			Tag: r.Tag, Alias: r.Alias, Port: r.Port, Protocol: r.UpProtocol.String, Role: r.Role, RelayMode: r.RelayMode,
+			UUID: ns(r.UpUUID), Flow: ns(r.UpFlow), Password: ns(r.UpPassword), SNI: ns(r.UpSNI),
+			RealityPublicKey: ns(r.UpRealityPub), RealityShortID: ns(r.UpRealitySID),
+			TransportPath: ns(r.UpTransportPath), TransportHost: ns(r.UpTransportHost),
+			SSMethod: ns(r.UpSSMethod), ExtraJSON: ns(r.UpExtraJSON),
+		}, serverLite{Name: r.SrvName, Host: r.SrvHost.String, Country: r.SrvCountry.String})
+		return n, "", nil
 	}
 	n := singboxInboundToNode(singboxLite{
 		Tag: r.Tag, Alias: r.Alias, Port: r.Port, Protocol: r.Protocol, Role: r.Role, RelayMode: r.RelayMode,

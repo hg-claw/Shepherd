@@ -249,6 +249,47 @@ func TestServersAPI_ScriptInstall_NameRequired(t *testing.T) {
 	}
 }
 
+func TestServersAPI_Inventory(t *testing.T) {
+	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	t.Cleanup(func() { _ = d.Close() })
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+
+	svc := &serversvc.Service{DB: d}
+	q := &telemetrysvc.Query{DB: d}
+	a := &ServersAPI{Servers: svc, Query: q}
+
+	srv, _ := svc.Create(context.Background(), serversvc.CreateInput{Name: "inv-host"})
+	sid := srv.ID
+
+	ing := &telemetrysvc.Ingest{DB: d}
+	_ = ing.WriteHostInventory(context.Background(), sid, agentapi.HostInventory{
+		CPUPhysical: 4, CPULogical: 8, CPUModel: "Xeon", MemTotal: 1 << 30, DiskTotal: 2 << 30,
+		GPUs: []agentapi.GPU{{Name: "RTX 4090", VRAMMiB: 24564}},
+	})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/api/servers/"+strconv.FormatInt(sid, 10)+"/inventory", nil)
+	a.Inventory(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, want := range []string{`"cpu_physical":4`, `"cpu_logical":8`, `"disk_total":2147483648`, `"RTX 4090"`, `"vram_mib":24564`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("body missing %q: %s", want, body)
+		}
+	}
+
+	// a different server with no inventory → null body, 200
+	rec2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest("GET", "/api/servers/99999/inventory", nil)
+	a.Inventory(rec2, req2)
+	if rec2.Code != 200 || strings.TrimSpace(rec2.Body.String()) != "null" {
+		t.Fatalf("missing inventory: code=%d body=%q", rec2.Code, rec2.Body.String())
+	}
+}
+
 func TestBuildInstallCommand(t *testing.T) {
 	cases := []struct {
 		name           string

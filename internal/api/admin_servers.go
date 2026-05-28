@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -216,6 +217,37 @@ func (a *ServersAPI) Telemetry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, pts)
+}
+
+// inventoryResponse is the inventory row with GPUs parsed for the client.
+type inventoryResponse struct {
+	*telemetrysvc.HostInventoryRow
+	GPUs []agentapi.GPU `json:"gpus"`
+}
+
+func (a *ServersAPI) Inventory(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID2(r, "/api/servers/", "/inventory")
+	if !ok {
+		writeError(w, 400, "bad path")
+		return
+	}
+	row, err := a.Query.HostInventory(r.Context(), id)
+	if err != nil {
+		writeError(w, 400, err.Error())
+		return
+	}
+	if row == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte("null\n"))
+		return
+	}
+	gpus := []agentapi.GPU{} // never null — UI relies on an array
+	_ = json.Unmarshal([]byte(row.GPUsJSON), &gpus)
+	if gpus == nil {
+		gpus = []agentapi.GPU{}
+	}
+	writeJSON(w, 200, inventoryResponse{HostInventoryRow: row, GPUs: gpus})
 }
 
 // pathID2 extracts the numeric segment between two fixed wrappers.
@@ -450,7 +482,7 @@ type scriptInstallReq struct {
 	// CN routes both the script URL and the install-time release-asset
 	// downloads through https://gh-proxy.com/. Set when the target host
 	// is in mainland China and can't reach github.com directly.
-	CN           bool   `json:"cn"`
+	CN bool `json:"cn"`
 }
 
 // ScriptInstall creates a server row with no SSH credentials (the agent
@@ -571,7 +603,7 @@ type batchUpdateReq struct {
 	ServerIDs []int64 `json:"server_ids"`
 	// CN routes every spawned install through the gh-proxy mirror.
 	// Pass once per batch; applies to every server in the request.
-	CN        bool    `json:"cn"`
+	CN bool `json:"cn"`
 }
 
 type batchUpdateResult struct {

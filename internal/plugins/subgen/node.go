@@ -174,6 +174,7 @@ type singboxLite struct {
 	TransportHost    *string
 	SSMethod         *string
 	ExtraJSON        *string
+	Insecure         bool
 }
 
 func deref(p *string) string {
@@ -221,6 +222,7 @@ func singboxInboundToNode(in singboxLite, srv serverLite) Node {
 			n.Extra = m
 		}
 	}
+	n.Insecure = in.Insecure
 	n.Name = aliasOrDefault(in.Alias, srv, n.Protocol)
 	return n
 }

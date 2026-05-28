@@ -111,6 +111,8 @@ type singboxRow struct {
 	UpTransportHost sql.NullString `db:"upstream_transport_host"`
 	UpSSMethod      sql.NullString `db:"upstream_ss_method"`
 	UpExtraJSON     sql.NullString `db:"upstream_extra_json"`
+	CertDomain      sql.NullString `db:"cert_domain"`
+	UpCertDomain    sql.NullString `db:"upstream_cert_domain"`
 	SrvName         string         `db:"srv_name"`
 	SrvHost         sql.NullString `db:"srv_host"`
 	SrvCountry      sql.NullString `db:"srv_country"`
@@ -135,10 +137,13 @@ func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, string, e
 		       u.reality_public_key AS upstream_reality_public_key, u.reality_short_id AS upstream_reality_short_id,
 		       u.transport_path AS upstream_transport_path, u.transport_host AS upstream_transport_host,
 		       u.ss_method AS upstream_ss_method, u.extra_json AS upstream_extra_json,
+		       c.domain AS cert_domain, uc.domain AS upstream_cert_domain,
 		       s.name AS srv_name, s.ssh_host AS srv_host, s.country_code AS srv_country
 		  FROM singbox_inbounds i
 		  JOIN servers s ON s.id=i.server_id
 		  LEFT JOIN singbox_inbounds u ON u.id=i.upstream_inbound_id
+		  LEFT JOIN singbox_certificates c ON c.id=i.cert_id
+		  LEFT JOIN singbox_certificates uc ON uc.id=u.cert_id
 		 WHERE i.id=$1`, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -162,6 +167,7 @@ func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, string, e
 			RealityPublicKey: ns(r.UpRealityPub), RealityShortID: ns(r.UpRealitySID),
 			TransportPath: ns(r.UpTransportPath), TransportHost: ns(r.UpTransportHost),
 			SSMethod: ns(r.UpSSMethod), ExtraJSON: ns(r.UpExtraJSON),
+			Insecure: certDomainMismatch(r.UpCertDomain.String, r.UpSNI),
 		}, serverLite{Name: r.SrvName, Host: r.SrvHost.String, Country: r.SrvCountry.String})
 		return n, "", nil
 	}
@@ -171,6 +177,16 @@ func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, string, e
 		RealityPublicKey: ns(r.RealityPub), RealityShortID: ns(r.RealitySID),
 		TransportPath: ns(r.TransportPath), TransportHost: ns(r.TransportHost),
 		SSMethod: ns(r.SSMethod), ExtraJSON: ns(r.ExtraJSON),
+		Insecure: certDomainMismatch(r.CertDomain.String, r.SNI),
 	}, serverLite{Name: r.SrvName, Host: r.SrvHost.String, Country: r.SrvCountry.String})
 	return n, "", nil
+}
+
+// certDomainMismatch reports whether a cert is present with a non-empty SNI that
+// the cert does not cover — i.e. the client must skip cert verification.
+func certDomainMismatch(certDomain string, sni sql.NullString) bool {
+	if certDomain == "" || !sni.Valid || sni.String == "" {
+		return false
+	}
+	return !certMatchesSNI(certDomain, sni.String)
 }

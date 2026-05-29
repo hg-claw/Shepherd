@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
@@ -14,6 +15,10 @@ import (
 	"github.com/hg-claw/Shepherd/internal/serversvc"
 	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
 )
+
+// maxPublicLiveNetConns is the global cap on concurrent anonymous
+// LiveNetWS connections. Excess connections are rejected with 503.
+const maxPublicLiveNetConns = 256
 
 type PublicAPI struct {
 	Servers      *serversvc.Service
@@ -35,6 +40,7 @@ type PublicAPI struct {
 	// silently downgraded by the helper.
 	NetqualityHistory func(ctx context.Context, serverID int64, rng string) []NetqualityISPHistoryRow
 	statusLimit       *tokenRateLimiter
+	liveNetConns      atomic.Int64
 }
 
 // NetqualityISPSummary is one ISP's recent average RTT/loss for a
@@ -310,6 +316,18 @@ func (t *taggingConn) WriteJSON(v any) error {
 	return t.inner.WriteJSON(wallLiveFrame{ServerID: t.serverID, TS: s.TS, RxBps: s.RxBps, TxBps: s.TxBps})
 }
 
+// tryAcquireLiveNetSlot reserves a public live-net connection slot, returning
+// false when the global cap is already reached.
+func (a *PublicAPI) tryAcquireLiveNetSlot() bool {
+	if a.liveNetConns.Add(1) > maxPublicLiveNetConns {
+		a.liveNetConns.Add(-1)
+		return false
+	}
+	return true
+}
+
+func (a *PublicAPI) releaseLiveNetSlot() { a.liveNetConns.Add(-1) }
+
 // LiveNetWS streams ~1s live network throughput for every opted-in server to an
 // anonymous public browser. One socket, multiplexed: the browser conn is
 // subscribed to each show_on_public server in the hub via a taggingConn.
@@ -319,6 +337,11 @@ func (a *PublicAPI) LiveNetWS(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 503, "unavailable")
 		return
 	}
+	if !a.tryAcquireLiveNetSlot() {
+		writeError(w, 503, "too many live connections")
+		return
+	}
+	defer a.releaseLiveNetSlot()
 	all, err := a.Servers.List(r.Context())
 	if err != nil {
 		writeError(w, 500, err.Error())

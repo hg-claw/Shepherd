@@ -10,6 +10,25 @@ type captureConn struct{ got []any }
 
 func (c *captureConn) WriteJSON(v any) error { c.got = append(c.got, v); return nil }
 
+func TestPublicLiveNetSlotCap(t *testing.T) {
+	a := &PublicAPI{}
+	// acquire up to the cap
+	for i := 0; i < maxPublicLiveNetConns; i++ {
+		if !a.tryAcquireLiveNetSlot() {
+			t.Fatalf("acquire %d should succeed", i)
+		}
+	}
+	// next one is rejected
+	if a.tryAcquireLiveNetSlot() {
+		t.Fatal("acquire past cap should fail")
+	}
+	// release one, then acquire succeeds again
+	a.releaseLiveNetSlot()
+	if !a.tryAcquireLiveNetSlot() {
+		t.Fatal("acquire after release should succeed")
+	}
+}
+
 func TestTaggingConn_WrapsWithServerID(t *testing.T) {
 	inner := &captureConn{}
 	tc := &taggingConn{serverID: 42, inner: inner}

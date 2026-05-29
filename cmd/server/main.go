@@ -190,7 +190,7 @@ func main() {
 		Settings:        settingsStore,
 		OnSandboxChange: sandboxPusher.PushAll,
 	}
-	public := &api.PublicAPI{Servers: serverSvc, Settings: settingsStore, Query: tQuery, Hub: hub, Tokens: agentSvc, BuildVersion: cfg.BuildVersion}
+	public := &api.PublicAPI{Servers: serverSvc, Settings: settingsStore, Query: tQuery, Hub: hub, Tokens: agentSvc, BuildVersion: cfg.BuildVersion, LiveNet: liveNetHub}
 	// Public-wall augmentation: when the netquality plugin is linked
 	// (it always is in this binary), fold its per-ISP RTT averages into
 	// each public card. The closure copies the typed plugin result into

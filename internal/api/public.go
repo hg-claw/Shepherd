@@ -8,7 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 	"github.com/hg-claw/Shepherd/internal/agentsvc"
+	"github.com/hg-claw/Shepherd/internal/livenet"
 	"github.com/hg-claw/Shepherd/internal/serversvc"
 	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
 )
@@ -20,6 +22,9 @@ type PublicAPI struct {
 	Hub          *agentsvc.Hub
 	Tokens       *agentsvc.Service // for AgentStatus token lookup
 	BuildVersion string            // injected from cfg.BuildVersion; surfaced via /api/version
+	// LiveNet is the live-net hub used to stream per-server throughput to
+	// anonymous public browsers. Optional — nil disables the endpoint.
+	LiveNet *livenet.Hub
 	// NetqualitySummary is set by main.go to the netquality plugin's
 	// LatestPerISP helper. Left nil in tests / when the plugin isn't
 	// linked; nil-safe (the public list handler skips the augmentation).
@@ -280,6 +285,70 @@ func (a *PublicAPI) Healthz(w http.ResponseWriter, _ *http.Request) {
 // and 200 with {online, last_seen_at} otherwise.
 //
 // `online` is true if agent_last_seen is non-null and within the last 60s.
+// wallLiveFrame is one live-net sample tagged with its server, streamed to the
+// public wall's multiplexed WebSocket.
+type wallLiveFrame struct {
+	ServerID int64     `json:"server_id"`
+	TS       time.Time `json:"ts"`
+	RxBps    int64     `json:"rx_bps"`
+	TxBps    int64     `json:"tx_bps"`
+}
+
+// taggingConn adapts a single browser conn into N per-server hub watchers,
+// tagging each LiveNetSample with its server_id. The inner conn (wsLiveConn)
+// serializes the concurrent writes from those watchers via its own mutex.
+type taggingConn struct {
+	serverID int64
+	inner    livenet.Conn
+}
+
+func (t *taggingConn) WriteJSON(v any) error {
+	s, ok := v.(agentapi.LiveNetSample)
+	if !ok {
+		return nil // hub only ever sends LiveNetSample
+	}
+	return t.inner.WriteJSON(wallLiveFrame{ServerID: t.serverID, TS: s.TS, RxBps: s.RxBps, TxBps: s.TxBps})
+}
+
+// LiveNetWS streams ~1s live network throughput for every opted-in server to an
+// anonymous public browser. One socket, multiplexed: the browser conn is
+// subscribed to each show_on_public server in the hub via a taggingConn.
+// GET /api/public/net-live/ws
+func (a *PublicAPI) LiveNetWS(w http.ResponseWriter, r *http.Request) {
+	if a.LiveNet == nil {
+		writeError(w, 503, "unavailable")
+		return
+	}
+	all, err := a.Servers.List(r.Context())
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	conn, err := liveNetUpgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
+	defer func() { _ = conn.Close() }()
+	shared := &wsLiveConn{conn: conn}
+	var detaches []func()
+	for _, s := range all {
+		if !s.ShowOnPublic {
+			continue
+		}
+		detaches = append(detaches, a.LiveNet.Subscribe(s.ID, &taggingConn{serverID: s.ID, inner: shared}))
+	}
+	defer func() {
+		for _, d := range detaches {
+			d()
+		}
+	}()
+	for {
+		if _, _, err := conn.ReadMessage(); err != nil {
+			return
+		}
+	}
+}
+
 func (a *PublicAPI) AgentStatus(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if token == "" {

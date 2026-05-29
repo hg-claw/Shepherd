@@ -135,6 +135,12 @@ func (i *Ingest) WriteSample(ctx context.Context, serverID int64, t agentapi.Tel
 			return err
 		}
 	}
-	_, err := i.DB.ExecContext(ctx, "UPDATE servers SET agent_last_seen=$1 WHERE id=$2", t.TS.UTC(), serverID)
+	// Liveness is the server's receipt time, NOT the agent-supplied t.TS: a
+	// behind/mis-NTP'd agent clock would otherwise write a stale last_seen,
+	// making the public wall show "offline" while the agent is actively
+	// connected and reporting. (The sample's own ts above keeps t.TS — that's
+	// the agent's measurement time for the time-series.) Matches the heartbeat
+	// handler, which already bumps agent_last_seen with time.Now().UTC().
+	_, err := i.DB.ExecContext(ctx, "UPDATE servers SET agent_last_seen=$1 WHERE id=$2", time.Now().UTC(), serverID)
 	return err
 }

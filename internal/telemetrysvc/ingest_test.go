@@ -131,3 +131,35 @@ func TestWriteSample_PersistsAndBumpsLastSeen(t *testing.T) {
 		t.Error("agent_last_seen not bumped")
 	}
 }
+
+// TestWriteSample_LastSeenUsesServerClock guards the agent/server clock-skew
+// bug: liveness must be measured by the server's receipt time, never the
+// agent-supplied Telemetry.TS. A telemetry sample carrying a TS far in the past
+// (a behind/mis-NTP'd agent clock) must still bump agent_last_seen to ~now, so
+// the public wall's `time.Since(agent_last_seen)` freshness check stays accurate
+// while the agent is actively reporting.
+func TestWriteSample_LastSeenUsesServerClock(t *testing.T) {
+	ing, sid := newIngest(t)
+	// Agent clock lags the server by 10 minutes.
+	staleTS := time.Now().UTC().Add(-10 * time.Minute)
+	tt := agentapi.Telemetry{TS: staleTS, CPUPct: 1, MemUsed: 1, MemTotal: 2}
+	if err := ing.WriteSample(context.Background(), sid, tt); err != nil {
+		t.Fatal(err)
+	}
+	var seen time.Time
+	if err := ing.DB.Get(&seen, "SELECT agent_last_seen FROM servers WHERE id=?", sid); err != nil {
+		t.Fatal(err)
+	}
+	// Must reflect server receipt time (~now), NOT the stale agent TS.
+	if d := time.Since(seen); d > time.Minute {
+		t.Fatalf("agent_last_seen is %v old — bumped with agent clock, not server clock (skew bug)", d)
+	}
+	// And the time-series sample keeps the agent's measurement timestamp.
+	var sampleTS time.Time
+	if err := ing.DB.Get(&sampleTS, "SELECT ts FROM telemetry_samples_30s WHERE server_id=?", sid); err != nil {
+		t.Fatal(err)
+	}
+	if sampleTS.UTC().Sub(staleTS).Abs() > 2*time.Second {
+		t.Fatalf("sample ts should keep the agent TS %v, got %v", staleTS, sampleTS)
+	}
+}

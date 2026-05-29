@@ -19,7 +19,19 @@
     "no_servers": "暂无公开展示的服务器",
     "ungrouped": "未分组",
     "stat": {
-      "total": "节点"
+      "total": "节点",
+      "nodes": "节点",
+      "realtime": "实时",
+      "traffic": "流量"
+    },
+    "col": {
+      "node": "节点",
+      "platform": "平台",
+      "memory": "内存",
+      "disk": "磁盘",
+      "network": "网络 ↓↑",
+      "traffic": "流量 ↓↑",
+      "load": "负载"
     }
   },
   "public_detail": {
@@ -143,6 +155,7 @@
     "not-installed": "未安装"
   },
   "view": {
+    "list": "列表",
     "grid": "卡片",
     "table": "表格"
   },

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -43,6 +43,7 @@ beforeAll(() => {
 // Shared mutable refs so individual tests can override per-hook data
 let mockInventory: any = null
 let mockTraffic: any = undefined
+let mockLiveNet: any = { rx: null, tx: null, rxSeries: [], txSeries: [], connected: false }
 
 vi.mock('@/api/servers', () => ({
   useServer: () => ({ data: baseServer }),
@@ -58,6 +59,10 @@ vi.mock('@/api/servers', () => ({
   useHostTraffic: () => ({ data: mockTraffic }),
   useSetTrafficResetDay: () => ({ mutate: vi.fn() }),
   useResetTraffic: () => ({ mutate: vi.fn() }),
+}))
+
+vi.mock('../../api/livenet', () => ({
+  useLiveNet: () => mockLiveNet,
 }))
 
 vi.mock('@/components/TimeSeriesChart', () => ({
@@ -130,6 +135,35 @@ describe('ServerDetail — Hardware card', () => {
     const dashes = screen.getAllByText('—')
     const muted = dashes.find((el) => el.tagName === 'SPAN' && el.className.includes('text-muted-foreground'))
     expect(muted).toBeTruthy()
+  })
+})
+
+describe('ServerDetail — Live net card', () => {
+  beforeEach(() => {
+    mockInventory = null
+    mockTraffic = undefined
+  })
+
+  it('renders readout line when connected with data', () => {
+    mockLiveNet = {
+      rx: 100,
+      tx: 200,
+      rxSeries: [{ ts: 't', v: 100 }],
+      txSeries: [{ ts: 't', v: 200 }],
+      connected: true,
+    }
+    renderPage()
+    expect(screen.getByText('实时网速')).toBeTruthy()
+    // bps(100) = "800 bps", bps(200) = "1.6 Kbps" — just assert the row renders at all
+    const readout = screen.getByText((content) => content.includes('↑') && content.includes('↓'))
+    expect(readout).toBeTruthy()
+  })
+
+  it('renders 未连接 when not connected and no data', () => {
+    mockLiveNet = { rx: null, tx: null, rxSeries: [], txSeries: [], connected: false }
+    renderPage()
+    expect(screen.getByText('实时网速')).toBeTruthy()
+    expect(screen.getByText('未连接')).toBeTruthy()
   })
 })
 

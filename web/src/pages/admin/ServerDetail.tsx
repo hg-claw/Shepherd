@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FolderTree, Terminal as TerminalIcon, ArrowUpCircle } from 'lucide-react'
 import { useServer, useTelemetry, usePatchServer, useDeleteServer, useRepair, usePushConfig, useServerIPCandidates, useServerInstallCommand, useUpdateAgent, useHostInventory, useHostTraffic, useSetTrafficResetDay, useResetTraffic } from '@/api/servers'
+import { useLiveNet } from '../../api/livenet'
 import { InstallCommandPanel } from '@/components/admin/InstallCommandPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -62,6 +63,7 @@ export default function AdminServerDetail() {
   const traffic = useHostTraffic(id)
   const setDay = useSetTrafficResetDay(id)
   const resetTraffic = useResetTraffic(id)
+  const live = useLiveNet(id)
 
   const [interval, setIntervalSecs] = useState(30)
   const [repairToken, setRepairToken] = useState<{ token: string; expires: string } | null>(null)
@@ -456,6 +458,26 @@ export default function AdminServerDetail() {
             yFormat={(v) => bps(v)}
             tooltipFormat={(v) => bps(v)}
           />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader><CardTitle>实时网速</CardTitle></CardHeader>
+        <CardContent className="min-w-0">
+          {live.rx === null ? (
+            <p className="text-muted-foreground text-[12px]">{live.connected ? '等待数据…' : '未连接'}</p>
+          ) : (
+            <>
+              <div className="text-[13px] mb-2">↑ {bps(live.tx ?? 0)}　↓ {bps(live.rx ?? 0)}</div>
+              <TimeSeriesChart
+                series={[
+                  { name: 'rx', values: live.rxSeries },
+                  { name: 'tx', values: live.txSeries },
+                ]}
+                yFormat={(v) => bps(v)}
+                tooltipFormat={(v) => bps(v)}
+              />
+            </>
+          )}
         </CardContent>
       </Card>
       {points.length > 0 && (

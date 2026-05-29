@@ -34,6 +34,8 @@ var allowedSettingKeys = map[string]bool{
 	"file_chunk_bytes":             true,
 	// Phase 4 (agent verbose log toggle, runtime push to online agents)
 	"agent_log_verbose": true,
+	// Phase 5 (cumulative traffic reset timezone)
+	"traffic_reset_tz": true,
 }
 
 // Keys that, when changed, require a re-push of the agent config snapshot

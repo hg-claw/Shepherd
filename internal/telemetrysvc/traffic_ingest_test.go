@@ -79,3 +79,32 @@ func TestHandleFrame_XrayTraffic(t *testing.T) {
 		t.Errorf("rows = %d after HandleFrame, want 1", n)
 	}
 }
+
+func TestWriteSample_AccumulatesHostTraffic(t *testing.T) {
+	ing, sid := newIngest(t)
+	ctx := context.Background()
+	mk := func(rx, tx int64) agentapi.Telemetry {
+		return agentapi.Telemetry{TS: time.Now().UTC(), MemTotal: 1, NetRxBytes: rx, NetTxBytes: tx}
+	}
+	if err := ing.WriteSample(ctx, sid, mk(100, 40)); err != nil {
+		t.Fatal(err)
+	}
+	var up, down int64
+	var lastReset *string
+	if err := ing.DB.QueryRowContext(ctx, `SELECT cum_bytes_up, cum_bytes_down, last_reset_at FROM host_traffic WHERE server_id=$1`, sid).Scan(&up, &down, &lastReset); err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if up != 40 || down != 100 {
+		t.Fatalf("after 1st: up=%d down=%d want 40/100", up, down)
+	}
+	if lastReset == nil {
+		t.Fatal("last_reset_at should be set on first insert")
+	}
+	if err := ing.WriteSample(ctx, sid, mk(10, 5)); err != nil {
+		t.Fatal(err)
+	}
+	_ = ing.DB.QueryRowContext(ctx, `SELECT cum_bytes_up, cum_bytes_down FROM host_traffic WHERE server_id=$1`, sid).Scan(&up, &down)
+	if up != 45 || down != 110 {
+		t.Fatalf("after 2nd: up=%d down=%d want 45/110", up, down)
+	}
+}

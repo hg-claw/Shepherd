@@ -2,7 +2,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FolderTree, Terminal as TerminalIcon, ArrowUpCircle } from 'lucide-react'
-import { useServer, useTelemetry, usePatchServer, useDeleteServer, useRepair, usePushConfig, useServerIPCandidates, useServerInstallCommand, useUpdateAgent, useHostInventory } from '@/api/servers'
+import { useServer, useTelemetry, usePatchServer, useDeleteServer, useRepair, usePushConfig, useServerIPCandidates, useServerInstallCommand, useUpdateAgent, useHostInventory, useHostTraffic, useSetTrafficResetDay, useResetTraffic } from '@/api/servers'
 import { InstallCommandPanel } from '@/components/admin/InstallCommandPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -59,6 +59,9 @@ export default function AdminServerDetail() {
 
   const updateAgent = useUpdateAgent(id)
   const inv = useHostInventory(id)
+  const traffic = useHostTraffic(id)
+  const setDay = useSetTrafficResetDay(id)
+  const resetTraffic = useResetTraffic(id)
 
   const [interval, setIntervalSecs] = useState(30)
   const [repairToken, setRepairToken] = useState<{ token: string; expires: string } | null>(null)
@@ -179,6 +182,46 @@ export default function AdminServerDetail() {
                   ? '无独立显卡'
                   : inv.data.gpus.map((g) => g.vram_mib > 0 ? `${g.name} (${Math.round(g.vram_mib / 1024)}GB)` : g.name).join(', ')}
               />
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>流量</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
+          {!traffic.data ? (
+            <span className="text-muted-foreground">—</span>
+          ) : (
+            <>
+              <KV k="本周期" v={`↑ ${bytes(traffic.data.cum_bytes_up)}　↓ ${bytes(traffic.data.cum_bytes_down)}`} />
+              <KV k="上周期" v={`↑ ${bytes(traffic.data.prev_bytes_up)}　↓ ${bytes(traffic.data.prev_bytes_down)}`} />
+              <div className="flex justify-between gap-4 items-center">
+                <span className="text-muted-foreground">重置日</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={28}
+                  defaultValue={traffic.data.reset_day}
+                  className="font-mono text-xs w-16 rounded border border-input bg-background px-2 py-0.5 text-right"
+                  onBlur={(e) => {
+                    const d = Number(e.target.value)
+                    if (d >= 1 && d <= 28 && d !== traffic.data!.reset_day) setDay.mutate(d)
+                  }}
+                />
+              </div>
+              <KV k="上次重置" v={traffic.data.last_reset_at ? new Date(traffic.data.last_reset_at).toLocaleString() : '—'} />
+              <div className="sm:col-span-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (confirm('确认立即重置流量统计？')) resetTraffic.mutate()
+                  }}
+                >
+                  立即重置
+                </Button>
+              </div>
             </>
           )}
         </CardContent>

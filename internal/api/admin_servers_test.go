@@ -290,6 +290,52 @@ func TestServersAPI_Inventory(t *testing.T) {
 	}
 }
 
+func TestServersAPI_Traffic(t *testing.T) {
+	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
+	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})
+	t.Cleanup(func() { _ = d.Close() })
+	_ = shepdb.Migrate(d, shepdb.DriverSQLite)
+
+	svc := &serversvc.Service{DB: d}
+	q := &telemetrysvc.Query{DB: d}
+	a := &ServersAPI{Servers: svc, Query: q}
+
+	srv, _ := svc.Create(context.Background(), serversvc.CreateInput{Name: "traffic-host"})
+	sid := srv.ID
+
+	rec := httptest.NewRecorder()
+	a.Traffic(rec, httptest.NewRequest("GET", "/api/servers/"+strconv.FormatInt(sid, 10)+"/traffic", nil))
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"reset_day":1`) || !strings.Contains(rec.Body.String(), `"cum_bytes_up":0`) {
+		t.Fatalf("default GET: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	a.SetTrafficResetDay(rec, httptest.NewRequest("POST", "/api/servers/"+strconv.FormatInt(sid, 10)+"/traffic/reset-day",
+		strings.NewReader(`{"reset_day":15}`)))
+	if rec.Code != 204 {
+		t.Fatalf("set-day: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	a.SetTrafficResetDay(rec, httptest.NewRequest("POST", "/api/servers/"+strconv.FormatInt(sid, 10)+"/traffic/reset-day",
+		strings.NewReader(`{"reset_day":31}`)))
+	if rec.Code != 400 {
+		t.Fatalf("set-day invalid should 400: %d", rec.Code)
+	}
+
+	ctx := context.Background()
+	_, _ = a.Query.DB.ExecContext(ctx, `UPDATE host_traffic SET cum_bytes_up=99 WHERE server_id=$1`, sid)
+	rec = httptest.NewRecorder()
+	a.ResetTraffic(rec, httptest.NewRequest("POST", "/api/servers/"+strconv.FormatInt(sid, 10)+"/traffic/reset", nil))
+	if rec.Code != 204 {
+		t.Fatalf("reset: %d %s", rec.Code, rec.Body.String())
+	}
+	row, _ := a.Query.HostTraffic(ctx, sid)
+	if row.CumBytesUp != 0 || row.PrevBytesUp != 99 || row.ResetDay != 15 {
+		t.Fatalf("after reset: %+v", row)
+	}
+}
+
 func TestBuildInstallCommand(t *testing.T) {
 	cases := []struct {
 		name           string

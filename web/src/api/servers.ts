@@ -258,6 +258,41 @@ export function useHostInventory(id: number) {
   })
 }
 
+export type HostTraffic = {
+  server_id: number
+  cum_bytes_up: number
+  cum_bytes_down: number
+  prev_bytes_up: number
+  prev_bytes_down: number
+  reset_day: number
+  last_reset_at: string | null
+}
+
+export function useHostTraffic(id: number) {
+  return useQuery({
+    queryKey: ['host-traffic', id],
+    queryFn: () => api.get<HostTraffic>(`/api/servers/${id}/traffic`),
+    enabled: !!id,
+    refetchInterval: 10_000,
+  })
+}
+
+export function useSetTrafficResetDay(id: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (reset_day: number) => api.post(`/api/servers/${id}/traffic/reset-day`, { reset_day }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['host-traffic', id] }),
+  })
+}
+
+export function useResetTraffic(id: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post(`/api/servers/${id}/traffic/reset`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['host-traffic', id] }),
+  })
+}
+
 export function useUpdateAgent(id: number) {
   const qc = useQueryClient()
   return useMutation({

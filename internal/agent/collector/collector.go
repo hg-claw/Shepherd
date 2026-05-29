@@ -70,24 +70,26 @@ func (c *Collector) sample() (agentapi.Telemetry, bool) {
 	}
 	la, _ := load.Avg()
 	disks, _ := Disks()
-	rx, tx, netOK := c.netMeter.Sample()
+	rx, tx, rxBytes, txBytes, netOK := c.netMeter.Sample()
 	if !netOK {
 		return agentapi.Telemetry{}, false
 	}
 	tcpConn := countEstablished()
 
 	return agentapi.Telemetry{
-		TS:       time.Now().UTC(),
-		CPUPct:   cpuPcts[0],
-		MemUsed:  int64(v.Used),
-		MemTotal: int64(v.Total),
-		Load1:    la.Load1,
-		Load5:    la.Load5,
-		Load15:   la.Load15,
-		NetRxBps: rx,
-		NetTxBps: tx,
-		TCPConn:  tcpConn,
-		Disks:    disks,
+		TS:         time.Now().UTC(),
+		CPUPct:     cpuPcts[0],
+		MemUsed:    int64(v.Used),
+		MemTotal:   int64(v.Total),
+		Load1:      la.Load1,
+		Load5:      la.Load5,
+		Load15:     la.Load15,
+		NetRxBps:   rx,
+		NetTxBps:   tx,
+		NetRxBytes: rxBytes,
+		NetTxBytes: txBytes,
+		TCPConn:    tcpConn,
+		Disks:      disks,
 	}, true
 }
 

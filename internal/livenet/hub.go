@@ -15,6 +15,11 @@ const ringSize = 60
 
 // Conn is the minimal browser-connection sink the hub writes to. *websocket.Conn
 // satisfies it; tests use a fake.
+//
+// WriteJSON may be called concurrently — Publish (agent read loop) and Attach
+// (browser handler) can both target a freshly-registered conn — so
+// implementations MUST serialize their own writes. The production wsLiveConn
+// holds a per-conn mutex; test fakes used across goroutines do the same.
 type Conn interface {
 	WriteJSON(v any) error
 }

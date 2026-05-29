@@ -250,6 +250,59 @@ func (a *ServersAPI) Inventory(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, inventoryResponse{HostInventoryRow: row, GPUs: gpus})
 }
 
+func (a *ServersAPI) Traffic(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID2(r, "/api/servers/", "/traffic")
+	if !ok {
+		writeError(w, 400, "bad path")
+		return
+	}
+	row, err := a.Query.HostTraffic(r.Context(), id)
+	if err != nil {
+		writeError(w, 400, err.Error())
+		return
+	}
+	writeJSON(w, 200, row)
+}
+
+type resetDayReq struct {
+	ResetDay int `json:"reset_day"`
+}
+
+func (a *ServersAPI) SetTrafficResetDay(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID2(r, "/api/servers/", "/traffic/reset-day")
+	if !ok {
+		writeError(w, 400, "bad path")
+		return
+	}
+	var in resetDayReq
+	if err := decodeJSON(r, &in); err != nil {
+		writeError(w, 400, "bad json")
+		return
+	}
+	if in.ResetDay < 1 || in.ResetDay > 28 {
+		writeError(w, 400, "reset_day must be 1..28")
+		return
+	}
+	if err := a.Query.SetTrafficResetDay(r.Context(), id, in.ResetDay); err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *ServersAPI) ResetTraffic(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID2(r, "/api/servers/", "/traffic/reset")
+	if !ok {
+		writeError(w, 400, "bad path")
+		return
+	}
+	if err := a.Query.ResetTrafficNow(r.Context(), id); err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // pathID2 extracts the numeric segment between two fixed wrappers.
 //
 //	pathID2(r, "/api/servers/", "/telemetry") on "/api/servers/42/telemetry" -> 42, true

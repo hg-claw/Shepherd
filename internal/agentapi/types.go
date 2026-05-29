@@ -76,17 +76,19 @@ type HostInventory struct {
 }
 
 type Telemetry struct {
-	TS       time.Time `json:"ts"`
-	CPUPct   float64   `json:"cpu_pct"`
-	MemUsed  int64     `json:"mem_used"`
-	MemTotal int64     `json:"mem_total"`
-	Load1    float64   `json:"load_1"`
-	Load5    float64   `json:"load_5"`
-	Load15   float64   `json:"load_15"`
-	NetRxBps int64     `json:"net_rx_bps"`
-	NetTxBps int64     `json:"net_tx_bps"`
-	TCPConn  int       `json:"tcp_conn"`
-	Disks    []Disk    `json:"disks"`
+	TS         time.Time `json:"ts"`
+	CPUPct     float64   `json:"cpu_pct"`
+	MemUsed    int64     `json:"mem_used"`
+	MemTotal   int64     `json:"mem_total"`
+	Load1      float64   `json:"load_1"`
+	Load5      float64   `json:"load_5"`
+	Load15     float64   `json:"load_15"`
+	NetRxBps   int64     `json:"net_rx_bps"`
+	NetTxBps   int64     `json:"net_tx_bps"`
+	NetRxBytes int64     `json:"net_rx_bytes"` // exact bytes received this interval
+	NetTxBytes int64     `json:"net_tx_bytes"` // exact bytes sent this interval
+	TCPConn    int       `json:"tcp_conn"`
+	Disks      []Disk    `json:"disks"`
 }
 
 // IPCandidate is a single network address the agent detected at boot.

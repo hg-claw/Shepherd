@@ -1,11 +1,40 @@
 package collector
 
 import (
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/net"
 )
+
+// isPhysicalIface reports whether name is a real uplink interface (not loopback
+// or a virtual/container/VPN device). Cumulative traffic and the live rate both
+// use this so container/VPN bytes aren't double-counted (counted on both the
+// virtual device and the physical NIC).
+func isPhysicalIface(name string) bool {
+	if name == "lo" {
+		return false
+	}
+	for _, p := range []string{"docker", "veth", "br-", "wg", "tun", "tap"} {
+		if strings.HasPrefix(name, p) {
+			return false
+		}
+	}
+	return true
+}
+
+// sumPhysical sums recv/sent bytes across physical interfaces only.
+func sumPhysical(stats []net.IOCountersStat) (rx, tx uint64) {
+	for _, s := range stats {
+		if !isPhysicalIface(s.Name) {
+			continue
+		}
+		rx += s.BytesRecv
+		tx += s.BytesSent
+	}
+	return rx, tx
+}
 
 type NetMeter struct {
 	mu     sync.Mutex
@@ -15,43 +44,33 @@ type NetMeter struct {
 	primed bool
 }
 
-// Sample returns the rx/tx bytes-per-second since the last call, summed across all
-// non-loopback interfaces. The first call primes counters and returns (0,0,false).
-func (m *NetMeter) Sample() (rxBps, txBps int64, ok bool) {
+// Sample returns the rx/tx bytes-per-second AND the exact per-interval byte
+// delta since the last call, summed across physical interfaces. The first call
+// primes counters and returns ok=false. On counter reset/wrap it re-primes and
+// returns ok=false (caller drops the tick — no spurious accumulation).
+func (m *NetMeter) Sample() (rxBps, txBps, rxBytes, txBytes int64, ok bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	stats, err := net.IOCounters(true)
 	if err != nil {
-		return 0, 0, false
+		return 0, 0, 0, 0, false
 	}
-	var rx, tx uint64
-	for _, s := range stats {
-		if s.Name == "lo" {
-			continue
-		}
-		rx += s.BytesRecv
-		tx += s.BytesSent
-	}
+	rx, tx := sumPhysical(stats)
 	now := time.Now()
 	if !m.primed {
 		m.prevRx, m.prevTx, m.prevTS, m.primed = rx, tx, now, true
-		return 0, 0, false
+		return 0, 0, 0, 0, false
 	}
 	dt := now.Sub(m.prevTS).Seconds()
 	if dt <= 0 {
-		return 0, 0, false
+		return 0, 0, 0, 0, false
 	}
-	// Guard against counter reset (interface bounce, container restart,
-	// or 32-bit counter wraparound). uint64 subtraction wraps around to
-	// near-max when rx < prevRx, which we'd then cast to float64/int64 and
-	// emit as nonsensical readings like 558921 TB/s.
-	// On reset: re-prime from the new baseline and skip this sample.
 	if rx < m.prevRx || tx < m.prevTx {
 		m.prevRx, m.prevTx, m.prevTS = rx, tx, now
-		return 0, 0, false
+		return 0, 0, 0, 0, false
 	}
-	rxBps = int64(float64(rx-m.prevRx) / dt)
-	txBps = int64(float64(tx-m.prevTx) / dt)
+	dRx := rx - m.prevRx
+	dTx := tx - m.prevTx
 	m.prevRx, m.prevTx, m.prevTS = rx, tx, now
-	return rxBps, txBps, true
+	return int64(float64(dRx) / dt), int64(float64(dTx) / dt), int64(dRx), int64(dTx), true
 }

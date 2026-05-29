@@ -4,7 +4,7 @@ import "testing"
 
 func TestNetMeter_FirstCallNotPrimed(t *testing.T) {
 	var m NetMeter
-	_, _, ok := m.Sample()
+	_, _, _, _, ok := m.Sample()
 	if ok {
 		t.Error("first call should return ok=false")
 	}

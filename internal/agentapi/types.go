@@ -24,6 +24,9 @@ const (
 	// TypeHostInventory: agent → server. Static hardware inventory, sent once
 	// on each WS (re)connect.
 	TypeHostInventory = "host.inventory"
+	// TypeLiveNet: agent → server, ~1s, rate-only. Ephemeral live throughput
+	// for the detail page; NEVER accumulated into cumulative traffic.
+	TypeLiveNet = "live.net"
 )
 
 // ConfigUpdate is a full snapshot pushed by the server to an agent. Each field
@@ -73,6 +76,12 @@ type HostInventory struct {
 	MemTotal    int64  `json:"mem_total"`
 	DiskTotal   int64  `json:"disk_total"`
 	GPUs        []GPU  `json:"gpus"`
+}
+
+type LiveNetSample struct {
+	TS    time.Time `json:"ts"`
+	RxBps int64     `json:"rx_bps"`
+	TxBps int64     `json:"tx_bps"`
 }
 
 type Telemetry struct {

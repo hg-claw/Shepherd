@@ -71,7 +71,32 @@ func (i *Ingest) HandleFrame(ctx context.Context, serverID int64, env agentapi.E
 		if err := i.WriteNetqualityBatch(ctx, serverID, batch.Samples); err != nil {
 			log.Printf("netquality.batch write (server=%d): %v", serverID, err)
 		}
+	case agentapi.TypeHostInventory:
+		var inv agentapi.HostInventory
+		if err := env.Decode(&inv); err != nil {
+			log.Printf("host.inventory decode (server=%d): %v", serverID, err)
+			return
+		}
+		if err := i.WriteHostInventory(ctx, serverID, inv); err != nil {
+			log.Printf("host.inventory write (server=%d): %v", serverID, err)
+		}
 	}
+}
+
+// WriteHostInventory upserts the static hardware inventory for a server.
+func (i *Ingest) WriteHostInventory(ctx context.Context, serverID int64, inv agentapi.HostInventory) error {
+	gpusJSON, _ := json.Marshal(inv.GPUs)
+	_, err := i.DB.ExecContext(ctx, `INSERT INTO host_inventory
+		(server_id, cpu_physical, cpu_logical, cpu_model, mem_total, disk_total, gpus_json, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+		ON CONFLICT (server_id) DO UPDATE SET
+		  cpu_physical=EXCLUDED.cpu_physical, cpu_logical=EXCLUDED.cpu_logical,
+		  cpu_model=EXCLUDED.cpu_model, mem_total=EXCLUDED.mem_total,
+		  disk_total=EXCLUDED.disk_total, gpus_json=EXCLUDED.gpus_json,
+		  updated_at=EXCLUDED.updated_at`,
+		serverID, inv.CPUPhysical, inv.CPULogical, inv.CPUModel, inv.MemTotal, inv.DiskTotal,
+		string(gpusJSON), time.Now().UTC())
+	return err
 }
 
 // WriteSample persists one telemetry point and bumps agent_last_seen.

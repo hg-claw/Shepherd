@@ -238,6 +238,26 @@ export interface UpdateAgentResult {
   expires_at: string
 }
 
+export type GPU = { name: string; vram_mib: number }
+export type HostInventory = {
+  server_id: number
+  cpu_physical: number
+  cpu_logical: number
+  cpu_model: string
+  mem_total: number
+  disk_total: number
+  gpus: GPU[]
+}
+
+export function useHostInventory(id: number) {
+  return useQuery({
+    queryKey: ['host-inventory', id],
+    queryFn: () => api.get<HostInventory | null>(`/api/servers/${id}/inventory`),
+    enabled: !!id,
+    staleTime: 60_000,
+  })
+}
+
 export function useUpdateAgent(id: number) {
   const qc = useQueryClient()
   return useMutation({

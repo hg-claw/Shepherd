@@ -88,6 +88,7 @@ func (r *Router) Handler() http.Handler {
 	admin.HandleFunc("PATCH /api/servers/{id}", r.Servers.Patch)
 	admin.HandleFunc("DELETE /api/servers/{id}", r.Servers.Delete)
 	admin.HandleFunc("GET /api/servers/{id}/telemetry", r.Servers.Telemetry)
+	admin.HandleFunc("GET /api/servers/{id}/inventory", r.Servers.Inventory)
 	admin.HandleFunc("POST /api/servers/{id}/repair", r.Servers.Repair)
 	admin.HandleFunc("POST /api/servers/{id}/install-command", r.Servers.InstallCommand)
 	admin.HandleFunc("POST /api/servers/{id}/update-agent", r.Servers.UpdateAgent)

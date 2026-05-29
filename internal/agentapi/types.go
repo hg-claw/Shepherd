@@ -4,12 +4,12 @@ import "time"
 
 // Type constants — keep in lockstep with spec §5.
 const (
-	TypeConfigUpdate = "config.update"
-	TypePing         = "ping"
-	TypePong         = "pong"
-	TypeHeartbeat    = "heartbeat"
-	TypeTelemetry    = "telemetry"
-	TypeXrayTraffic  = "xray.traffic"
+	TypeConfigUpdate   = "config.update"
+	TypePing           = "ping"
+	TypePong           = "pong"
+	TypeHeartbeat      = "heartbeat"
+	TypeTelemetry      = "telemetry"
+	TypeXrayTraffic    = "xray.traffic"
 	TypeSingboxTraffic = "singbox.traffic"
 	// TypeNetqualityConfig: server → agent. Sent on each WS connect (and
 	// whenever the per-server config changes) so the agent knows what to
@@ -21,6 +21,9 @@ const (
 	// TypeNetqualityBatch: agent → server. One batch per sample interval
 	// carrying every target's last probe result.
 	TypeNetqualityBatch = "netquality.batch"
+	// TypeHostInventory: agent → server. Static hardware inventory, sent once
+	// on each WS (re)connect.
+	TypeHostInventory = "host.inventory"
 )
 
 // ConfigUpdate is a full snapshot pushed by the server to an agent. Each field
@@ -41,11 +44,11 @@ type ConfigUpdate struct {
 }
 
 type Heartbeat struct {
-	TS           time.Time    `json:"ts"`
-	AgentVersion string       `json:"agent_version"`
-	OS           string       `json:"os"`
-	Arch         string       `json:"arch"`
-	Kernel       string       `json:"kernel"`
+	TS           time.Time `json:"ts"`
+	AgentVersion string    `json:"agent_version"`
+	OS           string    `json:"os"`
+	Arch         string    `json:"arch"`
+	Kernel       string    `json:"kernel"`
 	// IPCandidates is sent on the FIRST heartbeat after each WS connect.
 	// Server upserts into server_ip_candidates and auto-picks ssh_host when
 	// it's still empty. Periodic heartbeats omit the field to avoid DB churn.
@@ -56,6 +59,20 @@ type Disk struct {
 	Mount string `json:"mount"`
 	Used  int64  `json:"used"`
 	Total int64  `json:"total"`
+}
+
+type GPU struct {
+	Name    string `json:"name"`
+	VRAMMiB int64  `json:"vram_mib"` // 0 when unknown (lspci fallback)
+}
+
+type HostInventory struct {
+	CPUPhysical int    `json:"cpu_physical"`
+	CPULogical  int    `json:"cpu_logical"`
+	CPUModel    string `json:"cpu_model"`
+	MemTotal    int64  `json:"mem_total"`
+	DiskTotal   int64  `json:"disk_total"`
+	GPUs        []GPU  `json:"gpus"`
 }
 
 type Telemetry struct {
@@ -123,9 +140,9 @@ type XrayTrafficBatch struct {
 // SingboxTrafficSample is a per-inbound-tag traffic delta for one 30s window.
 // Kind mirrors the inbound role: "landing" or "relay".
 type SingboxTrafficSample struct {
-	Tag       string    `json:"tag"`        // e.g. "landing-aabb1122"
-	Kind      string    `json:"kind"`       // "landing" | "relay"
-	TS        time.Time `json:"ts"`         // sample timestamp, UTC
+	Tag       string    `json:"tag"`  // e.g. "landing-aabb1122"
+	Kind      string    `json:"kind"` // "landing" | "relay"
+	TS        time.Time `json:"ts"`   // sample timestamp, UTC
 	BytesUp   int64     `json:"bytes_up"`
 	BytesDown int64     `json:"bytes_down"`
 }
@@ -161,14 +178,14 @@ type NetqualityConfig struct {
 // RTT pointers are nil when status != 'ok' — they'd be misleading zeros
 // otherwise.
 type NetqualitySample struct {
-	TargetID  int64     `json:"target_id"`
-	TS        time.Time `json:"ts"`
-	Status    string    `json:"status"`              // ok | lost | error
-	RTTAvgMs  *float64  `json:"rtt_avg_ms,omitempty"`
-	RTTMinMs  *float64  `json:"rtt_min_ms,omitempty"`
-	RTTMaxMs  *float64  `json:"rtt_max_ms,omitempty"`
-	JitterMs  *float64  `json:"jitter_ms,omitempty"` // mdev from ping output
-	LossPct   float64   `json:"loss_pct"`            // 0..100
+	TargetID int64     `json:"target_id"`
+	TS       time.Time `json:"ts"`
+	Status   string    `json:"status"` // ok | lost | error
+	RTTAvgMs *float64  `json:"rtt_avg_ms,omitempty"`
+	RTTMinMs *float64  `json:"rtt_min_ms,omitempty"`
+	RTTMaxMs *float64  `json:"rtt_max_ms,omitempty"`
+	JitterMs *float64  `json:"jitter_ms,omitempty"` // mdev from ping output
+	LossPct  float64   `json:"loss_pct"`            // 0..100
 }
 
 // NetqualityBatch is the payload of a TypeNetqualityBatch envelope.

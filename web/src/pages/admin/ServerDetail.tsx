@@ -2,7 +2,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FolderTree, Terminal as TerminalIcon, ArrowUpCircle } from 'lucide-react'
-import { useServer, useTelemetry, usePatchServer, useDeleteServer, useRepair, usePushConfig, useServerIPCandidates, useServerInstallCommand, useUpdateAgent } from '@/api/servers'
+import { useServer, useTelemetry, usePatchServer, useDeleteServer, useRepair, usePushConfig, useServerIPCandidates, useServerInstallCommand, useUpdateAgent, useHostInventory } from '@/api/servers'
 import { InstallCommandPanel } from '@/components/admin/InstallCommandPanel'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -58,6 +58,7 @@ export default function AdminServerDetail() {
   const installCmd = useServerInstallCommand(id)
 
   const updateAgent = useUpdateAgent(id)
+  const inv = useHostInventory(id)
 
   const [interval, setIntervalSecs] = useState(30)
   const [repairToken, setRepairToken] = useState<{ token: string; expires: string } | null>(null)
@@ -156,6 +157,30 @@ export default function AdminServerDetail() {
           <KV k="agent_fingerprint" v={s.agent_fingerprint?.String ?? '-'} long />
           <KV k="agent_last_seen" v={s.agent_last_seen?.Valid ? s.agent_last_seen.Time : '-'} />
           <KV k="install_stage" v={s.install_stage} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Hardware</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
+          {!inv.data ? (
+            <span className="text-muted-foreground">—</span>
+          ) : (
+            <>
+              <KV
+                k="cpu"
+                v={`${inv.data.cpu_physical} 物理核 / ${inv.data.cpu_logical} 线程${inv.data.cpu_model ? ` · ${inv.data.cpu_model}` : ''}`}
+              />
+              <KV k="memory" v={bytes(inv.data.mem_total)} />
+              <KV k="disk" v={bytes(inv.data.disk_total)} />
+              <KV
+                k="gpu"
+                v={inv.data.gpus.length === 0
+                  ? '无独立显卡'
+                  : inv.data.gpus.map((g) => g.vram_mib > 0 ? `${g.name} (${Math.round(g.vram_mib / 1024)}GB)` : g.name).join(', ')}
+              />
+            </>
+          )}
         </CardContent>
       </Card>
 

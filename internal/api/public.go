@@ -29,7 +29,7 @@ type PublicAPI struct {
 	// 500s. range is one of "1h" / "24h" / "7d"; sloppy values are
 	// silently downgraded by the helper.
 	NetqualityHistory func(ctx context.Context, serverID int64, rng string) []NetqualityISPHistoryRow
-	statusLimit *tokenRateLimiter
+	statusLimit       *tokenRateLimiter
 }
 
 // NetqualityISPSummary is one ISP's recent average RTT/loss for a
@@ -44,7 +44,7 @@ type NetqualityISPSummary struct {
 // NetqualityISPHistoryRow is one ISP's time-series for the public chart.
 // One row per ISP per request; points already ordered by ts ascending.
 type NetqualityISPHistoryRow struct {
-	ISP    string                    `json:"isp"`
+	ISP    string                      `json:"isp"`
 	Points []NetqualityISPHistoryPoint `json:"points"`
 }
 
@@ -72,12 +72,16 @@ func (a *PublicAPI) InitRateLimit(max int, window time.Duration) {
 }
 
 type publicCard struct {
-	ID          int64   `json:"id"`
-	Alias       string  `json:"alias"`
-	Group       string  `json:"group"`
-	CountryCode string  `json:"country_code"`
-	Online      bool    `json:"online"`
-	Latest      *latest `json:"latest,omitempty"`
+	ID             int64   `json:"id"`
+	Alias          string  `json:"alias"`
+	Group          string  `json:"group"`
+	CountryCode    string  `json:"country_code"`
+	Online         bool    `json:"online"`
+	Platform       string  `json:"platform,omitempty"`
+	Arch           string  `json:"arch,omitempty"`
+	TrafficRxBytes int64   `json:"traffic_rx_bytes"`
+	TrafficTxBytes int64   `json:"traffic_tx_bytes"`
+	Latest         *latest `json:"latest,omitempty"`
 	// Netquality is per-ISP RTT/loss the netquality plugin recorded
 	// recently for this server. Omitted from the wire when the plugin
 	// isn't enabled or hasn't sampled yet — the wall UI just renders
@@ -133,6 +137,16 @@ func (a *PublicAPI) Servers_ListPublic(w http.ResponseWriter, r *http.Request) {
 		}
 		if pt, err := a.Query.Latest(r.Context(), s.ID); err == nil && pt != nil {
 			card.Latest = renderLatest(pt)
+		}
+		if s.AgentOS.Valid {
+			card.Platform = s.AgentOS.String
+		}
+		if s.AgentArch.Valid {
+			card.Arch = s.AgentArch.String
+		}
+		if tr, err := a.Query.HostTraffic(r.Context(), s.ID); err == nil && tr != nil {
+			card.TrafficRxBytes = tr.CumBytesDown // down = rx = received
+			card.TrafficTxBytes = tr.CumBytesUp   // up = tx = sent
 		}
 		// Augment with the netquality summary when the plugin is wired
 		// AND has data for this server. A nil/empty result drops the

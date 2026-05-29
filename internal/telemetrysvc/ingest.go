@@ -8,11 +8,13 @@ import (
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
 	"github.com/hg-claw/Shepherd/internal/agentsvc"
+	"github.com/hg-claw/Shepherd/internal/livenet"
 	"github.com/jmoiron/sqlx"
 )
 
 type Ingest struct {
-	DB *sqlx.DB
+	DB      *sqlx.DB
+	LiveNet *livenet.Hub // optional; live throughput fan-out
 }
 
 // HandleFrame is the FrameHandler injected into AgentAPI. It dispatches by envelope type.
@@ -80,6 +82,16 @@ func (i *Ingest) HandleFrame(ctx context.Context, serverID int64, env agentapi.E
 		if err := i.WriteHostInventory(ctx, serverID, inv); err != nil {
 			log.Printf("host.inventory write (server=%d): %v", serverID, err)
 		}
+	case agentapi.TypeLiveNet:
+		if i.LiveNet == nil {
+			return
+		}
+		var s agentapi.LiveNetSample
+		if err := env.Decode(&s); err != nil {
+			log.Printf("live.net decode (server=%d): %v", serverID, err)
+			return
+		}
+		i.LiveNet.Publish(serverID, s)
 	}
 }
 

@@ -171,6 +171,7 @@ func main() {
 			return err == nil && row.Enabled
 		},
 	}).Run(rootCtx)
+	go (&telemetrysvc.TrafficReset{DB: d, Settings: settingsStore}).Run(rootCtx)
 
 	authAPI := &api.AuthAPI{Auth: authH}
 	// hostExec is constructed before ServersAPI so UpdateAgent can borrow

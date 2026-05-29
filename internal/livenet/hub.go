@@ -25,8 +25,9 @@ type serverState struct {
 }
 
 // Hub fans out live samples to browser watchers, per server. Safe for
-// concurrent use; all conn writes happen under the hub lock (bounded by the
-// connection's own write deadline), so a stalled client can't corrupt state.
+// concurrent use; conn writes happen outside the hub lock (bounded by the
+// connection's own write deadline), so a stalled client cannot block other
+// servers or the agent read loop.
 type Hub struct {
 	mu      sync.Mutex
 	servers map[int64]*serverState
@@ -44,40 +45,65 @@ func (h *Hub) stateLocked(serverID int64) *serverState {
 }
 
 // Publish records a sample (updating the ring) and broadcasts it to the
-// server's watchers. A watcher whose write fails is dropped.
+// server's watchers. Writes happen outside the hub lock so a stalled client
+// cannot block other servers or the agent read loop; a watcher whose write
+// fails is removed.
 func (h *Hub) Publish(serverID int64, s agentapi.LiveNetSample) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	st := h.stateLocked(serverID)
 	st.ring = append(st.ring, s)
 	if len(st.ring) > ringSize {
 		st.ring = st.ring[len(st.ring)-ringSize:]
 	}
+	watchers := make([]Conn, 0, len(st.watchers))
 	for c := range st.watchers {
+		watchers = append(watchers, c)
+	}
+	h.mu.Unlock()
+
+	var failed []Conn
+	for _, c := range watchers {
 		if err := c.WriteJSON(s); err != nil {
-			delete(st.watchers, c)
+			failed = append(failed, c)
 		}
+	}
+	if len(failed) > 0 {
+		h.mu.Lock()
+		if st := h.servers[serverID]; st != nil {
+			for _, c := range failed {
+				delete(st.watchers, c)
+			}
+		}
+		h.mu.Unlock()
 	}
 }
 
-// Attach replays the current ring to c (immediate paint), then registers it as
-// a watcher. If the backfill write fails the conn is not registered. The
-// returned func deregisters the watcher.
+// Attach registers c as a watcher and replays the current ring (backfill) for
+// immediate paint. The ring snapshot + registration happen under the lock; the
+// backfill writes happen outside it. If a backfill write fails, c is removed
+// and a no-op detach is returned. The returned func deregisters the watcher.
 func (h *Hub) Attach(serverID int64, c Conn) func() {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	st := h.stateLocked(serverID)
-	for _, s := range st.ring {
+	backfill := make([]agentapi.LiveNetSample, len(st.ring))
+	copy(backfill, st.ring)
+	st.watchers[c] = struct{}{}
+	h.mu.Unlock()
+
+	for _, s := range backfill {
 		if err := c.WriteJSON(s); err != nil {
+			h.remove(serverID, c)
 			return func() {}
 		}
 	}
-	st.watchers[c] = struct{}{}
-	return func() {
-		h.mu.Lock()
-		defer h.mu.Unlock()
-		if s := h.servers[serverID]; s != nil {
-			delete(s.watchers, c)
-		}
+	return func() { h.remove(serverID, c) }
+}
+
+// remove deregisters a watcher (idempotent).
+func (h *Hub) remove(serverID int64, c Conn) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if st := h.servers[serverID]; st != nil {
+		delete(st.watchers, c)
 	}
 }

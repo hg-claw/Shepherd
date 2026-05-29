@@ -2,6 +2,7 @@ package livenet
 
 import (
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
@@ -70,4 +71,38 @@ func TestHub_DropsConnOnWriteError(t *testing.T) {
 	if len(good.got) == 0 {
 		t.Fatal("good conn should still receive")
 	}
+}
+
+func TestHub_ConcurrentPublishAttach(t *testing.T) {
+	h := NewHub()
+	stop := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				h.Publish(1, agentapi.LiveNetSample{RxBps: 1})
+			}
+		}
+	}()
+	for i := 0; i < 100; i++ {
+		c := &syncConn{}
+		detach := h.Attach(1, c)
+		h.Publish(1, agentapi.LiveNetSample{RxBps: 2})
+		detach()
+	}
+	close(stop)
+}
+
+type syncConn struct {
+	mu sync.Mutex
+	n  int
+}
+
+func (c *syncConn) WriteJSON(v any) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.n++
+	return nil
 }

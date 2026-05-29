@@ -104,6 +104,17 @@ func (h *Hub) Attach(serverID int64, c Conn) func() {
 	return func() { h.remove(serverID, c) }
 }
 
+// Subscribe registers c as a watcher WITHOUT replaying the ring — for
+// multiplexed consumers (e.g. the public wall feed) that only want live
+// samples, not each server's backfill. Returns a detach func.
+func (h *Hub) Subscribe(serverID int64, c Conn) func() {
+	h.mu.Lock()
+	st := h.stateLocked(serverID)
+	st.watchers[c] = struct{}{}
+	h.mu.Unlock()
+	return func() { h.remove(serverID, c) }
+}
+
 // remove deregisters a watcher (idempotent).
 func (h *Hub) remove(serverID int64, c Conn) {
 	h.mu.Lock()

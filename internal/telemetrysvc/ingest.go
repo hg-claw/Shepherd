@@ -110,6 +110,19 @@ func (i *Ingest) WriteSample(ctx context.Context, serverID int64, t agentapi.Tel
 		t.NetRxBps, t.NetTxBps, t.TCPConn, string(disksJSON)); err != nil {
 		return err
 	}
+	if t.NetRxBytes != 0 || t.NetTxBytes != 0 {
+		now := t.TS.UTC()
+		if _, err := i.DB.ExecContext(ctx, `INSERT INTO host_traffic
+			(server_id, cum_bytes_up, cum_bytes_down, last_reset_at, updated_at)
+			VALUES ($1,$2,$3,$4,$4)
+			ON CONFLICT (server_id) DO UPDATE SET
+			  cum_bytes_up   = host_traffic.cum_bytes_up   + EXCLUDED.cum_bytes_up,
+			  cum_bytes_down = host_traffic.cum_bytes_down + EXCLUDED.cum_bytes_down,
+			  updated_at     = EXCLUDED.updated_at`,
+			serverID, t.NetTxBytes, t.NetRxBytes, now); err != nil {
+			return err
+		}
+	}
 	_, err := i.DB.ExecContext(ctx, "UPDATE servers SET agent_last_seen=$1 WHERE id=$2", t.TS.UTC(), serverID)
 	return err
 }

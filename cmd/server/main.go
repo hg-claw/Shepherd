@@ -349,6 +349,7 @@ func main() {
 		consoleAPI, scriptsAPI, filesAPI, auditAPI, recAPI,
 		shepweb.Handler(), subgenAPI).
 		WithPlugins(pluginsAPI, eventsAPI, logsAPI)
+	router.LiveNet = &api.LiveNetAPI{Hub: liveNetHub}
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,

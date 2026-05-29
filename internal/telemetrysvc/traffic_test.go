@@ -23,7 +23,7 @@ func TestLastResetBoundary(t *testing.T) {
 	sh, _ := time.LoadLocation("Asia/Shanghai")
 	now = time.Date(2026, 3, 20, 12, 0, 0, 0, sh)
 	w := lastResetBoundary(now, 1, sh).In(sh)
-	if !(w.Year() == 2026 && w.Month() == 3 && w.Day() == 1 && w.Hour() == 0) {
+	if w.Year() != 2026 || w.Month() != 3 || w.Day() != 1 || w.Hour() != 0 {
 		t.Errorf("tz boundary wall-clock: %v", w)
 	}
 }

@@ -113,7 +113,9 @@ func TestSurge_WireGuard(t *testing.T) {
 		"[WireGuard wg0]",
 		"private-key = PRIV",
 		"self-ip = 10.254.253.3",
-		`peer = (public-key = PUB, allowed-ips = "0.0.0.0/0, ::/0", endpoint = home.hg.ht:51820, preshared-key = PSK)`,
+		"dns-server = 8.8.8.8, 114.114.114.114",
+		"mtu = 1420",
+		`peer = (public-key = PUB, allowed-ips = "0.0.0.0/0, ::/0", endpoint = home.hg.ht:51820, preshared-key = PSK, keepalive = 5)`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("surge WG missing %q\n%s", want, out)

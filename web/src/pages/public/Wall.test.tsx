@@ -100,15 +100,34 @@ describe('Wall — public probe dashboard', () => {
 
   it('summary strip shows correct Nodes (2) and Online (1) counts', () => {
     renderPage()
-    // The SummaryStat value for Nodes is "2"
+    // SummaryStat renders: outer div > [icon span, inner div > [label div, value div]]
+    // Walk up two levels from the label div to reach the outer card div.
+
+    // Nodes card: label is exactly "Nodes" (unique on the page).
     const nodesLabel = screen.getByText('Nodes')
-    expect(nodesLabel).toBeTruthy()
-    // "2" appears as the Nodes value; "1" appears as Online value
-    // Both are font-mono divs adjacent to their label divs
-    const allTwos = screen.getAllByText('2')
-    expect(allTwos.length).toBeGreaterThan(0)
-    const allOnes = screen.getAllByText('1')
-    expect(allOnes.length).toBeGreaterThan(0)
+    const nodesCard = nodesLabel.parentElement?.parentElement
+    expect(nodesCard).toBeTruthy()
+    // The card's text content contains the value "2" and the label "Nodes".
+    expect(nodesCard!.textContent).toContain('Nodes')
+    expect(nodesCard!.textContent).toContain('2')
+
+    // Online/Offline summary stats: the summary strip is the second div child
+    // of the page root. Find an element whose full textContent is exactly the
+    // online label (no slashes / digits) so we avoid hitting the group header.
+    // The SummaryStat label div is a leaf with only the label text.
+    const onlineStatLabel = screen.getAllByText((content, element) => {
+      if (!element) return false
+      // Must be a leaf-ish element (no children with text) whose own text
+      // matches "online" case-insensitively and has no digits.
+      return (
+        /^online$/i.test(content.trim()) &&
+        element.children.length === 0
+      )
+    })[0]
+    expect(onlineStatLabel).toBeTruthy()
+    const onlineCard = onlineStatLabel.parentElement?.parentElement
+    expect(onlineCard).toBeTruthy()
+    expect(onlineCard!.textContent).toContain('1')
   })
 
   it('renders serverA alias and platform in list view', () => {

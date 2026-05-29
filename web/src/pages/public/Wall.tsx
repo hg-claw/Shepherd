@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Server, CircleCheck, CircleX, Activity, ArrowDownUp, LayoutGrid, Rows3 } from 'lucide-react'
 import { usePublicServers, type PublicCard } from '@/api/public'
@@ -139,7 +139,6 @@ export default function Wall() {
                     <WallServerCard
                       key={s.id}
                       server={s}
-                      navigate={navigate}
                       rxOf={rxOf}
                       txOf={txOf}
                     />
@@ -192,7 +191,15 @@ function ServerListTable({
               <tr
                 key={s.id}
                 className="border-t hover:bg-sunken/60 cursor-pointer"
+                role="button"
+                tabIndex={0}
                 onClick={() => navigate(`/public/servers/${s.id}`)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    navigate(`/public/servers/${s.id}`)
+                  }
+                }}
               >
                 {/* Node */}
                 <Td>
@@ -272,12 +279,10 @@ function ServerListTable({
 
 function WallServerCard({
   server: s,
-  navigate,
   rxOf,
   txOf,
 }: {
   server: PublicCard
-  navigate: ReturnType<typeof useNavigate>
   rxOf: (s: PublicCard) => number
   txOf: (s: PublicCard) => number
 }) {
@@ -292,15 +297,15 @@ function WallServerCard({
         : 'ok'
 
   return (
-    <div
+    <Link
+      to={`/public/servers/${s.id}`}
       className={cn(
-        'bg-elev border rounded-lg p-3.5 flex flex-col gap-2.5 cursor-pointer hover:border-primary transition-colors',
+        'block bg-elev border rounded-lg p-3.5 flex flex-col gap-2.5 hover:border-primary transition-colors',
         st === 'ok' && 'border-[hsl(var(--ok)/0.3)]',
         st === 'warn' && 'border-[hsl(var(--warn)/0.5)]',
         st === 'err' && 'border-[hsl(var(--err)/0.5)]',
         st === 'offline' && 'opacity-60',
       )}
-      onClick={() => navigate(`/public/servers/${s.id}`)}
     >
       {/* Header row: dot + flag + alias */}
       <div className="flex items-center gap-2 min-w-0">
@@ -340,7 +345,7 @@ function WallServerCard({
       ) : (
         <div className="font-mono text-fg-dim text-[11.5px] py-2">offline</div>
       )}
-    </div>
+    </Link>
   )
 }
 
@@ -358,7 +363,7 @@ function Th({
   return (
     <th
       className={cn(
-        'font-medium text-muted-foreground text-[11px] uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0 text-left',
+        'font-medium text-muted-foreground text-[11px] uppercase tracking-[0.05em] px-3.5 py-2 bg-elev text-left',
         className,
       )}
       style={style}

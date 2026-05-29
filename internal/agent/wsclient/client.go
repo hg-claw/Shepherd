@@ -16,6 +16,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/hg-claw/Shepherd/internal/agent/filehandler"
+	"github.com/hg-claw/Shepherd/internal/agent/livenetsampler"
 	"github.com/hg-claw/Shepherd/internal/agent/netinfo"
 	"github.com/hg-claw/Shepherd/internal/agent/netqualitysampler"
 	"github.com/hg-claw/Shepherd/internal/agent/ptyrunner"
@@ -51,6 +52,10 @@ type Client struct {
 	// TypeNetqualityConfig and applied in dispatch.go; nothing here
 	// configures it directly.
 	NetqualitySampler *netqualitysampler.Sampler
+
+	// LiveNetSampler, if non-nil, is started as a goroutine after each WS
+	// connect (always-on 1s rate-only live throughput).
+	LiveNetSampler *livenetsampler.Sampler
 
 	// HostInventory is the static hardware inventory, collected once at startup
 	// and sent on each WS (re)connect.
@@ -266,6 +271,18 @@ func (c *Client) dialAndRun(ctx context.Context) error {
 			}
 		}()
 		go c.NetqualitySampler.Run(nqCtx)
+	}
+	if c.LiveNetSampler != nil {
+		lnCtx, lnCancel := context.WithCancel(ctx)
+		go func() {
+			select {
+			case <-stop:
+				lnCancel()
+			case <-ctx.Done():
+				lnCancel()
+			}
+		}()
+		go c.LiveNetSampler.Run(lnCtx)
 	}
 	// Close the connection when ctx is done so ReadMessage unblocks immediately.
 	go func() {

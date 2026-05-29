@@ -14,6 +14,7 @@ type Router struct {
 	Public     *PublicAPI
 	Agent      *AgentAPI
 	Console    *ConsoleAPI
+	LiveNet    *LiveNetAPI
 	Scripts    *ScriptsAPI
 	Files      *FilesAPI
 	Audit      *AuditAPI
@@ -104,6 +105,10 @@ func (r *Router) Handler() http.Handler {
 
 	admin.HandleFunc("POST /api/admin/console/open", r.Console.Open)
 	admin.HandleFunc("GET /api/admin/console/ws", r.Console.AttachWS)
+
+	if r.LiveNet != nil {
+		admin.HandleFunc("GET /api/servers/{id}/net-live/ws", r.LiveNet.AttachWS)
+	}
 
 	admin.HandleFunc("GET /api/admin/scripts", r.Scripts.List)
 	admin.HandleFunc("POST /api/admin/scripts", r.Scripts.Create)

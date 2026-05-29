@@ -28,6 +28,7 @@ import (
 	subgen "github.com/hg-claw/Shepherd/internal/plugins/subgen"               // registers via init() + public /sub wiring
 	xrayplugin "github.com/hg-claw/Shepherd/internal/plugins/xray"             // registers via init() + Migrate0003
 
+	"github.com/hg-claw/Shepherd/internal/livenet"
 	"github.com/hg-claw/Shepherd/internal/ptysvc"
 	"github.com/hg-claw/Shepherd/internal/scriptsvc"
 	"github.com/hg-claw/Shepherd/internal/serversvc"
@@ -66,7 +67,8 @@ func main() {
 	agentSvc := &agentsvc.Service{DB: d, AutoRecoverKey: cfg.AutoRecoverKey}
 	hub := agentsvc.NewHub()
 	tQuery := &telemetrysvc.Query{DB: d}
-	tIngest := &telemetrysvc.Ingest{DB: d}
+	liveNetHub := livenet.NewHub()
+	tIngest := &telemetrysvc.Ingest{DB: d, LiveNet: liveNetHub}
 	// pluginStore is constructed early so the per-plugin rollups can
 	// poll the enabled flag and short-circuit when the plugin isn't
 	// in use on this deployment. Pre-fix these goroutines ran 24/7
@@ -347,6 +349,7 @@ func main() {
 		consoleAPI, scriptsAPI, filesAPI, auditAPI, recAPI,
 		shepweb.Handler(), subgenAPI).
 		WithPlugins(pluginsAPI, eventsAPI, logsAPI)
+	router.LiveNet = &api.LiveNetAPI{Hub: liveNetHub}
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,

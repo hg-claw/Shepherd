@@ -12,6 +12,7 @@ import (
 	"github.com/hg-claw/Shepherd/internal/agent/collector"
 	"github.com/hg-claw/Shepherd/internal/agent/fingerprint"
 	"github.com/hg-claw/Shepherd/internal/agent/hostinfo"
+	"github.com/hg-claw/Shepherd/internal/agent/livenetsampler"
 	"github.com/hg-claw/Shepherd/internal/agent/netqualitysampler"
 	"github.com/hg-claw/Shepherd/internal/agent/singboxv2sampler"
 	"github.com/hg-claw/Shepherd/internal/agent/state"
@@ -74,6 +75,16 @@ func main() {
 	// list (TypeNetqualityConfig). Interval comes from the same push.
 	netqSampler := &netqualitysampler.Sampler{Send: client.Send}
 	client.NetqualitySampler = netqSampler
+
+	liveNetMeter := &collector.NetMeter{}
+	liveNetSampler := &livenetsampler.Sampler{
+		Send: client.Send,
+		Source: func() (int64, int64, bool) {
+			rx, tx, _, _, ok := liveNetMeter.Sample()
+			return rx, tx, ok
+		},
+	}
+	client.LiveNetSampler = liveNetSampler
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()

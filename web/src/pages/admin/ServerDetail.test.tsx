@@ -40,8 +40,9 @@ beforeAll(() => {
   }
 })
 
-// Shared mutable ref so individual tests can override useHostInventory
+// Shared mutable refs so individual tests can override per-hook data
 let mockInventory: any = null
+let mockTraffic: any = undefined
 
 vi.mock('@/api/servers', () => ({
   useServer: () => ({ data: baseServer }),
@@ -54,6 +55,9 @@ vi.mock('@/api/servers', () => ({
   useServerInstallCommand: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateAgent: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useHostInventory: () => ({ data: mockInventory }),
+  useHostTraffic: () => ({ data: mockTraffic }),
+  useSetTrafficResetDay: () => ({ mutate: vi.fn() }),
+  useResetTraffic: () => ({ mutate: vi.fn() }),
 }))
 
 vi.mock('@/components/TimeSeriesChart', () => ({
@@ -123,6 +127,37 @@ describe('ServerDetail — Hardware card', () => {
     renderPage()
     // Multiple '—' exist (KpiCard strip + Hardware card); find the one in a
     // <span class="text-muted-foreground"> which is how the Hardware card renders it.
+    const dashes = screen.getAllByText('—')
+    const muted = dashes.find((el) => el.tagName === 'SPAN' && el.className.includes('text-muted-foreground'))
+    expect(muted).toBeTruthy()
+  })
+})
+
+describe('ServerDetail — Traffic card', () => {
+  it('renders 本周期 with formatted bytes and reset-day input when traffic data is present', () => {
+    mockTraffic = {
+      server_id: 1,
+      cum_bytes_up: 1024 * 1024 * 1024,   // 1 GiB
+      cum_bytes_down: 2 * 1024 * 1024 * 1024, // 2 GiB
+      prev_bytes_up: 512 * 1024 * 1024,
+      prev_bytes_down: 768 * 1024 * 1024,
+      reset_day: 15,
+      last_reset_at: null,
+    }
+    renderPage()
+    expect(screen.getByText('本周期')).toBeTruthy()
+    // bytes(1 GB) = "1.0 GB"; bytes(2 GB) = "2.0 GB"
+    const row = screen.getByText((content) => content.includes('1.0 GB') && content.includes('2.0 GB'))
+    expect(row).toBeTruthy()
+    const input = screen.getByDisplayValue('15') as HTMLInputElement
+    expect(input).toBeTruthy()
+    expect(input.type).toBe('number')
+  })
+
+  it('renders — when traffic data is undefined', () => {
+    mockTraffic = undefined
+    renderPage()
+    // The traffic card renders a muted-foreground span with '—' when data absent
     const dashes = screen.getAllByText('—')
     const muted = dashes.find((el) => el.tagName === 'SPAN' && el.className.includes('text-muted-foreground'))
     expect(muted).toBeTruthy()

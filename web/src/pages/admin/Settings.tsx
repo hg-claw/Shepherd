@@ -30,7 +30,7 @@ const schema = z.object({
 })
 type FormVals = z.infer<typeof schema>
 
-type TabKey = 'about' | 'storage' | 'keys' | 'security' | 'audit' | 'appearance'
+type TabKey = 'about' | 'storage' | 'keys' | 'security' | 'audit' | 'appearance' | 'traffic'
 
 const TABS: { key: TabKey; labelKey: string; defaultLabel: string }[] = [
   { key: 'about', labelKey: 'settings.tab.about', defaultLabel: 'About' },
@@ -39,6 +39,7 @@ const TABS: { key: TabKey; labelKey: string; defaultLabel: string }[] = [
   { key: 'security', labelKey: 'settings.tab.security', defaultLabel: 'Security & sandbox' },
   { key: 'audit', labelKey: 'settings.tab.audit', defaultLabel: 'Audit & retention' },
   { key: 'appearance', labelKey: 'settings.tab.appearance', defaultLabel: 'Appearance' },
+  { key: 'traffic', labelKey: 'settings.tab.traffic', defaultLabel: 'Traffic' },
 ]
 
 export default function Settings() {
@@ -157,7 +158,9 @@ export default function Settings() {
 
           {tab === 'appearance' && <AppearanceTab />}
 
-          {tab !== 'about' && tab !== 'keys' && tab !== 'appearance' && (
+          {tab === 'traffic' && <TrafficTab settings={settings.data} patch={patch} toast={toast} />}
+
+          {tab !== 'about' && tab !== 'keys' && tab !== 'appearance' && tab !== 'traffic' && (
             <div className="flex items-center gap-2 pt-1">
               <Button type="submit" size="sm" className="h-8 px-4">
                 {t('admin.save')}
@@ -441,6 +444,47 @@ function AppearanceTab() {
             'settings.appearance_hint',
             'Theme and language live in the top bar so you can change them on any page.',
           )}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function TrafficTab({
+  settings,
+  patch,
+  toast,
+}: {
+  settings: Record<string, string> | undefined
+  patch: ReturnType<typeof usePatchSettings>
+  toast: (kind: 'success' | 'error', msg: string) => void
+}) {
+  const currentTz = settings?.traffic_reset_tz ?? 'UTC'
+  return (
+    <div className="border rounded-lg bg-elev overflow-hidden">
+      <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
+        <span className="text-foreground font-medium text-[12.5px]">Traffic reset</span>
+      </div>
+      <div className="px-4 py-3.5 space-y-3">
+        <div className="flex items-center gap-3">
+          <Label className="text-[12px] w-40 shrink-0">traffic_reset_tz</Label>
+          <Input
+            className="w-48 h-8 font-mono text-[12.5px]"
+            defaultValue={currentTz}
+            onBlur={async (e) => {
+              const v = e.target.value.trim() || 'UTC'
+              if (v === currentTz) return
+              try {
+                await patch.mutateAsync({ traffic_reset_tz: v })
+                toast('success', 'Saved')
+              } catch (err: any) {
+                toast('error', err?.message ?? 'Error')
+              }
+            }}
+          />
+        </div>
+        <p className="text-fg-dim font-mono text-[11px]">
+          IANA timezone name (e.g. Asia/Shanghai, America/New_York). Default: UTC.
         </p>
       </div>
     </div>

@@ -185,14 +185,14 @@ func surgeWGSection(n Node, sec string) string {
 	if ip := wgField(n, "ip"); ip != "" {
 		fmt.Fprintf(&b, "self-ip = %s\n", ip)
 	}
-	if mtu, ok := n.Extra["mtu"].(int); ok && mtu > 0 {
-		fmt.Fprintf(&b, "mtu = %d\n", mtu)
-	}
+	// Fixed operational defaults for Surge WireGuard.
+	b.WriteString("dns-server = 8.8.8.8, 114.114.114.114\n")
+	b.WriteString("mtu = 1420\n")
 	fmt.Fprintf(&b, `peer = (public-key = %s, allowed-ips = "0.0.0.0/0, ::/0", endpoint = %s:%d`, wgField(n, "public_key"), n.Server, n.Port)
 	if psk := wgField(n, "preshared_key"); psk != "" {
 		b.WriteString(", preshared-key = " + psk)
 	}
-	b.WriteString(")\n")
+	b.WriteString(", keepalive = 5)\n")
 	return b.String()
 }
 

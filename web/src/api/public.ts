@@ -17,6 +17,10 @@ export type PublicCard = {
   group: string
   country_code: string
   online: boolean
+  platform?: string
+  arch?: string
+  traffic_rx_bytes?: number
+  traffic_tx_bytes?: number
   latest?: {
     ts: string
     cpu_pct: number

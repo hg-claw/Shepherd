@@ -6,12 +6,19 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
+	"github.com/hg-claw/Shepherd/internal/agentapi"
 	"github.com/hg-claw/Shepherd/internal/agentsvc"
+	"github.com/hg-claw/Shepherd/internal/livenet"
 	"github.com/hg-claw/Shepherd/internal/serversvc"
 	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
 )
+
+// maxPublicLiveNetConns is the global cap on concurrent anonymous
+// LiveNetWS connections. Excess connections are rejected with 503.
+const maxPublicLiveNetConns = 256
 
 type PublicAPI struct {
 	Servers      *serversvc.Service
@@ -20,6 +27,9 @@ type PublicAPI struct {
 	Hub          *agentsvc.Hub
 	Tokens       *agentsvc.Service // for AgentStatus token lookup
 	BuildVersion string            // injected from cfg.BuildVersion; surfaced via /api/version
+	// LiveNet is the live-net hub used to stream per-server throughput to
+	// anonymous public browsers. Optional — nil disables the endpoint.
+	LiveNet *livenet.Hub
 	// NetqualitySummary is set by main.go to the netquality plugin's
 	// LatestPerISP helper. Left nil in tests / when the plugin isn't
 	// linked; nil-safe (the public list handler skips the augmentation).
@@ -29,7 +39,8 @@ type PublicAPI struct {
 	// 500s. range is one of "1h" / "24h" / "7d"; sloppy values are
 	// silently downgraded by the helper.
 	NetqualityHistory func(ctx context.Context, serverID int64, rng string) []NetqualityISPHistoryRow
-	statusLimit *tokenRateLimiter
+	statusLimit       *tokenRateLimiter
+	liveNetConns      atomic.Int64
 }
 
 // NetqualityISPSummary is one ISP's recent average RTT/loss for a
@@ -44,7 +55,7 @@ type NetqualityISPSummary struct {
 // NetqualityISPHistoryRow is one ISP's time-series for the public chart.
 // One row per ISP per request; points already ordered by ts ascending.
 type NetqualityISPHistoryRow struct {
-	ISP    string                    `json:"isp"`
+	ISP    string                      `json:"isp"`
 	Points []NetqualityISPHistoryPoint `json:"points"`
 }
 
@@ -72,12 +83,16 @@ func (a *PublicAPI) InitRateLimit(max int, window time.Duration) {
 }
 
 type publicCard struct {
-	ID          int64   `json:"id"`
-	Alias       string  `json:"alias"`
-	Group       string  `json:"group"`
-	CountryCode string  `json:"country_code"`
-	Online      bool    `json:"online"`
-	Latest      *latest `json:"latest,omitempty"`
+	ID             int64   `json:"id"`
+	Alias          string  `json:"alias"`
+	Group          string  `json:"group"`
+	CountryCode    string  `json:"country_code"`
+	Online         bool    `json:"online"`
+	Platform       string  `json:"platform,omitempty"`
+	Arch           string  `json:"arch,omitempty"`
+	TrafficRxBytes int64   `json:"traffic_rx_bytes"`
+	TrafficTxBytes int64   `json:"traffic_tx_bytes"`
+	Latest         *latest `json:"latest,omitempty"`
 	// Netquality is per-ISP RTT/loss the netquality plugin recorded
 	// recently for this server. Omitted from the wire when the plugin
 	// isn't enabled or hasn't sampled yet — the wall UI just renders
@@ -133,6 +148,16 @@ func (a *PublicAPI) Servers_ListPublic(w http.ResponseWriter, r *http.Request) {
 		}
 		if pt, err := a.Query.Latest(r.Context(), s.ID); err == nil && pt != nil {
 			card.Latest = renderLatest(pt)
+		}
+		if s.AgentOS.Valid {
+			card.Platform = s.AgentOS.String
+		}
+		if s.AgentArch.Valid {
+			card.Arch = s.AgentArch.String
+		}
+		if tr, err := a.Query.HostTraffic(r.Context(), s.ID); err == nil && tr != nil {
+			card.TrafficRxBytes = tr.CumBytesDown // down = rx = received
+			card.TrafficTxBytes = tr.CumBytesUp   // up = tx = sent
 		}
 		// Augment with the netquality summary when the plugin is wired
 		// AND has data for this server. A nil/empty result drops the
@@ -266,6 +291,87 @@ func (a *PublicAPI) Healthz(w http.ResponseWriter, _ *http.Request) {
 // and 200 with {online, last_seen_at} otherwise.
 //
 // `online` is true if agent_last_seen is non-null and within the last 60s.
+// wallLiveFrame is one live-net sample tagged with its server, streamed to the
+// public wall's multiplexed WebSocket.
+type wallLiveFrame struct {
+	ServerID int64     `json:"server_id"`
+	TS       time.Time `json:"ts"`
+	RxBps    int64     `json:"rx_bps"`
+	TxBps    int64     `json:"tx_bps"`
+}
+
+// taggingConn adapts a single browser conn into N per-server hub watchers,
+// tagging each LiveNetSample with its server_id. The inner conn (wsLiveConn)
+// serializes the concurrent writes from those watchers via its own mutex.
+type taggingConn struct {
+	serverID int64
+	inner    livenet.Conn
+}
+
+func (t *taggingConn) WriteJSON(v any) error {
+	s, ok := v.(agentapi.LiveNetSample)
+	if !ok {
+		return nil // hub only ever sends LiveNetSample
+	}
+	return t.inner.WriteJSON(wallLiveFrame{ServerID: t.serverID, TS: s.TS, RxBps: s.RxBps, TxBps: s.TxBps})
+}
+
+// tryAcquireLiveNetSlot reserves a public live-net connection slot, returning
+// false when the global cap is already reached.
+func (a *PublicAPI) tryAcquireLiveNetSlot() bool {
+	if a.liveNetConns.Add(1) > maxPublicLiveNetConns {
+		a.liveNetConns.Add(-1)
+		return false
+	}
+	return true
+}
+
+func (a *PublicAPI) releaseLiveNetSlot() { a.liveNetConns.Add(-1) }
+
+// LiveNetWS streams ~1s live network throughput for every opted-in server to an
+// anonymous public browser. One socket, multiplexed: the browser conn is
+// subscribed to each show_on_public server in the hub via a taggingConn.
+// GET /api/public/net-live/ws
+func (a *PublicAPI) LiveNetWS(w http.ResponseWriter, r *http.Request) {
+	if a.LiveNet == nil {
+		writeError(w, 503, "unavailable")
+		return
+	}
+	if !a.tryAcquireLiveNetSlot() {
+		writeError(w, 503, "too many live connections")
+		return
+	}
+	defer a.releaseLiveNetSlot()
+	all, err := a.Servers.List(r.Context())
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+	conn, err := liveNetUpgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
+	defer func() { _ = conn.Close() }()
+	shared := &wsLiveConn{conn: conn}
+	var detaches []func()
+	for _, s := range all {
+		if !s.ShowOnPublic {
+			continue
+		}
+		detaches = append(detaches, a.LiveNet.Subscribe(s.ID, &taggingConn{serverID: s.ID, inner: shared}))
+	}
+	defer func() {
+		for _, d := range detaches {
+			d()
+		}
+	}()
+	for {
+		if _, _, err := conn.ReadMessage(); err != nil {
+			return
+		}
+	}
+}
+
 func (a *PublicAPI) AgentStatus(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if token == "" {

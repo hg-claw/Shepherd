@@ -16,7 +16,19 @@
     "no_servers": "No public servers",
     "ungrouped": "Ungrouped",
     "stat": {
-      "total": "Hosts"
+      "total": "Hosts",
+      "nodes": "Nodes",
+      "realtime": "Realtime",
+      "traffic": "Traffic"
+    },
+    "col": {
+      "node": "Node",
+      "platform": "Platform",
+      "memory": "Memory",
+      "disk": "Disk",
+      "network": "Network ↓↑",
+      "traffic": "Traffic ↓↑",
+      "load": "Load"
     }
   },
   "public_detail": {
@@ -124,6 +136,7 @@
     "not-installed": "not installed"
   },
   "view": {
+    "list": "List",
     "grid": "Grid",
     "table": "Table"
   },

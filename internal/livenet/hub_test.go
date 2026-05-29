@@ -106,3 +106,24 @@ func (c *syncConn) WriteJSON(v any) error {
 	c.n++
 	return nil
 }
+
+func TestHub_SubscribeNoBackfill(t *testing.T) {
+	h := NewHub()
+	for i := 0; i < 5; i++ {
+		h.Publish(1, agentapi.LiveNetSample{RxBps: int64(i)})
+	}
+	c := &fakeConn{}
+	detach := h.Subscribe(1, c)
+	if len(c.got) != 0 {
+		t.Fatalf("Subscribe should not backfill, got %d", len(c.got))
+	}
+	h.Publish(1, agentapi.LiveNetSample{RxBps: 99})
+	if len(c.got) != 1 || c.got[0].RxBps != 99 {
+		t.Fatalf("subscribed conn missed live sample: %+v", c.got)
+	}
+	detach()
+	h.Publish(1, agentapi.LiveNetSample{RxBps: 100})
+	if len(c.got) != 1 {
+		t.Fatalf("detached conn still received: %+v", c.got)
+	}
+}

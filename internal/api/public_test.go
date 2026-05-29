@@ -142,6 +142,36 @@ func TestHealthz(t *testing.T) {
 	}
 }
 
+func TestPublicServers_PlatformArchTraffic(t *testing.T) {
+	a, db := newPublicAPIForTest(t)
+	ctx := context.Background()
+	// seed a show_on_public server
+	srv, err := a.Servers.Create(ctx, serversvc.CreateInput{Name: "plat-test", ShowOnPublic: true})
+	if err != nil {
+		t.Fatalf("seed server: %v", err)
+	}
+	sid := srv.ID
+
+	// ensure agent_os/agent_arch are set on the server row
+	_, _ = db.ExecContext(ctx, `UPDATE servers SET agent_os='linux', agent_arch='amd64' WHERE id=$1`, sid)
+	// seed cumulative traffic (sub-project B's table)
+	_, _ = db.ExecContext(ctx,
+		`INSERT INTO host_traffic (server_id, cum_bytes_up, cum_bytes_down, updated_at) VALUES ($1,$2,$3,$4)`,
+		sid, int64(500), int64(900), time.Now().UTC())
+
+	rec := httptest.NewRecorder()
+	a.Servers_ListPublic(rec, httptest.NewRequest("GET", "/api/public/servers", nil))
+	if rec.Code != 200 {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, want := range []string{`"platform":"linux"`, `"arch":"amd64"`, `"traffic_rx_bytes":900`, `"traffic_tx_bytes":500`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("body missing %q: %s", want, body)
+		}
+	}
+}
+
 func TestPublic_HidesPrivateAndExposesAlias(t *testing.T) {
 	dsn := "file:" + filepath.Join(t.TempDir(), "t.db") + "?_fk=1"
 	d, _ := shepdb.Open(context.Background(), shepdb.Config{Driver: shepdb.DriverSQLite, DSN: dsn})

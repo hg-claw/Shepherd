@@ -98,6 +98,20 @@ func TestSurge_SelectGroupDirectFallback(t *testing.T) {
 	}
 }
 
+// DOMAIN-SET is native on Surge/ShadowRocket — the custom rule passes through
+// verbatim with the ORIGINAL url (only Clash rewrites to a rule-provider).
+func TestSurge_DomainSetVerbatim(t *testing.T) {
+	url := "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/Advertising/Advertising_Domain.list"
+	im := Intermediate{
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"n1"}}},
+		Rules:  []Rule{{Match: "DOMAIN-SET," + url, Target: "Ad Block"}, {Final: true, Target: "PROXY"}},
+	}
+	out := (&SurgeRenderer{}).Render(im, "x", DefaultRulesetBase)
+	if !strings.Contains(out, "DOMAIN-SET,"+url+",Ad Block") {
+		t.Fatalf("surge should emit DOMAIN-SET verbatim\n%s", out)
+	}
+}
+
 func TestSurge_WireGuard(t *testing.T) {
 	im := Intermediate{
 		Nodes: []Node{{

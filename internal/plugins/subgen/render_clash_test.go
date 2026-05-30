@@ -144,6 +144,49 @@ func TestClash_CustomRulesetTextFormat(t *testing.T) {
 	}
 }
 
+func TestClashDomainSetURL(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{
+			"https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/Advertising/Advertising_Domain.list",
+			"https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Advertising/Advertising_Domain.yaml",
+		},
+		// already a Clash .yaml — unchanged
+		{
+			"https://example.com/rule/Clash/Foo/Foo_Domain.yaml",
+			"https://example.com/rule/Clash/Foo/Foo_Domain.yaml",
+		},
+		// non-blackmatrix7 host: no /Shadowrocket/ segment → left as-is
+		{"https://example.com/lists/ads.txt", "https://example.com/lists/ads.txt"},
+	}
+	for _, c := range cases {
+		if got := clashDomainSetURL(c.in); got != c.want {
+			t.Errorf("clashDomainSetURL(%q)=%q want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestClash_DomainSetToRuleSet(t *testing.T) {
+	url := "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/Advertising/Advertising_Domain.list"
+	im := Intermediate{
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"n1"}}},
+		Rules:  []Rule{{Match: "DOMAIN-SET," + url, Target: "Ad Block"}, {Final: true, Target: "PROXY"}},
+	}
+	out := (&ClashRenderer{}).Render(im, "", DefaultRulesetBase)
+	for _, want := range []string{
+		"RULE-SET,Advertising_Domain,Ad Block",
+		"behavior: domain",
+		"https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Advertising/Advertising_Domain.yaml",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("clash DOMAIN-SET missing %q\n%s", want, out)
+		}
+	}
+	// the bug: a verbatim DOMAIN-SET rule must NOT be emitted into the clash config
+	if strings.Contains(out, "DOMAIN-SET,") {
+		t.Errorf("clash should not emit a verbatim DOMAIN-SET rule\n%s", out)
+	}
+}
+
 func TestClash_TUICInsecureSkipCertVerify(t *testing.T) {
 	im := Intermediate{
 		Nodes:  []Node{{Name: "t", Protocol: "tuic", Server: "1.1.1.1", Port: 443, Password: "p", UUID: "u", SNI: "s.com", Insecure: true}},

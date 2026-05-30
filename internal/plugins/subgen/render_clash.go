@@ -89,7 +89,30 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, rulesetBase string) st
 		case rl.Native != "":
 			rules = append(rules, nativeToClash(rl.Native)+","+rl.Target)
 		default:
-			rules = append(rules, rl.Match+","+rl.Target)
+			// DOMAIN-SET is a Surge/ShadowRocket directive Clash rejects; convert
+			// it to a behavior:domain rule-provider pointing at the Clash variant
+			// of the list (blackmatrix7's rule/Clash/<...>_Domain.yaml).
+			if u, ok := domainSetURL(rl.Match); ok {
+				url := clashDomainSetURL(u)
+				name := domainSetName(url)
+				if _, exists := providers[name]; !exists {
+					format, ext := "yaml", "yaml"
+					if !strings.HasSuffix(url, ".yaml") && !strings.HasSuffix(url, ".yml") {
+						format, ext = "text", "txt"
+					}
+					providers[name] = map[string]any{
+						"type":     "http",
+						"behavior": "domain",
+						"format":   format,
+						"url":      url,
+						"path":     "./ruleset/" + name + "." + ext,
+						"interval": 86400,
+					}
+				}
+				rules = append(rules, "RULE-SET,"+name+","+rl.Target)
+			} else {
+				rules = append(rules, rl.Match+","+rl.Target)
+			}
 		}
 	}
 	if len(providers) > 0 {
@@ -102,6 +125,58 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, rulesetBase string) st
 		return "# clash render error: " + err.Error()
 	}
 	return string(out)
+}
+
+// domainSetURL returns the list URL of a "DOMAIN-SET,<url>" custom rule, or
+// ("", false) for any other custom rule. Case-insensitive on the directive.
+func domainSetURL(match string) (string, bool) {
+	m := strings.TrimSpace(match)
+	const p = "DOMAIN-SET,"
+	if len(m) < len(p) || !strings.EqualFold(m[:len(p)], p) {
+		return "", false
+	}
+	url := strings.TrimSpace(m[len(p):])
+	if url == "" {
+		return "", false
+	}
+	return url, true
+}
+
+// clashDomainSetURL rewrites a Surge/ShadowRocket DOMAIN-SET list URL to its
+// Clash equivalent (best-effort): blackmatrix7 ships the Clash variant under
+// rule/Clash/<...>_Domain.yaml. A URL without the /rule/Shadowrocket/ segment is
+// left unchanged (the operator owns non-blackmatrix7 URLs).
+func clashDomainSetURL(u string) string {
+	u = strings.Replace(u, "/rule/Shadowrocket/", "/rule/Clash/", 1)
+	if strings.HasSuffix(u, ".list") {
+		u = strings.TrimSuffix(u, ".list") + ".yaml"
+	}
+	return u
+}
+
+// domainSetName derives a rule-provider name from a list URL: the last path
+// segment without extension, sanitized to [A-Za-z0-9_-].
+func domainSetName(u string) string {
+	seg := u
+	if i := strings.LastIndex(seg, "/"); i >= 0 {
+		seg = seg[i+1:]
+	}
+	if i := strings.LastIndex(seg, "."); i >= 0 {
+		seg = seg[:i]
+	}
+	var b strings.Builder
+	for _, r := range seg {
+		if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			b.WriteRune(r)
+		} else {
+			b.WriteRune('_')
+		}
+	}
+	name := b.String()
+	if name == "" {
+		name = "domainset"
+	}
+	return name
 }
 
 // nativeToClash maps a catalog Native directive to its Clash rule prefix. Clash

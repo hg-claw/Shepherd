@@ -96,3 +96,7 @@ export const previewSubgenTemplate = (
 
 export const listSubgenCategories = (): Promise<SubgenCategory[]> =>
   api.get<SubgenCategory[]>(`${BASE}/categories`)
+
+// listSubgenOixGroups returns the ordered selectable oixCloud service-group names.
+export const listSubgenOixGroups = (): Promise<string[]> =>
+  api.get<string[]>(`${BASE}/oix-groups`)

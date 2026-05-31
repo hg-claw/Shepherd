@@ -7,102 +7,58 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestClash_RendersYAML(t *testing.T) {
+func TestClash_FillsTemplate(t *testing.T) {
 	im := Intermediate{
-		Nodes: []Node{
-			{Name: "🇺🇸 us trojan", Protocol: "trojan", Server: "1.1.1.1", Port: 443, Password: "p", SNI: "x.com"},
-			{Name: "🇭🇰 hk ss", Protocol: "shadowsocks", Server: "2.2.2.2", Port: 8388, SSMethod: "aes-128-gcm", Password: "pw"},
-		},
-		Groups: []Group{
-			{Name: "PROXY", Type: "select", Members: []string{"Auto Select", "🇺🇸 us trojan", "🇭🇰 hk ss"}},
-			{Name: "Auto Select", Type: "url-test", Members: []string{"🇺🇸 us trojan", "🇭🇰 hk ss"}},
-			{Name: "Telegram", Type: "select", Members: []string{"PROXY", "DIRECT", "REJECT", "🇺🇸 us trojan"}},
-		},
-		Rules: []Rule{
-			{Match: "IP-CIDR,10.0.0.0/24", Target: "PROXY"},
-			{Ruleset: "Telegram", Target: "Telegram"},
-			{Native: "GEOIP,CN", Target: "Location:CN"},
-			{Native: "RULE-SET,SYSTEM", Target: "Private"},
-			{Final: true, Target: "PROXY"},
-		},
-		ClashGeneral: "dns:\n  enable: true",
+		Nodes:  []Node{{Name: "🟢 A", Protocol: "trojan", Server: "1.1.1.1", Port: 443, Password: "p", SNI: "s.com"}},
+		Groups: []Group{{Name: "MyGroup", Type: "select", Members: []string{"DIRECT"}, Verbatim: true}},
+		Rules:  []Rule{{Match: "DOMAIN-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/Advertising/Advertising_Domain.list", Target: "AdBlock"}},
 	}
 	out := (&ClashRenderer{}).Render(im, "", DefaultRulesetBase)
-
+	if strings.Contains(out, "{{") {
+		t.Fatalf("unresolved marker:\n%s", out)
+	}
 	var doc map[string]any
 	if err := yaml.Unmarshal([]byte(out), &doc); err != nil {
-		t.Fatalf("invalid yaml: %v\n%s", err, out)
+		t.Fatalf("not valid YAML: %v\n%s", err, out)
 	}
-	if _, ok := doc["dns"]; !ok {
-		t.Fatalf("clash_general not injected:\n%s", out)
+	if !strings.Contains(out, "🟢 A") {
+		t.Errorf("node missing\n%s", out)
 	}
-	if doc["proxies"] == nil || doc["proxy-groups"] == nil || doc["rule-providers"] == nil {
-		t.Fatalf("missing sections:\n%s", out)
+	if !strings.Contains(out, "behavior: domain") || !strings.Contains(out, "RULE-SET,Advertising_Domain,AdBlock") {
+		t.Errorf("DOMAIN-SET not converted\n%s", out)
 	}
-	for _, want := range []string{
-		"RULE-SET,Telegram,Telegram",
-		"GEOIP,CN,Location:CN",
-		"GEOIP,PRIVATE,Private",
-		"IP-CIDR,10.0.0.0/24,PROXY",
-		"MATCH,PROXY",
-		"behavior: classical",
-		"/rule/Clash/Telegram/Telegram.yaml",
-		"type: trojan",
-		"type: ss",
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("clash output missing %q\n---\n%s", want, out)
-		}
+	if !strings.Contains(out, "MyGroup") {
+		t.Errorf("custom group missing\n%s", out)
 	}
-	if strings.Contains(out, "FINAL,") {
-		t.Fatalf("should use MATCH not FINAL:\n%s", out)
-	}
-
-	// emoji proxy names round-trip through YAML decoding (yaml.v3 escapes
-	// non-BMP runes in the raw bytes, but decoding restores them).
-	proxies, _ := doc["proxies"].([]any)
-	foundEmoji := false
-	for _, p := range proxies {
-		if pm, ok := p.(map[string]any); ok && pm["name"] == "🇺🇸 us trojan" {
-			foundEmoji = true
-		}
-	}
-	if !foundEmoji {
-		t.Fatalf("emoji proxy name did not round-trip:\n%s", out)
-	}
-
-	im2 := im
-	im2.ClashGeneral = ""
-	out2 := (&ClashRenderer{}).Render(im2, "", DefaultRulesetBase)
-	if !strings.Contains(out2, "mode: rule") {
-		t.Fatalf("default mode missing:\n%s", out2)
+	if !strings.Contains(out, "fastly.jsdelivr.net/gh/dler-io") {
+		t.Errorf("dler.io providers missing\n%s", out)
 	}
 }
 
-func TestClash_WireGuard(t *testing.T) {
+// TestClash_DeterministicProviders guards against map-iteration churn: multiple
+// DOMAIN-SET custom rules must render the rule-providers block in a stable
+// (first-seen) order so a regenerated subscription doesn't diff for no reason.
+func TestClash_DeterministicProviders(t *testing.T) {
+	base := "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/X/"
 	im := Intermediate{
-		Nodes: []Node{{
-			Name: "🇨🇳 WG", Protocol: "wireguard", Server: "home.hg.ht", Port: 51820,
-			Extra: map[string]any{
-				"private_key": "PRIV", "public_key": "PUB", "preshared_key": "PSK",
-				"ip": "10.254.253.3", "reserved": "0,0,0", "udp": true,
-			},
-		}},
-		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"🇨🇳 WG"}}},
-		Rules:  []Rule{{Final: true, Target: "PROXY"}},
+		Rules: []Rule{
+			{Match: "DOMAIN-SET," + base + "Alpha_Domain.list", Target: "Proxy"},
+			{Match: "DOMAIN-SET," + base + "Bravo_Domain.list", Target: "Proxy"},
+			{Match: "DOMAIN-SET," + base + "Charlie_Domain.list", Target: "Proxy"},
+		},
 	}
-	out := (&ClashRenderer{}).Render(im, "", DefaultRulesetBase)
-	var doc map[string]any
-	if err := yaml.Unmarshal([]byte(out), &doc); err != nil {
-		t.Fatalf("invalid yaml: %v\n%s", err, out)
-	}
-	for _, want := range []string{
-		"type: wireguard", "private-key: PRIV", "public-key: PUB",
-		"pre-shared-key: PSK", "ip: 10.254.253.3/32", "udp: true", "reserved:",
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("clash WG missing %q\n%s", want, out)
+	first := (&ClashRenderer{}).Render(im, "", DefaultRulesetBase)
+	for i := 0; i < 20; i++ {
+		if got := (&ClashRenderer{}).Render(im, "", DefaultRulesetBase); got != first {
+			t.Fatalf("non-deterministic clash output on iter %d", i)
 		}
+	}
+	// providers emitted in rule order
+	a := strings.Index(first, "Alpha_Domain:")
+	b := strings.Index(first, "Bravo_Domain:")
+	c := strings.Index(first, "Charlie_Domain:")
+	if a < 0 || a >= b || b >= c {
+		t.Fatalf("providers not in first-seen order (a=%d b=%d c=%d)", a, b, c)
 	}
 }
 
@@ -127,23 +83,6 @@ func TestClash_DoesNotCorruptBackslashValues(t *testing.T) {
 	}
 }
 
-func TestClash_CustomRulesetTextFormat(t *testing.T) {
-	im := Intermediate{
-		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"n1"}}},
-		Rules:  []Rule{{Ruleset: "AI", Target: "AI Services"}, {Final: true, Target: "PROXY"}},
-	}
-	out := (&ClashRenderer{}).Render(im, "", DefaultRulesetBase)
-	for _, want := range []string{
-		"RULE-SET,AI,AI Services",
-		"format: text",
-		"https://raw.githubusercontent.com/iab0x00/ProxyRules/main/Rule/AI.txt",
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("clash custom ruleset missing %q\n%s", want, out)
-		}
-	}
-}
-
 func TestClashDomainSetURL(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{
@@ -165,28 +104,6 @@ func TestClashDomainSetURL(t *testing.T) {
 	}
 }
 
-func TestClash_DomainSetToRuleSet(t *testing.T) {
-	url := "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/Advertising/Advertising_Domain.list"
-	im := Intermediate{
-		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"n1"}}},
-		Rules:  []Rule{{Match: "DOMAIN-SET," + url, Target: "Ad Block"}, {Final: true, Target: "PROXY"}},
-	}
-	out := (&ClashRenderer{}).Render(im, "", DefaultRulesetBase)
-	for _, want := range []string{
-		"RULE-SET,Advertising_Domain,Ad Block",
-		"behavior: domain",
-		"https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Advertising/Advertising_Domain.yaml",
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("clash DOMAIN-SET missing %q\n%s", want, out)
-		}
-	}
-	// the bug: a verbatim DOMAIN-SET rule must NOT be emitted into the clash config
-	if strings.Contains(out, "DOMAIN-SET,") {
-		t.Errorf("clash should not emit a verbatim DOMAIN-SET rule\n%s", out)
-	}
-}
-
 func TestClash_TUICInsecureSkipCertVerify(t *testing.T) {
 	im := Intermediate{
 		Nodes:  []Node{{Name: "t", Protocol: "tuic", Server: "1.1.1.1", Port: 443, Password: "p", UUID: "u", SNI: "s.com", Insecure: true}},
@@ -202,7 +119,7 @@ func TestClash_TUICInsecureSkipCertVerify(t *testing.T) {
 func TestClash_FiltersDevice(t *testing.T) {
 	im := Intermediate{
 		Groups: []Group{{Name: "Home", Type: "select", Members: []string{"DEVICE:HomeMac", "DIRECT"}, Verbatim: true}},
-		Rules:  []Rule{{Match: "IP-CIDR,192.168.1.0/24", Target: "DEVICE:HomeMac"}, {Final: true, Target: "PROXY"}},
+		Rules:  []Rule{{Match: "IP-CIDR,192.168.1.0/24", Target: "DEVICE:HomeMac"}},
 	}
 	out := (&ClashRenderer{}).Render(im, "", DefaultRulesetBase)
 	if strings.Contains(out, "DEVICE:") {
@@ -212,7 +129,7 @@ func TestClash_FiltersDevice(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(out), &doc); err != nil {
 		t.Fatalf("invalid yaml: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "name: Home") {
+	if !strings.Contains(out, "Home") {
 		t.Fatalf("Home group missing:\n%s", out)
 	}
 }

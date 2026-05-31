@@ -3,6 +3,8 @@ package subgen
 import (
 	"fmt"
 	"strings"
+
+	"github.com/hg-claw/Shepherd/internal/plugins/subgen/templates"
 )
 
 type SurgeRenderer struct{}
@@ -99,81 +101,73 @@ func (r *SurgeRenderer) Render(im Intermediate, subURL, rulesetBase string) stri
 	return r.render(im, subURL, rulesetBase, "surge")
 }
 
-// render builds the Surge-family .conf for target "surge" or "shadowrocket".
-// ShadowRocket gets inline WireGuard ([Proxy] line) and, having no Ponte, filters
-// out Surge-only DEVICE: members/rules; Surge keeps them.
+// render builds the Surge-family .conf for target "surge" or "shadowrocket" by
+// filling the embedded oixCloud template with the user's nodes + custom logic.
+// ShadowRocket gets inline WireGuard ([Proxy] line) and filters out Surge-only
+// DEVICE: members/rules; Surge keeps them.
 func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target string) string {
 	wgInline := target == "shadowrocket"
 	filterDevice := target != "surge"
-	var b strings.Builder
-	fmt.Fprintf(&b, "#!MANAGED-CONFIG %s interval=43200 strict=false\n\n", subURL)
 
-	var skipped []string
-	for _, n := range im.Nodes {
-		if !r.Supports(n.Protocol) {
-			skipped = append(skipped, n.Name)
-		}
-	}
-	if len(skipped) > 0 {
-		fmt.Fprintf(&b, "# skipped %d node(s) not supported by surge: %s\n", len(skipped), strings.Join(skipped, ", "))
-	}
-
-	b.WriteString("[General]\n")
-	if g := strings.TrimSpace(im.General); g != "" {
-		b.WriteString(g + "\n\n")
-	} else {
-		b.WriteString("bypass-system = true\n\n")
-	}
-
-	b.WriteString("[Proxy]\nDIRECT = direct\n")
-	type wgSec struct {
-		n   Node
-		sec string
-	}
-	var wgSecs []wgSec
+	var proxies, wg strings.Builder
+	var names []string
+	wgN := 0
 	for _, n := range im.Nodes {
 		if !r.Supports(n.Protocol) {
 			continue
 		}
+		names = append(names, n.Name)
 		if n.Protocol == "wireguard" {
 			if wgInline {
-				b.WriteString(shadowrocketWGLine(n) + "\n")
+				proxies.WriteString(shadowrocketWGLine(n) + "\n")
 			} else {
-				sec := fmt.Sprintf("wg%d", len(wgSecs))
-				fmt.Fprintf(&b, "%s = wireguard, section-name=%s\n", n.Name, sec)
-				wgSecs = append(wgSecs, wgSec{n, sec})
+				sec := fmt.Sprintf("wg%d", wgN)
+				wgN++
+				fmt.Fprintf(&proxies, "%s = wireguard, section-name=%s\n", n.Name, sec)
+				wg.WriteString("\n" + surgeWGSection(n, sec))
 			}
 			continue
 		}
-		b.WriteString(r.proxyLine(n) + "\n")
+		proxies.WriteString(r.proxyLine(n) + "\n")
+	}
+	nodeList := strings.Join(names, ", ")
+
+	var crules strings.Builder
+	for _, rule := range im.Rules {
+		if filterDevice && strings.HasPrefix(rule.Target, "DEVICE:") {
+			continue
+		}
+		crules.WriteString(surgeRuleLine(rule, rulesetBase) + "\n")
 	}
 
-	b.WriteString("\n[Proxy Group]\n")
+	var cgroups strings.Builder
 	for _, g := range im.Groups {
 		if filterDevice {
 			if g.Members = dropDevicePolicies(g.Members); len(g.Members) == 0 {
 				continue
 			}
 		}
-		b.WriteString(r.groupLine(g) + "\n")
+		cgroups.WriteString(r.groupLine(g) + "\n")
 	}
-	b.WriteString("\n[Rule]\n")
-	for _, rule := range im.Rules {
-		if filterDevice && strings.HasPrefix(rule.Target, "DEVICE:") {
-			continue
-		}
-		b.WriteString(surgeRuleLine(rule, rulesetBase) + "\n")
-	}
-	if u := strings.TrimSpace(im.URLRewrite); u != "" {
-		b.WriteString("\n[URL Rewrite]\n" + u + "\n")
-	}
+
+	mitm := ""
 	if m := strings.TrimSpace(im.MITM); m != "" {
-		b.WriteString("\n[MITM]\n" + m + "\n")
+		mitm = "[MITM]\n" + m + "\n"
 	}
-	for _, w := range wgSecs {
-		b.WriteString("\n" + surgeWGSection(w.n, w.sec))
+
+	out := templates.Surge
+	if nodeList == "" {
+		out = strings.ReplaceAll(out, ", {{NODES}}", "")
 	}
-	return b.String()
+	out = strings.ReplaceAll(out, "{{PROXIES}}", strings.TrimRight(proxies.String(), "\n"))
+	out = strings.ReplaceAll(out, "{{WIREGUARD}}", strings.TrimRight(wg.String(), "\n"))
+	out = strings.ReplaceAll(out, "{{NODES}}", nodeList)
+	out = strings.ReplaceAll(out, "{{CUSTOM_RULES}}", strings.TrimRight(crules.String(), "\n"))
+	out = strings.ReplaceAll(out, "{{CUSTOM_GROUPS}}", strings.TrimRight(cgroups.String(), "\n"))
+	out = strings.ReplaceAll(out, "{{GENERAL_EXTRA}}", strings.TrimSpace(im.General))
+	out = strings.ReplaceAll(out, "{{URLREWRITE_EXTRA}}", strings.TrimSpace(im.URLRewrite))
+	out = strings.ReplaceAll(out, "{{MITM}}", mitm)
+	return fmt.Sprintf("#!MANAGED-CONFIG %s interval=43200 strict=false\n", subURL) + out
 }
 
 // surgeWGSection renders a Surge [WireGuard <sec>] block. reserved has no Surge

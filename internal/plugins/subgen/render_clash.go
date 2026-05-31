@@ -99,7 +99,7 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, _ string) string {
 			strings.ReplaceAll(g.Name, "'", "''"), g.Type, strings.Join(q, ", "), extra)
 	}
 
-	out := templates.Clash
+	out := filterClashGroups(templates.Clash, disabledServiceSet(im.DisabledGroups))
 	out = strings.ReplaceAll(out, "{{PROXIES}}", strings.TrimRight(proxies.String(), "\n"))
 	if nodeList == "" {
 		out = strings.ReplaceAll(out, ", {{NODES}}", "")
@@ -112,6 +112,152 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, _ string) string {
 	out = strings.ReplaceAll(out, "{{CUSTOM_PROVIDERS}}", strings.TrimRight(cproviders.String(), "\n"))
 	out = strings.ReplaceAll(out, "{{CLASH_EXTRA}}", strings.TrimSpace(im.ClashGeneral))
 	return out
+}
+
+// filterClashGroups removes the proxy-group, rule, and rule-provider entries of
+// any disabled service group from the fixed Clash template while keeping it valid
+// YAML. A rule-provider is dropped only if it was referenced before filtering AND
+// is no longer referenced after — so an empty disabled set returns the template
+// byte-for-byte unchanged, and providers never referenced by a rule are left
+// alone. proxy-groups precede rules precede rule-providers in the template, so a
+// single forward pass has the full surviving-reference set ready by the time the
+// rule-providers block is reached.
+func filterClashGroups(tmpl string, disabled map[string]bool) string {
+	if len(disabled) == 0 {
+		return tmpl
+	}
+	lines := strings.Split(tmpl, "\n")
+
+	// References that exist before any filtering (RULE-SET,<provider>,<group>).
+	refBefore := map[string]bool{}
+	for _, line := range lines {
+		if p, _, ok := clashRuleRef(line); ok {
+			refBefore[p] = true
+		}
+	}
+
+	out := make([]string, 0, len(lines))
+	refAfter := map[string]bool{}
+	section := ""
+	for _, line := range lines {
+		if h, ok := clashTopKey(line); ok {
+			section = h
+			out = append(out, line)
+			continue
+		}
+		switch section {
+		case "proxy-groups":
+			if name, ok := clashGroupName(line); ok && disabled[name] {
+				continue
+			}
+		case "rules":
+			if p, g, ok := clashRuleRef(line); ok {
+				if disabled[g] {
+					continue
+				}
+				refAfter[p] = true
+			} else if g, ok := clashRuleTarget(line); ok && disabled[g] {
+				continue
+			}
+		case "rule-providers":
+			if key, ok := clashProviderKey(line); ok && refBefore[key] && !refAfter[key] {
+				continue
+			}
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
+}
+
+// clashTopKey reports whether line is a top-level (column-0) YAML key, and
+// returns the key name (without trailing ":") so the caller can track sections.
+// Marker lines like {{CUSTOM_RULES}} are NOT treated as section headers (they
+// live inside a section and must not reset it). Any other column-0 non-comment
+// line does reset the section.
+func clashTopKey(line string) (string, bool) {
+	if line == "" || line[0] == ' ' || line[0] == '\t' || line[0] == '#' {
+		return "", false
+	}
+	// {{...}} markers are inside sections; don't treat them as section resets.
+	if strings.HasPrefix(line, "{{") {
+		return "", false
+	}
+	if i := strings.Index(line, ":"); i > 0 {
+		return line[:i], true
+	}
+	return "_", true // unexpected column-0 line — still resets section
+}
+
+// clashGroupName extracts the name of a "- { name: <G>, ... }" proxy-group item.
+func clashGroupName(line string) (string, bool) {
+	t := strings.TrimSpace(line)
+	if !strings.HasPrefix(t, "- {") {
+		return "", false
+	}
+	i := strings.Index(t, "name:")
+	if i < 0 {
+		return "", false
+	}
+	rest := t[i+len("name:"):]
+	if j := strings.Index(rest, ","); j >= 0 {
+		rest = rest[:j]
+	}
+	return strings.Trim(strings.TrimSpace(rest), "'"), true
+}
+
+// clashRuleBody returns the unquoted payload of a "    - '<payload>'" rule item,
+// or ("", false) for non-rule lines (blank, marker, section header).
+func clashRuleBody(line string) (string, bool) {
+	t := strings.TrimSpace(line)
+	if !strings.HasPrefix(t, "- ") {
+		return "", false
+	}
+	t = strings.Trim(strings.TrimSpace(strings.TrimPrefix(t, "- ")), "'")
+	if t == "" || strings.HasPrefix(t, "{{") {
+		return "", false
+	}
+	return t, true
+}
+
+// clashRuleRef returns (provider, group, true) for a "RULE-SET,<provider>,<group>"
+// rule, else ("", "", false).
+func clashRuleRef(line string) (provider, group string, ok bool) {
+	body, ok := clashRuleBody(line)
+	if !ok {
+		return "", "", false
+	}
+	fields := strings.Split(body, ",")
+	if len(fields) >= 3 && strings.EqualFold(strings.TrimSpace(fields[0]), "RULE-SET") {
+		return strings.TrimSpace(fields[1]), strings.TrimSpace(fields[len(fields)-1]), true
+	}
+	return "", "", false
+}
+
+// clashRuleTarget returns the policy a non-RULE-SET rule routes to (last field).
+func clashRuleTarget(line string) (string, bool) {
+	body, ok := clashRuleBody(line)
+	if !ok {
+		return "", false
+	}
+	fields := strings.Split(body, ",")
+	if len(fields) < 2 {
+		return "", false
+	}
+	return strings.TrimSpace(fields[len(fields)-1]), true
+}
+
+// clashProviderKey returns the YAML key of a "    <Key>: { ... }" rule-provider
+// line, unquoting it; ("", false) for markers/comments/blank lines.
+func clashProviderKey(line string) (string, bool) {
+	t := strings.TrimSpace(line)
+	if t == "" || strings.HasPrefix(t, "{{") || strings.HasPrefix(t, "#") {
+		return "", false
+	}
+	i := strings.Index(t, ":")
+	if i <= 0 {
+		return "", false
+	}
+	return strings.Trim(strings.TrimSpace(t[:i]), "'"), true
 }
 
 // domainSetURL returns the list URL of a "DOMAIN-SET,<url>" custom rule, or

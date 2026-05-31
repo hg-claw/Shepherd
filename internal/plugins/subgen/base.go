@@ -19,13 +19,14 @@ type Rule struct {
 }
 
 type Intermediate struct {
-	Nodes        []Node
-	Groups       []Group
-	Rules        []Rule
-	General      string // Surge [General] body; empty → renderer default
-	MITM         string // Surge [MITM] body; empty → section omitted
-	URLRewrite   string // Surge [URL Rewrite] body; empty → section omitted
-	ClashGeneral string // Clash YAML preamble; empty → {mode: rule}
+	Nodes          []Node
+	Groups         []Group
+	Rules          []Rule
+	General        string   // Surge [General] body; empty → renderer default
+	MITM           string   // Surge [MITM] body; empty → section omitted
+	URLRewrite     string   // Surge [URL Rewrite] body; empty → section omitted
+	ClashGeneral   string   // Clash YAML preamble; empty → {mode: rule}
+	DisabledGroups []string // excluded oixCloud service groups (normalized)
 }
 
 // Assemble builds the target-agnostic model for the fixed-template renderers.
@@ -39,11 +40,12 @@ func Assemble(nodes []Node, spec TemplateSpec) Intermediate {
 	}
 	dedupeNodeNames(nodes)
 	im := Intermediate{
-		Nodes:        nodes,
-		General:      spec.General,
-		MITM:         spec.MITM,
-		URLRewrite:   spec.URLRewrite,
-		ClashGeneral: spec.ClashGeneral,
+		Nodes:          nodes,
+		General:        spec.General,
+		MITM:           spec.MITM,
+		URLRewrite:     spec.URLRewrite,
+		ClashGeneral:   spec.ClashGeneral,
+		DisabledGroups: normalizeServiceGroups(spec.DisabledGroups),
 	}
 	for _, cg := range spec.CustomGroups {
 		members := append([]string(nil), cg.Members...)

@@ -28,81 +28,29 @@ type Intermediate struct {
 	ClashGeneral string // Clash YAML preamble; empty → {mode: rule}
 }
 
-const autoSelectGroup = "Auto Select"
-const mainProxyGroup = "PROXY"
-
-// Assemble builds the target-agnostic model.
-//
-// Groups, in order: the main "PROXY" select (members = optional "Auto Select"
-// then every node name), an "Auto Select" url-test (only if IncludeAutoSelect),
-// then one switchable "select" group per category. A category group is named
-// after the category; its members are the configured policy (first → default
-// selection), PROXY, DIRECT, REJECT, then every node — de-duplicated.
-//
-// Rules (semantic): custom rules first (explicit policy), then one rule per
-// category routed to the category's GROUP by name, then the catch-all (Final).
-// The free-text General/MITM/ClashGeneral blocks ride along to the renderer,
-// which resolves rule-set URLs for its own target.
+// Assemble builds the target-agnostic model for the fixed-template renderers.
+// The base template (dler.io/oixCloud) owns the proxy-group taxonomy, the
+// rule-sets, and the catch-all; Assemble carries only what the user customizes:
+// the node set (selected + custom), the custom groups, the custom rules, and the
+// free-text section bodies. spec.Categories no longer affects output.
 func Assemble(nodes []Node, spec TemplateSpec) Intermediate {
 	if custom, _ := ParseShareLinks(spec.CustomNodes); len(custom) > 0 {
 		nodes = append(nodes, custom...)
 	}
 	dedupeNodeNames(nodes)
-	im := Intermediate{Nodes: nodes, General: spec.General, MITM: spec.MITM, URLRewrite: spec.URLRewrite, ClashGeneral: spec.ClashGeneral}
-
-	allNames := make([]string, 0, len(nodes))
-	for _, n := range nodes {
-		allNames = append(allNames, n.Name)
-	}
-
-	mainMembers := []string{}
-	if spec.IncludeAutoSelect {
-		mainMembers = append(mainMembers, autoSelectGroup)
-	}
-	mainMembers = append(mainMembers, allNames...)
-	im.Groups = append(im.Groups, Group{Name: mainProxyGroup, Type: "select", Members: mainMembers})
-	if spec.IncludeAutoSelect {
-		im.Groups = append(im.Groups, Group{Name: autoSelectGroup, Type: "url-test", Members: allNames})
+	im := Intermediate{
+		Nodes:        nodes,
+		General:      spec.General,
+		MITM:         spec.MITM,
+		URLRewrite:   spec.URLRewrite,
+		ClashGeneral: spec.ClashGeneral,
 	}
 	for _, cg := range spec.CustomGroups {
 		members := append([]string(nil), cg.Members...)
 		im.Groups = append(im.Groups, Group{Name: cg.Name, Type: cg.Type, Members: members, Verbatim: true})
 	}
-
-	for _, c := range spec.Categories {
-		members := dedupeStrings(append([]string{c.Policy, mainProxyGroup, "DIRECT", "REJECT"}, allNames...))
-		im.Groups = append(im.Groups, Group{Name: c.Name, Type: "select", Members: members})
-	}
-
 	for _, r := range spec.CustomRules {
 		im.Rules = append(im.Rules, Rule{Match: r.Match, Target: r.Policy})
 	}
-	for _, c := range spec.Categories {
-		cat, _ := categoryByName(c.Name) // categories are validated by ParseTemplate
-		if cat.Native != "" {
-			im.Rules = append(im.Rules, Rule{Native: cat.Native, Target: c.Name})
-		} else {
-			for _, folder := range cat.Rulesets {
-				im.Rules = append(im.Rules, Rule{Ruleset: folder, Target: c.Name})
-			}
-		}
-	}
-	im.Rules = append(im.Rules, Rule{Final: true, Target: spec.Final})
 	return im
-}
-
-// dedupeStrings drops later duplicates, preserving first-seen order. Keeps a
-// category group's default policy from repeating when it equals one of the
-// standard PROXY/DIRECT/REJECT members.
-func dedupeStrings(in []string) []string {
-	seen := make(map[string]bool, len(in))
-	out := make([]string, 0, len(in))
-	for _, s := range in {
-		if seen[s] {
-			continue
-		}
-		seen[s] = true
-		out = append(out, s)
-	}
-	return out
 }

@@ -112,6 +112,7 @@ rules:
     - 'GEOIP,CN,Domestic'
     - 'MATCH,Others'
 rule-providers:
+{{CUSTOM_PROVIDERS}}
     AdBlock: { type: http, behavior: classical, url: 'https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Clash/Provider/AdBlock.yaml', path: ./Rules/AdBlock, interval: 86400 }
     Special: { type: http, behavior: classical, url: 'https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Clash/Provider/Special.yaml', path: ./Rules/Special, interval: 86400 }
     PROXY: { type: http, behavior: classical, url: 'https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Clash/Provider/Proxy.yaml', path: ./Rules/Proxy, interval: 86400 }

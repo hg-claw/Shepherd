@@ -35,6 +35,33 @@ func TestClash_FillsTemplate(t *testing.T) {
 	}
 }
 
+// TestClash_DeterministicProviders guards against map-iteration churn: multiple
+// DOMAIN-SET custom rules must render the rule-providers block in a stable
+// (first-seen) order so a regenerated subscription doesn't diff for no reason.
+func TestClash_DeterministicProviders(t *testing.T) {
+	base := "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/X/"
+	im := Intermediate{
+		Rules: []Rule{
+			{Match: "DOMAIN-SET," + base + "Alpha_Domain.list", Target: "Proxy"},
+			{Match: "DOMAIN-SET," + base + "Bravo_Domain.list", Target: "Proxy"},
+			{Match: "DOMAIN-SET," + base + "Charlie_Domain.list", Target: "Proxy"},
+		},
+	}
+	first := (&ClashRenderer{}).Render(im, "", DefaultRulesetBase)
+	for i := 0; i < 20; i++ {
+		if got := (&ClashRenderer{}).Render(im, "", DefaultRulesetBase); got != first {
+			t.Fatalf("non-deterministic clash output on iter %d", i)
+		}
+	}
+	// providers emitted in rule order
+	a := strings.Index(first, "Alpha_Domain:")
+	b := strings.Index(first, "Bravo_Domain:")
+	c := strings.Index(first, "Charlie_Domain:")
+	if a < 0 || a >= b || b >= c {
+		t.Fatalf("providers not in first-seen order (a=%d b=%d c=%d)", a, b, c)
+	}
+}
+
 func TestClash_DoesNotCorruptBackslashValues(t *testing.T) {
 	im := Intermediate{
 		Nodes:  []Node{{Name: "n1", Protocol: "trojan", Server: "1.1.1.1", Port: 443, Password: `secretAx`, SNI: "x.com"}},

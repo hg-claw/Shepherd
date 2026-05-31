@@ -25,7 +25,7 @@ func (*ClashRenderer) Supports(p string) bool {
 // TEXT substitution, preserving the file's exact formatting and comments. subURL
 // and rulesetBase are unused — the template hard-codes the dler.io rule-providers.
 // Only the user's custom nodes/groups/rules feed the {{...}} markers.
-func (r *ClashRenderer) Render(im Intermediate, _ string, rulesetBase string) string {
+func (r *ClashRenderer) Render(im Intermediate, _ string, _ string) string {
 	// {{PROXIES}}: each node as a 4-space-indented YAML block-style list item.
 	var proxies strings.Builder
 	var names []string
@@ -52,8 +52,12 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, rulesetBase string) st
 	nodeList := strings.Join(quoted, ", ")
 
 	// {{CUSTOM_RULES}} + {{CUSTOM_PROVIDERS}}: custom rules; DOMAIN-SET → provider.
-	providers := map[string]string{}
-	var crules strings.Builder
+	// im.Rules carries only the user's custom rules (Match/Target); the fixed
+	// template owns the dler.io rule-sets and the catch-all, so Ruleset/Native/
+	// Final on a Rule are not reachable here. Providers are emitted in first-seen
+	// rule order (a map only de-dupes) so the output is deterministic.
+	seen := map[string]bool{}
+	var crules, cproviders strings.Builder
 	for _, rl := range im.Rules {
 		if strings.HasPrefix(rl.Target, "DEVICE:") {
 			continue
@@ -61,22 +65,19 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, rulesetBase string) st
 		if u, ok := domainSetURL(rl.Match); ok {
 			url := clashDomainSetURL(u)
 			name := domainSetName(url)
-			if _, exists := providers[name]; !exists {
+			if !seen[name] {
+				seen[name] = true
 				format := "yaml"
 				if !strings.HasSuffix(url, ".yaml") && !strings.HasSuffix(url, ".yml") {
 					format = "text"
 				}
-				providers[name] = fmt.Sprintf("    %s: { type: http, behavior: domain, format: %s, url: '%s', path: ./ruleset/%s, interval: 86400 }",
+				fmt.Fprintf(&cproviders, "    %s: { type: http, behavior: domain, format: %s, url: '%s', path: ./ruleset/%s, interval: 86400 }\n",
 					name, format, url, name)
 			}
 			crules.WriteString("    - 'RULE-SET," + name + "," + rl.Target + "'\n")
 		} else {
 			crules.WriteString("    - '" + rl.Match + "," + rl.Target + "'\n")
 		}
-	}
-	var cproviders strings.Builder
-	for _, line := range providers {
-		cproviders.WriteString(line + "\n")
 	}
 
 	// {{CUSTOM_GROUPS}}: custom groups as proxy-group list items.

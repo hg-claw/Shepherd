@@ -47,8 +47,8 @@ func TestService_PreviewTemplate(t *testing.T) {
 		t.Fatalf("content-type=%s", ct)
 	}
 	// Sample nodes render into [Proxy], the category becomes a RULE-SET line,
-	// and the FINAL rule trails. Sample nodes never get skipped.
-	for _, want := range []string{"[Proxy]", "= trojan,", "= ss,", "RULE-SET,", "FINAL,PROXY"} {
+	// and the template's fixed FINAL rule trails. Sample nodes never get skipped.
+	for _, want := range []string{"[Proxy]", "= trojan,", "= ss,", "RULE-SET,", "FINAL,Others"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("preview missing %q:\n%s", want, out)
 		}

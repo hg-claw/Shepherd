@@ -1,9 +1,11 @@
 package subgen
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
+	"github.com/hg-claw/Shepherd/internal/plugins/subgen/templates"
 	"gopkg.in/yaml.v3"
 )
 
@@ -19,112 +21,96 @@ func (*ClashRenderer) Supports(p string) bool {
 	return false
 }
 
-// Render produces a mihomo (Clash.Meta) YAML config. subURL is unused (Clash has
-// no managed-config header). The ClashGeneral preamble supplies top-level keys
-// (dns, mode, …); when empty the default is {mode: rule}.
+// Render fills the embedded fixed oixCloud Clash template (templates.Clash) by
+// TEXT substitution, preserving the file's exact formatting and comments. subURL
+// and rulesetBase are unused — the template hard-codes the dler.io rule-providers.
+// Only the user's custom nodes/groups/rules feed the {{...}} markers.
 func (r *ClashRenderer) Render(im Intermediate, _ string, rulesetBase string) string {
-	base := map[string]any{"mode": "rule"}
-	if g := strings.TrimSpace(im.ClashGeneral); g != "" {
-		var m map[string]any
-		if err := yaml.Unmarshal([]byte(g), &m); err == nil && m != nil {
-			base = m
-		}
-	}
-
-	proxies := []map[string]any{}
+	// {{PROXIES}}: each node as a 4-space-indented YAML block-style list item.
+	var proxies strings.Builder
+	var names []string
 	for _, n := range im.Nodes {
-		if px := clashProxy(n); px != nil {
-			proxies = append(proxies, px)
-		}
-	}
-	if len(proxies) > 0 {
-		base["proxies"] = proxies
-	}
-
-	groups := []map[string]any{}
-	for _, g := range im.Groups {
-		members := dropDevicePolicies(g.Members) // Clash has no Ponte
-		if len(members) == 0 {
+		px := clashProxy(n)
+		if px == nil {
 			continue
 		}
-		m := map[string]any{"name": g.Name, "type": g.Type, "proxies": members}
-		if g.Type == "url-test" {
-			m["url"] = "http://www.gstatic.com/generate_204"
-			m["interval"] = 300
+		names = append(names, n.Name)
+		b, err := yaml.Marshal([]map[string]any{px})
+		if err != nil {
+			continue
 		}
-		groups = append(groups, m)
-	}
-	if len(groups) > 0 {
-		base["proxy-groups"] = groups
+		for _, line := range strings.Split(strings.TrimRight(string(b), "\n"), "\n") {
+			proxies.WriteString("    " + line + "\n")
+		}
 	}
 
-	providers := map[string]any{}
-	rules := []string{}
+	// {{NODES}}: node names as a YAML inline-seq fragment (single-quoted).
+	quoted := make([]string, 0, len(names))
+	for _, nm := range names {
+		quoted = append(quoted, "'"+strings.ReplaceAll(nm, "'", "''")+"'")
+	}
+	nodeList := strings.Join(quoted, ", ")
+
+	// {{CUSTOM_RULES}} + {{CUSTOM_PROVIDERS}}: custom rules; DOMAIN-SET → provider.
+	providers := map[string]string{}
+	var crules strings.Builder
 	for _, rl := range im.Rules {
 		if strings.HasPrefix(rl.Target, "DEVICE:") {
 			continue
 		}
-		switch {
-		case rl.Final:
-			rules = append(rules, "MATCH,"+rl.Target)
-		case rl.Ruleset != "":
-			if _, ok := providers[rl.Ruleset]; !ok {
-				url := rulesetURL(rl.Ruleset, "clash", rulesetBase)
-				// blackmatrix7 ships .yaml rule-providers; custom URLs (e.g. a
-				// classical .txt list) use the text format.
-				format, ext := "yaml", "yaml"
+		if u, ok := domainSetURL(rl.Match); ok {
+			url := clashDomainSetURL(u)
+			name := domainSetName(url)
+			if _, exists := providers[name]; !exists {
+				format := "yaml"
 				if !strings.HasSuffix(url, ".yaml") && !strings.HasSuffix(url, ".yml") {
-					format, ext = "text", "txt"
+					format = "text"
 				}
-				providers[rl.Ruleset] = map[string]any{
-					"type":     "http",
-					"behavior": "classical",
-					"format":   format,
-					"url":      url,
-					"path":     "./ruleset/" + rl.Ruleset + "." + ext,
-					"interval": 86400,
-				}
+				providers[name] = fmt.Sprintf("    %s: { type: http, behavior: domain, format: %s, url: '%s', path: ./ruleset/%s, interval: 86400 }",
+					name, format, url, name)
 			}
-			rules = append(rules, "RULE-SET,"+rl.Ruleset+","+rl.Target)
-		case rl.Native != "":
-			rules = append(rules, nativeToClash(rl.Native)+","+rl.Target)
-		default:
-			// DOMAIN-SET is a Surge/ShadowRocket directive Clash rejects; convert
-			// it to a behavior:domain rule-provider pointing at the Clash variant
-			// of the list (blackmatrix7's rule/Clash/<...>_Domain.yaml).
-			if u, ok := domainSetURL(rl.Match); ok {
-				url := clashDomainSetURL(u)
-				name := domainSetName(url)
-				if _, exists := providers[name]; !exists {
-					format, ext := "yaml", "yaml"
-					if !strings.HasSuffix(url, ".yaml") && !strings.HasSuffix(url, ".yml") {
-						format, ext = "text", "txt"
-					}
-					providers[name] = map[string]any{
-						"type":     "http",
-						"behavior": "domain",
-						"format":   format,
-						"url":      url,
-						"path":     "./ruleset/" + name + "." + ext,
-						"interval": 86400,
-					}
-				}
-				rules = append(rules, "RULE-SET,"+name+","+rl.Target)
-			} else {
-				rules = append(rules, rl.Match+","+rl.Target)
-			}
+			crules.WriteString("    - 'RULE-SET," + name + "," + rl.Target + "'\n")
+		} else {
+			crules.WriteString("    - '" + rl.Match + "," + rl.Target + "'\n")
 		}
 	}
-	if len(providers) > 0 {
-		base["rule-providers"] = providers
+	var cproviders strings.Builder
+	for _, line := range providers {
+		cproviders.WriteString(line + "\n")
 	}
-	base["rules"] = rules
 
-	out, err := yaml.Marshal(base)
-	if err != nil {
-		return "# clash render error: " + err.Error()
+	// {{CUSTOM_GROUPS}}: custom groups as proxy-group list items.
+	var cgroups strings.Builder
+	for _, g := range im.Groups {
+		members := dropDevicePolicies(g.Members)
+		if len(members) == 0 {
+			continue
+		}
+		q := make([]string, 0, len(members))
+		for _, m := range members {
+			q = append(q, "'"+strings.ReplaceAll(m, "'", "''")+"'")
+		}
+		extra := ""
+		if g.Type == "url-test" {
+			extra = ", url: 'http://www.gstatic.com/generate_204', interval: 300"
+		}
+		fmt.Fprintf(&cgroups, "    - { name: '%s', type: %s, proxies: [%s]%s }\n",
+			strings.ReplaceAll(g.Name, "'", "''"), g.Type, strings.Join(q, ", "), extra)
 	}
-	return string(out)
+
+	out := templates.Clash
+	out = strings.ReplaceAll(out, "{{PROXIES}}", strings.TrimRight(proxies.String(), "\n"))
+	if nodeList == "" {
+		out = strings.ReplaceAll(out, ", {{NODES}}", "")
+		out = strings.ReplaceAll(out, "{{NODES}}", "")
+	} else {
+		out = strings.ReplaceAll(out, "{{NODES}}", nodeList)
+	}
+	out = strings.ReplaceAll(out, "{{CUSTOM_RULES}}", strings.TrimRight(crules.String(), "\n"))
+	out = strings.ReplaceAll(out, "{{CUSTOM_GROUPS}}", strings.TrimRight(cgroups.String(), "\n"))
+	out = strings.ReplaceAll(out, "{{CUSTOM_PROVIDERS}}", strings.TrimRight(cproviders.String(), "\n"))
+	out = strings.ReplaceAll(out, "{{CLASH_EXTRA}}", strings.TrimSpace(im.ClashGeneral))
+	return out
 }
 
 // domainSetURL returns the list URL of a "DOMAIN-SET,<url>" custom rule, or
@@ -177,16 +163,6 @@ func domainSetName(u string) string {
 		name = "domainset"
 	}
 	return name
-}
-
-// nativeToClash maps a catalog Native directive to its Clash rule prefix. Clash
-// has no SYSTEM rule-set, so the Private category maps to GEOIP,PRIVATE (mihomo's
-// LAN/loopback group); everything else (e.g. GEOIP,CN) is identical.
-func nativeToClash(native string) string {
-	if native == "RULE-SET,SYSTEM" {
-		return "GEOIP,PRIVATE"
-	}
-	return native
 }
 
 // clashProxy maps a Node to a mihomo proxy map, or nil if unsupported.

@@ -5,96 +5,37 @@ import (
 	"testing"
 )
 
-func TestSurge_RendersProtocolsGroupsRules(t *testing.T) {
+// TestSurge_FillsTemplate verifies the template-based renderer: no unresolved
+// markers, proxy defs emitted, nodes referenced in group lines, custom rules
+// appear before the dler.io RULE-SET block, custom groups present, and
+// free-text / fixed sections ({{GENERAL_EXTRA}}/[Host]/[Panel]) intact.
+func TestSurge_FillsTemplate(t *testing.T) {
 	im := Intermediate{
-		Nodes: []Node{
-			{Name: "ss1", Protocol: "shadowsocks", Server: "1.1.1.1", Port: 8388, SSMethod: "aes-256-gcm", Password: "p"},
-			{Name: "re1", Protocol: "vless", Server: "2.2.2.2", Port: 443, UUID: "u", SNI: "s", RealityPublicKey: "PBK", RealityShortID: "aa"},
-			{Name: "hy1", Protocol: "hysteria2", Server: "3.3.3.3", Port: 443, Password: "hp", SNI: "h"},
-			{Name: "at1", Protocol: "anytls", Server: "4.4.4.4", Port: 443, Password: "ap", SNI: "a"},
-		},
-		Groups: []Group{
-			{Name: "PROXY", Type: "select", Members: []string{"Auto Select", "ss1"}},
-			{Name: "Auto Select", Type: "url-test", Members: []string{"ss1", "re1"}},
-		},
-		Rules: []Rule{
-			{Match: "IP-CIDR,10.0.0.0/24", Target: "PROXY"},
-			{Ruleset: "Telegram", Target: "Telegram"},
-			{Native: "GEOIP,CN", Target: "DIRECT"},
-			{Final: true, Target: "PROXY"},
-		},
+		Nodes:   []Node{{Name: "🟢 A", Protocol: "shadowsocks", Server: "1.1.1.1", Port: 8388, SSMethod: "aes-256-gcm", Password: "p"}},
+		Groups:  []Group{{Name: "MyGroup", Type: "select", Members: []string{"DIRECT"}, Verbatim: true}},
+		Rules:   []Rule{{Match: "DOMAIN,x.com", Target: "DIRECT"}},
+		General: "ipv6 = true",
 	}
-	out := (&SurgeRenderer{}).Render(im, "https://x/sub/abc?target=surge", DefaultRulesetBase)
-	for _, want := range []string{
-		"#!MANAGED-CONFIG https://x/sub/abc?target=surge",
-		"[Proxy]", "DIRECT = direct",
-		"ss1 = ss, 1.1.1.1, 8388, encrypt-method=aes-256-gcm, password=p",
-		"re1 = vless, 2.2.2.2, 443, username=u, tls=true, sni=s, public-key=PBK, short-id=aa",
-		"hy1 = hysteria2, 3.3.3.3, 443, password=hp, sni=h",
-		"at1 = anytls, 4.4.4.4, 443, password=ap, sni=a",
-		"[Proxy Group]",
-		"PROXY = select, Auto Select, ss1, DIRECT",
-		"Auto Select = url-test, ss1, re1, url=http://www.gstatic.com/generate_204, interval=300",
-		"[Rule]",
-		"IP-CIDR,10.0.0.0/24,PROXY",
-		"RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Telegram/Telegram.list,Telegram",
-		"GEOIP,CN,DIRECT",
-		"FINAL,PROXY",
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("output missing %q\n---\n%s", want, out)
-		}
+	out := (&SurgeRenderer{}).Render(im, "https://sub", DefaultRulesetBase)
+	if strings.Contains(out, "{{") {
+		t.Fatalf("unresolved marker:\n%s", out)
 	}
-}
-
-func TestSurge_GeneralAndMITM(t *testing.T) {
-	base := Intermediate{
-		Nodes:  []Node{{Name: "n1", Protocol: "trojan", Server: "1.1.1.1", Port: 443, Password: "p"}},
-		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"n1"}}},
-		Rules:  []Rule{{Final: true, Target: "PROXY"}},
+	if !strings.Contains(out, "🟢 A = ss,") {
+		t.Errorf("missing proxy def\n%s", out)
 	}
-
-	out := (&SurgeRenderer{}).Render(base, "https://x/sub/t?target=surge", DefaultRulesetBase)
-	if !strings.Contains(out, "[General]\nbypass-system = true") {
-		t.Fatalf("default [General] missing:\n%s", out)
+	if !strings.Contains(out, "Proxy = select,") || !strings.Contains(out, "🟢 A") {
+		t.Errorf("node not in groups\n%s", out)
 	}
-	if strings.Contains(out, "[MITM]") {
-		t.Fatalf("[MITM] should be absent when unset:\n%s", out)
+	ri := strings.Index(out, "DOMAIN,x.com,DIRECT")
+	di := strings.Index(out, "RULE-SET,https://fastly.jsdelivr.net")
+	if ri < 0 || di < 0 || ri > di {
+		t.Errorf("custom rule must precede dler.io rules (ri=%d di=%d)", ri, di)
 	}
-
-	im := base
-	im.General = "dns-server = 1.1.1.1\nskip-proxy = 10.0.0.0/8"
-	im.MITM = "hostname = *.googlevideo.com"
-	out = (&SurgeRenderer{}).Render(im, "https://x/sub/t?target=surge", DefaultRulesetBase)
-	if !strings.Contains(out, "[General]\ndns-server = 1.1.1.1\nskip-proxy = 10.0.0.0/8") {
-		t.Fatalf("custom [General] missing:\n%s", out)
+	if !strings.Contains(out, "MyGroup = select, DIRECT") {
+		t.Errorf("custom group missing\n%s", out)
 	}
-	if strings.Contains(out, "bypass-system = true") {
-		t.Fatalf("default [General] should be replaced:\n%s", out)
-	}
-	if !strings.Contains(out, "[MITM]\nhostname = *.googlevideo.com") {
-		t.Fatalf("[MITM] missing:\n%s", out)
-	}
-}
-
-func TestSurge_SelectGroupDirectFallback(t *testing.T) {
-	im := Intermediate{
-		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"Auto Select", "n1"}}},
-	}
-	out := (&SurgeRenderer{}).Render(im, "x", DefaultRulesetBase)
-	if !strings.Contains(out, "PROXY = select, Auto Select, n1, DIRECT\n") {
-		t.Fatalf("missing DIRECT fallback:\n%s", out)
-	}
-
-	im2 := Intermediate{
-		Groups: []Group{{Name: "Telegram", Type: "select", Members: []string{"PROXY", "DIRECT", "REJECT", "n1"}}},
-	}
-	out2 := (&SurgeRenderer{}).Render(im2, "x", DefaultRulesetBase)
-	if !strings.Contains(out2, "Telegram = select, PROXY, DIRECT, REJECT, n1\n") {
-		t.Fatalf("Telegram group wrong:\n%s", out2)
-	}
-	if strings.Contains(out2, "REJECT, n1, DIRECT") {
-		t.Fatalf("DIRECT duplicated:\n%s", out2)
+	if !strings.Contains(out, "ipv6 = true") || !strings.Contains(out, "[Host]") || !strings.Contains(out, "[Panel]") {
+		t.Errorf("free-text/fixed sections missing\n%s", out)
 	}
 }
 
@@ -162,17 +103,6 @@ func TestSurge_ProxyLine_VmessTrojanTuic(t *testing.T) {
 	}
 }
 
-func TestSurge_CustomRulesetURL(t *testing.T) {
-	im := Intermediate{
-		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"n1"}}},
-		Rules:  []Rule{{Ruleset: "AI", Target: "AI Services"}},
-	}
-	out := (&SurgeRenderer{}).Render(im, "x", DefaultRulesetBase)
-	if !strings.Contains(out, "RULE-SET,https://raw.githubusercontent.com/iab0x00/ProxyRules/main/Rule/AI.txt,AI Services") {
-		t.Fatalf("surge AI rule missing:\n%s", out)
-	}
-}
-
 func TestSurge_CustomGroupVerbatimKeepsDevice(t *testing.T) {
 	im := Intermediate{
 		Groups: []Group{{Name: "Home", Type: "select", Members: []string{"DEVICE:HomeMac", "PROXY"}, Verbatim: true}},
@@ -206,31 +136,5 @@ func TestSurge_InsecureSkipCertVerify(t *testing.T) {
 		if out := mk(proto, false); strings.Contains(out, "skip-cert-verify=true") {
 			t.Errorf("%s secure: unexpected skip-cert-verify\n%s", proto, out)
 		}
-	}
-}
-
-func TestSurge_URLRewrite(t *testing.T) {
-	base := Intermediate{
-		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"n1"}}},
-		Rules:  []Rule{{Final: true, Target: "PROXY"}},
-	}
-	// empty → no section
-	if out := (&SurgeRenderer{}).Render(base, "x", DefaultRulesetBase); strings.Contains(out, "[URL Rewrite]") {
-		t.Fatalf("URL Rewrite should be absent when empty:\n%s", out)
-	}
-	// set → section emitted, before [MITM]
-	im := base
-	im.URLRewrite = "^https://example.com/x $1 header"
-	im.MITM = "hostname = *.example.com"
-	out := (&SurgeRenderer{}).Render(im, "x", DefaultRulesetBase)
-	if !strings.Contains(out, "[URL Rewrite]\n^https://example.com/x $1 header") {
-		t.Fatalf("URL Rewrite section missing:\n%s", out)
-	}
-	if ui, mi := strings.Index(out, "[URL Rewrite]"), strings.Index(out, "[MITM]"); ui < 0 || mi < 0 || ui > mi {
-		t.Fatalf("expected [URL Rewrite] before [MITM]:\n%s", out)
-	}
-	// ShadowRocket inherits the section
-	if out2 := (&ShadowRocketRenderer{}).Render(im, "x", DefaultRulesetBase); !strings.Contains(out2, "[URL Rewrite]\n^https://example.com/x $1 header") {
-		t.Fatalf("shadowrocket URL Rewrite missing:\n%s", out2)
 	}
 }

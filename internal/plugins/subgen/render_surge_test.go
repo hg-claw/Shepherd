@@ -186,3 +186,14 @@ func TestSurge_NoDisabledIsParity(t *testing.T) {
 		t.Fatalf("empty disabled set changed Surge output")
 	}
 }
+
+func TestSurge_SkipProxyDrops10Net(t *testing.T) {
+	out := (&SurgeRenderer{}).Render(Intermediate{}, "https://sub", DefaultRulesetBase)
+	if strings.Contains(out, "10.0.0.0/8") {
+		t.Fatalf("skip-proxy must not contain 10.0.0.0/8\n%s", out)
+	}
+	// neighbouring private ranges must remain
+	if !strings.Contains(out, "172.16.0.0/12") || !strings.Contains(out, "192.168.0.0/16") {
+		t.Fatalf("skip-proxy lost other private ranges\n%s", out)
+	}
+}

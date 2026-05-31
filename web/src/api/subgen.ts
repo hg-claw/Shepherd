@@ -22,11 +22,6 @@ export interface SubgenSelection {
   inbound_id: number
 }
 
-export interface SubgenCategory {
-  name: string
-  default_policy: string
-  rule_urls: string[]
-}
 
 const BASE = '/api/admin/plugins/subgen'
 
@@ -91,11 +86,6 @@ export const previewSubgenTemplate = (
   opts?: { signal?: AbortSignal },
 ): Promise<string> =>
   api.postText(`${BASE}/templates/preview`, { rules_json, target }, opts)
-
-// ── categories ────────────────────────────────────────────────────────────────
-
-export const listSubgenCategories = (): Promise<SubgenCategory[]> =>
-  api.get<SubgenCategory[]>(`${BASE}/categories`)
 
 // listSubgenOixGroups returns the ordered selectable oixCloud service-group names.
 export const listSubgenOixGroups = (): Promise<string[]> =>

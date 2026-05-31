@@ -222,7 +222,7 @@ export default function TemplatesTab() {
 
 type PreviewTarget = 'surge' | 'shadowrocket' | 'clash'
 
-function TemplateEditor({
+export function TemplateEditor({
   editing, onClose, onSaved,
 }: {
   editing: { id: number | null; name: string; rules: string }
@@ -277,7 +277,7 @@ function TemplateEditor({
     custom_nodes: customNodes,
     custom_groups: textToCustomGroups(customGroupsText),
     disabled_groups: oixGroups.length
-      ? oixGroups.filter((g) => disabledGroups.has(g))
+      ? selectedToDisabled(oixGroups, new Set(oixGroups.filter((g) => !disabledGroups.has(g))))
       : [...disabledGroups],
   })
 

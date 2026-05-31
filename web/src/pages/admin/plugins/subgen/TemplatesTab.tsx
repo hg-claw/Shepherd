@@ -42,9 +42,10 @@ interface RulesModel {
   clash_general: string
   custom_nodes: string
   custom_groups: CustomGroupModel[]
+  disabled_groups: string[]
 }
 
-function parseRules(rules_json: string): RulesModel {
+export function parseRules(rules_json: string): RulesModel {
   let raw: any = {}
   try { raw = JSON.parse(rules_json || '{}') } catch { raw = {} }
   return {
@@ -68,7 +69,16 @@ function parseRules(rules_json: string): RulesModel {
           members: Array.isArray(g.members) ? g.members.map((m: any) => String(m)) : [],
         }))
       : [],
+    disabled_groups: Array.isArray(raw.disabled_groups)
+      ? raw.disabled_groups.map(String)
+      : [],
   }
+}
+
+// selectedToDisabled returns the catalog groups that are NOT checked, preserving
+// catalog order — this is what gets persisted as disabled_groups.
+export function selectedToDisabled(allGroups: string[], checked: Set<string>): string[] {
+  return allGroups.filter((g) => !checked.has(g))
 }
 
 function customRulesToText(rules: CustomRule[]): string {
@@ -266,6 +276,7 @@ function TemplateEditor({
     clash_general: clashGeneral,
     custom_nodes: customNodes,
     custom_groups: textToCustomGroups(customGroupsText),
+    disabled_groups: [],
   })
 
   // The rules_json we save and preview: the raw text in raw mode, otherwise the

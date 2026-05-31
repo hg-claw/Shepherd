@@ -1,0 +1,223 @@
+#!MANAGED-CONFIG https://oics.net/api/v3/download.getFile/2e6d7ce3-ef65-4be1-b6fe-fd7a59ac937d?surge=smart&lv=2%7C3.png interval=86400
+
+[General]
+loglevel = notify
+
+dns-server = system,119.29.29.29,223.5.5.5,223.6.6.6
+# doh-server = https://doh.pub/dns-query,https://dns.alidns.com/dns-query
+skip-proxy = localhost,*.local,*.ts.net,captive.apple.com,e.crashlytics.com,passenger.t3go.cn,yunbusiness.ccb.com,wxh.wo.cn,gate.lagou.com,www.abchina.com.cn,login-service.mobile-bank.psbc.com,mobile-bank.psbc.com,10.0.0.0/8,100.64.0.0/10,169.254.0.0/16,172.16.0.0/12,192.168.0.0/16,224.0.0.0/4,::1/128,fc00::/7,fd00::/8,fe80::/10,ff00::/8,::ffff:0:0:0:0/96
+# tun-excluded-routes = 192.168.0.0/16,10.0.0.0/8,172.16.0.0/12
+# tun-included-routes = 192.168.1.12/32
+exclude-simple-hostnames = true
+{{GENERAL_EXTRA}}
+
+always-real-ip = *.lan,*.direct,cable.auth.com,*.msftconnecttest.com,*.msftncsi.com,network-test.debian.org,detectportal.firefox.com,resolver1.opendns.com,*.srv.nintendo.net,*.stun.playstation.net,xbox.*.microsoft.com,*.xboxlive.com,stun.*,global.turn.twilio.com,global.stun.twilio.com,app.yinxiang.com,injections.adguard.org,local.adguard.org,cable.auth.com,localhost.*.qq.com,localhost.*.weixin.qq.com,*.logon.battlenet.com.cn,*.logon.battle.net,*.blzstatic.cn,music.163.com,*.music.163.com,*.126.net,musicapi.taihe.com,music.taihe.com,songsearch.kugou.com,trackercdn.kugou.com,*.kuwo.cn,api-jooxtt.sanook.com,api.joox.com,joox.com,y.qq.com,*.y.qq.com,streamoc.music.tc.qq.com,mobileoc.music.tc.qq.com,isure.stream.qqmusic.qq.com,dl.stream.qqmusic.qq.com,aqqmusic.tc.qq.com,amobile.music.tc.qq.com,*.xiami.com,*.music.migu.cn,music.migu.cn,proxy.golang.org,*.mcdn.bilivideo.cn,*.cmpassport.com,id6.me,open.e.189.cn,opencloud.wostore.cn,id.mail.wo.cn,mdn.open.wo.cn,hmrz.wo.cn,nishub1.10010.com,enrichgw.10010.com,*.wosms.cn,*.jegotrip.com.cn,*.icitymobile.mobi,*.pingan.com.cn,*.cmbchina.com,*.10099.com.cn,*.microdone.cn,pool.ntp.org,*.pool.ntp.org,ntp.*.com,time.*.com,ntp?.*.com,time?.*.com,time.*.gov,time.*.edu.cn,*.ntp.org.cn,PDC._msDCS.*.*,DC._msDCS.*.*,GC._msDCS.*.*
+
+hijack-dns = 8.8.8.8:53,8.8.4.4:53,1.1.1.1:53,1.0.0.1:53
+
+http-listen = 0.0.0.0
+socks5-listen = 0.0.0.0
+wifi-access-http-port = 6152
+wifi-access-socks5-port = 6153
+
+external-controller-access = dler@0.0.0.0:6170
+
+internet-test-url = http://wifi.vivo.com.cn/generate_204
+proxy-test-url = http://cp.cloudflare.com/generate_204
+test-timeout = 3
+
+allow-wifi-access = true
+show-error-page-for-reject = true
+udp-policy-not-supported-behaviour = DIRECT
+ipv6 = false
+wifi-assist = false
+all-hybrid = false
+
+[Proxy]
+Direct = direct
+Block = reject
+
+{{PROXIES}}
+{{WIREGUARD}}
+
+[Proxy Group]
+Proxy = select, Auto - Smart, Auto - UrlTest, Direct, {{NODES}}
+Domestic = select, Direct, Proxy, {{NODES}}
+Others = select, Proxy, Direct, {{NODES}}
+AdBlock = select, Block, Direct, Proxy
+AI Suite = select, Proxy, Direct, {{NODES}}
+Netflix = select, Proxy, Direct, {{NODES}}
+Disney Plus = select, Proxy, Direct, {{NODES}}
+YouTube = select, Proxy, Direct, {{NODES}}
+Max = select, Proxy, Direct, {{NODES}}
+Spotify = select, Proxy, Direct, {{NODES}}
+CN Mainland TV = select, Direct, Proxy, {{NODES}}
+Asian TV = select, Proxy, Direct, {{NODES}}
+Global TV = select, Proxy, Direct, {{NODES}}
+Apple Push = select, Proxy, Direct, {{NODES}}
+Apple Services = select, Direct, Proxy, {{NODES}}
+Apple TV = select, Proxy, Direct, {{NODES}}
+Telegram = select, Proxy, Direct, {{NODES}}
+Google FCM = select, Proxy, Direct, {{NODES}}
+Crypto = select, Proxy, Direct, {{NODES}}
+Discord = select, Proxy, Direct, {{NODES}}
+PayPal = select, Direct, Proxy, {{NODES}}
+Microsoft = select, Proxy, Direct, {{NODES}}
+Scholar = select, Direct, Proxy, {{NODES}}
+Speedtest = select, Proxy, Direct, {{NODES}}
+Steam = select, Proxy, Direct, {{NODES}}
+TikTok = select, Proxy, Direct, {{NODES}}
+miHoYo = select, Direct, Proxy, {{NODES}}
+Auto - UrlTest = url-test, {{NODES}}, url = http://cp.cloudflare.com/generate_204, interval = 3600, tolerance = 100
+Auto - Smart = smart, {{NODES}}, evaluate-before-use = true
+
+{{CUSTOM_GROUPS}}
+[Rule]
+{{CUSTOM_RULES}}
+
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/AdBlock.list,AdBlock,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Special.list,DIRECT,extended-matching
+
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Netflix.list,Netflix,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Disney%20Plus.list,Disney Plus,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/YouTube.list,YouTube,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/YouTube%20Music.list,YouTube,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Max.list,Max,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Spotify.list,Spotify,extended-matching
+
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Abema%20TV.list,Asian TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Bahamut.list,Asian TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/DMM.list,Asian TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Fox%2B.list,Asian TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Hulu%20Japan.list,Asian TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/IQ.list,Asian TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Japonx.list,Asian TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/JOOX.list,Asian TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/KKBOX.list,Asian TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/KKTV.list,Asian TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Line%20TV.list,Asian TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/MOO.list,Asian TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/myTV%20SUPER.list,Asian TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Niconico.list,Asian TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/ViuTV.list,Asian TV,extended-matching
+
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/ABC.list,Global TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Amazon.list,Global TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/BBC%20iPlayer.list,Global TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/DAZN.list,Global TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Discovery%20Plus.list,Global TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/encoreTVB.list,Global TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/F1%20TV.list,Global TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Fox%20Now.list,Global TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Hulu.list,Global TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Pandora.list,Global TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/PBS.list,Global TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Pornhub.list,Global TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Soundcloud.list,Global TV,extended-matching
+
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Bilibili.list,CN Mainland TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/IQIYI.list,CN Mainland TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Letv.list,CN Mainland TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Netease%20Music.list,CN Mainland TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Tencent%20Video.list,CN Mainland TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Youku.list,CN Mainland TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/WeTV.list,CN Mainland TV,extended-matching
+
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Apple%20Music.list,Apple TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Apple%20News.list,Apple TV,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Media/Apple%20TV.list,Apple TV,extended-matching
+
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Crypto.list,Crypto,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Discord.list,Discord,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Google%20FCM.list,Google FCM,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Microsoft.list,Microsoft,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/AI%20Suite.list,AI Suite,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/PayPal.list,PayPal,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Scholar.list,Scholar,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Speedtest.list,Speedtest,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Steam.list,Steam,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/TikTok.list,TikTok,extended-matching
+
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Apple%20Push.list,Apple Push,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Apple.list,Apple Services,extended-matching
+
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Telegram.list,Telegram,extended-matching
+
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/miHoYo.list,miHoYo,extended-matching
+
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Proxy.list,Proxy,extended-matching
+
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Domestic.list,Domestic,extended-matching
+RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/Domestic%20IPs.list,Domestic
+RULE-SET,https://fastly.jsdelivr.net/gh/VirgilClyne/GetSomeFries@main/ruleset/ASN.China.list,Domestic
+RULE-SET,LAN,DIRECT
+
+GEOIP,CN,Domestic
+FINAL,Others,dns-failed
+
+[URL Rewrite]
+"^https?:\/\/(ditu|maps).google\.cn" https://maps.google.com 302
+"^https?:\/\/(www.)?(g|google)\.cn" https://www.google.com 302
+{{URLREWRITE_EXTRA}}
+
+
+[Host]
+*.cloud-nodes.com = server:124.221.68.73:1053
+ip6-localhost = ::1
+ip6-loopback = ::1
+taobao.com = server:223.6.6.6
+*.taobao.com = server:223.6.6.6
+tmall.com = server:223.6.6.6
+*.tmall.com = server:223.6.6.6
+jd.com = server:119.29.29.29
+*.jd.com = server:119.28.28.28
+*.qq.com = server:119.28.28.28
+*.tencent.com = server:119.28.28.28
+*.alicdn.com = server:223.5.5.5
+aliyun.com = server:223.5.5.5
+*.aliyun.com = server:223.5.5.5
+weixin.com = server:119.28.28.28
+*.weixin.com = server:119.28.28.28
+bilibili.com = server:119.29.29.29
+*.bilibili.com = server:119.29.29.29
+*.hdslb.com = server:119.29.29.29
+163.com = server:119.29.29.29
+*.163.com = server:119.29.29.29
+126.com = server:119.29.29.29
+*.126.com = server:119.29.29.29
+*.126.net = server:119.29.29.29
+*.127.net = server:119.29.29.29
+*.netease.com = server:119.29.29.29
+mi.com = server:119.29.29.29
+*.mi.com = server:119.29.29.29
+xiaomi.com = server:119.29.29.29
+*.xiaomi.com = server:119.29.29.29
+routerlogin.net = server:system
+_hotspot_.m2m = server:system
+router.asus.com = server:system
+hotspot.cslwifi.com = server:system
+amplifi.lan = server:system
+*.lan = server:system
+*.local = server:system
+*.arpa = server:system
+
+
+
+[Script]
+Sub_info = type=generic, script-path=https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%204/Script/sub_info_panel.js, script-update-interval=0, argument=url=https%3A%2F%2Foics.net%2Fapi%2Fv3%2Fdownload.getFile%2F2e6d7ce3-ef65-4be1-b6fe-fd7a59ac937d%3Fheader%3Dtrue.png&reset_day=1&title=oixCloud&icon=cloud.fill&color=#333333
+
+netflix_check = type=generic, script-path=https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%204/Script/netflix_check.js, argument=title=Netflix
+disney_check = type=generic, script-path=https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%204/Script/disney_check.js, argument=title=Disney Plus
+youtube_check = type=generic, script-path=https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%204/Script/youtube_check.js, argument=title=YouTube Premium
+chatgpt_check = type=generic, script-path=https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%204/Script/chatgpt_check.js, argument=icon=lasso.and.sparkles&iconerr=xmark.seal.fill&icon-color=#336FA9&iconerr-color=#D65C51
+
+[Panel]
+Sub_info = script-name=Sub_info, update-interval=1800
+
+netflix_check = script-name=netflix_check, update-interval=1800
+disney_check = script-name=disney_check,update-interval=1800
+youtube_check = script-name=youtube_check, update-interval=1800
+chatgpt_check = script-name=chatgpt_check, update-interval=-1800
+    
+
+{{MITM}}

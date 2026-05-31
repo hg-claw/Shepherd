@@ -28,3 +28,7 @@
 
 # Locally-built agent binaries (the embed dir; CI / docker rebuild them fresh)
 /internal/installer/bin/shepherd-agent-linux-*
+
+# Local-only design reference configs (templatized copies live under
+# internal/plugins/subgen/templates/)
+/tmp/

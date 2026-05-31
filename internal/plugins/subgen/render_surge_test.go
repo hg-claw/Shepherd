@@ -39,6 +39,20 @@ func TestSurge_FillsTemplate(t *testing.T) {
 	}
 }
 
+// TestSurge_NoResidualOwnerData guards that the embedded template's original
+// owner data (the oixCloud managed-config URL + sub-info account token) was
+// stripped: the output must carry exactly ONE managed-config header (ours) and
+// leak no oics.net token.
+func TestSurge_NoResidualOwnerData(t *testing.T) {
+	out := (&SurgeRenderer{}).Render(Intermediate{}, "https://sub", DefaultRulesetBase)
+	if strings.Contains(out, "oics.net") {
+		t.Fatalf("leaks original owner's oics.net token:\n%s", out)
+	}
+	if n := strings.Count(out, "#!MANAGED-CONFIG"); n != 1 {
+		t.Fatalf("want exactly 1 managed-config header, got %d", n)
+	}
+}
+
 // DOMAIN-SET is native on Surge/ShadowRocket — the custom rule passes through
 // verbatim with the ORIGINAL url (only Clash rewrites to a rule-provider).
 func TestSurge_DomainSetVerbatim(t *testing.T) {

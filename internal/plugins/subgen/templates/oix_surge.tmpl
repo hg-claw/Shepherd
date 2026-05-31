@@ -1,5 +1,3 @@
-#!MANAGED-CONFIG https://oics.net/api/v3/download.getFile/2e6d7ce3-ef65-4be1-b6fe-fd7a59ac937d?surge=smart&lv=2%7C3.png interval=86400
-
 [General]
 loglevel = notify
 
@@ -204,15 +202,12 @@ amplifi.lan = server:system
 
 
 [Script]
-Sub_info = type=generic, script-path=https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%204/Script/sub_info_panel.js, script-update-interval=0, argument=url=https%3A%2F%2Foics.net%2Fapi%2Fv3%2Fdownload.getFile%2F2e6d7ce3-ef65-4be1-b6fe-fd7a59ac937d%3Fheader%3Dtrue.png&reset_day=1&title=oixCloud&icon=cloud.fill&color=#333333
-
 netflix_check = type=generic, script-path=https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%204/Script/netflix_check.js, argument=title=Netflix
 disney_check = type=generic, script-path=https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%204/Script/disney_check.js, argument=title=Disney Plus
 youtube_check = type=generic, script-path=https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%204/Script/youtube_check.js, argument=title=YouTube Premium
 chatgpt_check = type=generic, script-path=https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%204/Script/chatgpt_check.js, argument=icon=lasso.and.sparkles&iconerr=xmark.seal.fill&icon-color=#336FA9&iconerr-color=#D65C51
 
 [Panel]
-Sub_info = script-name=Sub_info, update-interval=1800
 
 netflix_check = script-name=netflix_check, update-interval=1800
 disney_check = script-name=disney_check,update-interval=1800

@@ -89,3 +89,23 @@ func TestParseTemplate_CustomGroups(t *testing.T) {
 		}
 	}
 }
+
+func TestParseTemplate_DisabledGroups(t *testing.T) {
+	if _, err := ParseTemplate(`{"disabled_groups":["Netflix"]}`); err != nil {
+		t.Fatalf("valid service group rejected: %v", err)
+	}
+	if _, err := ParseTemplate(`{"disabled_groups":["Nope"]}`); err == nil {
+		t.Fatalf("unknown group must be rejected")
+	}
+	if _, err := ParseTemplate(`{"disabled_groups":["Proxy"]}`); err == nil {
+		t.Fatalf("core group must be rejected as a disabled service group")
+	}
+	// Legacy template (no disabled_groups key) ⇒ all groups on (empty slice).
+	sp, err := ParseTemplate(`{"final":"PROXY"}`)
+	if err != nil {
+		t.Fatalf("legacy parse failed: %v", err)
+	}
+	if len(sp.DisabledGroups) != 0 {
+		t.Fatalf("legacy default must be all-on, got %v", sp.DisabledGroups)
+	}
+}

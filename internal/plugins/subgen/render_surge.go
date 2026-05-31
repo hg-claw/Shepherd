@@ -155,7 +155,7 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 		mitm = "[MITM]\n" + m + "\n"
 	}
 
-	out := templates.Surge
+	out := filterSurgeGroups(templates.Surge, disabledServiceSet(im.DisabledGroups))
 	if nodeList == "" {
 		out = strings.ReplaceAll(out, ", {{NODES}}", "")
 	}
@@ -244,4 +244,58 @@ func surgeRuleLine(r Rule, rulesetBase string) string {
 	default:
 		return r.Match + "," + r.Target
 	}
+}
+
+// filterSurgeGroups removes the [Proxy Group] lines and [Rule] lines belonging to
+// any disabled service group, leaving all other sections untouched. The link is
+// the group name: a proxy-group line is "<Name> = ..."; a rule routes to the
+// field before ",extended-matching" (RULE-SET) or its last comma field. An empty
+// disabled set returns the template unchanged.
+func filterSurgeGroups(tmpl string, disabled map[string]bool) string {
+	if len(disabled) == 0 {
+		return tmpl
+	}
+	lines := strings.Split(tmpl, "\n")
+	out := make([]string, 0, len(lines))
+	section := ""
+	for _, line := range lines {
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(strings.TrimRight(line, " "), "]") {
+			section = strings.TrimSpace(line)
+		}
+		switch section {
+		case "[Proxy Group]":
+			if name, ok := surgeGroupName(line); ok && disabled[name] {
+				continue
+			}
+		case "[Rule]":
+			if disabled[surgeRuleTarget(line)] {
+				continue
+			}
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
+}
+
+// surgeGroupName returns the left-hand name of a "<Name> = ..." proxy-group line.
+func surgeGroupName(line string) (string, bool) {
+	i := strings.Index(line, " = ")
+	if i <= 0 {
+		return "", false
+	}
+	return strings.TrimSpace(line[:i]), true
+}
+
+// surgeRuleTarget returns the policy/group a Surge [Rule] line routes to, or ""
+// for blank/marker lines.
+func surgeRuleTarget(line string) string {
+	fields := strings.Split(line, ",")
+	if len(fields) < 2 {
+		return ""
+	}
+	t := strings.TrimSpace(fields[len(fields)-1])
+	if t == "extended-matching" {
+		t = strings.TrimSpace(fields[len(fields)-2])
+	}
+	return t
 }

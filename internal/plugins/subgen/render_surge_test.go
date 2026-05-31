@@ -152,3 +152,48 @@ func TestSurge_InsecureSkipCertVerify(t *testing.T) {
 		}
 	}
 }
+
+func TestSurge_DisabledGroupsDropped(t *testing.T) {
+	im := Intermediate{
+		Nodes:          []Node{{Name: "🟢 A", Protocol: "shadowsocks", Server: "1.1.1.1", Port: 8388, SSMethod: "aes-256-gcm", Password: "p"}},
+		DisabledGroups: []string{"Netflix", "AdBlock"},
+	}
+	out := (&SurgeRenderer{}).Render(im, "https://sub", DefaultRulesetBase)
+	if strings.Contains(out, "\nNetflix = select") || strings.Contains(out, "\nAdBlock = select") {
+		t.Errorf("disabled group line still present\n%s", out)
+	}
+	if strings.Contains(out, "/Media/Netflix.list,Netflix") || strings.Contains(out, "/AdBlock.list,AdBlock") {
+		t.Errorf("disabled group rule still present\n%s", out)
+	}
+	if !strings.Contains(out, "\nProxy = select") || !strings.Contains(out, "\nOthers = select") {
+		t.Errorf("core group wrongly dropped\n%s", out)
+	}
+	if !strings.Contains(out, "GEOIP,CN,Domestic") || !strings.Contains(out, "FINAL,Others") {
+		t.Errorf("structural rule wrongly dropped\n%s", out)
+	}
+	if !strings.Contains(out, "\nYouTube = select") {
+		t.Errorf("non-disabled service group wrongly dropped\n%s", out)
+	}
+	if strings.Contains(out, "{{") {
+		t.Errorf("unresolved marker\n%s", out)
+	}
+}
+
+func TestSurge_NoDisabledIsParity(t *testing.T) {
+	full := (&SurgeRenderer{}).Render(Intermediate{}, "x", DefaultRulesetBase)
+	got := (&SurgeRenderer{}).Render(Intermediate{DisabledGroups: []string{}}, "x", DefaultRulesetBase)
+	if got != full {
+		t.Fatalf("empty disabled set changed Surge output")
+	}
+}
+
+func TestSurge_SkipProxyDrops10Net(t *testing.T) {
+	out := (&SurgeRenderer{}).Render(Intermediate{}, "https://sub", DefaultRulesetBase)
+	if strings.Contains(out, "10.0.0.0/8") {
+		t.Fatalf("skip-proxy must not contain 10.0.0.0/8\n%s", out)
+	}
+	// neighbouring private ranges must remain
+	if !strings.Contains(out, "172.16.0.0/12") || !strings.Contains(out, "192.168.0.0/16") {
+		t.Fatalf("skip-proxy lost other private ranges\n%s", out)
+	}
+}

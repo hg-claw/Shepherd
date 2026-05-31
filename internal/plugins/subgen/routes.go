@@ -36,6 +36,7 @@ func (p *Plugin) registerRoutes(mux plugins.Mux) {
 
 	// Catalog
 	mux.HandleFunc("GET /categories", p.listCategories)
+	mux.HandleFunc("GET /oix-groups", p.listOixGroups)
 }
 
 // store builds a fresh Store bound to the runtime deps. Cheap to construct —
@@ -404,6 +405,13 @@ type categoryView struct {
 	Name          string   `json:"name"`
 	DefaultPolicy string   `json:"default_policy"`
 	RuleURLs      []string `json:"rule_urls"`
+}
+
+// listOixGroups returns the ordered list of user-selectable oixCloud service
+// groups, so the template editor renders its checklist from the same source the
+// renderer filters on.
+func (p *Plugin) listOixGroups(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, 200, OixServiceGroups)
 }
 
 func (p *Plugin) listCategories(w http.ResponseWriter, _ *http.Request) {

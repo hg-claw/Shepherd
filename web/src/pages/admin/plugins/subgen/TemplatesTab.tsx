@@ -3,13 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Plus, Copy as CopyIcon, Trash2 } from 'lucide-react'
 import {
   listSubgenTemplates,
-  listSubgenCategories,
+  listSubgenOixGroups,
   createSubgenTemplate,
   updateSubgenTemplate,
   deleteSubgenTemplate,
   previewSubgenTemplate,
   type SubgenTemplate,
-  type SubgenCategory,
 } from '@/api/subgen'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -42,9 +41,10 @@ interface RulesModel {
   clash_general: string
   custom_nodes: string
   custom_groups: CustomGroupModel[]
+  disabled_groups: string[]
 }
 
-function parseRules(rules_json: string): RulesModel {
+export function parseRules(rules_json: string): RulesModel {
   let raw: any = {}
   try { raw = JSON.parse(rules_json || '{}') } catch { raw = {} }
   return {
@@ -68,7 +68,16 @@ function parseRules(rules_json: string): RulesModel {
           members: Array.isArray(g.members) ? g.members.map((m: any) => String(m)) : [],
         }))
       : [],
+    disabled_groups: Array.isArray(raw.disabled_groups)
+      ? raw.disabled_groups.map(String)
+      : [],
   }
+}
+
+// selectedToDisabled returns the catalog groups that are NOT checked, preserving
+// catalog order — this is what gets persisted as disabled_groups.
+export function selectedToDisabled(allGroups: string[], checked: Set<string>): string[] {
+  return allGroups.filter((g) => !checked.has(g))
 }
 
 function customRulesToText(rules: CustomRule[]): string {
@@ -114,7 +123,6 @@ export default function TemplatesTab() {
   const qc = useQueryClient()
 
   const tplQ = useQuery({ queryKey: ['subgen-templates'], queryFn: listSubgenTemplates })
-  const catQ = useQuery({ queryKey: ['subgen-categories'], queryFn: listSubgenCategories })
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['subgen-templates'] })
 
@@ -129,7 +137,6 @@ export default function TemplatesTab() {
   const [editing, setEditing] = useState<{ id: number | null; name: string; rules: string } | null>(null)
 
   const templates = tplQ.data ?? []
-  const categories = catQ.data ?? []
 
   const openNew = () => setEditing({ id: null, name: '', rules: '{}' })
   const openEdit = (t: SubgenTemplate) => setEditing({ id: t.id, name: t.name, rules: t.rules_json })
@@ -203,7 +210,6 @@ export default function TemplatesTab() {
         <TemplateEditor
           key={editing.id ?? 'new'}
           editing={editing}
-          categories={categories}
           onClose={() => setEditing(null)}
           onSaved={() => { invalidate(); setEditing(null) }}
         />
@@ -216,11 +222,10 @@ export default function TemplatesTab() {
 
 type PreviewTarget = 'surge' | 'shadowrocket' | 'clash'
 
-function TemplateEditor({
-  editing, categories, onClose, onSaved,
+export function TemplateEditor({
+  editing, onClose, onSaved,
 }: {
   editing: { id: number | null; name: string; rules: string }
-  categories: SubgenCategory[]
   onClose: () => void
   onSaved: () => void
 }) {
@@ -229,10 +234,26 @@ function TemplateEditor({
   const initial = parseRules(editing.rules)
   const [name, setName] = useState(editing.name)
   const [mode, setMode] = useState<'form' | 'raw'>('form')
-  // map category name → policy; absence = unchecked
-  const [catPolicies, setCatPolicies] = useState<Record<string, Policy>>(
-    () => Object.fromEntries(initial.categories.map((c) => [c.name, c.policy])),
+
+  const oixGroupsQ = useQuery({ queryKey: ['subgen-oix-groups'], queryFn: listSubgenOixGroups })
+  const oixGroups = oixGroupsQ.data ?? []
+  // Source of truth = the DISABLED (unchecked) set, lazily initialized once from
+  // the template's disabled_groups. A checkbox is checked iff its group is NOT in
+  // this set. (Storing disabled — not checked — avoids re-deriving from the
+  // unstable `initial` object on every render.)
+  const [disabledGroups, setDisabledGroups] = useState<Set<string>>(
+    () => new Set(initial.disabled_groups),
   )
+  const toggleGroup = (name: string) =>
+    setDisabledGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name) // check it (include)
+      else next.add(name) // uncheck it (exclude)
+      return next
+    })
+  const checkAllGroups = () => setDisabledGroups(new Set())
+  const clearAllGroups = () => setDisabledGroups(new Set(oixGroups))
+
   const [customText, setCustomText] = useState(customRulesToText(initial.custom_rules))
   const [final, setFinal] = useState<string>(initial.final)
   const [includeAutoSelect, setIncludeAutoSelect] = useState(initial.include_auto_select)
@@ -244,19 +265,8 @@ function TemplateEditor({
   const [customGroupsText, setCustomGroupsText] = useState(customGroupsToText(initial.custom_groups))
   const [rawJson, setRawJson] = useState('')
 
-  const toggleCat = (name: string, defaultPolicy: string) => {
-    setCatPolicies((prev) => {
-      const next = { ...prev }
-      if (name in next) delete next[name]
-      else next[name] = defaultPolicy || 'PROXY'
-      return next
-    })
-  }
-  const setCatPolicy = (name: string, policy: Policy) =>
-    setCatPolicies((prev) => ({ ...prev, [name]: policy }))
-
   const buildModel = (): RulesModel => ({
-    categories: Object.entries(catPolicies).map(([name, policy]) => ({ name, policy })),
+    categories: [],
     custom_rules: textToCustomRules(customText),
     final,
     include_auto_select: includeAutoSelect,
@@ -266,6 +276,9 @@ function TemplateEditor({
     clash_general: clashGeneral,
     custom_nodes: customNodes,
     custom_groups: textToCustomGroups(customGroupsText),
+    disabled_groups: oixGroups.length
+      ? selectedToDisabled(oixGroups, new Set(oixGroups.filter((g) => !disabledGroups.has(g))))
+      : [...disabledGroups],
   })
 
   // The rules_json we save and preview: the raw text in raw mode, otherwise the
@@ -281,7 +294,7 @@ function TemplateEditor({
     // Re-read whatever's in the raw box back into the form. Invalid JSON falls
     // back to an empty model (parseRules swallows the parse error).
     const m = parseRules(rawJson)
-    setCatPolicies(Object.fromEntries(m.categories.map((c) => [c.name, c.policy])))
+    setDisabledGroups(new Set(m.disabled_groups))
     setCustomText(customRulesToText(m.custom_rules))
     setFinal(m.final)
     setIncludeAutoSelect(m.include_auto_select)
@@ -353,41 +366,26 @@ function TemplateEditor({
             {mode === 'form' ? (
               <>
                 <div>
-                  <Label className="text-[12px]">Categories</Label>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-[12px]">Proxy groups</Label>
+                    <button type="button" onClick={checkAllGroups}
+                      className="ml-auto text-[11px] text-fg-dim hover:text-fg underline">Select all</button>
+                    <button type="button" onClick={clearAllGroups}
+                      className="text-[11px] text-fg-dim hover:text-fg underline">Clear</button>
+                  </div>
                   <p className="text-fg-dim text-[11px] mt-0.5 mb-2">
-                    Check a category to route its rule-sets. Each becomes a switchable proxy group; the policy you pick is the group's default member (clients can change it). Rule URLs are the GitHub subscription addresses shipped with each category.
+                    Checked service groups (and their rules) are included in the generated config. Core groups (Proxy / Domestic / Others / Auto) are always present.
                   </p>
-                  <div className="space-y-2">
-                    {categories.map((c) => {
-                      const checked = c.name in catPolicies
-                      return (
-                        <div key={c.name} className="rounded-md border bg-sunken/30 p-2">
-                          <div className="flex items-center gap-2 text-[12.5px]">
-                            <input type="checkbox" checked={checked}
-                              onChange={() => toggleCat(c.name, c.default_policy)} aria-label={`category ${c.name}`} />
-                            <span className="font-mono">{c.name}</span>
-                            {checked && (
-                              <select value={catPolicies[c.name]} onChange={(e) => setCatPolicy(c.name, e.target.value)}
-                                className="h-6 px-1.5 ml-auto rounded border bg-background text-[11.5px]">
-                                {POLICIES.map((p) => <option key={p} value={p}>{p}</option>)}
-                              </select>
-                            )}
-                            {!checked && (
-                              <span className="ml-auto text-fg-dim text-[11px]">default {c.default_policy}</span>
-                            )}
-                          </div>
-                          {c.rule_urls.length > 0 && (
-                            <ul className="mt-1 pl-6 space-y-0.5">
-                              {c.rule_urls.map((u) => (
-                                <li key={u} className="font-mono text-[10.5px] text-fg-dim break-all">{u}</li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      )
-                    })}
-                    {categories.length === 0 && (
-                      <div className="text-fg-dim text-[12px]">No categories defined.</div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {oixGroups.map((name) => (
+                      <label key={name} className="flex items-center gap-2 text-[12.5px] rounded-md border bg-sunken/30 px-2 py-1">
+                        <input type="checkbox" checked={!disabledGroups.has(name)}
+                          onChange={() => toggleGroup(name)} aria-label={`group ${name}`} />
+                        <span className="font-mono">{name}</span>
+                      </label>
+                    ))}
+                    {oixGroups.length === 0 && (
+                      <div className="text-fg-dim text-[12px]">No groups defined.</div>
                     )}
                   </div>
                 </div>

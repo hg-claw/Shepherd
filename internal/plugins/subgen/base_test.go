@@ -79,6 +79,13 @@ func TestAssemble_AppendsCustomNodes(t *testing.T) {
 	}
 }
 
+func TestAssemble_NormalizesDisabledGroups(t *testing.T) {
+	im := Assemble(nil, TemplateSpec{DisabledGroups: []string{"Netflix", "Bogus", "Proxy"}})
+	if len(im.DisabledGroups) != 1 || im.DisabledGroups[0] != "Netflix" {
+		t.Fatalf("want [Netflix], got %v", im.DisabledGroups)
+	}
+}
+
 func findGroup(gs []Group, name string) *Group {
 	for i := range gs {
 		if gs[i].Name == name {

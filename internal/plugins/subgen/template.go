@@ -37,6 +37,7 @@ type TemplateSpec struct {
 	ClashGeneral      string        `json:"clash_general,omitempty"` // Clash YAML preamble (top-level keys)
 	CustomNodes       string        `json:"custom_nodes,omitempty"`  // newline-separated proxy share links
 	CustomGroups      []CustomGroup `json:"custom_groups,omitempty"`
+	DisabledGroups    []string      `json:"disabled_groups,omitempty"` // excluded service groups; empty = all on
 }
 
 func validPolicy(p string) bool {
@@ -84,6 +85,11 @@ func ParseTemplate(rulesJSON string) (TemplateSpec, error) {
 		}
 		if len(g.Members) == 0 {
 			return t, fmt.Errorf("custom group %q: needs at least one member", g.Name)
+		}
+	}
+	for _, g := range t.DisabledGroups {
+		if !isOixServiceGroup(g) {
+			return t, fmt.Errorf("unknown service group %q in disabled_groups", g)
 		}
 	}
 	return t, nil

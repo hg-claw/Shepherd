@@ -133,3 +133,34 @@ func TestClash_FiltersDevice(t *testing.T) {
 		t.Fatalf("Home group missing:\n%s", out)
 	}
 }
+
+func TestClash_DisabledGroupsDropped(t *testing.T) {
+	im := Intermediate{DisabledGroups: []string{"Asian TV"}}
+	out := (&ClashRenderer{}).Render(im, "", DefaultRulesetBase)
+	if strings.Contains(out, "name: 'Asian TV'") {
+		t.Errorf("disabled proxy-group still present\n%s", out)
+	}
+	if strings.Contains(out, ",Asian TV'") {
+		t.Errorf("rule targeting disabled group still present\n%s", out)
+	}
+	// Providers that were unique to Asian TV become orphaned and must be removed.
+	if strings.Contains(out, "Abema TV") || strings.Contains(out, "Bahamut") {
+		t.Errorf("orphaned rule-provider still present\n%s", out)
+	}
+	// Core groups + core-referenced providers survive.
+	if !strings.Contains(out, "name: Proxy") || !strings.Contains(out, "Domestic:") {
+		t.Errorf("core group/provider wrongly dropped\n%s", out)
+	}
+	var doc map[string]any
+	if err := yaml.Unmarshal([]byte(out), &doc); err != nil {
+		t.Fatalf("not valid YAML after filtering: %v\n%s", err, out)
+	}
+}
+
+func TestClash_NoDisabledIsParity(t *testing.T) {
+	full := (&ClashRenderer{}).Render(Intermediate{}, "", DefaultRulesetBase)
+	got := (&ClashRenderer{}).Render(Intermediate{DisabledGroups: []string{}}, "", DefaultRulesetBase)
+	if got != full {
+		t.Fatalf("empty disabled set changed Clash output")
+	}
+}

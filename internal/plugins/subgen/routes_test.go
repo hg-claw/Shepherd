@@ -272,6 +272,21 @@ func TestRoutes_PreviewTemplate(t *testing.T) {
 	}
 }
 
+func TestListOixGroups(t *testing.T) {
+	p, _ := testPlugin(t)
+	w := p.do("GET", "/oix-groups", nil)
+	if w.Code != 200 {
+		t.Fatalf("status = %d", w.Code)
+	}
+	var got []string
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("bad json: %v", err)
+	}
+	if len(got) != len(OixServiceGroups) || got[0] != "AdBlock" {
+		t.Fatalf("got %v", got)
+	}
+}
+
 func TestRoutes_Preview(t *testing.T) {
 	p, s := testPlugin(t)
 	ctx := context.Background()

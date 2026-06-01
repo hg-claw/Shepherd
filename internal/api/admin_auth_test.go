@@ -49,3 +49,18 @@ func TestLogin_BadCreds(t *testing.T) {
 		t.Fatalf("status=%d want 401", w.Code)
 	}
 }
+
+func TestClientIP(t *testing.T) {
+	cases := map[string]string{
+		"1.2.3.4:5678": "1.2.3.4",
+		"1.2.3.4":      "1.2.3.4",
+		"[::1]:443":    "::1",
+	}
+	for remote, want := range cases {
+		r := httptest.NewRequest("POST", "/api/login", nil)
+		r.RemoteAddr = remote
+		if got := clientIP(r); got != want {
+			t.Errorf("clientIP(%q)=%q want %q", remote, got, want)
+		}
+	}
+}

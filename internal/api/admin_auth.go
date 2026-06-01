@@ -1,6 +1,7 @@
 package api
 
 import (
+	"net"
 	"net/http"
 
 	"github.com/hg-claw/Shepherd/internal/auth"
@@ -56,4 +57,15 @@ func (a *AuthAPI) Me(w http.ResponseWriter, r *http.Request) {
 		"id":       admin.ID,
 		"username": admin.Username,
 	})
+}
+
+// clientIP returns the host part of the direct TCP peer (RemoteAddr). NOTE: it
+// does NOT honor X-Forwarded-For — doing so safely requires a trusted-proxy
+// allowlist and is a deliberate follow-up.
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }

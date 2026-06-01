@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Trash2, LayoutGrid, Rows3, ArrowUpCircle } from 'lucide-react'
 import { useServers, useDeleteServer, useBatchUpdateAgent, useReinstall, type ServerWithLatest } from '@/api/servers'
 import { useUI } from '@/store/ui'
@@ -118,6 +118,7 @@ const VIEW_KEY = 'shep_hosts_view'
 
 export default function ServerList() {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
   const [filter, setFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | HostStatus>('all')
   const [selected, setSelected] = useState<Set<number>>(new Set())
@@ -411,7 +412,7 @@ export default function ServerList() {
                   <tr
                     key={s.id}
                     className="border-t hover:bg-sunken/60 cursor-pointer"
-                    onClick={() => window.location.assign(`/admin/servers/${s.id}`)}
+                    onClick={() => navigate(`/admin/servers/${s.id}`)}
                   >
                     <Td onClick={(e) => { e.stopPropagation(); toggleSelect(s.id) }}>
                       <input

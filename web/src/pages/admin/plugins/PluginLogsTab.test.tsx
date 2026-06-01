@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { act } from 'react'
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@/test-utils/render'
 
 class FakeWS {
@@ -32,10 +32,9 @@ beforeEach(() => { FakeWS.instances = [] })
 describe('PluginLogsTab pause', () => {
   it('pause keeps the buffer and does not reconnect; resume keeps appending', async () => {
     renderWithProviders(<PluginLogsTab plugin="xray" />)
-    await act(async () => { await Promise.resolve() })
-    await act(async () => { await Promise.resolve() })
-    await act(async () => { await Promise.resolve() })
-    expect(FakeWS.instances.length).toBe(1)
+    // Wait for the hosts query to resolve → serverID effect → WS open. Polling
+    // (not a fixed microtask count) keeps this deterministic in isolation too.
+    await waitFor(() => expect(FakeWS.instances.length).toBe(1))
 
     send('line-A')
     expect(screen.getByText('line-A')).toBeTruthy()

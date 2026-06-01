@@ -102,7 +102,7 @@ func previewRead(ctx context.Context, maxB int, downloadFn func(context.Context,
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	pr, pw := io.Pipe()
-	defer pr.Close()
+	defer func() { _ = pr.Close() }()
 	go func() { _ = pw.CloseWithError(downloadFn(ctx, pw)) }()
 	buf := make([]byte, maxB)
 	n, _ := io.ReadFull(pr, buf)

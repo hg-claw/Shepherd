@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/hg-claw/Shepherd/internal/auth"
 	shepdb "github.com/hg-claw/Shepherd/internal/db"
@@ -47,6 +48,49 @@ func TestLogin_BadCreds(t *testing.T) {
 	a.Login(w, r)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status=%d want 401", w.Code)
+	}
+}
+
+func doLogin(t *testing.T, a *AuthAPI, user, pass string) int {
+	t.Helper()
+	body, _ := json.Marshal(loginReq{Username: user, Password: pass})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/login", bytes.NewReader(body))
+	a.Login(w, r)
+	return w.Code
+}
+
+func TestLogin_RateLimitedAfterMaxFailures(t *testing.T) {
+	a, _ := newAuthAPI(t)
+	a.InitRateLimit(3, time.Minute)
+	for i := 0; i < 3; i++ {
+		if got := doLogin(t, a, "alice", "wrong"); got != http.StatusUnauthorized {
+			t.Fatalf("fail %d: status=%d want 401", i, got)
+		}
+	}
+	if got := doLogin(t, a, "alice", "wrong"); got != http.StatusTooManyRequests {
+		t.Fatalf("4th attempt: status=%d want 429", got)
+	}
+}
+
+func TestLogin_SuccessResetsCounter(t *testing.T) {
+	a, _ := newAuthAPI(t)
+	a.InitRateLimit(3, time.Minute)
+	doLogin(t, a, "alice", "wrong")
+	doLogin(t, a, "alice", "wrong")
+	if got := doLogin(t, a, "alice", "hunter2"); got != http.StatusOK {
+		t.Fatalf("good login status=%d want 200", got)
+	}
+	if got := doLogin(t, a, "alice", "wrong"); got != http.StatusUnauthorized {
+		t.Fatalf("after reset: status=%d want 401", got)
+	}
+}
+
+func TestLogin_UnknownUserIs401(t *testing.T) {
+	a, _ := newAuthAPI(t)
+	a.InitRateLimit(3, time.Minute)
+	if got := doLogin(t, a, "nobody", "whatever"); got != http.StatusUnauthorized {
+		t.Fatalf("unknown user status=%d want 401", got)
 	}
 }
 

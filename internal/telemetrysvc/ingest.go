@@ -111,10 +111,17 @@ func (i *Ingest) WriteHostInventory(ctx context.Context, serverID int64, inv age
 	return err
 }
 
-// WriteSample persists one telemetry point and bumps agent_last_seen.
+// WriteSample persists one telemetry point, bumps host_traffic, and bumps
+// agent_last_seen — atomically, in one transaction (one fsync instead of three).
 func (i *Ingest) WriteSample(ctx context.Context, serverID int64, t agentapi.Telemetry) error {
 	disksJSON, _ := json.Marshal(t.Disks)
-	if _, err := i.DB.ExecContext(ctx, `INSERT INTO telemetry_samples_30s
+	tx, err := i.DB.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }() // no-op after a successful Commit
+
+	if _, err := tx.ExecContext(ctx, `INSERT INTO telemetry_samples_30s
 		(server_id, ts, cpu_pct, mem_used, mem_total, load_1, load_5, load_15,
 		 net_rx_bps, net_tx_bps, tcp_conn, disks_json)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
@@ -124,7 +131,7 @@ func (i *Ingest) WriteSample(ctx context.Context, serverID int64, t agentapi.Tel
 	}
 	if t.NetRxBytes != 0 || t.NetTxBytes != 0 {
 		now := t.TS.UTC()
-		if _, err := i.DB.ExecContext(ctx, `INSERT INTO host_traffic
+		if _, err := tx.ExecContext(ctx, `INSERT INTO host_traffic
 			(server_id, cum_bytes_up, cum_bytes_down, last_reset_at, updated_at)
 			VALUES ($1,$2,$3,$4,$4)
 			ON CONFLICT (server_id) DO UPDATE SET
@@ -141,6 +148,9 @@ func (i *Ingest) WriteSample(ctx context.Context, serverID int64, t agentapi.Tel
 	// connected and reporting. (The sample's own ts above keeps t.TS — that's
 	// the agent's measurement time for the time-series.) Matches the heartbeat
 	// handler, which already bumps agent_last_seen with time.Now().UTC().
-	_, err := i.DB.ExecContext(ctx, "UPDATE servers SET agent_last_seen=$1 WHERE id=$2", time.Now().UTC(), serverID)
-	return err
+	if _, err := tx.ExecContext(ctx, "UPDATE servers SET agent_last_seen=$1 WHERE id=$2",
+		time.Now().UTC(), serverID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

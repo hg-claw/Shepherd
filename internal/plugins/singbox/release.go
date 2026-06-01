@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
+	"github.com/hg-claw/Shepherd/internal/ghmirror"
 )
 
 // Releaser resolves shepherd-singbox release metadata (asset URL + sha256
@@ -28,11 +29,6 @@ type Releaser struct {
 	Repo    string       // override for tests; default "hg-claw/Shepherd"
 	HTTP    *http.Client // override for tests; default 30s-timeout client
 }
-
-// CNMirrorPrefix is prepended to the github.com asset URL when a deploy
-// asks for the CN mirror. Kept here so swapping mirrors is a one-line
-// change. The same constant lives in xray's Releaser for symmetry.
-const CNMirrorPrefix = "https://gh-proxy.com/"
 
 const (
 	defaultSingboxRepo = "hg-claw/Shepherd"
@@ -98,7 +94,7 @@ func singboxAssetName(version, osName, arch string) string {
 // for (osName, arch). The server only hits api.github.com here — the
 // tarball never touches the Shepherd server's disk.
 //
-// useMirror=true wraps the asset URL with CNMirrorPrefix so mainland-China
+// useMirror=true wraps the asset URL with ghmirror.Prefix so mainland-China
 // agents can fetch via the gh-proxy relay. The .sha256 sidecar URL is
 // wrapped too (it's also on github.com). The api.github.com lookup stays
 // direct because gh-proxy doesn't reliably mirror the API.
@@ -110,8 +106,8 @@ func (r *Releaser) ResolveFetchSpec(ctx context.Context, version, osName, arch s
 	}
 	shaURL := dlURL + ".sha256"
 	if useMirror {
-		dlURL = CNMirrorPrefix + dlURL
-		shaURL = CNMirrorPrefix + shaURL
+		dlURL = ghmirror.Prefix + dlURL
+		shaURL = ghmirror.Prefix + shaURL
 	}
 	// Sidecar fetch is best-effort. Older shepherd-singbox releases
 	// (pre-build-pipeline-update) don't ship .sha256; in that case we

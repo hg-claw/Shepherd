@@ -12,6 +12,7 @@ import (
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
 	"github.com/hg-claw/Shepherd/internal/agentsvc"
+	"github.com/hg-claw/Shepherd/internal/ghmirror"
 	"github.com/hg-claw/Shepherd/internal/installer"
 	"github.com/hg-claw/Shepherd/internal/serversvc"
 	"github.com/hg-claw/Shepherd/internal/telemetrysvc"
@@ -602,7 +603,7 @@ func (a *ServersAPI) InstallCommand(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 500, err.Error())
 		return
 	}
-	cn := r.URL.Query().Get("cn") == "1" || r.URL.Query().Get("cn") == "true"
+	cn := cnFlag(r)
 	writeJSON(w, 200, map[string]any{
 		"server_id":  id,
 		"token":      tok,
@@ -644,7 +645,7 @@ func (a *ServersAPI) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 	}
 	// Optional ?cn=1 to route the update through the gh-proxy mirror.
 	// Doesn't persist anywhere — each update call passes its own flag.
-	cn := r.URL.Query().Get("cn") == "1" || r.URL.Query().Get("cn") == "true"
+	cn := cnFlag(r)
 	cmd := buildInstallCommand(a.BuildVersion, a.PublicURL, tok, cn)
 	// Fire-and-forget: the install script restarts the agent service which
 	// kills the WS connection. Reading the result would block forever.
@@ -747,6 +748,12 @@ func (a *ServersAPI) BatchUpdateAgent(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"results": results})
 }
 
+// cnFlag reports whether the request asks for the CN gh-proxy mirror (?cn=1|true).
+func cnFlag(r *http.Request) bool {
+	v := r.URL.Query().Get("cn")
+	return v == "1" || v == "true"
+}
+
 // buildInstallCommand renders the install / upgrade command dispatched to
 // a target host. The script URL AND the --version flag are both pinned to
 // the running server's BuildVersion so script + binary + server stay in
@@ -779,7 +786,7 @@ func buildInstallCommand(buildVersion, publicURL, token string, cn bool) string 
 	// then propagates the prefix to subsequent asset downloads.
 	scriptURL := "https://raw.githubusercontent.com/hg-claw/Shepherd/" + tag + "/scripts/install-agent.sh"
 	if cn {
-		scriptURL = "https://gh-proxy.com/" + scriptURL
+		scriptURL = ghmirror.Prefix + scriptURL
 	}
 	inner := "curl -fsSL " + scriptURL +
 		" | sudo bash -s -- --token " + token +

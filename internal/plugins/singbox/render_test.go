@@ -900,3 +900,36 @@ func TestRender_SS2022Relay(t *testing.T) {
 		t.Errorf("method: %v", ssOB["method"])
 	}
 }
+
+func TestBuildTransport(t *testing.T) {
+	ws := buildTransport("ws", "/p", "h.com", true)
+	if ws["path"] != "/p" {
+		t.Fatalf("ws path: %v", ws)
+	}
+	if hdr, ok := ws["headers"].(map[string]any); !ok || hdr["Host"] != "h.com" {
+		t.Fatalf("ws headers: %v", ws)
+	}
+	inHTTP := buildTransport("http", "/p", "h.com", true)
+	if inHTTP["method"] != "PUT" {
+		t.Fatalf("inbound http should have method=PUT: %v", inHTTP)
+	}
+	upHTTP := buildTransport("http", "/p", "h.com", false)
+	if _, has := upHTTP["method"]; has {
+		t.Fatalf("upstream http must NOT have method: %v", upHTTP)
+	}
+	if hh, ok := upHTTP["host"].([]any); !ok || hh[0] != "h.com" {
+		t.Fatalf("http host: %v", upHTTP)
+	}
+	hu := buildTransport("httpupgrade", "/p", "h.com", false)
+	if hu["host"] != "h.com" {
+		t.Fatalf("httpupgrade host should be string: %v", hu)
+	}
+	q := buildTransport("quic", "", "", true)
+	if len(q) != 1 || q["type"] != "quic" {
+		t.Fatalf("quic should be {type:quic} only: %v", q)
+	}
+	noHost := buildTransport("ws", "/p", "", true)
+	if _, has := noHost["headers"]; has {
+		t.Fatalf("ws no-host should omit headers: %v", noHost)
+	}
+}

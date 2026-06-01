@@ -8,6 +8,7 @@ import (
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
 	shepdb "github.com/hg-claw/Shepherd/internal/db"
+	"github.com/hg-claw/Shepherd/internal/ghmirror"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 )
 
@@ -58,7 +59,7 @@ func (f *fakeReleaser) ResolveFetchSpec(_ context.Context, version, osStr, arch 
 		u = "https://github.com/XTLS/Xray-core/releases/download/v" + version + "/Xray-linux-64.zip"
 	}
 	if useMirror {
-		u = CNMirrorPrefix + u
+		u = ghmirror.Prefix + u
 	}
 	return agentapi.FileFetch{
 		URL: u, Path: xrayBinaryRemotePathUnix, Mode: 0o755, SHA256: f.sha,
@@ -138,8 +139,8 @@ func TestDeployToHost_UseMirror_PassedThrough(t *testing.T) {
 	if !rel.mirror {
 		t.Fatal("useMirror=true did not propagate to Releaser.ResolveFetchSpec")
 	}
-	if !strings.HasPrefix(exec.fetched[0].URL, CNMirrorPrefix) {
-		t.Errorf("fetched URL = %q, expected to start with %q", exec.fetched[0].URL, CNMirrorPrefix)
+	if !strings.HasPrefix(exec.fetched[0].URL, ghmirror.Prefix) {
+		t.Errorf("fetched URL = %q, expected to start with %q", exec.fetched[0].URL, ghmirror.Prefix)
 	}
 }
 

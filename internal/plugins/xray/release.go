@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hg-claw/Shepherd/internal/agentapi"
+	"github.com/hg-claw/Shepherd/internal/ghmirror"
 )
 
 // Releaser resolves xray release metadata. The actual zip download
@@ -19,10 +20,6 @@ type Releaser struct {
 	BaseURL string // https://github.com/XTLS/Xray-core (override for tests)
 	HTTP    *http.Client
 }
-
-// CNMirrorPrefix is prepended to the github.com asset URL when a deploy
-// asks for the CN mirror. Kept symmetric with singbox.CNMirrorPrefix.
-const CNMirrorPrefix = "https://gh-proxy.com/"
 
 func defaultClient() *http.Client {
 	return &http.Client{Timeout: 60 * time.Second}
@@ -65,14 +62,14 @@ func (r *Releaser) base() string {
 }
 
 // buildAssetURLs returns the (download, digest) URLs for a given version.
-// useMirror wraps both with CNMirrorPrefix. Split out so URL construction
+// useMirror wraps both with ghmirror.Prefix. Split out so URL construction
 // is testable without round-tripping the digest fetch.
 func (r *Releaser) buildAssetURLs(version, osName, arch string, useMirror bool) (zipURL, dgstURL string) {
 	zipURL = fmt.Sprintf("%s/releases/download/v%s/Xray-%s-%s.zip", r.base(), version, xrayOS(osName), xrayArch(arch))
 	dgstURL = zipURL + ".dgst"
 	if useMirror {
-		zipURL = CNMirrorPrefix + zipURL
-		dgstURL = CNMirrorPrefix + dgstURL
+		zipURL = ghmirror.Prefix + zipURL
+		dgstURL = ghmirror.Prefix + dgstURL
 	}
 	return
 }
@@ -83,7 +80,7 @@ func (r *Releaser) buildAssetURLs(version, osName, arch string, useMirror bool) 
 // has always published per-release digests so this is mandatory.
 //
 // useMirror=true wraps both the zip URL and the .dgst URL with
-// CNMirrorPrefix. API endpoints stay direct.
+// ghmirror.Prefix. API endpoints stay direct.
 func (r *Releaser) ResolveFetchSpec(ctx context.Context, version, osName, arch string, useMirror bool) (agentapi.FileFetch, error) {
 	zipURL, dgstURL := r.buildAssetURLs(version, osName, arch, useMirror)
 	httpc := r.HTTP
@@ -178,4 +175,3 @@ func (r *Releaser) ListLatestTags(ctx context.Context, limit int) ([]string, err
 	}
 	return out, nil
 }
-

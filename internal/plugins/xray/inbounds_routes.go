@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/hg-claw/Shepherd/internal/httpjson"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 )
 
@@ -38,9 +39,7 @@ type postInboundBody struct {
 }
 
 func writeJSONResp(w http.ResponseWriter, code int, body any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(body)
+	httpjson.Write(w, code, body)
 }
 
 func writeRouteError(w http.ResponseWriter, code int, msg string) {
@@ -69,17 +68,27 @@ func inboundToMap(v InboundView) map[string]any {
 	}
 	if v.UpstreamInboundID != nil {
 		m["upstream_inbound_id"] = *v.UpstreamInboundID
-		if v.UpstreamTag.Valid        { m["upstream_tag"] = v.UpstreamTag.String }
-		if v.UpstreamServerID.Valid   { m["upstream_server_id"] = v.UpstreamServerID.Int64 }
-		if v.UpstreamServerName.Valid { m["upstream_server_name"] = v.UpstreamServerName.String }
+		if v.UpstreamTag.Valid {
+			m["upstream_tag"] = v.UpstreamTag.String
+		}
+		if v.UpstreamServerID.Valid {
+			m["upstream_server_id"] = v.UpstreamServerID.Int64
+		}
+		if v.UpstreamServerName.Valid {
+			m["upstream_server_name"] = v.UpstreamServerName.String
+		}
 	}
 	return m
 }
 
 // validatePostInbound runs all sync checks. Returns nil on success.
 func validatePostInbound(ctx context.Context, store *InboundStore, body postInboundBody) error {
-	if body.ServerID == 0 { return errors.New("server_id required") }
-	if body.Port <= 0 || body.Port > 65535 { return errors.New("port out of range") }
+	if body.ServerID == 0 {
+		return errors.New("server_id required")
+	}
+	if body.Port <= 0 || body.Port > 65535 {
+		return errors.New("port out of range")
+	}
 	if body.Port == APIPort {
 		return fmt.Errorf("port %d is reserved for the xray stats API", APIPort)
 	}
@@ -97,7 +106,9 @@ func validatePostInbound(ctx context.Context, store *InboundStore, body postInbo
 			return errors.New("upstream_inbound_id required when role=relay")
 		}
 		upstream, err := store.GetByID(ctx, *body.UpstreamInboundID)
-		if err != nil { return fmt.Errorf("upstream inbound %d not found", *body.UpstreamInboundID) }
+		if err != nil {
+			return fmt.Errorf("upstream inbound %d not found", *body.UpstreamInboundID)
+		}
 		if upstream.Role != "landing" {
 			return fmt.Errorf("upstream inbound %d is not a landing (role=%s)", upstream.ID, upstream.Role)
 		}
@@ -109,13 +120,17 @@ func postInboundHandler(deps plugins.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body postInboundBody
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeRouteError(w, 400, "bad json"); return
+			writeRouteError(w, 400, "bad json")
+			return
 		}
 		store := &InboundStore{DB: deps.DB}
 		if err := validatePostInbound(r.Context(), store, body); err != nil {
-			writeRouteError(w, 409, err.Error()); return
+			writeRouteError(w, 409, err.Error())
+			return
 		}
-		if body.Protocol == "" { body.Protocol = "vless-reality" }
+		if body.Protocol == "" {
+			body.Protocol = "vless-reality"
+		}
 		in := Inbound{
 			ServerID: body.ServerID, Tag: store.GenerateTag(body.Role), Port: body.Port,
 			Role: body.Role, Protocol: body.Protocol,
@@ -125,14 +140,20 @@ func postInboundHandler(deps plugins.Deps) http.HandlerFunc {
 			UpstreamInboundID: body.UpstreamInboundID, Alias: body.Alias,
 		}
 		id, err := store.Insert(r.Context(), in)
-		if err != nil { writeRouteError(w, 500, err.Error()); return }
+		if err != nil {
+			writeRouteError(w, 500, err.Error())
+			return
+		}
 
 		// Trigger reassemble + restart in background
 		asyncDeploy(deps, body.ServerID)
 
 		views, _ := store.ListAllWithUpstream(r.Context())
 		for _, v := range views {
-			if v.ID == id { writeJSONResp(w, 201, inboundToMap(v)); return }
+			if v.ID == id {
+				writeJSONResp(w, 201, inboundToMap(v))
+				return
+			}
 		}
 		writeRouteError(w, 500, "inserted but not findable")
 	}
@@ -142,13 +163,18 @@ func getInboundsHandler(deps plugins.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		store := &InboundStore{DB: deps.DB}
 		views, err := store.ListAllWithUpstream(r.Context())
-		if err != nil { writeRouteError(w, 500, err.Error()); return }
+		if err != nil {
+			writeRouteError(w, 500, err.Error())
+			return
+		}
 		filter := r.URL.Query().Get("server_id")
 		out := []map[string]any{}
 		for _, v := range views {
 			if filter != "" {
 				want, _ := strconv.ParseInt(filter, 10, 64)
-				if v.ServerID != want { continue }
+				if v.ServerID != want {
+					continue
+				}
 			}
 			out = append(out, inboundToMap(v))
 		}
@@ -159,28 +185,54 @@ func getInboundsHandler(deps plugins.Deps) http.HandlerFunc {
 func patchInboundHandler(deps plugins.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-		if id == 0 { writeRouteError(w, 400, "id required"); return }
+		if id == 0 {
+			writeRouteError(w, 400, "id required")
+			return
+		}
 		var body map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeRouteError(w, 400, "bad json"); return
+			writeRouteError(w, 400, "bad json")
+			return
 		}
 		patch := InboundPatch{}
-		if v, ok := body["port"].(float64);       ok { p := int(v); patch.Port = &p }
-		if v, ok := body["uuid"].(string);        ok { patch.UUID = &v }
-		if v, ok := body["sni"].(string);         ok { patch.SNI = &v }
-		if v, ok := body["public_key"].(string);  ok { patch.PublicKey = &v }
-		if v, ok := body["private_key"].(string); ok && v != "[REDACTED]" { patch.PrivateKey = &v }
-		if v, ok := body["short_id"].(string);    ok { patch.ShortID = &v }
-		if v, ok := body["ws_path"].(string);     ok { patch.WSPath = &v }
-		if v, ok := body["ss_method"].(string);   ok { patch.SSMethod = &v }
-		if v, ok := body["ss_password"].(string); ok { patch.SSPassword = &v }
+		if v, ok := body["port"].(float64); ok {
+			p := int(v)
+			patch.Port = &p
+		}
+		if v, ok := body["uuid"].(string); ok {
+			patch.UUID = &v
+		}
+		if v, ok := body["sni"].(string); ok {
+			patch.SNI = &v
+		}
+		if v, ok := body["public_key"].(string); ok {
+			patch.PublicKey = &v
+		}
+		if v, ok := body["private_key"].(string); ok && v != "[REDACTED]" {
+			patch.PrivateKey = &v
+		}
+		if v, ok := body["short_id"].(string); ok {
+			patch.ShortID = &v
+		}
+		if v, ok := body["ws_path"].(string); ok {
+			patch.WSPath = &v
+		}
+		if v, ok := body["ss_method"].(string); ok {
+			patch.SSMethod = &v
+		}
+		if v, ok := body["ss_password"].(string); ok {
+			patch.SSPassword = &v
+		}
 		if v, ok := body["alias"].(string); ok {
 			patch.Alias = &v
 		}
 
 		store := &InboundStore{DB: deps.DB}
 		row, err := store.GetByID(r.Context(), id)
-		if err != nil { writeRouteError(w, 404, "inbound not found"); return }
+		if err != nil {
+			writeRouteError(w, 404, "inbound not found")
+			return
+		}
 
 		if patch.Port != nil && *patch.Port != row.Port {
 			others, _ := store.ListByServer(r.Context(), row.ServerID)
@@ -192,12 +244,16 @@ func patchInboundHandler(deps plugins.Deps) http.HandlerFunc {
 			}
 		}
 		if err := store.Update(r.Context(), id, patch); err != nil {
-			writeRouteError(w, 500, err.Error()); return
+			writeRouteError(w, 500, err.Error())
+			return
 		}
 		asyncDeploy(deps, row.ServerID)
 		views, _ := store.ListAllWithUpstream(r.Context())
 		for _, v := range views {
-			if v.ID == id { writeJSONResp(w, 200, inboundToMap(v)); return }
+			if v.ID == id {
+				writeJSONResp(w, 200, inboundToMap(v))
+				return
+			}
 		}
 		writeRouteError(w, 500, "updated but not findable")
 	}
@@ -206,15 +262,23 @@ func patchInboundHandler(deps plugins.Deps) http.HandlerFunc {
 func deleteInboundHandler(deps plugins.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-		if id == 0 { writeRouteError(w, 400, "id required"); return }
+		if id == 0 {
+			writeRouteError(w, 400, "id required")
+			return
+		}
 		store := &InboundStore{DB: deps.DB}
 		row, err := store.GetByID(r.Context(), id)
-		if err != nil { writeRouteError(w, 404, "inbound not found"); return }
+		if err != nil {
+			writeRouteError(w, 404, "inbound not found")
+			return
+		}
 		if row.Role == "landing" {
 			dependents, _ := store.ListByUpstream(r.Context(), id)
 			if len(dependents) > 0 {
 				ids := make([]int64, 0, len(dependents))
-				for _, d := range dependents { ids = append(ids, d.ID) }
+				for _, d := range dependents {
+					ids = append(ids, d.ID)
+				}
 				writeJSONResp(w, 409, map[string]any{
 					"error":             fmt.Sprintf("landing inbound %s has %d relay(s) depending on it", row.Tag, len(dependents)),
 					"relay_inbound_ids": ids,
@@ -223,7 +287,8 @@ func deleteInboundHandler(deps plugins.Deps) http.HandlerFunc {
 			}
 		}
 		if err := store.Delete(r.Context(), id); err != nil {
-			writeRouteError(w, 500, err.Error()); return
+			writeRouteError(w, 500, err.Error())
+			return
 		}
 		asyncDeploy(deps, row.ServerID)
 		writeJSONResp(w, 200, map[string]any{"ok": true})
@@ -238,12 +303,19 @@ type patchVersionBody struct {
 func patchServerVersionHandler(deps plugins.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sid, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
-		if sid == 0 { writeRouteError(w, 400, "id required"); return }
+		if sid == 0 {
+			writeRouteError(w, 400, "id required")
+			return
+		}
 		var body patchVersionBody
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeRouteError(w, 400, "bad json"); return
+			writeRouteError(w, 400, "bad json")
+			return
 		}
-		if body.Version == "" { writeRouteError(w, 400, "version required"); return }
+		if body.Version == "" {
+			writeRouteError(w, 400, "version required")
+			return
+		}
 
 		// UPSERT plugin_hosts row with new version (status=deploying)
 		_, err := deps.DB.ExecContext(r.Context(), `
@@ -254,7 +326,10 @@ func patchServerVersionHandler(deps plugins.Deps) http.HandlerFunc {
 			    status           = 'deploying',
 			    updated_at       = excluded.updated_at`,
 			sid, body.Version, time.Now().UTC())
-		if err != nil { writeRouteError(w, 500, err.Error()); return }
+		if err != nil {
+			writeRouteError(w, 500, err.Error())
+			return
+		}
 
 		// Async: push new binary + restart, then reassemble config
 		go func() {

@@ -3,18 +3,16 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/hg-claw/Shepherd/internal/httpjson"
 )
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if body != nil {
-		_ = json.NewEncoder(w).Encode(body)
-	}
+	httpjson.Write(w, status, body)
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
+	httpjson.Error(w, status, msg)
 }
 
 func decodeJSON(r *http.Request, v any) error {

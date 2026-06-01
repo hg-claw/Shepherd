@@ -11,6 +11,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
+	"github.com/hg-claw/Shepherd/internal/httpjson"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 )
 
@@ -48,13 +49,13 @@ func (p *Plugin) RegisterRoutes(mux plugins.Mux, deps plugins.Deps) {
 
 // targetRow is the JSON shape returned by /targets endpoints.
 type targetRow struct {
-	ID        int64  `db:"id"         json:"id"`
-	Source    string `db:"source"     json:"source"`
-	ISP       string `db:"isp"        json:"isp"`
-	Region    string `db:"region"     json:"region"`
-	Label     string `db:"label"      json:"label"`
-	Host      string `db:"host"       json:"host"`
-	Enabled   bool   `db:"enabled"    json:"enabled"`
+	ID        int64     `db:"id"         json:"id"`
+	Source    string    `db:"source"     json:"source"`
+	ISP       string    `db:"isp"        json:"isp"`
+	Region    string    `db:"region"     json:"region"`
+	Label     string    `db:"label"      json:"label"`
+	Host      string    `db:"host"       json:"host"`
+	Enabled   bool      `db:"enabled"    json:"enabled"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
@@ -176,11 +177,11 @@ func (p *Plugin) deleteCustomTarget(w http.ResponseWriter, r *http.Request) {
 }
 
 type hostRow struct {
-	ServerID                int64      `db:"server_id"               json:"server_id"`
-	Enabled                 bool       `db:"enabled"                 json:"enabled"`
-	SampleIntervalSeconds   int        `db:"sample_interval_seconds" json:"sample_interval_seconds"`
-	LastError               *string    `db:"last_error"              json:"last_error,omitempty"`
-	UpdatedAt               *time.Time `db:"updated_at"              json:"updated_at,omitempty"`
+	ServerID              int64      `db:"server_id"               json:"server_id"`
+	Enabled               bool       `db:"enabled"                 json:"enabled"`
+	SampleIntervalSeconds int        `db:"sample_interval_seconds" json:"sample_interval_seconds"`
+	LastError             *string    `db:"last_error"              json:"last_error,omitempty"`
+	UpdatedAt             *time.Time `db:"updated_at"              json:"updated_at,omitempty"`
 }
 
 func (p *Plugin) listHosts(w http.ResponseWriter, r *http.Request) {
@@ -499,11 +500,9 @@ func validISP(s string) bool {
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(v)
+	httpjson.Write(w, code, v)
 }
 
 func writeErr(w http.ResponseWriter, code int, err error) {
-	writeJSON(w, code, map[string]any{"error": err.Error()})
+	httpjson.Error(w, code, err.Error())
 }

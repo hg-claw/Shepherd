@@ -9,8 +9,7 @@ import i18n from './i18n'
 import { useUI } from './store/ui'
 import { setOn401 } from './api/client'
 import { useAuth } from './store/auth'
-import { Toaster as ShadcnToaster } from './components/ui/toaster'
-import { ToastBridge } from './components/ToastBridge'
+import { Toaster } from './components/ui/toaster'
 import { installChunkReload } from './lib/chunkReload'
 
 // Recover from stale lazy-chunk imports after a redeploy. Registered before
@@ -53,8 +52,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={qc}>
       <BrowserRouter>
         <App />
-        <ShadcnToaster />
-        <ToastBridge />
+        <Toaster />
       </BrowserRouter>
     </QueryClientProvider>
   </React.StrictMode>,

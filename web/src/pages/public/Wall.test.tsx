@@ -1,3 +1,4 @@
+import React from 'react'
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -54,11 +55,32 @@ vi.mock('@/api/public', () => ({
   }),
 }))
 
+const liveMap: Record<number, { rx_bps: number; tx_bps: number }> = {
+  [serverA.id]: { rx_bps: 999_000, tx_bps: 111_000 },
+}
+
 vi.mock('@/api/wallLive', () => ({
-  useWallLiveNet: () => ({
-    live: new Map([[serverA.id, { rx_bps: 999_000, tx_bps: 111_000 }]]),
-    connected: true,
-  }),
+  useWallLiveConnection: () => {},
+  useWallLiveStore: (sel: (s: { live: typeof liveMap }) => unknown) => sel({ live: liveMap }),
+}))
+
+vi.mock('@/components/LiveNetCell', () => ({
+  LiveNetCell: ({
+    id,
+    fallbackRx,
+    fallbackTx,
+    children,
+  }: {
+    id: number
+    fallbackRx: number
+    fallbackTx: number
+    children: (rx: number, tx: number) => React.ReactNode
+  }) => {
+    const entry = liveMap[id]
+    const rx = entry?.rx_bps ?? fallbackRx
+    const tx = entry?.tx_bps ?? fallbackTx
+    return children(rx, tx)
+  },
 }))
 
 // ── Setup ─────────────────────────────────────────────────────────────────────

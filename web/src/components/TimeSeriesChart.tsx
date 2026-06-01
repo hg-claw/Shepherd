@@ -93,9 +93,9 @@ export function TimeSeriesChart({
               .map((p, i) => `${i === 0 ? 'M' : 'L'} ${x(p.ts).toFixed(1)} ${y(p.v).toFixed(1)}`)
               .join(' '),
       ),
-    // x/y derive from width + memoized bounds; recompute when those change.
+    // x/y derive from width/height + memoized bounds; recompute when those change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [series, width, min, max, tMin, tMax],
+    [series, width, height, min, max, tMin, tMax],
   )
 
   return (

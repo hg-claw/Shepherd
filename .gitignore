@@ -17,6 +17,7 @@
 
 # Frontend (Plan 1.B)
 /web/node_modules/
+/node_modules/
 /web/dist/
 
 # OS

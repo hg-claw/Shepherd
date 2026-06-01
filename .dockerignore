@@ -13,3 +13,7 @@ shepherd.db*
 .env
 .env.local
 internal/installer/bin/shepherd-agent-linux-*
+data/
+tmp/
+*.db-shm
+*.db-wal

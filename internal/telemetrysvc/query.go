@@ -94,3 +94,46 @@ func (q *Query) Latest(ctx context.Context, serverID int64) (*Point, error) {
 	}
 	return &p, nil
 }
+
+// latestRow scans one server's latest sample. The embedded Point carries the
+// metric columns (by their db tags); ServerID is the partition key for folding
+// the flat result set into a per-server map.
+type latestRow struct {
+	ServerID int64 `db:"server_id"`
+	Point
+}
+
+// LatestForAll returns the most recent sample per server for the given ids,
+// keyed by server_id. Ids with no samples are absent from the map. Empty ids
+// returns an empty map without querying. One query (window function), portable
+// across the SQLite and Postgres drivers.
+func (q *Query) LatestForAll(ctx context.Context, ids []int64) (map[int64]*Point, error) {
+	out := map[int64]*Point{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	query, args, err := sqlx.In(`
+		SELECT server_id, ts, cpu, mem_used, mem_total, load_1,
+		       net_rx_bps, net_tx_bps, tcp_conn, disks_json
+		FROM (
+			SELECT server_id, ts, cpu_pct AS cpu, mem_used, mem_total, load_1,
+			       net_rx_bps, net_tx_bps, tcp_conn, disks_json,
+			       ROW_NUMBER() OVER (PARTITION BY server_id ORDER BY ts DESC) AS rn
+			FROM telemetry_samples_30s
+			WHERE server_id IN (?)
+		) ranked
+		WHERE rn = 1`, ids)
+	if err != nil {
+		return nil, err
+	}
+	query = q.DB.Rebind(query)
+	var rows []latestRow
+	if err := q.DB.SelectContext(ctx, &rows, query, args...); err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		p := rows[i].Point
+		out[rows[i].ServerID] = &p
+	}
+	return out, nil
+}

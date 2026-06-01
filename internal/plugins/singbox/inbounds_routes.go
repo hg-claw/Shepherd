@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/hg-claw/Shepherd/internal/httpjson"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 )
 
@@ -61,17 +62,15 @@ type postInboundBody struct {
 	// (legacy dual-termination), "forward" (transparent sing-box
 	// direct inbound). Empty defaults to "proxy" for backward
 	// compatibility with existing clients.
-	RelayMode              string  `json:"relay_mode"`
+	RelayMode string `json:"relay_mode"`
 }
 
 func writeJSON(w http.ResponseWriter, code int, body any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(body)
+	httpjson.Write(w, code, body)
 }
 
 func writeErr(w http.ResponseWriter, code int, msg string) {
-	writeJSON(w, code, map[string]string{"error": msg})
+	httpjson.Error(w, code, msg)
 }
 
 func validatePostInbound(ctx context.Context, store *InboundStore, body postInboundBody) error {
@@ -140,25 +139,25 @@ func inboundToMap(v InboundView) map[string]any {
 		"role":        v.Role,
 		"protocol":    v.Protocol,
 		// pointer fields — nil → JSON null
-		"uuid":                    v.UUID,
-		"flow":                    v.Flow,
-		"password":                v.Password,
-		"sni":                     v.SNI,
-		"cert_id":                 v.CertID,
-		"reality_private_key":     "[REDACTED]",
-		"reality_public_key":      v.RealityPublicKey,
-		"reality_short_id":        v.RealityShortID,
+		"uuid":                     v.UUID,
+		"flow":                     v.Flow,
+		"password":                 v.Password,
+		"sni":                      v.SNI,
+		"cert_id":                  v.CertID,
+		"reality_private_key":      "[REDACTED]",
+		"reality_public_key":       v.RealityPublicKey,
+		"reality_short_id":         v.RealityShortID,
 		"reality_handshake_server": v.RealityHandshakeServer,
-		"reality_handshake_port":  v.RealityHandshakePort,
-		"transport_path":          v.TransportPath,
-		"transport_host":          v.TransportHost,
-		"alter_id":                v.AlterID,
-		"ss_method":               v.SSMethod,
-		"extra_json":              v.ExtraJSON,
-		"upstream_inbound_id":     v.UpstreamInboundID,
-		"relay_mode":              v.RelayMode,
-		"created_at":              v.CreatedAt,
-		"updated_at":              v.UpdatedAt,
+		"reality_handshake_port":   v.RealityHandshakePort,
+		"transport_path":           v.TransportPath,
+		"transport_host":           v.TransportHost,
+		"alter_id":                 v.AlterID,
+		"ss_method":                v.SSMethod,
+		"extra_json":               v.ExtraJSON,
+		"upstream_inbound_id":      v.UpstreamInboundID,
+		"relay_mode":               v.RelayMode,
+		"created_at":               v.CreatedAt,
+		"updated_at":               v.UpdatedAt,
 	}
 	if v.UpstreamTag.Valid {
 		m["upstream_tag"] = v.UpstreamTag.String

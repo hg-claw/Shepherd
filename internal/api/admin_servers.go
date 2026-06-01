@@ -51,10 +51,14 @@ func (a *ServersAPI) List(w http.ResponseWriter, r *http.Request) {
 		Latest    *telemetrysvc.Point `json:"latest"`
 		Connected bool                `json:"connected"`
 	}
+	ids := make([]int64, 0, len(servers))
+	for _, s := range servers {
+		ids = append(ids, s.ID)
+	}
+	latestByID, _ := a.Query.LatestForAll(r.Context(), ids)
 	out := make([]wrapped, 0, len(servers))
 	for _, s := range servers {
-		pt, _ := a.Query.Latest(r.Context(), s.ID) // nil if no telemetry yet — fine
-		out = append(out, wrapped{Server: s, Latest: pt, Connected: a.hubIsOnline(s.ID)})
+		out = append(out, wrapped{Server: s, Latest: latestByID[s.ID], Connected: a.hubIsOnline(s.ID)})
 	}
 	writeJSON(w, 200, out)
 }

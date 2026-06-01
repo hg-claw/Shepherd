@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -93,6 +94,21 @@ func (a *FilesAPI) Stat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, ent)
 }
 
+// previewRead pipes downloadFn's output and returns up to maxB bytes. On return
+// it cancels the download context (so Download sends FileCancel and the agent
+// stops streaming) and closes the pipe reader (so an in-flight write fails fast
+// instead of head-of-line-blocking the agent connection's read loop).
+func previewRead(ctx context.Context, maxB int, downloadFn func(context.Context, io.Writer) error) []byte {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	pr, pw := io.Pipe()
+	defer pr.Close()
+	go func() { _ = pw.CloseWithError(downloadFn(ctx, pw)) }()
+	buf := make([]byte, maxB)
+	n, _ := io.ReadFull(pr, buf)
+	return buf[:n]
+}
+
 func (a *FilesAPI) Preview(w http.ResponseWriter, r *http.Request) {
 	sid, _ := strconv.ParseInt(r.URL.Query().Get("server_id"), 10, 64)
 	path := r.URL.Query().Get("path")
@@ -100,22 +116,19 @@ func (a *FilesAPI) Preview(w http.ResponseWriter, r *http.Request) {
 	if maxB <= 0 || maxB > 256*1024 {
 		maxB = 64 * 1024
 	}
-	pr, pw := io.Pipe()
-	go func() {
-		_, err := a.Files.Download(r.Context(), sid, path, pw)
-		_ = pw.CloseWithError(err)
-	}()
-	buf := make([]byte, maxB)
-	n, _ := io.ReadFull(pr, buf)
-	for i := 0; i < n; i++ {
-		if buf[i] == 0 {
+	data := previewRead(r.Context(), maxB, func(ctx context.Context, dst io.Writer) error {
+		_, err := a.Files.Download(ctx, sid, path, dst)
+		return err
+	})
+	for _, b := range data {
+		if b == 0 {
 			writeError(w, 415, "binary content")
 			return
 		}
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(200)
-	_, _ = w.Write(buf[:n])
+	_, _ = w.Write(data)
 }
 
 func (a *FilesAPI) Download(w http.ResponseWriter, r *http.Request) {

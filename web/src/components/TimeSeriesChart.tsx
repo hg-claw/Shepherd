@@ -39,14 +39,15 @@ export function TimeSeriesChart({
     return () => ro.disconnect()
   }, [])
 
-  const allValues = series.flatMap((s) => s.values.map((p) => p.v))
-  const min = yMin ?? (allValues.length ? Math.min(...allValues) : 0)
-  const max = yMax ?? (allValues.length ? Math.max(...allValues) : 1)
-  const span = max - min || 1
-  const allTs = series.flatMap((s) => s.values.map((p) => +new Date(p.ts)))
-  const tMin = allTs.length ? Math.min(...allTs) : 0
-  const tMax = allTs.length ? Math.max(...allTs) : 1
-  const tSpan = tMax - tMin || 1
+  const { min, max, span, tMin, tMax, tSpan } = useMemo(() => {
+    const allValues = series.flatMap((s) => s.values.map((p) => p.v))
+    const mn = yMin ?? (allValues.length ? Math.min(...allValues) : 0)
+    const mx = yMax ?? (allValues.length ? Math.max(...allValues) : 1)
+    const allTs = series.flatMap((s) => s.values.map((p) => +new Date(p.ts)))
+    const tmn = allTs.length ? Math.min(...allTs) : 0
+    const tmx = allTs.length ? Math.max(...allTs) : 1
+    return { min: mn, max: mx, span: mx - mn || 1, tMin: tmn, tMax: tmx, tSpan: tmx - tmn || 1 }
+  }, [series, yMin, yMax])
 
   const pad = { l: 40, r: 8, t: 8, b: 20 }
   const innerW = Math.max(0, width - pad.l - pad.r)
@@ -82,6 +83,20 @@ export function TimeSeriesChart({
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hoverX, series])
+
+  const paths = useMemo(
+    () =>
+      series.map((s) =>
+        s.values.length < 2
+          ? null
+          : s.values
+              .map((p, i) => `${i === 0 ? 'M' : 'L'} ${x(p.ts).toFixed(1)} ${y(p.v).toFixed(1)}`)
+              .join(' '),
+      ),
+    // x/y derive from width + memoized bounds; recompute when those change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [series, width, min, max, tMin, tMax],
+  )
 
   return (
     <div ref={containerRef} className="relative w-full" style={{ overflow: 'hidden' }}>
@@ -123,10 +138,8 @@ export function TimeSeriesChart({
             </text>
           ))}
           {series.map((s, idx) => {
-            if (s.values.length < 2) return null
-            const d = s.values
-              .map((p, i) => `${i === 0 ? 'M' : 'L'} ${x(p.ts).toFixed(1)} ${y(p.v).toFixed(1)}`)
-              .join(' ')
+            const d = paths[idx]
+            if (d == null) return null
             return (
               <path
                 key={s.name}

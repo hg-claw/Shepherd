@@ -54,7 +54,3 @@ func (a *AuditAPI) List(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, rows)
 }
-
-func (a *AuditAPI) CSV(w http.ResponseWriter, r *http.Request) {
-	a.List(w, r) // placeholder; frontend formats CSV from JSON
-}

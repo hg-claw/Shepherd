@@ -115,35 +115,6 @@ func TestStore_UpdateTemplate(t *testing.T) {
 	}
 }
 
-func TestStore_TemplateByName(t *testing.T) {
-	s := newStore(t)
-	ctx := context.Background()
-
-	_, err := s.CreateTemplate(ctx, "probe", true, `{"final":"PROXY"}`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, err := s.TemplateByName(ctx, "probe")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !got.Builtin || got.Name != "probe" {
-		t.Fatalf("unexpected template: %+v", got)
-	}
-
-	// Non-builtin with same name must not be returned.
-	_, err = s.CreateTemplate(ctx, "probe", false, `{}`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got2, err := s.TemplateByName(ctx, "probe")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !got2.Builtin {
-		t.Fatalf("TemplateByName returned non-builtin row: %+v", got2)
-	}
-}
 
 func TestStore_DeleteSubscriptionCascades(t *testing.T) {
 	s := newStore(t)

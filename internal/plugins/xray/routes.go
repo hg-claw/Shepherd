@@ -3,13 +3,12 @@ package xray
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"sync"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/hg-claw/Shepherd/internal/plugins"
+	"github.com/jmoiron/sqlx"
 )
 
 // latestFetcher can be overridden in tests.
@@ -87,13 +86,13 @@ func (p *Plugin) RegisterRoutes(mux plugins.Mux, deps plugins.Deps) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"short_id": id})
 	})
 
-	mux.HandleFunc("POST /inbounds",        postInboundHandler(deps))
-	mux.HandleFunc("GET /inbounds",         getInboundsHandler(deps))
-	mux.HandleFunc("PATCH /inbounds/{id}",  patchInboundHandler(deps))
+	mux.HandleFunc("POST /inbounds", postInboundHandler(deps))
+	mux.HandleFunc("GET /inbounds", getInboundsHandler(deps))
+	mux.HandleFunc("PATCH /inbounds/{id}", patchInboundHandler(deps))
 	mux.HandleFunc("DELETE /inbounds/{id}", deleteInboundHandler(deps))
-	mux.HandleFunc("PATCH /servers/{id}",   patchServerVersionHandler(deps))
+	mux.HandleFunc("PATCH /servers/{id}", patchServerVersionHandler(deps))
 
-	mux.HandleFunc("GET /traffic",       trafficQueryHandler(deps.DB))
+	mux.HandleFunc("GET /traffic", trafficQueryHandler(deps.DB))
 	mux.HandleFunc("GET /traffic/batch", trafficBatchQueryHandler(deps.DB))
 
 	// Retire /topology — replaced by /inbounds (each row carries upstream_*).
@@ -128,32 +127,4 @@ func listCached(ctx context.Context, db *sqlx.DB) ([]cachedBinary, error) {
 		out = append(out, c)
 	}
 	return out, rows.Err()
-}
-
-// topologyHandler returns an http.HandlerFunc that emits a map keyed by
-// server_id (string, JSON-friendly) of every xray host's role + upstream
-// metadata. UI fetches this in parallel with the generic /hosts list.
-func topologyHandler(db *sqlx.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, req *http.Request) {
-		store := &TopologyStore{DB: db}
-		rows, err := store.ListWithUpstreamName(req.Context())
-		if err != nil { http.Error(w, err.Error(), 500); return }
-		out := map[string]map[string]any{}
-		for _, t := range rows {
-			entry := map[string]any{"role": t.Role}
-			if t.UpstreamServerID.Valid {
-				entry["upstream_server_id"] = t.UpstreamServerID.Int64
-			} else {
-				entry["upstream_server_id"] = nil
-			}
-			if t.UpstreamName.Valid {
-				entry["upstream_name"] = t.UpstreamName.String
-			} else {
-				entry["upstream_name"] = nil
-			}
-			out[fmt.Sprint(t.ServerID)] = entry
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(out)
-	}
 }

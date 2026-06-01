@@ -110,15 +110,6 @@ func (s *Store) Template(ctx context.Context, id int64) (Template, error) {
 	return t, err
 }
 
-// TemplateByName returns a builtin template by name.
-func (s *Store) TemplateByName(ctx context.Context, name string) (Template, error) {
-	var t Template
-	err := s.DB.GetContext(ctx, &t,
-		`SELECT id, name, builtin, rules_json, created_at, updated_at
-		 FROM subgen_templates WHERE name=$1 AND builtin=true`, name)
-	return t, err
-}
-
 // ─── Subscriptions ───────────────────────────────────────────────────────────
 
 // CreateSubscription inserts a new subscription with a generated token.

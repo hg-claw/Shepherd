@@ -63,3 +63,33 @@ func TestWSConn_SlowConsumerError(t *testing.T) {
 		t.Fatalf("err=%v want ErrSlowConsumer", err)
 	}
 }
+
+func TestWSConn_ConcurrentSendCloseNoPanic(t *testing.T) {
+	// With the old `close(sendCh)` in Close, a concurrent Send racing Close
+	// panics ("send on closed channel"), crashing the test binary. The fix must
+	// survive many iterations of the race.
+	for i := 0; i < 300; i++ {
+		c := NewWSConn(&fakeRaw{}, 4, time.Second)
+		var wg sync.WaitGroup
+		for s := 0; s < 8; s++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for j := 0; j < 20; j++ {
+					_ = c.Send(OutFrame{Text: []byte("x")})
+				}
+			}()
+		}
+		go c.Close()
+		wg.Wait()
+		c.Close()
+	}
+}
+
+func TestWSConn_SendAfterCloseReturnsClosed(t *testing.T) {
+	c := NewWSConn(&fakeRaw{}, 4, time.Second)
+	c.Close()
+	if err := c.Send(OutFrame{Text: []byte("x")}); !errors.Is(err, ErrConnClosed) {
+		t.Fatalf("send after close: err=%v want ErrConnClosed", err)
+	}
+}

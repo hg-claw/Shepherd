@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"time"
+
+	"github.com/jmoiron/sqlx"
 )
 
 // HostTrafficRow is one server's cumulative-traffic state.
@@ -43,6 +45,32 @@ func (q *Query) HostTraffic(ctx context.Context, serverID int64) (*HostTrafficRo
 		return nil, err
 	}
 	return &row, nil
+}
+
+// HostTrafficForAll returns the host_traffic row per server for the given ids,
+// keyed by server_id. Ids with no row are absent from the map (the caller
+// supplies the same default the single-row HostTraffic uses: {ServerID, ResetDay:1}).
+func (q *Query) HostTrafficForAll(ctx context.Context, ids []int64) (map[int64]*HostTrafficRow, error) {
+	out := map[int64]*HostTrafficRow{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	query, args, err := sqlx.In(`SELECT server_id, cum_bytes_up, cum_bytes_down,
+		prev_bytes_up, prev_bytes_down, reset_day, last_reset_at
+		FROM host_traffic WHERE server_id IN (?)`, ids)
+	if err != nil {
+		return nil, err
+	}
+	query = q.DB.Rebind(query)
+	var rows []HostTrafficRow
+	if err := q.DB.SelectContext(ctx, &rows, query, args...); err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		r := rows[i]
+		out[r.ServerID] = &r
+	}
+	return out, nil
 }
 
 // SetTrafficResetDay upserts the per-server reset day (caller validates 1..28).

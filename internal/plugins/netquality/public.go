@@ -13,7 +13,7 @@ import (
 // target in that ISP bucket — gives a "this server feels X ms from
 // $ISP right now" headline without leaking the full target list.
 type ISPSummary struct {
-	ISP     string  `json:"isp"`      // telecom|unicom|mobile|overseas
+	ISP      string  `json:"isp"` // telecom|unicom|mobile|overseas
 	RTTAvgMs float64 `json:"rtt_avg_ms"`
 	LossPct  float64 `json:"loss_pct"`
 }
@@ -65,6 +65,52 @@ func LatestPerISP(ctx context.Context, db *sqlx.DB, serverID int64) []ISPSummary
 		return nil
 	}
 	return rows
+}
+
+// ispRow scans one (server, ISP) summary cell for the batch query.
+type ispRow struct {
+	ServerID int64   `db:"server_id"`
+	ISP      string  `db:"isp"`
+	RTTAvgMs float64 `db:"rtt_avg_ms"`
+	LossPct  float64 `db:"loss_pct"`
+}
+
+// LatestPerISPForAll is the batch analogue of LatestPerISP: one grouped query
+// over the id set, returning per-server ISP summaries keyed by server_id. Hosts
+// not enabled (or with no recent ok samples) are absent from the map. Returns an
+// empty map — never an error — so the public wall never 500s on us.
+func LatestPerISPForAll(ctx context.Context, db *sqlx.DB, ids []int64) map[int64][]ISPSummary {
+	out := map[int64][]ISPSummary{}
+	if len(ids) == 0 {
+		return out
+	}
+	cutoff := time.Now().UTC().Add(-1 * time.Duration(LookbackSeconds) * time.Second)
+	query, args, err := sqlx.In(`
+		SELECT s.server_id AS server_id, t.isp AS isp,
+		       AVG(s.rtt_avg_ms) AS rtt_avg_ms,
+		       AVG(s.loss_pct)   AS loss_pct
+		  FROM netquality_targets t
+		  JOIN netquality_samples_raw s ON s.target_id = t.id
+		  JOIN netquality_hosts h ON h.server_id = s.server_id
+		 WHERE s.server_id IN (?)
+		   AND h.enabled = true
+		   AND t.enabled = true
+		   AND s.ts > ?
+		   AND s.status = 'ok'
+		 GROUP BY s.server_id, t.isp
+		 ORDER BY s.server_id, t.isp`, ids, cutoff)
+	if err != nil {
+		return out
+	}
+	query = db.Rebind(query)
+	var rows []ispRow
+	if err := db.SelectContext(ctx, &rows, query, args...); err != nil {
+		return out
+	}
+	for _, r := range rows {
+		out[r.ServerID] = append(out[r.ServerID], ISPSummary{ISP: r.ISP, RTTAvgMs: r.RTTAvgMs, LossPct: r.LossPct})
+	}
+	return out
 }
 
 // HistoryPoint is one (timestamp, ISP) cell in the public per-server

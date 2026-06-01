@@ -186,6 +186,7 @@ func main() {
 		BuildVersion: cfg.BuildVersion,
 		PublicURL:    deriveServerURL(cfg),
 	}
+	servers.InitInstallConcurrency(20)
 	settings := &api.SettingsAPI{
 		Settings:        settingsStore,
 		OnSandboxChange: sandboxPusher.PushAll,

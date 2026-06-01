@@ -34,6 +34,9 @@ type ServersAPI struct {
 	// pinned script URL and server address in the returned curl|bash command.
 	BuildVersion string
 	PublicURL    string
+	// installSem bounds concurrent background agent installs across all batch
+	// calls. nil → unbounded (the field is set in main.go via InitInstallConcurrency).
+	installSem chan struct{}
 }
 
 func (a *ServersAPI) List(w http.ResponseWriter, r *http.Request) {
@@ -656,6 +659,25 @@ func (a *ServersAPI) UpdateAgent(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// InitInstallConcurrency caps concurrent background agent installs.
+func (a *ServersAPI) InitInstallConcurrency(max int) {
+	a.installSem = make(chan struct{}, max)
+}
+
+// dispatchInstall runs an agent install in the background, bounded by installSem
+// (shared across batch calls). Uses context.Background() so a client disconnect
+// never cancels an in-flight install. Fire-and-forget: the caller has already
+// reported "dispatched".
+func (a *ServersAPI) dispatchInstall(serverID int64, cmd string) {
+	go func() {
+		if a.installSem != nil {
+			a.installSem <- struct{}{}
+			defer func() { <-a.installSem }()
+		}
+		_, _, _, _ = a.HostExec.RunCmd(context.Background(), serverID, "sh", "-c", cmd)
+	}()
+}
+
 type batchUpdateReq struct {
 	ServerIDs []int64 `json:"server_ids"`
 	// CN routes every spawned install through the gh-proxy mirror.
@@ -717,10 +739,7 @@ func (a *ServersAPI) BatchUpdateAgent(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			cmd := buildInstallCommand(a.BuildVersion, a.PublicURL, tok, in.CN)
-			go func() {
-				ctx := context.Background()
-				_, _, _, _ = a.HostExec.RunCmd(ctx, serverID, "sh", "-c", cmd)
-			}()
+			a.dispatchInstall(serverID, cmd)
 			res.OK = true
 		}(i, sID)
 	}

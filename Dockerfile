@@ -19,22 +19,24 @@ FROM golang:1.25-alpine AS go-builder
 RUN apk add --no-cache build-base sqlite-dev
 WORKDIR /src
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
 COPY --from=web-builder /src/internal/web/dist ./internal/web/dist
 ARG VERSION=dev
 # Cross-compile both agent arches into the embed dir so any-arch server
 # image can install agents on either-arch hosts. Agents are pure Go (CGO=0)
 # and cross-compile cleanly without a C toolchain.
-RUN GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \
-      -ldflags "-X github.com/hg-claw/Shepherd/internal/agentconfig.BuildVersion=${VERSION}" \
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
+      -ldflags "-s -w -X github.com/hg-claw/Shepherd/internal/agentconfig.BuildVersion=${VERSION}" \
       -o internal/installer/bin/shepherd-agent-linux-amd64 ./cmd/agent && \
-    GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build \
-      -ldflags "-X github.com/hg-claw/Shepherd/internal/agentconfig.BuildVersion=${VERSION}" \
+    GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath \
+      -ldflags "-s -w -X github.com/hg-claw/Shepherd/internal/agentconfig.BuildVersion=${VERSION}" \
       -o internal/installer/bin/shepherd-agent-linux-arm64 ./cmd/agent
 # Server: native build for the (QEMU-emulated) target arch. CGO=1 for sqlite.
-RUN CGO_ENABLED=1 go build \
-      -ldflags "-X github.com/hg-claw/Shepherd/internal/config.BuildVersion=${VERSION}" \
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=1 go build -trimpath \
+      -ldflags "-s -w -X github.com/hg-claw/Shepherd/internal/config.BuildVersion=${VERSION}" \
       -o /out/shepherd-server ./cmd/server
 
 # ── Stage 3: runtime ──────────────────────────────────────────────

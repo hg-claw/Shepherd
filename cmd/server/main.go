@@ -235,6 +235,7 @@ func main() {
 		return out
 	}
 	public.InitRateLimit(30, time.Minute)
+	authAPI.InitRateLimit(10, 5*time.Minute)
 	agentAPI := &api.AgentAPI{
 		Agents:            agentSvc,
 		Hub:               hub,

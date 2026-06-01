@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Server, CircleCheck, CircleX, Activity, ArrowDownUp, LayoutGrid, Rows3 } from 'lucide-react'
 import { usePublicServers, type PublicCard } from '@/api/public'
-import { useWallLiveNet } from '@/api/wallLive'
+import { useWallLiveConnection, useWallLiveStore } from '@/api/wallLive'
+import { LiveNetCell } from '@/components/LiveNetCell'
 import { bps, bytes } from '@/lib/bytes'
 import { cn } from '@/lib/utils'
 import { Seg } from '@/components/Seg'
@@ -18,7 +19,7 @@ export default function Wall() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const servers = usePublicServers()
-  const { live } = useWallLiveNet()
+  useWallLiveConnection()
 
   const [view, setView] = useState<'list' | 'grid'>(() => {
     try { return localStorage.getItem(WALL_VIEW_KEY) === 'grid' ? 'grid' : 'list' } catch { return 'list' }
@@ -38,16 +39,10 @@ export default function Wall() {
     return <div className="text-muted-foreground">{t('wall.no_servers')}</div>
   }
 
-  // Effective net: live wins, else fall back to polled latest
-  const rxOf = (s: PublicCard) => live.get(s.id)?.rx_bps ?? s.latest?.net_rx_bps ?? 0
-  const txOf = (s: PublicCard) => live.get(s.id)?.tx_bps ?? s.latest?.net_tx_bps ?? 0
-
   const onlineList = list.filter((s) => s.online)
   const onlineCount = onlineList.length
   const offlineCount = total - onlineCount
 
-  const sumRxBps = onlineList.reduce((a, s) => a + rxOf(s), 0)
-  const sumTxBps = onlineList.reduce((a, s) => a + txOf(s), 0)
   const sumTrafficRx = list.reduce((a, s) => a + (s.traffic_rx_bytes ?? 0), 0)
   const sumTrafficTx = list.reduce((a, s) => a + (s.traffic_tx_bytes ?? 0), 0)
 
@@ -96,12 +91,7 @@ export default function Wall() {
           icon={CircleX}
           tone={offlineCount > 0 ? 'err' : undefined}
         />
-        <SummaryStat
-          label={t('wall.stat.realtime', 'Realtime')}
-          value={`↓ ${bps(sumRxBps)}`}
-          sub={`↑ ${bps(sumTxBps)}`}
-          icon={Activity}
-        />
+        <RealtimeStat online={onlineList} label={t('wall.stat.realtime', 'Realtime')} />
         <SummaryStat
           label={t('wall.stat.traffic', 'Traffic')}
           value={`↓ ${bytes(sumTrafficRx)}`}
@@ -126,7 +116,7 @@ export default function Wall() {
             </div>
 
             {view === 'list' ? (
-              <ServerListTable servers={ss} navigate={navigate} rxOf={rxOf} txOf={txOf} />
+              <ServerListTable servers={ss} navigate={navigate} />
             ) : (
               <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
                 {ss
@@ -139,8 +129,6 @@ export default function Wall() {
                     <WallServerCard
                       key={s.id}
                       server={s}
-                      rxOf={rxOf}
-                      txOf={txOf}
                     />
                   ))}
               </div>
@@ -152,18 +140,21 @@ export default function Wall() {
   )
 }
 
+function RealtimeStat({ online, label }: { online: PublicCard[]; label: string }) {
+  const live = useWallLiveStore((s) => s.live)
+  const rx = online.reduce((a, s) => a + (live[s.id]?.rx_bps ?? s.latest?.net_rx_bps ?? 0), 0)
+  const tx = online.reduce((a, s) => a + (live[s.id]?.tx_bps ?? s.latest?.net_tx_bps ?? 0), 0)
+  return <SummaryStat label={label} value={`↓ ${bps(rx)}`} sub={`↑ ${bps(tx)}`} icon={Activity} />
+}
+
 // ── List view ─────────────────────────────────────────────────────────────────
 
 function ServerListTable({
   servers,
   navigate,
-  rxOf,
-  txOf,
 }: {
   servers: PublicCard[]
   navigate: ReturnType<typeof useNavigate>
-  rxOf: (s: PublicCard) => number
-  txOf: (s: PublicCard) => number
 }) {
   const { t } = useTranslation()
   const sorted = servers.slice().sort((a, b) => {
@@ -248,8 +239,14 @@ function ServerListTable({
                 <Td>
                   {s.online ? (
                     <div className="flex flex-col gap-[1px] font-mono tabular-nums text-[11.5px] whitespace-nowrap">
-                      <span>↓ {bps(rxOf(s))}</span>
-                      <span>↑ {bps(txOf(s))}</span>
+                      <LiveNetCell id={s.id} fallbackRx={s.latest?.net_rx_bps ?? 0} fallbackTx={s.latest?.net_tx_bps ?? 0}>
+                        {(rx, tx) => (
+                          <>
+                            <span>↓ {bps(rx)}</span>
+                            <span>↑ {bps(tx)}</span>
+                          </>
+                        )}
+                      </LiveNetCell>
                     </div>
                   ) : (
                     <span className="text-fg-dim">—</span>
@@ -279,12 +276,8 @@ function ServerListTable({
 
 function WallServerCard({
   server: s,
-  rxOf,
-  txOf,
 }: {
   server: PublicCard
-  rxOf: (s: PublicCard) => number
-  txOf: (s: PublicCard) => number
 }) {
   const l = s.latest
   const top = !s.online || !l ? -1 : Math.max(l.cpu_pct ?? 0, l.mem_pct ?? 0, ...(l.disks_pct ?? []))
@@ -329,10 +322,16 @@ function WallServerCard({
 
           {/* Net + load */}
           <div className="flex items-center gap-3 font-mono tabular-nums text-[11px] mt-0.5">
-            <span className="text-ok">↓</span>
-            <span>{bps(rxOf(s))}</span>
-            <span className="text-primary">↑</span>
-            <span>{bps(txOf(s))}</span>
+            <LiveNetCell id={s.id} fallbackRx={s.latest?.net_rx_bps ?? 0} fallbackTx={s.latest?.net_tx_bps ?? 0}>
+              {(rx, tx) => (
+                <>
+                  <span className="text-ok">↓</span>
+                  <span>{bps(rx)}</span>
+                  <span className="text-primary">↑</span>
+                  <span>{bps(tx)}</span>
+                </>
+              )}
+            </LiveNetCell>
             <span className="ml-auto text-fg-dim">load {l.load_1.toFixed(2)}</span>
           </div>
 

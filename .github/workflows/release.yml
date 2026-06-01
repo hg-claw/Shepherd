@@ -43,8 +43,8 @@ jobs:
         run: |
           for goos in linux darwin; do
             for goarch in amd64 arm64; do
-              GOOS=$goos GOARCH=$goarch CGO_ENABLED=0 go build \
-                -ldflags "-X github.com/hg-claw/Shepherd/internal/agentconfig.BuildVersion=${VERSION}" \
+              GOOS=$goos GOARCH=$goarch CGO_ENABLED=0 go build -trimpath \
+                -ldflags "-s -w -X github.com/hg-claw/Shepherd/internal/agentconfig.BuildVersion=${VERSION}" \
                 -o internal/installer/bin/shepherd-agent-${goos}-${goarch} ./cmd/agent
             done
           done
@@ -52,8 +52,8 @@ jobs:
         run: |
           mkdir -p dist
           CGO_ENABLED=1 \
-            go build \
-            -ldflags "-X github.com/hg-claw/Shepherd/internal/config.BuildVersion=${VERSION}" \
+            go build -trimpath \
+            -ldflags "-s -w -X github.com/hg-claw/Shepherd/internal/config.BuildVersion=${VERSION}" \
             -o dist/shepherd-server-linux-${{ matrix.arch }} \
             ./cmd/server
       - name: Package + checksum (linux server tarball)

@@ -15,21 +15,21 @@ web-clean:
 agents: agent-amd64 agent-arm64
 
 agent-amd64:
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \
-	  -ldflags "-X github.com/hg-claw/Shepherd/internal/agentconfig.BuildVersion=$(VERSION)" \
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
+	  -ldflags "-s -w -X github.com/hg-claw/Shepherd/internal/agentconfig.BuildVersion=$(VERSION)" \
 	  -o internal/installer/bin/shepherd-agent-linux-amd64 ./cmd/agent
 
 agent-arm64:
-	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build \
-	  -ldflags "-X github.com/hg-claw/Shepherd/internal/agentconfig.BuildVersion=$(VERSION)" \
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath \
+	  -ldflags "-s -w -X github.com/hg-claw/Shepherd/internal/agentconfig.BuildVersion=$(VERSION)" \
 	  -o internal/installer/bin/shepherd-agent-linux-arm64 ./cmd/agent
 
 # `server` builds the host-arch server binary; depends on web (for embed)
 # and agents (so installer.bin/* contains real binaries, not just the
 # .gitkeep placeholder).
 server: web agents
-	go build \
-	  -ldflags "-X github.com/hg-claw/Shepherd/internal/config.BuildVersion=$(VERSION)" \
+	go build -trimpath \
+	  -ldflags "-s -w -X github.com/hg-claw/Shepherd/internal/config.BuildVersion=$(VERSION)" \
 	  -o bin/shepherd-server ./cmd/server
 
 # Skip web + agents — for environments without npm or for quick Go iteration.
@@ -54,8 +54,8 @@ release: web agents
 	@for arch in amd64 arm64; do \
 	  echo ">> server linux/$$arch"; \
 	  GOOS=linux GOARCH=$$arch CGO_ENABLED=1 \
-	    go build \
-	    -ldflags "-X github.com/hg-claw/Shepherd/internal/config.BuildVersion=$(VERSION)" \
+	    go build -trimpath \
+	    -ldflags "-s -w -X github.com/hg-claw/Shepherd/internal/config.BuildVersion=$(VERSION)" \
 	    -o dist/shepherd-server-linux-$$arch \
 	    ./cmd/server || exit 1; \
 	  cp internal/installer/bin/shepherd-agent-linux-$$arch dist/shepherd-agent-linux-$$arch; \

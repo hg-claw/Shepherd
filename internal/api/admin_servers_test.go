@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -408,5 +409,45 @@ func TestBuildInstallCommand(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+type countingExec struct {
+	mu       sync.Mutex
+	cur, max int
+	done     *sync.WaitGroup
+}
+
+func (c *countingExec) RunCmd(ctx context.Context, serverID int64, name string, args ...string) ([]byte, []byte, int, error) {
+	c.mu.Lock()
+	c.cur++
+	if c.cur > c.max {
+		c.max = c.cur
+	}
+	c.mu.Unlock()
+	time.Sleep(15 * time.Millisecond)
+	c.mu.Lock()
+	c.cur--
+	c.mu.Unlock()
+	c.done.Done()
+	return nil, nil, 0, nil
+}
+
+func TestDispatchInstall_BoundsConcurrency(t *testing.T) {
+	const n, capacity = 12, 3
+	var wg sync.WaitGroup
+	wg.Add(n)
+	ex := &countingExec{done: &wg}
+	a := &ServersAPI{HostExec: ex}
+	a.InitInstallConcurrency(capacity)
+	for i := 0; i < n; i++ {
+		a.dispatchInstall(int64(i), "echo hi")
+	}
+	wg.Wait()
+	if ex.max > capacity {
+		t.Fatalf("max concurrent installs = %d, want <= %d", ex.max, capacity)
+	}
+	if ex.max == 0 {
+		t.Fatal("no installs ran")
 	}
 }

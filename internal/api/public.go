@@ -34,6 +34,9 @@ type PublicAPI struct {
 	// LatestPerISP helper. Left nil in tests / when the plugin isn't
 	// linked; nil-safe (the public list handler skips the augmentation).
 	NetqualitySummary func(ctx context.Context, serverID int64) []NetqualityISPSummary
+	// NetqualitySummaryForAll is the batch form used by the wall list; nil when
+	// the netquality plugin isn't wired. Keyed by server_id; absent → no data.
+	NetqualitySummaryForAll func(ctx context.Context, ids []int64) map[int64][]NetqualityISPSummary
 	// NetqualityHistory powers the public detail page chart. Same nil-
 	// safe contract — the handler returns an empty list if unset, never
 	// 500s. range is one of "1h" / "24h" / "7d"; sloppy values are
@@ -128,13 +131,23 @@ func (a *PublicAPI) Servers_ListPublic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	out := []publicCard{}
+	ids := make([]int64, 0, len(all))
+	for _, s := range all {
+		if s.ShowOnPublic {
+			ids = append(ids, s.ID)
+		}
+	}
+	latestByID, _ := a.Query.LatestForAll(r.Context(), ids)
+	trafficByID, _ := a.Query.HostTrafficForAll(r.Context(), ids)
+	var nqByID map[int64][]NetqualityISPSummary
+	if a.NetqualitySummaryForAll != nil {
+		nqByID = a.NetqualitySummaryForAll(r.Context(), ids)
+	}
+
 	for _, s := range all {
 		if !s.ShowOnPublic {
 			continue
 		}
-		// public_alias is the desensitized display name; if the admin didn't
-		// set one, fall back to the server's internal name. The desensitization
-		// is opt-in: toggling show_on_public alone should make it visible.
 		alias := s.PublicAlias.String
 		if !s.PublicAlias.Valid || alias == "" {
 			alias = s.Name
@@ -146,7 +159,7 @@ func (a *PublicAPI) Servers_ListPublic(w http.ResponseWriter, r *http.Request) {
 			CountryCode: s.CountryCode.String,
 			Online:      s.AgentLastSeen.Valid && time.Since(s.AgentLastSeen.Time) <= threshold,
 		}
-		if pt, err := a.Query.Latest(r.Context(), s.ID); err == nil && pt != nil {
+		if pt := latestByID[s.ID]; pt != nil {
 			card.Latest = renderLatest(pt)
 		}
 		if s.AgentOS.Valid {
@@ -155,16 +168,12 @@ func (a *PublicAPI) Servers_ListPublic(w http.ResponseWriter, r *http.Request) {
 		if s.AgentArch.Valid {
 			card.Arch = s.AgentArch.String
 		}
-		if tr, err := a.Query.HostTraffic(r.Context(), s.ID); err == nil && tr != nil {
-			card.TrafficRxBytes = tr.CumBytesDown // down = rx = received
-			card.TrafficTxBytes = tr.CumBytesUp   // up = tx = sent
+		if tr := trafficByID[s.ID]; tr != nil {
+			card.TrafficRxBytes = tr.CumBytesDown
+			card.TrafficTxBytes = tr.CumBytesUp
 		}
-		// Augment with the netquality summary when the plugin is wired
-		// AND has data for this server. A nil/empty result drops the
-		// field via omitempty so we don't leak "feature exists but is
-		// dark" cues to the public wall.
-		if a.NetqualitySummary != nil {
-			card.Netquality = a.NetqualitySummary(r.Context(), s.ID)
+		if nq := nqByID[s.ID]; len(nq) > 0 {
+			card.Netquality = nq
 		}
 		out = append(out, card)
 	}

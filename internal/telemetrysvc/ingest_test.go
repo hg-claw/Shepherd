@@ -163,3 +163,28 @@ func TestWriteSample_LastSeenUsesServerClock(t *testing.T) {
 		t.Fatalf("sample ts should keep the agent TS %v, got %v", staleTS, sampleTS)
 	}
 }
+
+func TestWriteSample_PersistsSampleTrafficAndLiveness(t *testing.T) {
+	ing, sid := newIngest(t)
+	now := time.Now().UTC()
+	if err := ing.WriteSample(context.Background(), sid, agentapi.Telemetry{
+		TS: now, CPUPct: 42, NetRxBytes: 1000, NetTxBytes: 500,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var nSamples int
+	_ = ing.DB.Get(&nSamples, "SELECT COUNT(*) FROM telemetry_samples_30s WHERE server_id=$1", sid)
+	if nSamples != 1 {
+		t.Fatalf("samples=%d want 1", nSamples)
+	}
+	q := &Query{DB: ing.DB}
+	tr, _ := q.HostTraffic(context.Background(), sid)
+	if tr.CumBytesDown != 1000 || tr.CumBytesUp != 500 {
+		t.Fatalf("traffic up=%d down=%d want 500/1000", tr.CumBytesUp, tr.CumBytesDown)
+	}
+	var ls sql.NullTime
+	_ = ing.DB.Get(&ls, "SELECT agent_last_seen FROM servers WHERE id=$1", sid)
+	if !ls.Valid {
+		t.Fatal("agent_last_seen not advanced")
+	}
+}

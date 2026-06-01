@@ -186,6 +186,7 @@ func main() {
 		BuildVersion: cfg.BuildVersion,
 		PublicURL:    deriveServerURL(cfg),
 	}
+	servers.InitInstallConcurrency(20)
 	settings := &api.SettingsAPI{
 		Settings:        settingsStore,
 		OnSandboxChange: sandboxPusher.PushAll,
@@ -212,6 +213,21 @@ func main() {
 		out := make([]api.NetqualityISPSummary, 0, len(rows))
 		for _, r := range rows {
 			out = append(out, api.NetqualityISPSummary{ISP: r.ISP, RTTAvgMs: r.RTTAvgMs, LossPct: r.LossPct})
+		}
+		return out
+	}
+	public.NetqualitySummaryForAll = func(ctx context.Context, ids []int64) map[int64][]api.NetqualityISPSummary {
+		if !isNetqualityOn() {
+			return nil
+		}
+		byID := netqualityplugin.LatestPerISPForAll(ctx, d, ids)
+		out := make(map[int64][]api.NetqualityISPSummary, len(byID))
+		for sid, rows := range byID {
+			conv := make([]api.NetqualityISPSummary, 0, len(rows))
+			for _, r := range rows {
+				conv = append(conv, api.NetqualityISPSummary{ISP: r.ISP, RTTAvgMs: r.RTTAvgMs, LossPct: r.LossPct})
+			}
+			out[sid] = conv
 		}
 		return out
 	}

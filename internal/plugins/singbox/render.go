@@ -379,10 +379,11 @@ func renderSS2022(base map[string]any, in InboundView) (map[string]any, error) {
 
 // ── Transport block builder ──────────────────────────────────────────────────
 
-func renderTransport(ttype string, in InboundView) map[string]any {
+// buildTransport renders a sing-box transport block. isInbound adds the
+// inbound-only fields (http method=PUT, the quic case), preserving the existing
+// inbound/upstream difference exactly.
+func buildTransport(ttype, path, host string, isInbound bool) map[string]any {
 	tr := map[string]any{"type": ttype}
-	path := strVal(in.TransportPath)
-	host := strVal(in.TransportHost)
 	switch ttype {
 	case "ws":
 		tr["path"] = path
@@ -394,16 +395,22 @@ func renderTransport(ttype string, in InboundView) map[string]any {
 		if host != "" {
 			tr["host"] = []any{host}
 		}
-		tr["method"] = "PUT"
+		if isInbound {
+			tr["method"] = "PUT"
+		}
 	case "httpupgrade":
 		tr["path"] = path
 		if host != "" {
 			tr["host"] = host
 		}
 	case "quic":
-		// no extra fields
+		// inbound only; no extra fields
 	}
 	return tr
+}
+
+func renderTransport(ttype string, in InboundView) map[string]any {
+	return buildTransport(ttype, strVal(in.TransportPath), strVal(in.TransportHost), true)
 }
 
 // ── Relay outbound renderer ──────────────────────────────────────────────────
@@ -509,27 +516,7 @@ func renderRelayOutbound(in InboundView) (map[string]any, error) {
 
 // renderUpstreamTransport builds a transport block using upstream transport fields.
 func renderUpstreamTransport(ttype string, in InboundView) map[string]any {
-	tr := map[string]any{"type": ttype}
-	path := in.UpstreamTransportPath.String
-	host := in.UpstreamTransportHost.String
-	switch ttype {
-	case "ws":
-		tr["path"] = path
-		if host != "" {
-			tr["headers"] = map[string]any{"Host": host}
-		}
-	case "http":
-		tr["path"] = path
-		if host != "" {
-			tr["host"] = []any{host}
-		}
-	case "httpupgrade":
-		tr["path"] = path
-		if host != "" {
-			tr["host"] = host
-		}
-	}
-	return tr
+	return buildTransport(ttype, in.UpstreamTransportPath.String, in.UpstreamTransportHost.String, false)
 }
 
 // protoToTransport maps protocol suffix to sing-box transport type string.
@@ -583,4 +570,3 @@ func int64Val(i *int64) int64 {
 	}
 	return *i
 }
-

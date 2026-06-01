@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/hg-claw/Shepherd/internal/ghmirror"
 )
 
 func TestReleaser_ResolveFetchSpec_Direct(t *testing.T) {
@@ -46,11 +48,11 @@ func TestReleaser_ResolveFetchSpec_Direct(t *testing.T) {
 func TestReleaser_BuildAssetURLs_Mirror(t *testing.T) {
 	r := &Releaser{BaseURL: "https://github.com/XTLS/Xray-core"}
 	zipURL, dgstURL := r.buildAssetURLs("1.2.3", "linux", "amd64", true)
-	if !strings.HasPrefix(zipURL, CNMirrorPrefix) {
-		t.Errorf("zipURL = %q, want prefix %q", zipURL, CNMirrorPrefix)
+	if !strings.HasPrefix(zipURL, ghmirror.Prefix) {
+		t.Errorf("zipURL = %q, want prefix %q", zipURL, ghmirror.Prefix)
 	}
-	if !strings.HasPrefix(dgstURL, CNMirrorPrefix) {
-		t.Errorf("dgstURL = %q, want prefix %q", dgstURL, CNMirrorPrefix)
+	if !strings.HasPrefix(dgstURL, ghmirror.Prefix) {
+		t.Errorf("dgstURL = %q, want prefix %q", dgstURL, ghmirror.Prefix)
 	}
 	if !strings.HasSuffix(zipURL, "/Xray-linux-64.zip") {
 		t.Errorf("zipURL = %q, missing asset suffix", zipURL)
@@ -63,10 +65,10 @@ func TestReleaser_BuildAssetURLs_Mirror(t *testing.T) {
 func TestReleaser_BuildAssetURLs_Direct(t *testing.T) {
 	r := &Releaser{BaseURL: "https://github.com/XTLS/Xray-core"}
 	zipURL, dgstURL := r.buildAssetURLs("1.2.3", "linux", "amd64", false)
-	if strings.HasPrefix(zipURL, CNMirrorPrefix) {
+	if strings.HasPrefix(zipURL, ghmirror.Prefix) {
 		t.Errorf("zipURL = %q, should NOT have mirror prefix", zipURL)
 	}
-	if strings.HasPrefix(dgstURL, CNMirrorPrefix) {
+	if strings.HasPrefix(dgstURL, ghmirror.Prefix) {
 		t.Errorf("dgstURL = %q, should NOT have mirror prefix", dgstURL)
 	}
 }

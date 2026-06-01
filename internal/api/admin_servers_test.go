@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"strconv"
@@ -431,6 +432,16 @@ func (c *countingExec) RunCmd(ctx context.Context, serverID int64, name string, 
 	c.mu.Unlock()
 	c.done.Done()
 	return nil, nil, 0, nil
+}
+
+func TestCNFlag(t *testing.T) {
+	mk := func(q string) *http.Request { return httptest.NewRequest("GET", "/x?"+q, nil) }
+	cases := map[string]bool{"cn=1": true, "cn=true": true, "cn=0": false, "cn=yes": false, "": false}
+	for q, want := range cases {
+		if got := cnFlag(mk(q)); got != want {
+			t.Errorf("cnFlag(%q)=%v want %v", q, got, want)
+		}
+	}
 }
 
 func TestDispatchInstall_BoundsConcurrency(t *testing.T) {

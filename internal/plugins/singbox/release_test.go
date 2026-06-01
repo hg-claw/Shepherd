@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/hg-claw/Shepherd/internal/ghmirror"
 )
 
 // TestReleaser_ResolveFetchSpec_Direct verifies the spec built when the
@@ -65,7 +67,7 @@ func TestReleaser_ResolveFetchSpec_Direct(t *testing.T) {
 }
 
 // TestReleaser_ResolveFetchSpec_Mirror verifies that useMirror=true
-// wraps the asset download URL with CNMirrorPrefix. The sidecar gh-proxy
+// wraps the asset download URL with ghmirror.Prefix. The sidecar gh-proxy
 // URL won't actually resolve (it points to the real gh-proxy.com) but
 // the sidecar fetch is best-effort — failure → SHA="" and we still
 // return a usable spec for the agent.
@@ -98,8 +100,8 @@ func TestReleaser_ResolveFetchSpec_Mirror(t *testing.T) {
 	// the test just confirms the URL on the returned spec is wrapped.
 	rel := &Releaser{BaseURL: srv.URL, Repo: "example/repo", HTTP: srv.Client()}
 	spec, _ := rel.ResolveFetchSpec(context.Background(), version, osName, arch, true)
-	if !strings.HasPrefix(spec.URL, CNMirrorPrefix) {
-		t.Errorf("URL = %q, want prefix %q", spec.URL, CNMirrorPrefix)
+	if !strings.HasPrefix(spec.URL, ghmirror.Prefix) {
+		t.Errorf("URL = %q, want prefix %q", spec.URL, ghmirror.Prefix)
 	}
 	if !strings.HasSuffix(spec.URL, dlURL) {
 		t.Errorf("URL = %q, want suffix %q", spec.URL, dlURL)

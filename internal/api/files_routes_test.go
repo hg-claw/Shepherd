@@ -11,7 +11,7 @@ func TestPreviewRead_ReturnsPrefixAndCancels(t *testing.T) {
 	cancelled := make(chan struct{})
 	downloadFn := func(ctx context.Context, w io.Writer) error {
 		_, _ = w.Write([]byte("hello world more than five")) // pipe write blocks past 5 bytes
-		<-ctx.Done()                                          // unblocked only when previewRead cancels us
+		<-ctx.Done()                                         // unblocked only when previewRead cancels us
 		close(cancelled)
 		return ctx.Err()
 	}

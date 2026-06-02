@@ -1,15 +1,20 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import { useColorScheme } from 'react-native';
+import { useEffect } from 'react'
+import { Stack } from 'expo-router'
+import { View, ActivityIndicator } from 'react-native'
+import { useAuth } from '@/store/auth'
+import { theme } from '@/theme'
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+export default function RootLayout() {
+  const status = useAuth((s) => s.status)
+  const restore = useAuth((s) => s.restore)
+  useEffect(() => { restore() }, [restore])
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
-  );
+  if (status === 'loading') {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={theme.accent} />
+      </View>
+    )
+  }
+  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.bg } }} />
 }

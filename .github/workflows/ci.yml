@@ -42,3 +42,21 @@ jobs:
         run: cd web && npm test
       - name: Build (typescript + vite)
         run: cd web && npm run build
+
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: 'mobile/package-lock.json'
+      - name: Install mobile deps
+        run: cd mobile && npm ci
+      - name: Typecheck
+        run: cd mobile && npx tsc --noEmit
+      - name: Lint
+        run: cd mobile && npx eslint .
+      - name: Jest
+        run: cd mobile && npx jest --ci

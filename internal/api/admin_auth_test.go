@@ -108,3 +108,71 @@ func TestClientIP(t *testing.T) {
 		}
 	}
 }
+
+func loginBody(t *testing.T, a *AuthAPI, req loginReq, query string) (int, map[string]any) {
+	t.Helper()
+	body, _ := json.Marshal(req)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/login"+query, bytes.NewReader(body))
+	a.Login(w, r)
+	var out map[string]any
+	_ = json.Unmarshal(w.Body.Bytes(), &out)
+	return w.Code, out
+}
+
+func TestLogin_MobileReturnsToken(t *testing.T) {
+	a, _ := newAuthAPI(t)
+	code, out := loginBody(t, a, loginReq{Username: "alice", Password: "hunter2", Client: "mobile"}, "")
+	if code != 200 {
+		t.Fatalf("status=%d", code)
+	}
+	tok, _ := out["token"].(string)
+	if tok == "" {
+		t.Fatal("mobile login must return a token")
+	}
+	h := a.Auth
+	called := false
+	srv := h.RequireAdmin(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true }))
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/admin/x", nil)
+	r.Header.Set("Authorization", "Bearer "+tok)
+	srv.ServeHTTP(w, r)
+	if !called || w.Code != 200 {
+		t.Fatalf("returned token should authenticate: code=%d called=%v", w.Code, called)
+	}
+}
+
+func TestLogin_WebOmitsToken(t *testing.T) {
+	a, _ := newAuthAPI(t)
+	code, out := loginBody(t, a, loginReq{Username: "alice", Password: "hunter2"}, "")
+	if code != 200 {
+		t.Fatalf("status=%d", code)
+	}
+	if _, has := out["token"]; has {
+		t.Fatal("web login must NOT return a token in the body")
+	}
+}
+
+func TestLogin_QueryOptInReturnsToken(t *testing.T) {
+	a, _ := newAuthAPI(t)
+	_, out := loginBody(t, a, loginReq{Username: "alice", Password: "hunter2"}, "?token=1")
+	if tok, _ := out["token"].(string); tok == "" {
+		t.Fatal("?token=1 should return a token")
+	}
+}
+
+func TestLogout_BearerRevokes(t *testing.T) {
+	a, _ := newAuthAPI(t)
+	_, out := loginBody(t, a, loginReq{Username: "alice", Password: "hunter2", Client: "mobile"}, "")
+	tok := out["token"].(string)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/logout", nil)
+	r.Header.Set("Authorization", "Bearer "+tok)
+	a.Logout(w, r)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("logout status=%d", w.Code)
+	}
+	if _, _, err := a.Auth.Store.LookupSession(r.Context(), tok); err == nil {
+		t.Fatal("token should be revoked after bearer logout")
+	}
+}

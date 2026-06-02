@@ -1,0 +1,11 @@
+jest.mock('expo-secure-store', () => {
+  const mem: Record<string, string> = {}
+  return {
+    setItemAsync: jest.fn(async (k: string, v: string) => { mem[k] = v }),
+    getItemAsync: jest.fn(async (k: string) => (k in mem ? mem[k] : null)),
+    deleteItemAsync: jest.fn(async (k: string) => { delete mem[k] }),
+  }
+})
+jest.mock('@react-native-async-storage/async-storage', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'))

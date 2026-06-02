@@ -33,3 +33,6 @@
 # Local-only design reference configs (templatized copies live under
 # internal/plugins/subgen/templates/)
 /tmp/
+/mobile/node_modules/
+/mobile/.expo/
+/mobile/dist/

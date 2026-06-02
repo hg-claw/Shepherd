@@ -22,6 +22,7 @@ func (a *AuthAPI) InitRateLimit(max int, window time.Duration) {
 type loginReq struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	Client   string `json:"client,omitempty"` // "mobile" → also return the token in the body
 }
 
 func (a *AuthAPI) Login(w http.ResponseWriter, r *http.Request) {
@@ -67,15 +68,18 @@ func (a *AuthAPI) Login(w http.ResponseWriter, r *http.Request) {
 		a.limit.reset(userKey)
 	}
 	a.Auth.SetSessionCookie(w, sess)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"id":       admin.ID,
-		"username": admin.Username,
-	})
+	out := map[string]any{"id": admin.ID, "username": admin.Username}
+	if req.Client == "mobile" || r.URL.Query().Get("token") == "1" {
+		out["token"] = sess.Token
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (a *AuthAPI) Logout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(a.Auth.CookieName()); err == nil && c.Value != "" {
 		_ = a.Auth.Store.RevokeSession(r.Context(), c.Value)
+	} else if tok := auth.BearerToken(r); tok != "" {
+		_ = a.Auth.Store.RevokeSession(r.Context(), tok)
 	}
 	a.Auth.ClearSessionCookie(w)
 	w.WriteHeader(http.StatusNoContent)

@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"net/http"
+	"strings"
 )
 
 const (
@@ -34,14 +35,37 @@ func (h *Handler) CookieName() string {
 	return cookieNameDev
 }
 
+// BearerToken returns the token from an "Authorization: Bearer <token>" header
+// (scheme is case-insensitive), or "" if absent / a different scheme.
+func BearerToken(r *http.Request) string {
+	a := r.Header.Get("Authorization")
+	const p = "Bearer "
+	if len(a) <= len(p) || !strings.EqualFold(a[:len(p)], p) {
+		return ""
+	}
+	return strings.TrimSpace(a[len(p):])
+}
+
+// sessionToken returns the caller's session token from the bearer header
+// (preferred for non-browser clients) or the session cookie.
+func (h *Handler) sessionToken(r *http.Request) string {
+	if t := BearerToken(r); t != "" {
+		return t
+	}
+	if c, err := r.Cookie(h.CookieName()); err == nil {
+		return c.Value
+	}
+	return ""
+}
+
 func (h *Handler) RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		c, err := r.Cookie(h.CookieName())
-		if err != nil || c.Value == "" {
+		tok := h.sessionToken(r)
+		if tok == "" {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		_, admin, err := h.Store.LookupSession(r.Context(), c.Value)
+		_, admin, err := h.Store.LookupSession(r.Context(), tok)
 		if err != nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return

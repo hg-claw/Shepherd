@@ -84,3 +84,82 @@ func TestRequireAdminRejectsAnonymous(t *testing.T) {
 		t.Error("handler should not have been called")
 	}
 }
+
+func TestRequireAdmin_BearerToken(t *testing.T) {
+	s := newTestStore(t)
+	a, err := s.CreateAdmin(context.Background(), "bob", "pw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess, err := s.IssueSession(context.Background(), a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &Handler{Store: s, Secure: false}
+	called := false
+	srv := h.RequireAdmin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		if adm, ok := AdminFromContext(r.Context()); !ok || adm.ID != a.ID {
+			t.Errorf("admin not in context")
+		}
+	}))
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/", nil)
+	r.Header.Set("Authorization", "Bearer "+sess.Token)
+	srv.ServeHTTP(w, r)
+	if w.Code != 200 || !called {
+		t.Fatalf("bearer should pass: code=%d called=%v", w.Code, called)
+	}
+
+	called = false
+	w = httptest.NewRecorder()
+	r = httptest.NewRequest("GET", "/", nil)
+	r.AddCookie(&http.Cookie{Name: h.CookieName(), Value: "garbage"})
+	r.Header.Set("Authorization", "Bearer "+sess.Token)
+	srv.ServeHTTP(w, r)
+	if w.Code != 200 || !called {
+		t.Fatalf("valid bearer + bad cookie should pass: code=%d", w.Code)
+	}
+
+	if err := s.RevokeSession(context.Background(), sess.Token); err != nil {
+		t.Fatal(err)
+	}
+	called = false
+	w = httptest.NewRecorder()
+	r = httptest.NewRequest("GET", "/", nil)
+	r.Header.Set("Authorization", "Bearer "+sess.Token)
+	srv.ServeHTTP(w, r)
+	if w.Code != 401 || called {
+		t.Fatalf("revoked bearer should 401: code=%d called=%v", w.Code, called)
+	}
+
+	w = httptest.NewRecorder()
+	r = httptest.NewRequest("GET", "/", nil)
+	r.Header.Set("Authorization", "Bearer ")
+	srv.ServeHTTP(w, r)
+	if w.Code != 401 {
+		t.Fatalf("empty bearer should 401: code=%d", w.Code)
+	}
+}
+
+func TestBearerToken(t *testing.T) {
+	r := httptest.NewRequest("GET", "/", nil)
+	r.Header.Set("Authorization", "Bearer abc123")
+	if got := BearerToken(r); got != "abc123" {
+		t.Fatalf("got %q", got)
+	}
+	r2 := httptest.NewRequest("GET", "/", nil)
+	r2.Header.Set("Authorization", "bearer xyz")
+	if got := BearerToken(r2); got != "xyz" {
+		t.Fatalf("case-insensitive: got %q", got)
+	}
+	if got := BearerToken(httptest.NewRequest("GET", "/", nil)); got != "" {
+		t.Fatalf("no header: got %q", got)
+	}
+	r3 := httptest.NewRequest("GET", "/", nil)
+	r3.Header.Set("Authorization", "Basic abc")
+	if got := BearerToken(r3); got != "" {
+		t.Fatalf("non-bearer scheme: got %q", got)
+	}
+}

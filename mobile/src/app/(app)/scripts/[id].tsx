@@ -8,18 +8,21 @@ export default function RunForm() {
   const { id, serverId } = useLocalSearchParams<{ id: string; serverId: string }>()
   const router = useRouter()
   const script = useScripts().data?.find((s) => s.id === Number(id))
-  const [args, setArgs] = useState<Record<string, string>>(() =>
-    Object.fromEntries((script?.params ?? []).map((p) => [p.name, p.default ?? ''])))
+  // Store only user edits; the effective value falls back to each param's default. This way defaults
+  // appear reactively once useScripts resolves after mount (a one-shot useState initializer would miss them).
+  const [overrides, setOverrides] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   if (!script) return <View style={{ flex: 1, backgroundColor: theme.bg, padding: theme.space(4) }}><Text style={{ color: theme.textDim }}>Script not found.</Text></View>
 
-  const missing = script.params.filter((p) => p.required && !(args[p.name] ?? '').trim())
+  const valueFor = (name: string, def?: string) => overrides[name] ?? def ?? ''
+  const missing = script.params.filter((p) => p.required && !valueFor(p.name, p.default).trim())
   const run = async () => {
     if (missing.length) { setError(`Required: ${missing.map((p) => p.label ?? p.name).join(', ')}`); return }
     setBusy(true); setError(null)
     try {
+      const args = Object.fromEntries(script.params.map((p) => [p.name, valueFor(p.name, p.default)]))
       const { run_id } = await runScript(script.id, args, Number(serverId))
       router.push(`/(app)/scripts/run/${run_id}`)
     } catch (e) { setError(e instanceof Error ? e.message : 'run failed') } finally { setBusy(false) }
@@ -32,7 +35,7 @@ export default function RunForm() {
         <View key={p.name} style={{ marginBottom: theme.space(3) }}>
           <Text style={{ color: theme.textDim, marginBottom: theme.space(1) }}>{p.label ?? p.name}{p.required ? ' *' : ''}</Text>
           <TextInput placeholder={p.name} placeholderTextColor={theme.textDim} autoCapitalize="none" autoCorrect={false}
-            value={args[p.name] ?? ''} onChangeText={(t) => setArgs((a) => ({ ...a, [p.name]: t }))}
+            value={valueFor(p.name, p.default)} onChangeText={(t) => setOverrides((a) => ({ ...a, [p.name]: t }))}
             style={{ backgroundColor: theme.surface, color: theme.text, borderColor: theme.border, borderWidth: 1, borderRadius: 8, padding: theme.space(3) }} />
         </View>
       ))}

@@ -50,7 +50,7 @@ export default function ServerList() {
         <FlatList
           data={rows}
           keyExtractor={(s) => String(s.id)}
-          renderItem={({ item }) => <Row row={item} onPress={() => router.push(`/(app)/server/${item.id}` as any)} />}
+          renderItem={({ item }) => <Row row={item} onPress={() => router.push(`/(app)/server/${item.id}`)} />}
           refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={q.refetch} tintColor={theme.accent} />}
           ListEmptyComponent={<Text style={{ color: theme.textDim, padding: theme.space(4) }}>No servers.</Text>}
         />

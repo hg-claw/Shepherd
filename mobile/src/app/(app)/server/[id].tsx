@@ -1,5 +1,5 @@
-import { View, Text } from 'react-native'
-import { useLocalSearchParams } from 'expo-router'
+import { View, Text, Pressable } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useServer } from '@/api/servers'
 import { isOnline, memPct, firstDiskPct } from '@/api/metrics'
 import { bps, pct, relTime } from '@/lib/format'
@@ -15,6 +15,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export default function ServerDetail() {
+  const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const row = useServer(Number(id))
   if (!row) {
@@ -34,6 +35,9 @@ export default function ServerDetail() {
       <Stat label="TCP conns" value={l?.tcp_conn != null ? String(l.tcp_conn) : '—'} />
       <Stat label="OS / Arch" value={`${row.agent_os ?? '—'} / ${row.agent_arch ?? '—'}`} />
       <Stat label="Last seen" value={lastSeen ? relTime(lastSeen) : '—'} />
+      <Pressable onPress={() => router.push(`/(app)/console/${row.id}`)} style={{ marginTop: theme.space(5), padding: theme.space(3), borderRadius: 8, backgroundColor: theme.accent, alignItems: 'center' }}>
+        <Text style={{ color: theme.bg, fontWeight: '600' }}>Open console</Text>
+      </Pressable>
     </View>
   )
 }

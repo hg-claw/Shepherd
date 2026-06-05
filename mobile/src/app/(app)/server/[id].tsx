@@ -38,6 +38,12 @@ export default function ServerDetail() {
       <Pressable onPress={() => router.push(`/(app)/console/${row.id}`)} style={{ marginTop: theme.space(5), padding: theme.space(3), borderRadius: 8, backgroundColor: theme.accent, alignItems: 'center' }}>
         <Text style={{ color: theme.bg, fontWeight: '600' }}>Open console</Text>
       </Pressable>
+      <Pressable onPress={() => router.push(`/(app)/files/${row.id}`)} style={{ marginTop: theme.space(3), padding: theme.space(3), borderRadius: 8, borderWidth: 1, borderColor: theme.border, alignItems: 'center' }}>
+        <Text style={{ color: theme.text }}>Files</Text>
+      </Pressable>
+      <Pressable onPress={() => router.push(`/(app)/scripts?serverId=${row.id}`)} style={{ marginTop: theme.space(3), padding: theme.space(3), borderRadius: 8, borderWidth: 1, borderColor: theme.border, alignItems: 'center' }}>
+        <Text style={{ color: theme.text }}>Run script</Text>
+      </Pressable>
     </View>
   )
 }

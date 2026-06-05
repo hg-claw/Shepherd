@@ -1,6 +1,6 @@
 import React from 'react'
 import { render, fireEvent } from '@testing-library/react-native'
-import FileBrowser from '../[id]'
+import FileBrowser from '../index'
 jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: '7' }), useRouter: () => ({ push: jest.fn() }) }))
 jest.mock('@/api/files', () => ({ useDir: jest.fn() }))
 import { useDir } from '@/api/files'

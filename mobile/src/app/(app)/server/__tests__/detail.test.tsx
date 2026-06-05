@@ -2,7 +2,7 @@ import React from 'react'
 import { render } from '@testing-library/react-native'
 import ServerDetail from '../[id]'
 
-jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: '7' }) }))
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: '7' }), useRouter: () => ({ push: jest.fn() }) }))
 jest.mock('@/api/servers', () => ({ useServer: jest.fn() }))
 import { useServer } from '@/api/servers'
 

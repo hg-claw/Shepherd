@@ -26,6 +26,8 @@ export default function ConsoleScreen() {
   const [status, setStatus] = useState<ConsoleStatus>('connecting')
 
   const start = async () => {
+    sessionRef.current?.close()
+    sessionRef.current = null
     setStatus('connecting')
     const { sid } = await openConsole(Number(id), 24, 80)
     sessionRef.current = new ConsoleSession(baseURL ?? '', token, sid, 24, 80, {
@@ -66,7 +68,8 @@ export default function ConsoleScreen() {
         autoFocus autoCorrect={false} autoCapitalize="none" spellCheck={false} blurOnSubmit={false}
         value=""
         onChangeText={(t) => { if (t) sendKey(charBytes(t)) }}
-        onKeyPress={(e) => { if (e.nativeEvent.key === 'Backspace') sendKey(KEYS.backspace); else if (e.nativeEvent.key === 'Enter') sendKey(KEYS.enter) }}
+        onKeyPress={(e) => { if (e.nativeEvent.key === 'Backspace') sendKey(KEYS.backspace) }}
+        onSubmitEditing={() => sendKey(KEYS.enter)}
         style={{ height: 1, opacity: 0 }}
       />
       <ScrollView horizontal keyboardShouldPersistTaps="always" style={{ maxHeight: 44, borderTopWidth: 1, borderColor: theme.border }} contentContainerStyle={{ alignItems: 'center', padding: theme.space(1) }}>

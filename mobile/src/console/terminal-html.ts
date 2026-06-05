@@ -19,7 +19,7 @@ term.onData(function(d){
 });
 function onMsg(ev){
   var m;try{m=JSON.parse(ev.data)}catch(e){return}
-  if(m.type==='data'){var s=atob(m.b64);term.write(s)}
+  if(m.type==='data'){var s=atob(m.b64);var u=new Uint8Array(s.length);for(var j=0;j<s.length;j++)u[j]=s.charCodeAt(j)&255;term.write(u)}
   else if(m.type==='fit'){doFit()}
 }
 document.addEventListener('message',onMsg);window.addEventListener('message',onMsg);

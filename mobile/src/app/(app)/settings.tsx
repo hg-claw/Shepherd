@@ -4,6 +4,7 @@ import { useLock } from '@/store/lock'
 import { useAuth } from '@/store/auth'
 import { hasHardware, isEnrolled } from '@/lib/biometrics'
 import { theme } from '@/theme'
+import { Screen } from '@/components/Screen'
 
 export default function Settings() {
   const { enabled, setEnabled } = useLock()
@@ -17,7 +18,7 @@ export default function Settings() {
   }, [])
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+    <Screen>
       <View style={{ padding: theme.space(3), borderBottomWidth: 1, borderColor: theme.border }}>
         <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600' }}>Settings</Text>
       </View>
@@ -31,6 +32,6 @@ export default function Settings() {
       <Pressable onPress={logout} style={{ padding: theme.space(4) }}>
         <Text style={{ color: theme.error }}>Sign out</Text>
       </Pressable>
-    </View>
+    </Screen>
   )
 }

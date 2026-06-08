@@ -4,6 +4,7 @@ import ServerDetail from '../[id]'
 
 jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: '7' }), useRouter: () => ({ push: jest.fn() }) }))
 jest.mock('@/api/servers', () => ({ useServer: jest.fn() }))
+jest.mock('@/api/wallLive', () => ({ useLiveNet: () => ({ rx_bps: 4096, tx_bps: 100 }) }))
 import { useServer } from '@/api/servers'
 
 test('renders metrics for a server', () => {
@@ -14,6 +15,7 @@ test('renders metrics for a server', () => {
   const { getByText } = render(<ServerDetail />)
   expect(getByText('gamma')).toBeTruthy()
   expect(getByText(/linux/)).toBeTruthy()
+  expect(getByText(/4\.1 KB\/s/)).toBeTruthy()
 })
 
 test('not found when absent', () => {

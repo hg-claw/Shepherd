@@ -3,6 +3,7 @@ import { FlatList, View, Text, TextInput, Pressable, ActivityIndicator } from 'r
 import { useLocalSearchParams } from 'expo-router'
 import { usePluginHosts, deployHost, undeployHost, startHost, stopHost, restartHost, refreshHost, type HostDeployment } from '@/api/plugins'
 import { theme } from '@/theme'
+import { Screen } from '@/components/Screen'
 
 function Btn({ testID, label, onPress }: { testID: string; label: string; onPress: () => void }) {
   return (
@@ -36,7 +37,7 @@ export default function PluginHosts() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+    <Screen>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space(2), padding: theme.space(3), borderBottomWidth: 1, borderColor: theme.border }}>
         <TextInput value={serverId} onChangeText={setServerId} keyboardType="number-pad" placeholder="server id" placeholderTextColor={theme.textDim}
           style={{ flex: 1, backgroundColor: theme.surface, color: theme.text, borderColor: theme.border, borderWidth: 1, borderRadius: 8, padding: theme.space(2) }} />
@@ -48,6 +49,6 @@ export default function PluginHosts() {
         : q.isError ? <Text style={{ color: theme.error, padding: theme.space(4) }}>failed to load hosts</Text>
         : <FlatList data={q.data ?? []} keyExtractor={(h) => String(h.id)} renderItem={({ item }) => renderRow(item)}
             ListEmptyComponent={<Text style={{ color: theme.textDim, padding: theme.space(4) }}>Not deployed anywhere.</Text>} />}
-    </View>
+    </Screen>
   )
 }

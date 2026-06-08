@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { View, Text, Pressable, TextInput, ScrollView } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { WebView } from 'react-native-webview'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { openConsole } from '@/api/console'
@@ -9,6 +10,7 @@ import { dataMsg, parseFromWebView } from '@/console/bridge'
 import { KEYS, charBytes } from '@/console/keys'
 import { useAuth } from '@/store/auth'
 import { theme } from '@/theme'
+import { Screen } from '@/components/Screen'
 
 const BAR: { label: string; bytes: Uint8Array }[] = [
   { label: 'Esc', bytes: KEYS.esc }, { label: 'Tab', bytes: KEYS.tab },
@@ -49,9 +51,10 @@ export default function ConsoleScreen() {
     else if (m.type === 'resize') sessionRef.current?.resize(m.rows, m.cols)
   }
   const sendKey = (bytes: Uint8Array) => sessionRef.current?.write(bytes)
+  const insets = useSafeAreaInsets()
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+    <Screen edges={['top']}>
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: theme.space(2), borderBottomWidth: 1, borderColor: theme.border }}>
         <Text style={{ color: theme.text, flex: 1 }}>Console · {status}</Text>
         <Pressable onPress={start} style={{ marginRight: theme.space(3) }}><Text style={{ color: theme.accent }}>Reconnect</Text></Pressable>
@@ -72,13 +75,13 @@ export default function ConsoleScreen() {
         onSubmitEditing={() => sendKey(KEYS.enter)}
         style={{ height: 1, opacity: 0 }}
       />
-      <ScrollView horizontal keyboardShouldPersistTaps="always" style={{ maxHeight: 44, borderTopWidth: 1, borderColor: theme.border }} contentContainerStyle={{ alignItems: 'center', padding: theme.space(1) }}>
+      <ScrollView horizontal keyboardShouldPersistTaps="always" style={{ maxHeight: 44, borderTopWidth: 1, borderColor: theme.border, paddingBottom: insets.bottom }} contentContainerStyle={{ alignItems: 'center', padding: theme.space(1) }}>
         {BAR.map((k) => (
           <Pressable key={k.label} onPress={() => sendKey(k.bytes)} style={{ paddingHorizontal: theme.space(3), paddingVertical: theme.space(2), marginHorizontal: theme.space(1), borderRadius: 6, backgroundColor: theme.surface }}>
             <Text style={{ color: theme.text, fontFamily: 'monospace' }}>{k.label}</Text>
           </Pressable>
         ))}
       </ScrollView>
-    </View>
+    </Screen>
   )
 }

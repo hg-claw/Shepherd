@@ -9,6 +9,7 @@ jest.mock('@/components/LockScreen', () => {
 jest.mock('@/store/auth', () => ({ useAuth: (sel: (s: { status: string }) => unknown) => sel({ status: 'signedIn' }) }))
 const mockLockState = { enabled: true, locked: true, hydrated: true, hydrate: jest.fn(), noteBackground: jest.fn(), maybeLockOnForeground: jest.fn() }
 jest.mock('@/store/lock', () => ({ useLock: () => mockLockState }))
+jest.mock('@/api/wallLive', () => ({ useWallLiveConnection: () => {} }))
 
 beforeEach(() => { mockLockState.enabled = true; mockLockState.locked = true; mockLockState.hydrated = true })
 

@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useDir, type FileEntry } from '@/api/files'
 import { joinPath, parentPath, crumbs } from '@/lib/paths'
 import { theme } from '@/theme'
+import { Screen } from '@/components/Screen'
 
 export default function FileBrowser() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -20,7 +21,7 @@ export default function FileBrowser() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+    <Screen>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', padding: theme.space(2), borderBottomWidth: 1, borderColor: theme.border }}>
         {crumbs(path).map((c, i) => (
           <Pressable key={i} onPress={() => setPath(c.path)}><Text style={{ color: theme.accent, fontFamily: 'monospace' }}>{c.label === '/' ? '/' : `${c.label}/`}</Text></Pressable>
@@ -41,6 +42,6 @@ export default function FileBrowser() {
             refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={q.refetch} tintColor={theme.accent} />}
             ListEmptyComponent={<Text style={{ color: theme.textDim, padding: theme.space(4) }}>Empty.</Text>}
           />}
-    </View>
+    </Screen>
   )
 }

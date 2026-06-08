@@ -14,3 +14,8 @@ jest.mock('expo-local-authentication', () => ({
   isEnrolledAsync: jest.fn(async () => true),
   authenticateAsync: jest.fn(async () => ({ success: false })),
 }))
+jest.mock('react-native-safe-area-context', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const m = require('react-native-safe-area-context/jest/mock')
+  return m.default ?? m
+})

@@ -3,6 +3,7 @@ import { View, Text, Pressable, Switch, ScrollView } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { usePlugins, enablePlugin, disablePlugin } from '@/api/plugins'
 import { theme } from '@/theme'
+import { Screen } from '@/components/Screen'
 
 export default function PluginDetail() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -11,7 +12,7 @@ export default function PluginDetail() {
   const p = q.data?.find((x) => x.id === id)
   const [busy, setBusy] = useState(false)
 
-  if (!p) return <View style={{ flex: 1, backgroundColor: theme.bg, padding: theme.space(4) }}><Text style={{ color: theme.textDim }}>Plugin not found.</Text></View>
+  if (!p) return <Screen><View style={{ padding: theme.space(4) }}><Text style={{ color: theme.textDim }}>Plugin not found.</Text></View></Screen>
 
   const toggle = async (on: boolean) => {
     setBusy(true)
@@ -20,6 +21,7 @@ export default function PluginDetail() {
   const rowStyle = { padding: theme.space(3), borderTopWidth: 1, borderColor: theme.border }
 
   return (
+    <Screen edges={['top']}>
     <ScrollView style={{ flex: 1, backgroundColor: theme.bg }}>
       <View style={{ padding: theme.space(4) }}>
         <Text style={{ color: theme.text, fontSize: 22, fontWeight: '700' }}>{p.meta.icon} {p.meta.name}</Text>
@@ -39,5 +41,6 @@ export default function PluginDetail() {
         </Pressable>
       ) : null}
     </ScrollView>
+    </Screen>
   )
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { View, Text, TextInput, Pressable, ScrollView } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useScripts, runScript } from '@/api/scripts'
 import { theme } from '@/theme'
 import { Screen } from '@/components/Screen'
@@ -15,7 +15,7 @@ export default function RunForm() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  if (!script) return <Screen><View style={{ padding: theme.space(4) }}><Text style={{ color: theme.textDim }}>Script not found.</Text></View></Screen>
+  if (!script) return <Screen edges={['bottom']}><View style={{ padding: theme.space(4) }}><Text style={{ color: theme.textDim }}>Script not found.</Text></View></Screen>
 
   const valueFor = (name: string, def?: string) => overrides[name] ?? def ?? ''
   const missing = script.params.filter((p) => p.required && !valueFor(p.name, p.default).trim())
@@ -30,7 +30,8 @@ export default function RunForm() {
   }
 
   return (
-    <Screen edges={['top']}>
+    <Screen edges={['bottom']}>
+    <Stack.Screen options={{ title: 'Run script' }} />
     <ScrollView style={{ flex: 1, backgroundColor: theme.bg }} contentContainerStyle={{ padding: theme.space(4) }}>
       <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600', marginBottom: theme.space(3) }}>{script.name}</Text>
       {script.params.map((p) => (

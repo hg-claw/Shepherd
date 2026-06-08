@@ -2,7 +2,7 @@ import React from 'react'
 import { render } from '@testing-library/react-native'
 import ServerDetail from '../[id]'
 
-jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: '7' }), useRouter: () => ({ push: jest.fn() }) }))
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: '7' }), useRouter: () => ({ push: jest.fn() }), Stack: Object.assign(() => null, { Screen: () => null }) }))
 jest.mock('@/api/servers', () => ({ useServer: jest.fn() }))
 jest.mock('@/api/wallLive', () => ({ useLiveNet: () => ({ rx_bps: 4096, tx_bps: 100 }) }))
 import { useServer } from '@/api/servers'

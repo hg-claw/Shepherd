@@ -1,6 +1,7 @@
 import React from 'react'
 import { render, fireEvent, waitFor } from '@testing-library/react-native'
 import Settings from '../settings'
+jest.mock('expo-router', () => ({ Stack: Object.assign(() => null, { Screen: () => null }) }))
 const mockSetEnabled = jest.fn().mockResolvedValue(undefined)
 jest.mock('@/store/lock', () => ({ useLock: () => ({ enabled: false, setEnabled: mockSetEnabled }) }))
 jest.mock('@/store/auth', () => ({ useAuth: (sel: (s: { logout: () => void }) => unknown) => sel({ logout: jest.fn() }) }))

@@ -8,10 +8,15 @@ export const TERMINAL_HTML = `<!doctype html><html><head><meta name="viewport" c
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
 <style>html,body,#t{height:100%;width:100%;margin:0;background:#0a0a0b}</style></head>
 <body><div id="t"></div><script>
-var post=function(o){window.ReactNativeWebView.postMessage(JSON.stringify(o))};
-var term=new window.Terminal({fontSize:13,convertEol:false,theme:{background:'#0a0a0b'}});
+var post=function(o){if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(o))};
+function fail(msg){document.getElementById('t').innerHTML='<div style="color:#f08a8a;font-family:monospace;font-size:12px;padding:12px;white-space:pre-wrap">'+msg+'</div>';}
+if(!window.Terminal||!window.FitAddon){
+  fail('Failed to load terminal assets (xterm).\\nThe device must be able to reach cdn.jsdelivr.net.');
+}else{
+try{
+var term=new window.Terminal({fontSize:13,convertEol:false,cursorBlink:true,theme:{background:'#0a0a0b'}});
 var fit=new window.FitAddon.FitAddon();term.loadAddon(fit);
-term.open(document.getElementById('t'));
+term.open(document.getElementById('t'));term.focus();
 function doFit(){try{fit.fit();post({type:'resize',rows:term.rows,cols:term.cols})}catch(e){}}
 term.onData(function(d){
   var b=[];for(var i=0;i<d.length;i++)b.push(d.charCodeAt(i)&255);
@@ -25,4 +30,6 @@ function onMsg(ev){
 document.addEventListener('message',onMsg);window.addEventListener('message',onMsg);
 window.addEventListener('resize',doFit);
 setTimeout(function(){doFit();post({type:'ready'})},50);
+}catch(e){fail('Terminal init error: '+e.message);}
+}
 </script></body></html>`

@@ -1,5 +1,5 @@
 import { View, Text, ActivityIndicator, ScrollView } from 'react-native'
-import { useLocalSearchParams } from 'expo-router'
+import { Stack, useLocalSearchParams } from 'expo-router'
 import { useRun } from '@/api/scripts'
 import { theme } from '@/theme'
 import { Screen } from '@/components/Screen'
@@ -9,7 +9,8 @@ export default function RunStatus() {
   const q = useRun(Number(runId))
   const rows = q.data ?? []
   return (
-    <Screen edges={['top']}>
+    <Screen edges={['bottom']}>
+      <Stack.Screen options={{ title: 'Run' }} />
       <ScrollView style={{ flex: 1, backgroundColor: theme.bg }} contentContainerStyle={{ padding: theme.space(4) }}>
         <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600', marginBottom: theme.space(3) }}>Run #{runId}</Text>
         {q.isLoading ? <ActivityIndicator color={theme.accent} /> : null}

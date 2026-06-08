@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useDir, type FileEntry } from '@/api/files'
 import { joinPath, parentPath, crumbs } from '@/lib/paths'
 import { cmpStr } from '@/lib/format'
@@ -22,7 +22,8 @@ export default function FileBrowser() {
   }
 
   return (
-    <Screen>
+    <Screen edges={['bottom']}>
+      <Stack.Screen options={{ title: 'Files' }} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', padding: theme.space(2), borderBottomWidth: 1, borderColor: theme.border }}>
         {crumbs(path).map((c, i) => (
           <Pressable key={i} onPress={() => setPath(c.path)}><Text style={{ color: theme.accent, fontFamily: 'monospace' }}>{c.label === '/' ? '/' : `${c.label}/`}</Text></Pressable>

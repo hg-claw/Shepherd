@@ -2,7 +2,7 @@ import React from 'react'
 import { render, fireEvent, waitFor } from '@testing-library/react-native'
 import RunForm from '../[id]'
 const mockPush = jest.fn()
-jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: '1', serverId: '7' }), useRouter: () => ({ push: mockPush }) }))
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: '1', serverId: '7' }), useRouter: () => ({ push: mockPush }), Stack: Object.assign(() => null, { Screen: () => null }) }))
 const mockRun = jest.fn().mockResolvedValue({ run_id: 9 })
 const mockUseScripts = jest.fn()
 jest.mock('@/api/scripts', () => ({

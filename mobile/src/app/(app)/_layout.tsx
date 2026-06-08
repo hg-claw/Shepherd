@@ -7,7 +7,7 @@ import { LockScreen } from '@/components/LockScreen'
 
 export default function AppLayout() {
   const status = useAuth((s) => s.status)
-  const { enabled, locked, hydrate, noteBackground, maybeLockOnForeground } = useLock()
+  const { enabled, locked, hydrated, hydrate, noteBackground, maybeLockOnForeground } = useLock()
   const appState = useRef<AppStateStatus>(AppState.currentState)
 
   useEffect(() => { hydrate() }, [hydrate])
@@ -22,6 +22,9 @@ export default function AppLayout() {
   }, [noteBackground, maybeLockOnForeground])
 
   if (status !== 'signedIn') return <Redirect href="/(auth)/login" />
+  // Don't paint protected content until the lock flag is read — otherwise it
+  // flashes unlocked for a frame before hydrate() resolves (security gap).
+  if (!hydrated) return null
   return (
     <>
       <Slot />

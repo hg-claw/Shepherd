@@ -6,6 +6,7 @@ const LOCK_AFTER_MS = 30_000
 type LockState = {
   enabled: boolean
   locked: boolean
+  hydrated: boolean
   lastBackground: number | null
   hydrate: () => Promise<void>
   setEnabled: (on: boolean) => Promise<void>
@@ -18,10 +19,11 @@ type LockState = {
 export const useLock = create<LockState>((set, get) => ({
   enabled: false,
   locked: false,
+  hydrated: false,
   lastBackground: null,
   hydrate: async () => {
     const enabled = await loadLockEnabled()
-    set({ enabled, locked: enabled })
+    set({ enabled, locked: enabled, hydrated: true })
   },
   setEnabled: async (on) => {
     await saveLockEnabled(on)

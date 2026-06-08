@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { View, Text, Pressable } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { Modal, View, Text, Pressable } from 'react-native'
 import { authenticate } from '@/lib/biometrics'
 import { useLock } from '@/store/lock'
 import { useAuth } from '@/store/auth'
@@ -9,21 +9,38 @@ export function LockScreen() {
   const unlock = useLock((s) => s.unlock)
   const logout = useAuth((s) => s.logout)
   const [failed, setFailed] = useState(false)
+  const mounted = useRef(true)
+  const inFlight = useRef(false)
 
-  const tryAuth = () => { authenticate().then((ok) => (ok ? unlock() : setFailed(true))).catch(() => setFailed(true)) }
+  // Coalesces concurrent prompts (StrictMode double-mount / fast re-taps) and
+  // guards against resolving onto an unmounted tree (e.g. a 401 tears the
+  // (app) subtree down while the native prompt is still open).
+  const tryAuth = () => {
+    if (inFlight.current) return
+    inFlight.current = true
+    authenticate()
+      .then((ok) => { if (mounted.current) { if (ok) unlock(); else setFailed(true) } })
+      .catch(() => { if (mounted.current) setFailed(true) })
+      .finally(() => { inFlight.current = false })
+  }
   useEffect(() => {
-    let live = true
-    authenticate().then((ok) => { if (live) { if (ok) unlock(); else setFailed(true) } }).catch(() => { if (live) setFailed(true) })
-    return () => { live = false }
-  }, [unlock])
+    mounted.current = true
+    tryAuth()
+    return () => { mounted.current = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
+  // A native Modal sits above the navigator so its gestures (edge-swipe-back,
+  // scroll) can't leak through to the protected content while locked.
   return (
-    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center', gap: theme.space(5) }}>
-      <Text style={{ color: theme.text, fontSize: 20, fontWeight: '700' }}>🔒 Shepherd locked</Text>
-      <Pressable onPress={tryAuth} style={{ backgroundColor: theme.accent, paddingVertical: theme.space(3), paddingHorizontal: theme.space(8), borderRadius: 8 }}>
-        <Text style={{ color: theme.bg, fontWeight: '600' }}>Unlock</Text>
-      </Pressable>
-      {failed ? <Pressable onPress={logout}><Text style={{ color: theme.textDim }}>Sign out</Text></Pressable> : null}
-    </View>
+    <Modal visible animationType="fade" transparent={false} onRequestClose={() => {}}>
+      <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center', gap: theme.space(5) }}>
+        <Text style={{ color: theme.text, fontSize: 20, fontWeight: '700' }}>🔒 Shepherd locked</Text>
+        <Pressable onPress={tryAuth} style={{ backgroundColor: theme.accent, paddingVertical: theme.space(3), paddingHorizontal: theme.space(8), borderRadius: 8 }}>
+          <Text style={{ color: theme.bg, fontWeight: '600' }}>Unlock</Text>
+        </Pressable>
+        {failed ? <Pressable onPress={logout}><Text style={{ color: theme.textDim }}>Sign out</Text></Pressable> : null}
+      </View>
+    </Modal>
   )
 }

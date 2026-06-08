@@ -1,6 +1,14 @@
-import type { Point, ServerRow } from './servers'
+import type { Point, ServerRow, NullStr } from './servers'
 
 const ONLINE_WINDOW_MS = 90_000
+
+// nullStr extracts a plain string from a Go sql.NullString ({String, Valid}),
+// a plain string, or null/undefined → '' when absent.
+export function nullStr(v: NullStr | string | null | undefined): string {
+  if (v == null) return ''
+  if (typeof v === 'string') return v
+  return v.Valid ? v.String : ''
+}
 
 export function memPct(p: Point | null): number | null {
   if (!p || p.mem_used == null || p.mem_total == null || p.mem_total === 0) return null

@@ -16,3 +16,11 @@ export function relTime(iso: string): string {
   if (s < 86400) return `${Math.round(s / 3600)}h ago`
   return `${Math.round(s / 86400)}d ago`
 }
+
+// countryFlag turns an ISO-3166-1 alpha-2 code into its flag emoji ('' if absent/invalid).
+export function countryFlag(code?: string | null): string {
+  if (!code) return ''
+  const cc = code.toUpperCase()
+  if (!/^[A-Z]{2}$/.test(cc)) return ''
+  return String.fromCodePoint(...[...cc].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65))
+}

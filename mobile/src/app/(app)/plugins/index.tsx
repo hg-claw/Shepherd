@@ -3,6 +3,7 @@ import { FlatList, View, Text, Pressable, Switch, ActivityIndicator } from 'reac
 import { useRouter } from 'expo-router'
 import { usePlugins, enablePlugin, disablePlugin, type Plugin } from '@/api/plugins'
 import { theme } from '@/theme'
+import { Screen } from '@/components/Screen'
 
 function PluginRow({ p, onToggle, onOpen }: { p: Plugin; onToggle: (on: boolean) => Promise<void>; onOpen: () => void }) {
   const [busy, setBusy] = useState(false)
@@ -28,7 +29,7 @@ export default function PluginsList() {
     await q.refetch()
   }
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+    <Screen>
       <View style={{ padding: theme.space(3), borderBottomWidth: 1, borderColor: theme.border }}>
         <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600' }}>Plugins</Text>
       </View>
@@ -40,6 +41,6 @@ export default function PluginsList() {
             renderItem={({ item }) => <PluginRow p={item} onToggle={(on) => onToggle(item, on)} onOpen={() => router.push(`/(app)/plugins/${item.id}`)} />}
             ListEmptyComponent={<Text style={{ color: theme.textDim, padding: theme.space(4) }}>No plugins.</Text>}
           />}
-    </View>
+    </Screen>
   )
 }

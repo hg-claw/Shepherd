@@ -6,15 +6,17 @@ export type Point = {
   cpu_pct?: number; mem_used?: number; mem_total?: number; load_1?: number
   net_rx_bps?: number; net_tx_bps?: number; tcp_conn?: number; disks_json?: string
 }
+// Go serializes sql.NullString as {String, Valid} (not a plain string).
+export type NullStr = { String: string; Valid: boolean }
 export type ServerRow = {
   id: number; name: string
-  agent_os?: string | null; agent_arch?: string | null
+  agent_os?: NullStr | string | null; agent_arch?: NullStr | string | null
   agent_last_seen?: { Valid: boolean; Time: string } | string | null
   connected: boolean
   latest: Point | null
-  public_alias?: string | null
-  public_group?: string | null
-  country_code?: string | null
+  public_alias?: NullStr | string | null
+  public_group?: NullStr | string | null
+  country_code?: NullStr | string | null
 }
 
 export function useServers(): UseQueryResult<ServerRow[]> {

@@ -1,7 +1,7 @@
 import { FlatList, View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useServers, type ServerRow } from '@/api/servers'
-import { isOnline, memPct, firstDiskPct } from '@/api/metrics'
+import { isOnline, memPct, firstDiskPct, nullStr } from '@/api/metrics'
 import { bps, countryFlag, cmpStr } from '@/lib/format'
 import { useAuth } from '@/store/auth'
 import { useWallLiveStore } from '@/api/wallLive'
@@ -11,7 +11,7 @@ import { OnlineDot } from '@/components/OnlineDot'
 import { Screen } from '@/components/Screen'
 import { theme } from '@/theme'
 
-const aliasOf = (r: ServerRow) => r.public_alias || r.name
+const aliasOf = (r: ServerRow) => nullStr(r.public_alias) || r.name
 
 function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: 'ok' | 'err' }) {
   return (
@@ -44,7 +44,7 @@ function SummaryStrip({ total, online, offline, onlineRows }: { total: number; o
 function ServerCard({ row, onPress }: { row: ServerRow; onPress: () => void }) {
   const online = isOnline(row)
   const l = row.latest
-  const flag = countryFlag(row.country_code)
+  const flag = countryFlag(nullStr(row.country_code))
   return (
     <Pressable onPress={onPress} style={{ backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, borderRadius: 10, padding: theme.space(3), marginBottom: theme.space(2), opacity: online ? 1 : 0.6 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space(2) }}>
@@ -55,7 +55,7 @@ function ServerCard({ row, onPress }: { row: ServerRow; onPress: () => void }) {
       </View>
       {online && l ? (
         <View style={{ marginTop: theme.space(2), gap: theme.space(1) }}>
-          {row.agent_os ? <Text style={{ color: theme.textDim, fontSize: 10 }}>{row.agent_os}{row.agent_arch ? ` · ${row.agent_arch}` : ''}</Text> : null}
+          {nullStr(row.agent_os) ? <Text style={{ color: theme.textDim, fontSize: 10 }}>{nullStr(row.agent_os)}{nullStr(row.agent_arch) ? ` · ${nullStr(row.agent_arch)}` : ''}</Text> : null}
           <MetricBar label="CPU" value={l.cpu_pct ?? null} />
           <MetricBar label="MEM" value={memPct(l)} />
           <MetricBar label="DSK" value={firstDiskPct(l.disks_json)} />
@@ -78,7 +78,7 @@ export default function Home() {
 
   const groups = new Map<string, ServerRow[]>()
   for (const r of rows) {
-    const k = r.public_group || ''
+    const k = nullStr(r.public_group)
     const a = groups.get(k) ?? []
     a.push(r)
     groups.set(k, a)

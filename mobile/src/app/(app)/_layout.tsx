@@ -4,10 +4,12 @@ import { Redirect, Slot } from 'expo-router'
 import { useAuth } from '@/store/auth'
 import { useLock } from '@/store/lock'
 import { LockScreen } from '@/components/LockScreen'
+import { useWallLiveConnection } from '@/api/wallLive'
 
 export default function AppLayout() {
   const status = useAuth((s) => s.status)
   const { enabled, locked, hydrated, hydrate, noteBackground, maybeLockOnForeground } = useLock()
+  useWallLiveConnection()
   const appState = useRef<AppStateStatus>(AppState.currentState)
 
   useEffect(() => { hydrate() }, [hydrate])

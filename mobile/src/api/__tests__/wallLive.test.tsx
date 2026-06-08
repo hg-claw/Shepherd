@@ -5,10 +5,12 @@ import { useAuth } from '@/store/auth'
 class FakeWS {
   static last: FakeWS | null = null
   url: string
+  readyState = 1
   onopen: (() => void) | null = null
   onclose: (() => void) | null = null
+  onerror: (() => void) | null = null
   onmessage: ((ev: { data: string }) => void) | null = null
-  close = jest.fn()
+  close = jest.fn(() => { this.readyState = 3 })
   constructor(url: string) { this.url = url; FakeWS.last = this }
 }
 
@@ -31,4 +33,20 @@ test('connection opens the public ws and writes frames', () => {
   expect(useWallLiveStore.getState().connected).toBe(true)
   FakeWS.last?.onmessage?.({ data: JSON.stringify({ server_id: 3, rx_bps: 5, tx_bps: 6 }) })
   expect(useWallLiveStore.getState().live[3]).toEqual({ rx_bps: 5, tx_bps: 6 })
+})
+
+test('reconnects after the socket drops', () => {
+  jest.useFakeTimers()
+  try {
+    const { unmount } = renderHook(() => useWallLiveConnection())
+    const first = FakeWS.last
+    expect(first).toBeTruthy()
+    first?.onclose?.()                          // socket drops
+    expect(useWallLiveStore.getState().connected).toBe(false)
+    jest.advanceTimersByTime(1000)              // backoff elapses → reopen
+    expect(FakeWS.last).not.toBe(first)         // a fresh socket opened
+    unmount()
+  } finally {
+    jest.useRealTimers()
+  }
 })

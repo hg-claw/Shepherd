@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { AppState } from 'react-native'
 import { create } from 'zustand'
 import { useAuth } from '@/store/auth'
 import { wsURL } from '@/lib/wsurl'
@@ -23,25 +24,57 @@ export const useWallLiveStore = create<WallLiveState>((set) => ({
 
 // Opens the single public multiplexed net-live WS and writes frames into the store.
 // Call ONCE for the authed session (mounted in (app)/_layout.tsx). Public endpoint
-// → no bearer. Best-effort: if it never opens, cards use the polled fallback.
+// → no bearer. Re-keys on baseURL (so a new login reconnects to the new host), and
+// auto-reconnects with backoff + on foreground — otherwise the socket dies on the
+// first sleep/wake or network blip and the "live" numbers silently freeze.
 export function useWallLiveConnection(): void {
+  const baseURL = useAuth((s) => s.baseURL)
   useEffect(() => {
-    const baseURL = useAuth.getState().baseURL
     if (!baseURL) return
-    const ws = new WebSocket(wsURL(baseURL, '/api/public/net-live/ws'))
     const { setFrame, setConnected } = useWallLiveStore.getState()
-    ws.onopen = () => setConnected(true)
-    ws.onclose = () => setConnected(false)
-    ws.onmessage = (ev: { data: string }) => {
-      try {
-        const f = JSON.parse(ev.data) as { server_id: number; rx_bps: number; tx_bps: number }
-        setFrame(f.server_id, f.rx_bps, f.tx_bps)
-      } catch {
-        /* ignore malformed frame */
+    let ws: WebSocket | null = null
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let stopped = false
+    let backoff = 1000
+
+    const open = () => {
+      if (stopped) return
+      ws = new WebSocket(wsURL(baseURL, '/api/public/net-live/ws'))
+      ws.onopen = () => { backoff = 1000; setConnected(true) }
+      ws.onmessage = (ev: { data: string }) => {
+        try {
+          const f = JSON.parse(ev.data) as { server_id: number; rx_bps: number; tx_bps: number }
+          setFrame(f.server_id, f.rx_bps, f.tx_bps)
+        } catch {
+          /* ignore malformed frame */
+        }
+      }
+      ws.onerror = () => { ws?.close() }
+      ws.onclose = () => {
+        setConnected(false)
+        if (!stopped) { timer = setTimeout(open, backoff); backoff = Math.min(backoff * 2, 30_000) }
       }
     }
-    return () => { ws.onmessage = null; ws.close() }
-  }, [])
+
+    // On resume, if the socket is gone, reopen immediately instead of waiting on backoff.
+    const reconnectNow = () => {
+      if (stopped) return
+      if (!ws || ws.readyState === 2 || ws.readyState === 3) {
+        if (timer) { clearTimeout(timer); timer = null }
+        backoff = 1000
+        open()
+      }
+    }
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') reconnectNow() })
+
+    open()
+    return () => {
+      stopped = true
+      sub.remove()
+      if (timer) clearTimeout(timer)
+      if (ws) { ws.onclose = null; ws.onmessage = null; ws.close() }
+    }
+  }, [baseURL])
 }
 
 // Subscribes to one server's latest {rx,tx}; re-renders only when THAT id changes.

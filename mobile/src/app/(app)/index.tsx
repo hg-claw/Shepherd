@@ -2,7 +2,7 @@ import { FlatList, View, Text, Pressable, RefreshControl, ActivityIndicator } fr
 import { useRouter } from 'expo-router'
 import { useServers, type ServerRow } from '@/api/servers'
 import { isOnline, memPct, firstDiskPct } from '@/api/metrics'
-import { bps, countryFlag } from '@/lib/format'
+import { bps, countryFlag, cmpStr } from '@/lib/format'
 import { useAuth } from '@/store/auth'
 import { useWallLiveStore } from '@/api/wallLive'
 import { LiveNet } from '@/components/LiveNet'
@@ -83,7 +83,7 @@ export default function Home() {
     a.push(r)
     groups.set(k, a)
   }
-  const ordered = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))
+  const ordered = [...groups.entries()].sort(([a], [b]) => cmpStr(a, b))
 
   return (
     <Screen>
@@ -104,7 +104,7 @@ export default function Home() {
               const gOnline = ss.filter(isOnline).length
               const sorted = ss.slice().sort((a, b) => {
                 const oa = isOnline(a) ? 0 : 1, ob = isOnline(b) ? 0 : 1
-                return oa - ob || aliasOf(a).localeCompare(aliasOf(b))
+                return oa - ob || cmpStr(aliasOf(a), aliasOf(b))
               })
               return (
                 <View style={{ paddingHorizontal: theme.space(3), paddingTop: theme.space(3) }}>

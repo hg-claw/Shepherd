@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Stack } from 'expo-router'
 import { View, ActivityIndicator } from 'react-native'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useAuth } from '@/store/auth'
 import { theme } from '@/theme'
 
@@ -12,14 +13,16 @@ export default function RootLayout() {
   useEffect(() => { restore() }, [restore])
 
   return (
-    <QueryClientProvider client={queryClient}>
-      {status === 'loading' ? (
-        <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={theme.accent} />
-        </View>
-      ) : (
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.bg } }} />
-      )}
-    </QueryClientProvider>
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        {status === 'loading' ? (
+          <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator color={theme.accent} />
+          </View>
+        ) : (
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.bg } }} />
+        )}
+      </QueryClientProvider>
+    </SafeAreaProvider>
   )
 }

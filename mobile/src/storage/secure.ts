@@ -19,3 +19,12 @@ export async function saveBaseURL(url: string): Promise<void> {
 export async function loadBaseURL(): Promise<string | null> {
   return AsyncStorage.getItem(BASE_URL_KEY)
 }
+
+const LOCK_ENABLED_KEY = 'shepherd_lock_enabled'
+
+export async function saveLockEnabled(enabled: boolean): Promise<void> {
+  await AsyncStorage.setItem(LOCK_ENABLED_KEY, enabled ? 'true' : 'false')
+}
+export async function loadLockEnabled(): Promise<boolean> {
+  return (await AsyncStorage.getItem(LOCK_ENABLED_KEY)) === 'true'
+}

@@ -19,9 +19,24 @@ export type ServerRow = {
   country_code?: NullStr | string | null
 }
 
+// useServers is the FAST list — plain /api/servers, no telemetry join. Used to
+// paint the home immediately. Metrics arrive separately via useServersLatest().
 export function useServers(): UseQueryResult<ServerRow[]> {
   return useQuery({
     queryKey: ['servers'],
+    queryFn: () => authedFetch<ServerRow[]>('/api/servers'),
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    staleTime: 10000,
+  })
+}
+
+// useServersLatest adds the latest telemetry + live connected flag. This hits the
+// heavier ?with=latest path (a window scan over telemetry), so it's a separate
+// query that fills the metric bars after the list is already on screen.
+export function useServersLatest(): UseQueryResult<ServerRow[]> {
+  return useQuery({
+    queryKey: ['servers', 'latest'],
     queryFn: () => authedFetch<ServerRow[]>('/api/servers?with=latest'),
     refetchInterval: 5000,
     refetchOnWindowFocus: true,
@@ -29,6 +44,7 @@ export function useServers(): UseQueryResult<ServerRow[]> {
   })
 }
 
+// useServer (detail) needs metrics → reads the latest query.
 export function useServer(id: number): ServerRow | undefined {
-  return useServers().data?.find((s) => s.id === id)
+  return useServersLatest().data?.find((s) => s.id === id)
 }

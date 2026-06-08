@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { FlatList, View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
-import { useServers, type ServerRow } from '@/api/servers'
+import { useServers, useServersLatest, type ServerRow } from '@/api/servers'
 import { isOnline, memPct, firstDiskPct, nullStr } from '@/api/metrics'
 import { bps, countryFlag, cmpStr } from '@/lib/format'
 import { useAuth } from '@/store/auth'
@@ -53,7 +54,7 @@ function ServerCard({ row, onPress }: { row: ServerRow; onPress: () => void }) {
         <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }} numberOfLines={1}>{aliasOf(row)}</Text>
         {online && l ? <Text style={{ color: theme.textDim, fontSize: 11 }}>load {l.load_1?.toFixed(2) ?? '—'}</Text> : null}
       </View>
-      {online && l ? (
+      {l ? (
         <View style={{ marginTop: theme.space(2), gap: theme.space(1) }}>
           {nullStr(row.agent_os) ? <Text style={{ color: theme.textDim, fontSize: 10 }}>{nullStr(row.agent_os)}{nullStr(row.agent_arch) ? ` · ${nullStr(row.agent_arch)}` : ''}</Text> : null}
           <MetricBar label="CPU" value={l.cpu_pct ?? null} />
@@ -63,7 +64,7 @@ function ServerCard({ row, onPress }: { row: ServerRow; onPress: () => void }) {
             {(rx, tx) => <Text style={{ color: theme.textDim, fontFamily: 'monospace', fontSize: 11, marginTop: theme.space(1) }}>↓ {bps(rx)}   ↑ {bps(tx)}</Text>}
           </LiveNet>
         </View>
-      ) : <Text style={{ color: theme.textDim, fontSize: 11, marginTop: theme.space(1) }}>offline</Text>}
+      ) : online ? null : <Text style={{ color: theme.textDim, fontSize: 11, marginTop: theme.space(1) }}>offline</Text>}
     </Pressable>
   )
 }
@@ -71,8 +72,16 @@ function ServerCard({ row, onPress }: { row: ServerRow; onPress: () => void }) {
 export default function Home() {
   const router = useRouter()
   const logout = useAuth((s) => s.logout)
-  const q = useServers()
-  const rows = q.data ?? []
+  const list = useServers()          // fast — paints the list immediately
+  const latest = useServersLatest()  // metrics — fills the bars in after
+  const [refreshing, setRefreshing] = useState(false)
+  const onRefresh = async () => {
+    setRefreshing(true)
+    try { await Promise.all([list.refetch(), latest.refetch()]) } finally { setRefreshing(false) }
+  }
+  // Merge: prefer the metric-enriched row once it arrives, else the plain row.
+  const byId = new Map((latest.data ?? []).map((s) => [s.id, s]))
+  const rows = (list.data ?? []).map((s) => byId.get(s.id) ?? s)
   const total = rows.length
   const onlineRows = rows.filter(isOnline)
 
@@ -93,8 +102,8 @@ export default function Home() {
         <Pressable onPress={() => router.push('/(app)/settings')} style={{ marginRight: theme.space(3) }}><Text style={{ color: theme.accent }}>Settings</Text></Pressable>
         <Pressable onPress={logout}><Text style={{ color: theme.accent }}>Log out</Text></Pressable>
       </View>
-      {q.isLoading ? <ActivityIndicator color={theme.accent} style={{ marginTop: theme.space(8) }} />
-        : q.isError ? <Text style={{ color: theme.error, padding: theme.space(4) }}>{q.error instanceof Error ? q.error.message : 'failed to load'}</Text>
+      {list.isLoading ? <ActivityIndicator color={theme.accent} style={{ marginTop: theme.space(8) }} />
+        : list.isError ? <Text style={{ color: theme.error, padding: theme.space(4) }}>{list.error instanceof Error ? list.error.message : 'failed to load'}</Text>
         : <FlatList
             data={ordered}
             keyExtractor={([g]) => g || '_'}
@@ -116,7 +125,7 @@ export default function Home() {
                 </View>
               )
             }}
-            refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => q.refetch()} tintColor={theme.accent} />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} />}
             ListEmptyComponent={<Text style={{ color: theme.textDim, padding: theme.space(4) }}>No servers.</Text>}
           />}
     </Screen>

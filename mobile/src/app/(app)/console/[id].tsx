@@ -25,7 +25,19 @@ export default function ConsoleScreen() {
   const token = useAuth((s) => s.token)
   const webRef = useRef<WebView>(null)
   const sessionRef = useRef<ConsoleSession | null>(null)
+  const readyRef = useRef(false)
+  const bufRef = useRef<Uint8Array[]>([])
   const [status, setStatus] = useState<ConsoleStatus>('connecting')
+
+  const postToWeb = (bytes: Uint8Array) =>
+    (webRef.current as WebView & { postMessage(s: string): void } | null)?.postMessage(dataMsg(bytes))
+  // The shell prompt often arrives before xterm has finished loading from the CDN.
+  // Buffer PTY output until the WebView posts {ready}, then flush — otherwise the
+  // first prompt (root@host:~#) is written into a not-yet-ready terminal and lost.
+  const pushData = (bytes: Uint8Array) => {
+    if (readyRef.current) postToWeb(bytes)
+    else bufRef.current.push(bytes)
+  }
 
   const start = async () => {
     sessionRef.current?.close()
@@ -33,7 +45,7 @@ export default function ConsoleScreen() {
     setStatus('connecting')
     const { sid } = await openConsole(Number(id), 24, 80)
     sessionRef.current = new ConsoleSession(baseURL ?? '', token, sid, 24, 80, {
-      onData: (bytes) => (webRef.current as WebView & { postMessage(s: string): void } | null)?.postMessage(dataMsg(bytes)),
+      onData: pushData,
       onStatus: setStatus,
     })
   }
@@ -49,6 +61,12 @@ export default function ConsoleScreen() {
     if (!m) return
     if (m.type === 'input') sessionRef.current?.write(m.bytes)
     else if (m.type === 'resize') sessionRef.current?.resize(m.rows, m.cols)
+    else if (m.type === 'ready') {
+      readyRef.current = true
+      const pending = bufRef.current
+      bufRef.current = []
+      pending.forEach(postToWeb)
+    }
   }
   const sendKey = (bytes: Uint8Array) => sessionRef.current?.write(bytes)
   const insets = useSafeAreaInsets()

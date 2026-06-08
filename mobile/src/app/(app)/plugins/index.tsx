@@ -37,7 +37,7 @@ export default function PluginsList() {
         : <FlatList
             data={q.data ?? []}
             keyExtractor={(p) => p.id}
-            renderItem={({ item }) => <PluginRow p={item} onToggle={(on) => onToggle(item, on)} onOpen={() => router.push(`/(app)/plugins/${item.id}` as never)} />}
+            renderItem={({ item }) => <PluginRow p={item} onToggle={(on) => onToggle(item, on)} onOpen={() => router.push(`/(app)/plugins/${item.id}`)} />}
             ListEmptyComponent={<Text style={{ color: theme.textDim, padding: theme.space(4) }}>No plugins.</Text>}
           />}
     </View>

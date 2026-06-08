@@ -40,6 +40,8 @@ export default function ServerList() {
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: theme.space(3), borderBottomWidth: 1, borderColor: theme.border }}>
         <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600', flex: 1 }}>Servers</Text>
         <Text style={{ color: theme.textDim, marginRight: theme.space(3) }}>{onlineCount}/{rows.length} online</Text>
+        <Pressable onPress={() => router.push('/(app)/plugins')} style={{ marginRight: theme.space(3) }}><Text style={{ color: theme.accent }}>Plugins</Text></Pressable>
+        <Pressable onPress={() => router.push('/(app)/settings')} style={{ marginRight: theme.space(3) }}><Text style={{ color: theme.accent }}>Settings</Text></Pressable>
         <Pressable onPress={logout}><Text style={{ color: theme.accent }}>Log out</Text></Pressable>
       </View>
       {q.isLoading ? (

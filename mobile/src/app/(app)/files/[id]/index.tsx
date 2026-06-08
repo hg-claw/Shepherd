@@ -3,6 +3,7 @@ import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator } fr
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useDir, type FileEntry } from '@/api/files'
 import { joinPath, parentPath, crumbs } from '@/lib/paths'
+import { cmpStr } from '@/lib/format'
 import { theme } from '@/theme'
 import { Screen } from '@/components/Screen'
 
@@ -12,7 +13,7 @@ export default function FileBrowser() {
   const router = useRouter()
   const [path, setPath] = useState('/')
   const q = useDir(sid, path)
-  const entries = (q.data ?? []).slice().sort((a, b) => (a.is_dir === b.is_dir ? a.name.localeCompare(b.name) : a.is_dir ? -1 : 1))
+  const entries = (q.data ?? []).slice().sort((a, b) => (a.is_dir === b.is_dir ? cmpStr(a.name, b.name) : a.is_dir ? -1 : 1))
 
   const openEntry = (e: FileEntry) => {
     const full = joinPath(path, e.name)

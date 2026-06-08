@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { FlatList, View, Text, Pressable, Switch, ActivityIndicator } from 'react-native'
-import { useRouter } from 'expo-router'
+import { Stack, useRouter } from 'expo-router'
 import { usePlugins, enablePlugin, disablePlugin, type Plugin } from '@/api/plugins'
 import { theme } from '@/theme'
 import { Screen } from '@/components/Screen'
@@ -29,10 +29,8 @@ export default function PluginsList() {
     await q.refetch()
   }
   return (
-    <Screen>
-      <View style={{ padding: theme.space(3), borderBottomWidth: 1, borderColor: theme.border }}>
-        <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600' }}>Plugins</Text>
-      </View>
+    <Screen edges={['bottom']}>
+      <Stack.Screen options={{ title: 'Plugins' }} />
       {q.isLoading ? <ActivityIndicator color={theme.accent} style={{ marginTop: theme.space(8) }} />
         : q.isError ? <Text style={{ color: theme.error, padding: theme.space(4) }}>failed to load plugins</Text>
         : <FlatList

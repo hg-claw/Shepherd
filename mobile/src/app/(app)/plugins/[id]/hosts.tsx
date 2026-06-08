@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { FlatList, View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native'
-import { useLocalSearchParams } from 'expo-router'
+import { Stack, useLocalSearchParams } from 'expo-router'
 import { usePluginHosts, deployHost, undeployHost, startHost, stopHost, restartHost, refreshHost, type HostDeployment } from '@/api/plugins'
 import { theme } from '@/theme'
 import { Screen } from '@/components/Screen'
@@ -37,7 +37,8 @@ export default function PluginHosts() {
   }
 
   return (
-    <Screen>
+    <Screen edges={['bottom']}>
+      <Stack.Screen options={{ title: 'Hosts' }} />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space(2), padding: theme.space(3), borderBottomWidth: 1, borderColor: theme.border }}>
         <TextInput value={serverId} onChangeText={setServerId} keyboardType="number-pad" placeholder="server id" placeholderTextColor={theme.textDim}
           style={{ flex: 1, backgroundColor: theme.surface, color: theme.text, borderColor: theme.border, borderWidth: 1, borderRadius: 8, padding: theme.space(2) }} />

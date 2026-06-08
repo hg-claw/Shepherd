@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { AppState, type AppStateStatus } from 'react-native'
-import { Redirect, Slot } from 'expo-router'
+import { Redirect, Stack } from 'expo-router'
 import { useAuth } from '@/store/auth'
 import { useLock } from '@/store/lock'
 import { LockScreen } from '@/components/LockScreen'
 import { useWallLiveConnection } from '@/api/wallLive'
+import { theme } from '@/theme'
 
 export default function AppLayout() {
   const status = useAuth((s) => s.status)
@@ -29,7 +30,21 @@ export default function AppLayout() {
   if (!hydrated) return null
   return (
     <>
-      <Slot />
+      {/* A Stack gives every pushed screen a back button (+ Android back + swipe).
+          Home and console keep their own headers, so theirs is hidden. */}
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: theme.bg },
+          headerTintColor: theme.accent,
+          headerTitleStyle: { color: theme.text },
+          headerShadowVisible: false,
+          headerBackButtonDisplayMode: 'minimal',
+          contentStyle: { backgroundColor: theme.bg },
+        }}
+      >
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="console/[id]" options={{ headerShown: false }} />
+      </Stack>
       {enabled && locked ? <LockScreen /> : null}
     </>
   )

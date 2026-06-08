@@ -1,5 +1,5 @@
 import { View, Text, Pressable } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useServer } from '@/api/servers'
 import { isOnline, memPct, firstDiskPct, nullStr } from '@/api/metrics'
 import { bps, pct, relTime } from '@/lib/format'
@@ -21,12 +21,13 @@ export default function ServerDetail() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const row = useServer(Number(id))
   if (!row) {
-    return <Screen><View style={{ padding: theme.space(5) }}><Text style={{ color: theme.textDim }}>Server not found.</Text></View></Screen>
+    return <Screen edges={['bottom']}><View style={{ padding: theme.space(5) }}><Text style={{ color: theme.textDim }}>Server not found.</Text></View></Screen>
   }
   const l = row.latest
   const lastSeen = typeof row.agent_last_seen === 'object' && row.agent_last_seen?.Valid ? row.agent_last_seen.Time : null
   return (
-    <Screen>
+    <Screen edges={['bottom']}>
+    <Stack.Screen options={{ title: row.name }} />
     <View style={{ padding: theme.space(4) }}>
       <Text style={{ color: theme.text, fontSize: 20, fontWeight: '600' }}>{row.name}</Text>
       <Text style={{ color: isOnline(row) ? '#4ade80' : theme.textDim, marginBottom: theme.space(3) }}>{isOnline(row) ? 'online' : 'offline'}</Text>

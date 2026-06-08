@@ -1,7 +1,7 @@
 import React from 'react'
 import { render, waitFor } from '@testing-library/react-native'
 import Preview from '../preview'
-jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: '7', path: '/a.txt' }) }))
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: '7', path: '/a.txt' }), Stack: Object.assign(() => null, { Screen: () => null }) }))
 jest.mock('@/api/files', () => ({ previewFile: jest.fn() }))
 import { previewFile } from '@/api/files'
 

@@ -63,8 +63,14 @@ export default function ConsoleScreen() {
       <WebView
         ref={webRef}
         originWhitelist={['*']}
-        source={{ html: TERMINAL_HTML }}
+        // A real https baseUrl gives the page a secure origin; without it the html
+        // string loads from an opaque/null origin and Android blocks the https
+        // xterm CDN scripts → a blank terminal with no cursor.
+        source={{ html: TERMINAL_HTML, baseUrl: 'https://shepherd.app/' }}
         onMessage={(e) => onMessage(e.nativeEvent.data)}
+        javaScriptEnabled
+        domStorageEnabled
+        mixedContentMode="always"
         style={{ flex: 1, backgroundColor: theme.bg }}
       />
       <TextInput

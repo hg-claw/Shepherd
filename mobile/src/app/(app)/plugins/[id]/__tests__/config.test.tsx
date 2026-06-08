@@ -2,7 +2,7 @@ import React from 'react'
 import { render, fireEvent, waitFor } from '@testing-library/react-native'
 import PluginConfig from '../config'
 const mockBack = jest.fn()
-jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: 'xray' }), useRouter: () => ({ back: mockBack }) }))
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: 'xray' }), useRouter: () => ({ back: mockBack }), Stack: Object.assign(() => null, { Screen: () => null }) }))
 const mockSave = jest.fn().mockResolvedValue({ ok: true })
 jest.mock('@/api/plugins', () => ({
   usePluginConfig: () => ({ data: { port: 443 }, isLoading: false, isError: false }),

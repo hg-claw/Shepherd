@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { usePluginConfig, savePluginConfig } from '@/api/plugins'
 import { theme } from '@/theme'
 import { Screen } from '@/components/Screen'
@@ -21,7 +21,8 @@ function Editor({ id, initial }: { id: string; initial: Record<string, unknown> 
   }
 
   return (
-    <Screen edges={['top']}>
+    <Screen edges={['bottom']}>
+      <Stack.Screen options={{ title: 'Config' }} />
       <ScrollView style={{ flex: 1, backgroundColor: theme.bg }} contentContainerStyle={{ padding: theme.space(4) }}>
         <Text style={{ color: theme.textDim, fontSize: 12, marginBottom: theme.space(2) }}>Secrets show as &quot;***&quot; — leave them to keep the stored value.</Text>
         <TextInput testID="config-input" multiline value={text} onChangeText={setText} autoCapitalize="none" autoCorrect={false}
@@ -38,7 +39,7 @@ function Editor({ id, initial }: { id: string; initial: Record<string, unknown> 
 export default function PluginConfig() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const q = usePluginConfig(id)
-  if (q.isLoading) return <Screen><View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator color={theme.accent} /></View></Screen>
-  if (q.isError) return <Screen><View style={{ padding: theme.space(4) }}><Text style={{ color: theme.error }}>failed to load config</Text></View></Screen>
+  if (q.isLoading) return <Screen edges={['bottom']}><View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator color={theme.accent} /></View></Screen>
+  if (q.isError) return <Screen edges={['bottom']}><View style={{ padding: theme.space(4) }}><Text style={{ color: theme.error }}>failed to load config</Text></View></Screen>
   return <Editor id={id} initial={q.data ?? {}} />
 }

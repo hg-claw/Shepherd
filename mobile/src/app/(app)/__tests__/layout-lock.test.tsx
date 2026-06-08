@@ -1,7 +1,10 @@
 import React from 'react'
 import { render } from '@testing-library/react-native'
 import AppLayout from '../_layout'
-jest.mock('expo-router', () => ({ Slot: () => null, Redirect: () => null }))
+jest.mock('expo-router', () => {
+  const Stack = Object.assign(() => null, { Screen: () => null })
+  return { Stack, Redirect: () => null }
+})
 jest.mock('@/components/LockScreen', () => {
   const { Text } = require('react-native')
   return { LockScreen: () => <Text>LOCKED</Text> }

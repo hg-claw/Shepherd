@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { View, Text, Switch, Pressable } from 'react-native'
+import { Stack } from 'expo-router'
 import { useLock } from '@/store/lock'
 import { useAuth } from '@/store/auth'
 import { hasHardware, isEnrolled } from '@/lib/biometrics'
@@ -18,10 +19,8 @@ export default function Settings() {
   }, [])
 
   return (
-    <Screen>
-      <View style={{ padding: theme.space(3), borderBottomWidth: 1, borderColor: theme.border }}>
-        <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600' }}>Settings</Text>
-      </View>
+    <Screen edges={['bottom']}>
+      <Stack.Screen options={{ title: 'Settings' }} />
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: theme.space(4), borderBottomWidth: 1, borderColor: theme.border }}>
         <View style={{ flex: 1 }}>
           <Text style={{ color: theme.text }}>Require biometric unlock</Text>

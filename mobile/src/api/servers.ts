@@ -12,6 +12,9 @@ export type ServerRow = {
   agent_last_seen?: { Valid: boolean; Time: string } | string | null
   connected: boolean
   latest: Point | null
+  public_alias?: string | null
+  public_group?: string | null
+  country_code?: string | null
 }
 
 export function useServers(): UseQueryResult<ServerRow[]> {

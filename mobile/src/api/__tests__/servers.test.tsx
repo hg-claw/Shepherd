@@ -1,7 +1,7 @@
 import React from 'react'
 import { renderHook, waitFor } from '@testing-library/react-native'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useServers } from '../servers'
+import { useServers, useServersLatest } from '../servers'
 
 jest.mock('../authed', () => ({ authedFetch: jest.fn() }))
 import { authedFetch } from '../authed'
@@ -16,6 +16,13 @@ test('useServers resolves to rows', async () => {
   const { result } = renderHook(() => useServers(), { wrapper })
   await waitFor(() => expect(result.current.isSuccess).toBe(true))
   expect(result.current.data?.[0].name).toBe('srv1')
+  expect(authedFetch).toHaveBeenCalledWith('/api/servers') // fast list — no telemetry join
+})
+
+test('useServersLatest hits the with=latest path', async () => {
+  ;(authedFetch as jest.Mock).mockResolvedValue([{ id: 1, name: 'srv1', connected: true, latest: null }])
+  const { result } = renderHook(() => useServersLatest(), { wrapper })
+  await waitFor(() => expect(result.current.isSuccess).toBe(true))
   expect(authedFetch).toHaveBeenCalledWith('/api/servers?with=latest')
 })
 

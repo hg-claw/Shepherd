@@ -11,7 +11,10 @@ const mockRows = [
   { id: 1, name: 'alpha', public_group: mockNs('asia'), country_code: mockNs('HK'), connected: true, agent_os: mockNs('linux'), agent_arch: mockNs('amd64'), latest: { ts: '', cpu_pct: 10, mem_used: 1, mem_total: 2, load_1: 0.5, net_rx_bps: 100, net_tx_bps: 50, disks_json: '[]' } },
   { id: 2, name: 'beta', public_group: mockNs('asia'), country_code: mockNs('US'), connected: false, latest: null },
 ]
-jest.mock('@/api/servers', () => ({ useServers: () => ({ data: mockRows, isLoading: false, isError: false, isRefetching: false, refetch: jest.fn() }) }))
+jest.mock('@/api/servers', () => ({
+  useServers: () => ({ data: mockRows, isLoading: false, isError: false, refetch: jest.fn() }),
+  useServersLatest: () => ({ data: mockRows, refetch: jest.fn() }),
+}))
 jest.mock('@/api/metrics', () => ({ ...jest.requireActual('@/api/metrics'), isOnline: (r: { connected: boolean }) => r.connected, memPct: () => 50, firstDiskPct: () => 30 }))
 
 beforeEach(() => mockPush.mockClear())

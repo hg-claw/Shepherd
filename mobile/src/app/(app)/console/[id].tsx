@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { View, Text, Pressable, TextInput, ScrollView, Keyboard, KeyboardAvoidingView, Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import * as Clipboard from 'expo-clipboard'
 import { WebView } from 'react-native-webview'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { openConsole } from '@/api/console'
@@ -14,6 +13,17 @@ import { useServer } from '@/api/servers'
 import { nullStr } from '@/api/metrics'
 import { useTheme } from '@/theme'
 import { NavBar, IconButton, Pill, type PillKind } from '@/components/ds'
+
+// expo-clipboard is a NATIVE module. Load it guardedly so a JS-only update on an
+// older dev client (one built before this dep was added) doesn't crash the whole
+// console — copy just no-ops until the client is rebuilt.
+let clipboardSet: ((s: string) => Promise<unknown>) | null = null
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  clipboardSet = require('expo-clipboard').setStringAsync
+} catch {
+  clipboardSet = null
+}
 
 const BAR: { label: string; bytes: Uint8Array }[] = [
   { label: 'Esc', bytes: KEYS.esc }, { label: 'Tab', bytes: KEYS.tab },
@@ -93,8 +103,8 @@ export default function ConsoleScreen() {
       bufRef.current = []
       pending.forEach(postToWeb)
     } else if (m.type === 'copy') {
-      if (m.text) {
-        Clipboard.setStringAsync(m.text)
+      if (m.text && clipboardSet) {
+        clipboardSet(m.text)
         setCopied(true)
         setTimeout(() => setCopied(false), 1500)
       }

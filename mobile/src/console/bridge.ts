@@ -21,6 +21,7 @@ export type FromWebView =
   | { type: 'input'; bytes: Uint8Array }
   | { type: 'resize'; rows: number; cols: number }
   | { type: 'ready' }
+  | { type: 'copy'; text: string }
 
 export function parseFromWebView(raw: string): FromWebView | null {
   let m: unknown
@@ -30,5 +31,6 @@ export function parseFromWebView(raw: string): FromWebView | null {
   if (o.type === 'input' && typeof o.b64 === 'string') return { type: 'input', bytes: b64decode(o.b64) }
   if (o.type === 'resize' && typeof o.rows === 'number' && typeof o.cols === 'number') return { type: 'resize', rows: o.rows, cols: o.cols }
   if (o.type === 'ready') return { type: 'ready' }
+  if (o.type === 'copy' && typeof o.text === 'string') return { type: 'copy', text: o.text }
   return null
 }

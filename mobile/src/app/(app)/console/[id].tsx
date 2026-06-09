@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { View, Text, Pressable, TextInput, ScrollView } from 'react-native'
+import { View, Text, Pressable, TextInput, ScrollView, Keyboard, KeyboardAvoidingView, Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import * as Clipboard from 'expo-clipboard'
 import { WebView } from 'react-native-webview'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { openConsole } from '@/api/console'
@@ -40,6 +41,19 @@ export default function ConsoleScreen() {
   const readyRef = useRef(false)
   const bufRef = useRef<Uint8Array[]>([])
   const [status, setStatus] = useState<ConsoleStatus>('connecting')
+  const [kbVisible, setKbVisible] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  // Track the soft keyboard so the control-key bar can sit above it (iOS) and the
+  // home-indicator inset can be dropped while the keyboard covers it.
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKbVisible(true))
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbVisible(false))
+    return () => { show.remove(); hide.remove() }
+  }, [])
+
+  // Copy: ask the WebView for the xterm selection (or full buffer); it posts {copy}.
+  const doCopy = () => webRef.current?.injectJavaScript('window.__shepCopy && window.__shepCopy(); true;')
 
   const postToWeb = (bytes: Uint8Array) =>
     (webRef.current as WebView & { postMessage(s: string): void } | null)?.postMessage(dataMsg(bytes))
@@ -78,6 +92,12 @@ export default function ConsoleScreen() {
       const pending = bufRef.current
       bufRef.current = []
       pending.forEach(postToWeb)
+    } else if (m.type === 'copy') {
+      if (m.text) {
+        Clipboard.setStringAsync(m.text)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1500)
+      }
     }
   }
   const sendKey = (bytes: Uint8Array) => sessionRef.current?.write(bytes)
@@ -92,7 +112,10 @@ export default function ConsoleScreen() {
         title={`console · ${host}`}
         backLabel="Host"
         onBack={closeBack}
-        actions={<IconButton name="rotate-cw" onPress={start} accessibilityLabel="Reconnect" />}
+        actions={<>
+          <IconButton name="copy" onPress={doCopy} accessibilityLabel="Copy" />
+          <IconButton name="rotate-cw" onPress={start} accessibilityLabel="Reconnect" />
+        </>}
       />
       {/* .statline — live connection state strip under the nav bar */}
       <View style={{
@@ -101,11 +124,12 @@ export default function ConsoleScreen() {
         backgroundColor: t.surface, borderBottomWidth: 1, borderBottomColor: t.border,
       }}>
         <Pill kind={pill.kind}>{pill.label}</Pill>
-        <Text style={{ fontFamily: t.mono(), fontSize: 11, color: t.fgDim }}>24×80 · UTF-8</Text>
+        <Text style={{ fontFamily: t.mono(), fontSize: 11, color: copied ? t.ok : t.fgDim }}>{copied ? 'Copied ✓' : '24×80 · UTF-8'}</Text>
         <Pressable onPress={closeBack} style={{ marginLeft: 'auto' }}>
           <Text style={{ fontFamily: t.mono(), fontSize: 12, color: t.muted }}>Close</Text>
         </Pressable>
       </View>
+      <KeyboardAvoidingView style={{ flex: 1, minHeight: 0 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={{ flex: 1, minHeight: 0 }}>
         <WebView
           ref={webRef}
@@ -129,12 +153,13 @@ export default function ConsoleScreen() {
           style={{ height: 1, opacity: 0 }}
         />
       </View>
-      {/* .keybar — control-key chips */}
+      {/* .keybar — control-key chips. Sits above the keyboard (KeyboardAvoidingView
+          lifts it on iOS); drop the home-indicator inset while the keyboard covers it. */}
       <ScrollView
         horizontal
         keyboardShouldPersistTaps="always"
-        style={{ maxHeight: 38 + 16 + insets.bottom, backgroundColor: t.surface, borderTopWidth: 1, borderTopColor: t.border }}
-        contentContainerStyle={{ alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8 + insets.bottom }}
+        style={{ maxHeight: 38 + 16 + (kbVisible ? 0 : insets.bottom), backgroundColor: t.surface, borderTopWidth: 1, borderTopColor: t.border }}
+        contentContainerStyle={{ alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8 + (kbVisible ? 0 : insets.bottom) }}
       >
         {BAR.map((k) => (
           <Pressable
@@ -150,6 +175,7 @@ export default function ConsoleScreen() {
           </Pressable>
         ))}
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   )
 }

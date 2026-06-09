@@ -3,12 +3,13 @@ import { View, Pressable } from 'react-native'
 import { useTheme } from '@/theme'
 
 // .switch: 51x31 r9999, track input -> ok when on. thumb 27 white, left 2 -> 22.
-export function Switch({ on, onChange, disabled }: {
-  on: boolean; onChange: (next: boolean) => void; disabled?: boolean
+export function Switch({ on, onChange, disabled, testID }: {
+  on: boolean; onChange: (next: boolean) => void; disabled?: boolean; testID?: string
 }) {
   const t = useTheme()
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="switch"
       accessibilityState={{ checked: on, disabled: !!disabled }}
       onPress={() => { if (!disabled) onChange(!on) }}

@@ -1,47 +1,76 @@
 import { useState } from 'react'
-import { View, Text, Pressable, Switch, ScrollView } from 'react-native'
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
+import { View, Text, ScrollView } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { usePlugins, enablePlugin, disablePlugin } from '@/api/plugins'
-import { theme } from '@/theme'
-import { Screen } from '@/components/Screen'
+import { useTheme } from '@/theme'
+import { NavBar, List, ListRow, Switch, Pill, Icon, Empty } from '@/components/ds'
 
 export default function PluginDetail() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
+  const t = useTheme()
   const q = usePlugins()
   const p = q.data?.find((x) => x.id === id)
   const [busy, setBusy] = useState(false)
 
-  if (!p) return <Screen edges={['bottom']}><View style={{ padding: theme.space(4) }}><Text style={{ color: theme.textDim }}>Plugin not found.</Text></View></Screen>
+  if (!p) {
+    return (
+      <View style={{ flex: 1, backgroundColor: t.bg }}>
+        <NavBar title="Plugin" onBack={() => router.back()} backLabel="Plugins" />
+        <Empty>Plugin not found.</Empty>
+      </View>
+    )
+  }
 
   const toggle = async (on: boolean) => {
     setBusy(true)
     try { if (on) await enablePlugin(p.id); else await disablePlugin(p.id); await q.refetch() } finally { setBusy(false) }
   }
-  const rowStyle = { padding: theme.space(3), borderTopWidth: 1, borderColor: theme.border }
 
   return (
-    <Screen edges={['bottom']}>
-    <Stack.Screen options={{ title: 'Plugin' }} />
-    <ScrollView style={{ flex: 1, backgroundColor: theme.bg }}>
-      <View style={{ padding: theme.space(4) }}>
-        <Text style={{ color: theme.text, fontSize: 22, fontWeight: '700' }}>{p.meta.icon} {p.meta.name}</Text>
-        {p.meta.description ? <Text style={{ color: theme.textDim, marginTop: theme.space(2) }}>{p.meta.description}</Text> : null}
-        <Text style={{ color: theme.textDim, fontSize: 12, marginTop: theme.space(2) }}>{p.meta.category}</Text>
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', ...rowStyle }}>
-        <Text style={{ color: theme.text, flex: 1 }}>Enabled</Text>
-        <Switch testID="detail-toggle" value={p.enabled} disabled={busy} onValueChange={toggle} />
-      </View>
-      <Pressable onPress={() => router.push(`/(app)/plugin/${p.id}/config`)} style={rowStyle}>
-        <Text style={{ color: theme.accent }}>Edit config</Text>
-      </Pressable>
-      {p.meta.host_aware ? (
-        <Pressable onPress={() => router.push(`/(app)/plugin/${p.id}/hosts`)} style={rowStyle}>
-          <Text style={{ color: theme.accent }}>Hosts{p.host_count != null ? ` (${p.host_count})` : ''}</Text>
-        </Pressable>
-      ) : null}
-    </ScrollView>
-    </Screen>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <NavBar title={p.meta.name} onBack={() => router.back()} backLabel="Plugins" />
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 44, gap: 16 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+          <View style={{ width: 46, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: t.sunken }}>
+            <Icon name={p.meta.icon || 'puzzle'} size={24} color={t.primary} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontFamily: t.font(600), fontSize: 22, letterSpacing: -0.22, color: t.text }}>{p.meta.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
+              <Pill kind={p.enabled ? 'ok' : 'neutral'}>{p.enabled ? 'enabled' : 'disabled'}</Pill>
+              <Pill kind="neutral">{p.meta.category}</Pill>
+            </View>
+          </View>
+        </View>
+
+        {p.meta.description ? (
+          <Text style={{ fontFamily: t.font(), fontSize: 13.5, lineHeight: 20, color: t.muted }}>{p.meta.description}</Text>
+        ) : null}
+
+        <List>
+          <ListRow
+            title="Enabled"
+            chevron={false}
+            right={<Switch testID="detail-toggle" on={p.enabled} disabled={busy} onChange={toggle} />}
+          />
+          <ListRow
+            icon="settings"
+            title="Edit config"
+            onPress={() => router.push(`/(app)/plugin/${p.id}/config`)}
+          />
+          {p.meta.host_aware ? (
+            <ListRow
+              icon="server"
+              title="Hosts"
+              detail={p.host_count != null ? String(p.host_count) : ''}
+              onPress={() => router.push(`/(app)/plugin/${p.id}/hosts`)}
+            />
+          ) : null}
+        </List>
+
+        <Text style={{ textAlign: 'center', fontFamily: t.mono(), fontSize: 11, color: t.fgDim }}>plugin id · {p.id}</Text>
+      </ScrollView>
+    </View>
   )
 }

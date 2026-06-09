@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator } from 'react-native'
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
+import { View, Text, ScrollView, ActivityIndicator } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { usePluginConfig, savePluginConfig } from '@/api/plugins'
-import { theme } from '@/theme'
-import { Screen } from '@/components/Screen'
+import { useTheme } from '@/theme'
+import { NavBar, Field, Input, Button, ErrLine, Empty } from '@/components/ds'
 
 function Editor({ id, initial }: { id: string; initial: Record<string, unknown> }) {
   const router = useRouter()
+  const t = useTheme()
   const [text, setText] = useState(() => JSON.stringify(initial, null, 2))
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -21,25 +22,51 @@ function Editor({ id, initial }: { id: string; initial: Record<string, unknown> 
   }
 
   return (
-    <Screen edges={['bottom']}>
-      <Stack.Screen options={{ title: 'Config' }} />
-      <ScrollView style={{ flex: 1, backgroundColor: theme.bg }} contentContainerStyle={{ padding: theme.space(4) }}>
-        <Text style={{ color: theme.textDim, fontSize: 12, marginBottom: theme.space(2) }}>Secrets show as &quot;***&quot; — leave them to keep the stored value.</Text>
-        <TextInput testID="config-input" multiline value={text} onChangeText={setText} autoCapitalize="none" autoCorrect={false}
-          style={{ backgroundColor: theme.surface, color: theme.text, fontFamily: 'monospace', fontSize: 12, borderColor: theme.border, borderWidth: 1, borderRadius: 8, padding: theme.space(3), minHeight: 240, textAlignVertical: 'top' }} />
-        {error ? <Text style={{ color: theme.error, marginTop: theme.space(2) }}>{error}</Text> : null}
-        <Pressable onPress={save} disabled={busy} style={{ backgroundColor: theme.accent, padding: theme.space(3), borderRadius: 8, alignItems: 'center', marginTop: theme.space(3), opacity: busy ? 0.6 : 1 }}>
-          <Text style={{ color: theme.bg, fontWeight: '600' }}>Save</Text>
-        </Pressable>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <NavBar title="Config" onBack={() => router.back()} backLabel="Plugin" />
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 44, gap: 12 }}>
+        <Text style={{ fontFamily: t.mono(), fontSize: 11.5, color: t.fgDim }}>
+          {id}.yml — secrets show as &quot;***&quot;; leave them to keep the stored value.
+        </Text>
+        <Field label="config">
+          <Input
+            testID="config-input"
+            mono
+            multiline
+            value={text}
+            onChangeText={setText}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={{ height: undefined, minHeight: 260, paddingVertical: 12, textAlignVertical: 'top', fontSize: 12.5 }}
+          />
+        </Field>
+        {error ? <ErrLine>{error}</ErrLine> : null}
+        <Button variant="primary" icon="play" block disabled={busy} onPress={save}>Save</Button>
       </ScrollView>
-    </Screen>
+    </View>
   )
 }
 
 export default function PluginConfig() {
   const { id } = useLocalSearchParams<{ id: string }>()
+  const t = useTheme()
+  const router = useRouter()
   const q = usePluginConfig(id)
-  if (q.isLoading) return <Screen edges={['bottom']}><View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator color={theme.accent} /></View></Screen>
-  if (q.isError) return <Screen edges={['bottom']}><View style={{ padding: theme.space(4) }}><Text style={{ color: theme.error }}>failed to load config</Text></View></Screen>
+  if (q.isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: t.bg }}>
+        <NavBar title="Config" onBack={() => router.back()} backLabel="Plugin" />
+        <ActivityIndicator color={t.primary} style={{ marginTop: 32 }} />
+      </View>
+    )
+  }
+  if (q.isError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: t.bg }}>
+        <NavBar title="Config" onBack={() => router.back()} backLabel="Plugin" />
+        <Empty>failed to load config</Empty>
+      </View>
+    )
+  }
   return <Editor id={id} initial={q.data ?? {}} />
 }

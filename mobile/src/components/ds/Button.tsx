@@ -7,7 +7,7 @@ type Variant = 'primary' | 'outline' | 'danger' | 'ghost'
 
 // .btn: h44, pad 0/16, radius, md/500, gap 7. variants per CSS; active states approximated via pressed.
 export function Button({
-  variant = 'primary', children, onPress, disabled, block, icon,
+  variant = 'primary', children, onPress, disabled, block, icon, testID,
 }: {
   variant?: Variant
   children: React.ReactNode
@@ -15,6 +15,7 @@ export function Button({
   disabled?: boolean
   block?: boolean
   icon?: string
+  testID?: string
 }) {
   const t = useTheme()
   const styleFor = (pressed: boolean) => {
@@ -32,6 +33,7 @@ export function Button({
   }
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}

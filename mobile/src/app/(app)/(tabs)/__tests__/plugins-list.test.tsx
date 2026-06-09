@@ -15,6 +15,6 @@ beforeEach(() => { mockEnable.mockClear(); mockRefetch.mockClear() })
 test('renders a plugin and toggling enables it', async () => {
   const { getByText, getByTestId } = render(<PluginsList />)
   expect(getByText('Xray')).toBeTruthy()
-  fireEvent(getByTestId('toggle-xray'), 'valueChange', true)
+  fireEvent.press(getByTestId('toggle-xray'))
   await waitFor(() => expect(mockEnable).toHaveBeenCalledWith('xray'))
 })

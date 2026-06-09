@@ -30,20 +30,15 @@ export default function AppLayout() {
   if (!hydrated) return null
   return (
     <>
-      {/* A Stack gives every pushed screen a back button (+ Android back + swipe).
-          Home and console keep their own headers, so theirs is hidden. */}
+      {/* The design uses custom in-screen headers, so the native header is hidden
+          for every screen. The (tabs) group hosts the bottom tab navigator. */}
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: theme.bg },
-          headerTintColor: theme.accent,
-          headerTitleStyle: { color: theme.text },
-          headerShadowVisible: false,
-          headerBackButtonDisplayMode: 'minimal',
+          headerShown: false,
           contentStyle: { backgroundColor: theme.bg },
         }}
       >
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="console/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>
       {enabled && locked ? <LockScreen /> : null}
     </>

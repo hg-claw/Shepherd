@@ -33,11 +33,11 @@ export default function PluginDetail() {
         <Text style={{ color: theme.text, flex: 1 }}>Enabled</Text>
         <Switch testID="detail-toggle" value={p.enabled} disabled={busy} onValueChange={toggle} />
       </View>
-      <Pressable onPress={() => router.push(`/(app)/plugins/${p.id}/config`)} style={rowStyle}>
+      <Pressable onPress={() => router.push(`/(app)/plugin/${p.id}/config`)} style={rowStyle}>
         <Text style={{ color: theme.accent }}>Edit config</Text>
       </Pressable>
       {p.meta.host_aware ? (
-        <Pressable onPress={() => router.push(`/(app)/plugins/${p.id}/hosts`)} style={rowStyle}>
+        <Pressable onPress={() => router.push(`/(app)/plugin/${p.id}/hosts`)} style={rowStyle}>
           <Text style={{ color: theme.accent }}>Hosts{p.host_count != null ? ` (${p.host_count})` : ''}</Text>
         </Pressable>
       ) : null}

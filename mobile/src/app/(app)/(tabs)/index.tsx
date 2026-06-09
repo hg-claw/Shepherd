@@ -98,8 +98,8 @@ export default function Home() {
     <Screen>
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: theme.space(3), borderBottomWidth: 1, borderColor: theme.border }}>
         <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600', flex: 1 }}>Servers</Text>
-        <Pressable onPress={() => router.push('/(app)/plugins')} style={{ marginRight: theme.space(3) }}><Text style={{ color: theme.accent }}>Plugins</Text></Pressable>
-        <Pressable onPress={() => router.push('/(app)/settings')} style={{ marginRight: theme.space(3) }}><Text style={{ color: theme.accent }}>Settings</Text></Pressable>
+        <Pressable onPress={() => router.push('/(app)/(tabs)/plugins')} style={{ marginRight: theme.space(3) }}><Text style={{ color: theme.accent }}>Plugins</Text></Pressable>
+        <Pressable onPress={() => router.push('/(app)/(tabs)/settings')} style={{ marginRight: theme.space(3) }}><Text style={{ color: theme.accent }}>Settings</Text></Pressable>
         <Pressable onPress={logout}><Text style={{ color: theme.accent }}>Log out</Text></Pressable>
       </View>
       {list.isLoading ? <ActivityIndicator color={theme.accent} style={{ marginTop: theme.space(8) }} />

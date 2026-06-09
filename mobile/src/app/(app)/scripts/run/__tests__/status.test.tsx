@@ -1,7 +1,7 @@
 import React from 'react'
 import { render } from '@testing-library/react-native'
 import RunStatus from '../[runId]'
-jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ runId: '9' }), Stack: Object.assign(() => null, { Screen: () => null }) }))
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ runId: '9' }), useRouter: () => ({ back: jest.fn() }), Stack: Object.assign(() => null, { Screen: () => null }) }))
 jest.mock('@/api/scripts', () => ({ useRun: jest.fn() }))
 import { useRun } from '@/api/scripts'
 

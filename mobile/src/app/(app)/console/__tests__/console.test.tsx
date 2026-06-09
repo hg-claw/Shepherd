@@ -6,6 +6,7 @@ jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: '7' }), use
 jest.mock('react-native-webview', () => ({ WebView: () => null }))
 jest.mock('@/api/console', () => ({ openConsole: jest.fn().mockResolvedValue({ session_id: 1, sid: 's1' }) }))
 jest.mock('@/store/auth', () => ({ useAuth: Object.assign((sel: any) => sel({ baseURL: 'https://h', token: 'T' }), { getState: () => ({ baseURL: 'https://h', token: 'T' }) }) }))
+jest.mock('@/api/servers', () => ({ useServer: () => ({ id: 7, name: 'web-1', public_alias: { String: 'edge', Valid: true } }) }))
 
 const mockWrite = jest.fn()
 const mockCloses: jest.Mock[] = []
@@ -28,9 +29,9 @@ test('opens console on mount and a control key writes bytes', async () => {
 })
 
 test('reconnect closes the previous session', async () => {
-  const { getByText } = render(<ConsoleScreen />)
+  const { getByLabelText } = render(<ConsoleScreen />)
   await waitFor(() => expect(openConsole).toHaveBeenCalled())
   const firstClose = mockCloses[mockCloses.length - 1]
-  fireEvent.press(getByText('Reconnect'))
+  fireEvent.press(getByLabelText('Reconnect'))
   await waitFor(() => expect(firstClose).toHaveBeenCalled())
 })

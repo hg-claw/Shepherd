@@ -1,7 +1,7 @@
 import React from 'react'
 import { render, fireEvent, waitFor } from '@testing-library/react-native'
 import PluginHosts from '../hosts'
-jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: 'xray' }), Stack: Object.assign(() => null, { Screen: () => null }) }))
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: 'xray' }), useRouter: () => ({ back: jest.fn() }), Stack: Object.assign(() => null, { Screen: () => null }) }))
 const mockRestart = jest.fn().mockResolvedValue({ status: 'running' })
 const mockRefetch = jest.fn()
 jest.mock('@/api/plugins', () => ({

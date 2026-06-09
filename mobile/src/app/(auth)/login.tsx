@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { View, Text, TextInput, Pressable } from 'react-native'
+import { View, Text } from 'react-native'
 import { useAuth } from '@/store/auth'
-import { theme } from '@/theme'
+import { useTheme } from '@/theme'
+import { BrandMark, Field, Input, Button, ErrLine } from '@/components/ds'
 
 export default function LoginScreen() {
+  const t = useTheme()
   const login = useAuth((s) => s.login)
   const error = useAuth((s) => s.error)
   const [url, setUrl] = useState('')
@@ -16,18 +18,57 @@ export default function LoginScreen() {
     await login(url, user, pass)
     setBusy(false)
   }
-  const input = { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border, borderWidth: 1, borderRadius: 8, padding: theme.space(3), marginBottom: theme.space(2) }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg, padding: theme.space(5), justifyContent: 'center' }}>
-      <Text style={{ color: theme.text, fontSize: 22, marginBottom: theme.space(4) }}>Shepherd</Text>
-      <TextInput style={input} placeholder="https://your-server" placeholderTextColor={theme.textDim} autoCapitalize="none" autoCorrect={false} value={url} onChangeText={setUrl} />
-      <TextInput style={input} placeholder="username" placeholderTextColor={theme.textDim} autoCapitalize="none" value={user} onChangeText={setUser} />
-      <TextInput style={input} placeholder="password" placeholderTextColor={theme.textDim} secureTextEntry value={pass} onChangeText={setPass} />
-      {error ? <Text style={{ color: theme.error, marginBottom: theme.space(2) }}>{error}</Text> : null}
-      <Pressable onPress={submit} disabled={busy} style={{ backgroundColor: theme.accent, padding: theme.space(3), borderRadius: 8, alignItems: 'center', opacity: busy ? 0.6 : 1 }}>
-        <Text style={{ color: theme.bg, fontWeight: '600' }}>Sign in</Text>
-      </Pressable>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 28, paddingBottom: 40, gap: 14 }}>
+        <View style={{ marginBottom: 14, alignItems: 'center' }}>
+          <BrandMark />
+        </View>
+        <Text style={{ textAlign: 'center', fontSize: 12.5, color: t.muted, marginBottom: 8 }}>
+          Self-hosted server fleet manager
+        </Text>
+
+        <Field label="Server">
+          <Input
+            mono
+            value={url}
+            onChangeText={setUrl}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="https://your-server"
+          />
+        </Field>
+        <Field label="Username">
+          <Input
+            value={user}
+            onChangeText={setUser}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="admin"
+          />
+        </Field>
+        <Field label="Password">
+          <Input
+            value={pass}
+            onChangeText={setPass}
+            secureTextEntry
+            placeholder="password"
+          />
+        </Field>
+
+        {error ? <ErrLine>{error}</ErrLine> : null}
+
+        <View style={{ marginTop: 6 }}>
+          <Button block disabled={busy} onPress={() => { void submit() }}>
+            {busy ? 'Signing in…' : 'Sign in'}
+          </Button>
+        </View>
+
+        <Text style={{ textAlign: 'center', fontFamily: t.mono(), fontSize: 11, color: t.fgDim, marginTop: 4 }}>
+          token stored in secure enclave · v1.0.0
+        </Text>
+      </View>
     </View>
   )
 }

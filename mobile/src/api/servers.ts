@@ -11,6 +11,7 @@ export type NullStr = { String: string; Valid: boolean }
 export type ServerRow = {
   id: number; name: string
   agent_os?: NullStr | string | null; agent_arch?: NullStr | string | null
+  agent_kernel?: NullStr | string | null
   agent_last_seen?: { Valid: boolean; Time: string } | string | null
   connected: boolean
   latest: Point | null

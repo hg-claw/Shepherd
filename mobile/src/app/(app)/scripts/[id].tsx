@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { View, Text, TextInput, Pressable, ScrollView } from 'react-native'
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
+import { View, Text, ScrollView } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useScripts, runScript } from '@/api/scripts'
-import { theme } from '@/theme'
-import { Screen } from '@/components/Screen'
+import { useTheme } from '@/theme'
+import { NavBar, Pill, Field, Input, Button, ErrLine, Empty } from '@/components/ds'
 
 export default function RunForm() {
   const { id, serverId } = useLocalSearchParams<{ id: string; serverId: string }>()
   const router = useRouter()
+  const t = useTheme()
   const script = useScripts().data?.find((s) => s.id === Number(id))
   // Store only user edits; the effective value falls back to each param's default. This way defaults
   // appear reactively once useScripts resolves after mount (a one-shot useState initializer would miss them).
@@ -15,7 +16,14 @@ export default function RunForm() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  if (!script) return <Screen edges={['bottom']}><View style={{ padding: theme.space(4) }}><Text style={{ color: theme.textDim }}>Script not found.</Text></View></Screen>
+  if (!script) {
+    return (
+      <View style={{ flex: 1, backgroundColor: t.bg }}>
+        <NavBar title="Run script" backLabel="Scripts" onBack={() => router.back()} />
+        <Empty>Script not found.</Empty>
+      </View>
+    )
+  }
 
   const valueFor = (name: string, def?: string) => overrides[name] ?? def ?? ''
   const missing = script.params.filter((p) => p.required && !valueFor(p.name, p.default).trim())
@@ -30,23 +38,42 @@ export default function RunForm() {
   }
 
   return (
-    <Screen edges={['bottom']}>
-    <Stack.Screen options={{ title: 'Run script' }} />
-    <ScrollView style={{ flex: 1, backgroundColor: theme.bg }} contentContainerStyle={{ padding: theme.space(4) }}>
-      <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600', marginBottom: theme.space(3) }}>{script.name}</Text>
-      {script.params.map((p) => (
-        <View key={p.name} style={{ marginBottom: theme.space(3) }}>
-          <Text style={{ color: theme.textDim, marginBottom: theme.space(1) }}>{p.label ?? p.name}{p.required ? ' *' : ''}</Text>
-          <TextInput placeholder={p.name} placeholderTextColor={theme.textDim} autoCapitalize="none" autoCorrect={false}
-            value={valueFor(p.name, p.default)} onChangeText={(t) => setOverrides((a) => ({ ...a, [p.name]: t }))}
-            style={{ backgroundColor: theme.surface, color: theme.text, borderColor: theme.border, borderWidth: 1, borderRadius: 8, padding: theme.space(3) }} />
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <NavBar title="Run script" backLabel="Scripts" onBack={() => router.back()} />
+
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 14, paddingBottom: 44, gap: 16 }}>
+        <View>
+          <Text style={{ fontFamily: t.mono(600), fontSize: 22, letterSpacing: -0.22, color: t.text }}>{script.name}</Text>
+          {script.description ? (
+            <Text style={{ fontFamily: t.font(), fontSize: t.fs.sm, color: t.muted, marginTop: 3 }}>{script.description}</Text>
+          ) : null}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
+            <Pill kind="neutral">{`⌖ ${serverId || 'fan-out'}`}</Pill>
+            <Pill kind="neutral">{`${script.params.length} params`}</Pill>
+          </View>
         </View>
-      ))}
-      {error ? <Text style={{ color: theme.error, marginBottom: theme.space(2) }}>{error}</Text> : null}
-      <Pressable onPress={run} disabled={busy} style={{ backgroundColor: theme.accent, padding: theme.space(3), borderRadius: 8, alignItems: 'center', opacity: busy ? 0.6 : 1 }}>
-        <Text style={{ color: theme.bg, fontWeight: '600' }}>Run</Text>
-      </Pressable>
-    </ScrollView>
-    </Screen>
+
+        <View style={{ gap: 16 }}>
+          {script.params.map((p) => (
+            <Field key={p.name} label={p.label ?? p.name} required={p.required}>
+              <Input
+                mono
+                placeholder={p.name}
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={valueFor(p.name, p.default)}
+                onChangeText={(t2) => setOverrides((a) => ({ ...a, [p.name]: t2 }))}
+              />
+            </Field>
+          ))}
+        </View>
+
+        {error ? <ErrLine>{error}</ErrLine> : null}
+
+        <Button variant="primary" block icon="play" disabled={busy} onPress={run}>
+          {`Run on ${serverId || 'fleet'}`}
+        </Button>
+      </ScrollView>
+    </View>
   )
 }

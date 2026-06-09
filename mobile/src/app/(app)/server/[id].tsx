@@ -1,56 +1,127 @@
-import { View, Text, Pressable } from 'react-native'
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
+import React from 'react'
+import { ScrollView, View, Text } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useServer } from '@/api/servers'
 import { isOnline, memPct, firstDiskPct, nullStr } from '@/api/metrics'
 import { bps, pct, relTime } from '@/lib/format'
-import { theme } from '@/theme'
-import { Screen } from '@/components/Screen'
 import { LiveNet } from '@/components/LiveNet'
+import {
+  NavBar, IconButton, Pill, Card, Button, Cc, Empty, Kpi, statusOf, barKind,
+} from '@/components/ds'
+import { useTheme } from '@/theme'
 
-function Stat({ label, value }: { label: string; value: string }) {
+const EM_DASH = '—'
+
+// One line in the details Card: dim label left, mono value right. `first` drops
+// the top divider so it doesn't double up with the Card border.
+function Row({ label, value, first }: { label: string; value: React.ReactNode; first?: boolean }) {
+  const t = useTheme()
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: theme.space(2), borderBottomWidth: 1, borderColor: theme.border }}>
-      <Text style={{ color: theme.textDim }}>{label}</Text>
-      <Text style={{ color: theme.text, fontFamily: 'monospace' }}>{value}</Text>
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+      paddingVertical: 11, paddingHorizontal: 14,
+      borderTopWidth: first ? 0 : 1, borderTopColor: t.border,
+    }}>
+      <Text style={{ fontFamily: t.font(), fontSize: 13, color: t.muted }}>{label}</Text>
+      <Text style={{ fontFamily: t.mono(), fontSize: 13, color: t.text }}>{value}</Text>
     </View>
   )
 }
 
 export default function ServerDetail() {
+  const t = useTheme()
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const row = useServer(Number(id))
+
   if (!row) {
-    return <Screen edges={['bottom']}><View style={{ padding: theme.space(5) }}><Text style={{ color: theme.textDim }}>Server not found.</Text></View></Screen>
+    return (
+      <View style={{ flex: 1, backgroundColor: t.bg }}>
+        <NavBar title="Not found" backLabel="Servers" onBack={() => router.back()} />
+        <Empty>Host #{String(id)} not found.</Empty>
+      </View>
+    )
   }
+
   const l = row.latest
-  const lastSeen = typeof row.agent_last_seen === 'object' && row.agent_last_seen?.Valid ? row.agent_last_seen.Time : null
+  const online = isOnline(row)
+  const alias = nullStr(row.public_alias) || row.name
+  const group = nullStr(row.public_group)
+  const cc = nullStr(row.country_code)
+  const kernel = nullStr(row.agent_kernel)
+  const st = statusOf({
+    online,
+    cpu: l?.cpu_pct ?? 0,
+    mem: memPct(l) ?? 0,
+    disk: firstDiskPct(l?.disks_json) ?? 0,
+  })
+  const lastSeen = typeof row.agent_last_seen === 'object' && row.agent_last_seen?.Valid
+    ? row.agent_last_seen.Time
+    : null
+  const load = l?.load_1 != null ? l.load_1.toFixed(2) : EM_DASH
+
+  const openConsole = () => router.push(`/(app)/console/${row.id}`)
+
   return (
-    <Screen edges={['bottom']}>
-    <Stack.Screen options={{ title: row.name }} />
-    <View style={{ padding: theme.space(4) }}>
-      <Text style={{ color: theme.text, fontSize: 20, fontWeight: '600' }}>{row.name}</Text>
-      <Text style={{ color: isOnline(row) ? '#4ade80' : theme.textDim, marginBottom: theme.space(3) }}>{isOnline(row) ? 'online' : 'offline'}</Text>
-      <Stat label="CPU" value={pct(l?.cpu_pct ?? null)} />
-      <Stat label="Memory" value={pct(memPct(l ?? null))} />
-      <Stat label="Disk" value={pct(firstDiskPct(l?.disks_json))} />
-      <LiveNet id={Number(id)} fallbackRx={l?.net_rx_bps ?? 0} fallbackTx={l?.net_tx_bps ?? 0}>
-        {(rx, tx) => <Stat label="Net" value={`↓ ${bps(rx)}  ↑ ${bps(tx)}`} />}
-      </LiveNet>
-      <Stat label="Load (1m)" value={l?.load_1 != null ? l.load_1.toFixed(2) : '—'} />
-      <Stat label="TCP conns" value={l?.tcp_conn != null ? String(l.tcp_conn) : '—'} />
-      <Stat label="OS / Arch" value={`${nullStr(row.agent_os) || '—'} / ${nullStr(row.agent_arch) || '—'}`} />
-      <Stat label="Last seen" value={lastSeen ? relTime(lastSeen) : '—'} />
-      <Pressable onPress={() => router.push(`/(app)/console/${row.id}`)} style={{ marginTop: theme.space(5), padding: theme.space(3), borderRadius: 8, backgroundColor: theme.accent, alignItems: 'center' }}>
-        <Text style={{ color: theme.bg, fontWeight: '600' }}>Open console</Text>
-      </Pressable>
-      <Pressable onPress={() => router.push(`/(app)/files/${row.id}`)} style={{ marginTop: theme.space(3), padding: theme.space(3), borderRadius: 8, borderWidth: 1, borderColor: theme.border, alignItems: 'center' }}>
-        <Text style={{ color: theme.text }}>Files</Text>
-      </Pressable>
-      <Pressable onPress={() => router.push(`/(app)/scripts?serverId=${row.id}`)} style={{ marginTop: theme.space(3), padding: theme.space(3), borderRadius: 8, borderWidth: 1, borderColor: theme.border, alignItems: 'center' }}>
-        <Text style={{ color: theme.text }}>Run script</Text>
-      </Pressable>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <NavBar
+        title={alias}
+        backLabel="Servers"
+        onBack={() => router.back()}
+        actions={<IconButton name="square-terminal" size={20} onPress={openConsole} />}
+      />
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 44, gap: 16 }}>
+        <View style={{ gap: 9 }}>
+          <Text
+            numberOfLines={1}
+            style={{ fontFamily: t.mono(600), fontSize: 23, letterSpacing: -0.23, color: t.text }}
+          >
+            {row.name}
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+            <Pill kind={st.kind}>{st.label}</Pill>
+            {group ? <Pill kind="neutral">{group}</Pill> : null}
+            {cc ? <Pill kind="neutral"><Cc code={cc} /></Pill> : null}
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          <View style={{ flexGrow: 1, flexBasis: '46%' }}>
+            <Kpi label="CPU" value={online ? pct(l?.cpu_pct ?? null) : EM_DASH} tone={barKind(l?.cpu_pct) || undefined} />
+          </View>
+          <View style={{ flexGrow: 1, flexBasis: '46%' }}>
+            <Kpi label="Memory" value={online ? pct(memPct(l)) : EM_DASH} tone={barKind(memPct(l)) || undefined} />
+          </View>
+          <View style={{ flexGrow: 1, flexBasis: '46%' }}>
+            <Kpi label="Disk" value={online ? pct(firstDiskPct(l?.disks_json)) : EM_DASH} tone={barKind(firstDiskPct(l?.disks_json)) || undefined} />
+          </View>
+          <View style={{ flexGrow: 1, flexBasis: '46%' }}>
+            <Kpi label="Load 1m" value={online ? load : EM_DASH} />
+          </View>
+        </View>
+
+        <Card>
+          <LiveNet id={Number(id)} fallbackRx={l?.net_rx_bps ?? 0} fallbackTx={l?.net_tx_bps ?? 0}>
+            {(rx, tx) => <Row first label="Net" value={online ? `↓ ${bps(rx)}  ↑ ${bps(tx)}` : EM_DASH} />}
+          </LiveNet>
+          <Row label="TCP conns" value={online && l?.tcp_conn != null ? l.tcp_conn.toLocaleString() : EM_DASH} />
+          <Row label="OS / Arch" value={`${nullStr(row.agent_os) || EM_DASH} / ${nullStr(row.agent_arch) || EM_DASH}`} />
+          <Row label="Kernel" value={kernel || EM_DASH} />
+          <Row label="Last seen" value={lastSeen ? relTime(lastSeen) : EM_DASH} />
+        </Card>
+
+        <View style={{ gap: 12 }}>
+          <Button variant="primary" block icon="square-terminal" onPress={openConsole}>Open console</Button>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <Button variant="outline" block icon="folder-tree" onPress={() => router.push(`/(app)/files/${row.id}`)}>Files</Button>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button variant="outline" block icon="play" onPress={() => router.push(`/(app)/scripts?serverId=${row.id}`)}>Run script</Button>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
     </View>
-    </Screen>
   )
 }

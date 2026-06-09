@@ -3,6 +3,6 @@ import { useAuth } from '@/store/auth'
 
 export default function AuthLayout() {
   const status = useAuth((s) => s.status)
-  if (status === 'signedIn') return <Redirect href="/(app)" />
+  if (status === 'signedIn') return <Redirect href="/(app)/(tabs)" />
   return <Slot />
 }

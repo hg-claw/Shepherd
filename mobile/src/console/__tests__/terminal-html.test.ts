@@ -6,4 +6,6 @@ test('HTML wires the message protocol', () => {
   expect(TERMINAL_HTML).toContain("'resize'")
   expect(TERMINAL_HTML).toContain('onData')
   expect(TERMINAL_HTML).toContain('ReactNativeWebView')
+  expect(TERMINAL_HTML).toContain('__shepCopy') // copy-to-clipboard hook
+  expect(TERMINAL_HTML).toContain('getSelection')
 })

@@ -4,7 +4,7 @@ import {
   ArrowDown, ArrowUp, SquareTerminal, FolderTree, Play, Folder, File, CornerLeftUp,
   ScrollText, Target, RotateCw, RefreshCw, ScanFace, Lock, User, Globe, LogOut,
   Activity, Cloud, Gauge, Archive, Shield, Network, X, CircleQuestionMark,
-  Rss, Box, Package, Terminal,
+  Rss, Box, Package, Terminal, Copy,
 } from 'lucide-react-native'
 
 type IconComp = React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>
@@ -19,7 +19,7 @@ const MAP: Record<string, IconComp> = {
   'rotate-cw': RotateCw, 'refresh-cw': RefreshCw, 'scan-face': ScanFace, lock: Lock,
   user: User, globe: Globe, 'log-out': LogOut, activity: Activity, cloud: Cloud,
   gauge: Gauge, archive: Archive, shield: Shield, network: Network, x: X,
-  rss: Rss, box: Box, package: Package, terminal: Terminal,
+  rss: Rss, box: Box, package: Package, terminal: Terminal, copy: Copy,
   'circle-help': CircleQuestionMark,
 }
 

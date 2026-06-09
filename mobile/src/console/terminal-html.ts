@@ -29,6 +29,12 @@ function onMsg(ev){
 }
 document.addEventListener('message',onMsg);window.addEventListener('message',onMsg);
 window.addEventListener('resize',doFit);
+// Copy: the current xterm selection, else the whole scrollback buffer.
+window.__shepCopy=function(){
+  var txt=(term.getSelection&&term.getSelection())||'';
+  if(!txt){var b=term.buffer.active,ls=[];for(var i=0;i<b.length;i++){var ln=b.getLine(i);if(ln)ls.push(ln.translateToString(true));}txt=ls.join('\\n').replace(/[ \\n]+$/,'');}
+  post({type:'copy',text:txt});
+};
 setTimeout(function(){doFit();post({type:'ready'})},50);
 }catch(e){fail('Terminal init error: '+e.message);}
 }

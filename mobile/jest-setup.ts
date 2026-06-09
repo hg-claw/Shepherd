@@ -20,3 +20,4 @@ jest.mock('react-native-safe-area-context', () => {
   return m.default ?? m
 })
 jest.mock('expo-font', () => ({ useFonts: () => [true, null], isLoaded: () => true, loadAsync: jest.fn() }))
+jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(async () => true), getStringAsync: jest.fn(async () => '') }))

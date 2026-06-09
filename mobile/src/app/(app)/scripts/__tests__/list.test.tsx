@@ -1,7 +1,7 @@
 import React from 'react'
 import { render } from '@testing-library/react-native'
 import ScriptsList from '../index'
-jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ serverId: '7' }), useRouter: () => ({ push: jest.fn() }), Stack: Object.assign(() => null, { Screen: () => null }) }))
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ serverId: '7' }), useRouter: () => ({ push: jest.fn(), back: jest.fn() }), Stack: Object.assign(() => null, { Screen: () => null }) }))
 jest.mock('@/api/scripts', () => ({ useScripts: jest.fn() }))
 import { useScripts } from '@/api/scripts'
 

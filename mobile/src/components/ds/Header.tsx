@@ -65,11 +65,12 @@ export function NavBar({ title, onBack, backLabel = 'Back', actions }: {
 }
 
 // .iconbtn: 36x36 radius, muted icon; sunken bg + fg on press.
-export function IconButton({ name, onPress, size = 18 }: { name: string; onPress?: () => void; size?: number }) {
+export function IconButton({ name, onPress, size = 18, accessibilityLabel }: { name: string; onPress?: () => void; size?: number; accessibilityLabel?: string }) {
   const t = useTheme()
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       onPress={onPress}
       style={({ pressed }) => ({
         width: 36, height: 36, borderRadius: t.radius, alignItems: 'center', justifyContent: 'center',

@@ -9,8 +9,11 @@ import { TERMINAL_HTML } from '@/console/terminal-html'
 import { dataMsg, parseFromWebView } from '@/console/bridge'
 import { KEYS, charBytes } from '@/console/keys'
 import { useAuth } from '@/store/auth'
-import { theme } from '@/theme'
+import { useServer } from '@/api/servers'
+import { nullStr } from '@/api/metrics'
+import { useTheme } from '@/theme'
 import { Screen } from '@/components/Screen'
+import { NavBar, IconButton, Pill, type PillKind } from '@/components/ds'
 
 const BAR: { label: string; bytes: Uint8Array }[] = [
   { label: 'Esc', bytes: KEYS.esc }, { label: 'Tab', bytes: KEYS.tab },
@@ -18,11 +21,21 @@ const BAR: { label: string; bytes: Uint8Array }[] = [
   { label: '↑', bytes: KEYS.up }, { label: '↓', bytes: KEYS.down }, { label: '←', bytes: KEYS.left }, { label: '→', bytes: KEYS.right },
 ]
 
+// Map the live PTY connection state onto a status Pill.
+const STATUS_PILL: Record<ConsoleStatus, { kind: PillKind; label: string }> = {
+  open: { kind: 'ok', label: 'connected' },
+  connecting: { kind: 'warn', label: 'connecting' },
+  closed: { kind: 'err', label: 'closed' },
+  error: { kind: 'err', label: 'error' },
+}
+
 export default function ConsoleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const baseURL = useAuth((s) => s.baseURL)
   const token = useAuth((s) => s.token)
+  const row = useServer(Number(id))
+  const host = nullStr(row?.public_alias) || row?.name || 'host'
   const webRef = useRef<WebView>(null)
   const sessionRef = useRef<ConsoleSession | null>(null)
   const readyRef = useRef(false)
@@ -69,40 +82,72 @@ export default function ConsoleScreen() {
     }
   }
   const sendKey = (bytes: Uint8Array) => sessionRef.current?.write(bytes)
+  const closeBack = () => { sessionRef.current?.close(); router.back() }
   const insets = useSafeAreaInsets()
+  const t = useTheme()
+  const pill = STATUS_PILL[status] ?? STATUS_PILL.connecting
 
   return (
     <Screen edges={['top']}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', padding: theme.space(2), borderBottomWidth: 1, borderColor: theme.border }}>
-        <Text style={{ color: theme.text, flex: 1 }}>Console · {status}</Text>
-        <Pressable onPress={start} style={{ marginRight: theme.space(3) }}><Text style={{ color: theme.accent }}>Reconnect</Text></Pressable>
-        <Pressable onPress={() => { sessionRef.current?.close(); router.back() }}><Text style={{ color: theme.textDim }}>Close</Text></Pressable>
+      <NavBar
+        title={`console · ${host}`}
+        backLabel="Host"
+        onBack={closeBack}
+        actions={<IconButton name="rotate-cw" onPress={start} accessibilityLabel="Reconnect" />}
+      />
+      {/* .statline — live connection state strip under the nav bar */}
+      <View style={{
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        paddingHorizontal: 14, paddingVertical: 9,
+        backgroundColor: t.surface, borderBottomWidth: 1, borderBottomColor: t.border,
+      }}>
+        <Pill kind={pill.kind}>{pill.label}</Pill>
+        <Text style={{ fontFamily: t.mono(), fontSize: 11, color: t.fgDim }}>24×80 · UTF-8</Text>
+        <Pressable onPress={closeBack} style={{ marginLeft: 'auto' }}>
+          <Text style={{ fontFamily: t.mono(), fontSize: 12, color: t.muted }}>Close</Text>
+        </Pressable>
       </View>
-      <WebView
-        ref={webRef}
-        originWhitelist={['*']}
-        // A real https baseUrl gives the page a secure origin; without it the html
-        // string loads from an opaque/null origin and Android blocks the https
-        // xterm CDN scripts → a blank terminal with no cursor.
-        source={{ html: TERMINAL_HTML, baseUrl: 'https://shepherd.app/' }}
-        onMessage={(e) => onMessage(e.nativeEvent.data)}
-        javaScriptEnabled
-        domStorageEnabled
-        mixedContentMode="always"
-        style={{ flex: 1, backgroundColor: theme.bg }}
-      />
-      <TextInput
-        autoFocus autoCorrect={false} autoCapitalize="none" spellCheck={false} blurOnSubmit={false}
-        value=""
-        onChangeText={(t) => { if (t) sendKey(charBytes(t)) }}
-        onKeyPress={(e) => { if (e.nativeEvent.key === 'Backspace') sendKey(KEYS.backspace) }}
-        onSubmitEditing={() => sendKey(KEYS.enter)}
-        style={{ height: 1, opacity: 0 }}
-      />
-      <ScrollView horizontal keyboardShouldPersistTaps="always" style={{ maxHeight: 44, borderTopWidth: 1, borderColor: theme.border, paddingBottom: insets.bottom }} contentContainerStyle={{ alignItems: 'center', padding: theme.space(1) }}>
+      <View style={{ flex: 1, minHeight: 0 }}>
+        <WebView
+          ref={webRef}
+          originWhitelist={['*']}
+          // A real https baseUrl gives the page a secure origin; without it the html
+          // string loads from an opaque/null origin and Android blocks the https
+          // xterm CDN scripts → a blank terminal with no cursor.
+          source={{ html: TERMINAL_HTML, baseUrl: 'https://shepherd.app/' }}
+          onMessage={(e) => onMessage(e.nativeEvent.data)}
+          javaScriptEnabled
+          domStorageEnabled
+          mixedContentMode="always"
+          style={{ flex: 1, backgroundColor: t.bg }}
+        />
+        <TextInput
+          autoFocus autoCorrect={false} autoCapitalize="none" spellCheck={false} blurOnSubmit={false}
+          value=""
+          onChangeText={(t) => { if (t) sendKey(charBytes(t)) }}
+          onKeyPress={(e) => { if (e.nativeEvent.key === 'Backspace') sendKey(KEYS.backspace) }}
+          onSubmitEditing={() => sendKey(KEYS.enter)}
+          style={{ height: 1, opacity: 0 }}
+        />
+      </View>
+      {/* .keybar — control-key chips */}
+      <ScrollView
+        horizontal
+        keyboardShouldPersistTaps="always"
+        style={{ maxHeight: 38 + 16 + insets.bottom, backgroundColor: t.surface, borderTopWidth: 1, borderTopColor: t.border }}
+        contentContainerStyle={{ alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 8 + insets.bottom }}
+      >
         {BAR.map((k) => (
-          <Pressable key={k.label} onPress={() => sendKey(k.bytes)} style={{ paddingHorizontal: theme.space(3), paddingVertical: theme.space(2), marginHorizontal: theme.space(1), borderRadius: 6, backgroundColor: theme.surface }}>
-            <Text style={{ color: theme.text, fontFamily: 'monospace' }}>{k.label}</Text>
+          <Pressable
+            key={k.label}
+            onPress={() => sendKey(k.bytes)}
+            style={({ pressed }) => ({
+              minWidth: 42, height: 38, paddingHorizontal: 12, borderRadius: 8,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: pressed ? t.border : t.sunken, borderWidth: 1, borderColor: t.border,
+            })}
+          >
+            <Text style={{ fontFamily: t.mono(), fontSize: 13, color: t.text }}>{k.label}</Text>
           </Pressable>
         ))}
       </ScrollView>

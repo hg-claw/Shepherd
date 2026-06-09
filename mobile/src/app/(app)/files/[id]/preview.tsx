@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
 import { ScrollView, Text, View, ActivityIndicator } from 'react-native'
-import { Stack, useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { previewFile, type Preview as Prev } from '@/api/files'
-import { theme } from '@/theme'
-import { Screen } from '@/components/Screen'
+import { useTheme } from '@/theme'
+import { NavBar, Pill, Empty } from '@/components/ds'
 
 export default function Preview() {
   const { id, path } = useLocalSearchParams<{ id: string; path: string }>()
+  const router = useRouter()
+  const t = useTheme()
+  const name = String(path).split('/').filter(Boolean).pop() ?? String(path)
   const [state, setState] = useState<{ loading: boolean; data?: Prev; error?: string }>({ loading: true })
+
   useEffect(() => {
     let live = true
     previewFile(Number(id), String(path))
@@ -16,16 +20,40 @@ export default function Preview() {
     return () => { live = false }
   }, [id, path])
 
-  if (state.loading) return <Screen edges={['bottom']}><View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator color={theme.accent} /></View></Screen>
-  if (state.error) return <Screen edges={['bottom']}><View style={{ padding: theme.space(4) }}><Text style={{ color: theme.error }}>{state.error}</Text></View></Screen>
-  if (state.data?.kind === 'binary') return <Screen edges={['bottom']}><View style={{ padding: theme.space(4) }}><Text style={{ color: theme.textDim }}>Binary file — can&apos;t preview.</Text></View></Screen>
-  const text = state.data?.kind === 'text' ? state.data.text : ''
   return (
-    <Screen edges={['bottom']}>
-      <Stack.Screen options={{ title: 'Preview' }} />
-      <ScrollView style={{ flex: 1, backgroundColor: theme.bg }} contentContainerStyle={{ padding: theme.space(3) }}>
-        <Text style={{ color: theme.text, fontFamily: 'monospace', fontSize: 12 }}>{text || '(empty)'}</Text>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <NavBar title={name} backLabel="Files" onBack={() => router.back()} />
+
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 14, paddingBottom: 44, gap: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <Text numberOfLines={1} style={{ flex: 1, fontFamily: t.mono(), fontSize: 11.5, color: t.fgDim }}>
+            {String(path)}
+          </Text>
+          <Pill kind="neutral">read-only</Pill>
+        </View>
+
+        {state.loading ? (
+          <View style={{ paddingTop: t.space(8), alignItems: 'center' }}>
+            <ActivityIndicator color={t.primary} />
+          </View>
+        ) : state.error ? (
+          <Text style={{ color: t.error, fontFamily: t.mono(), fontSize: 12 }}>{state.error}</Text>
+        ) : state.data?.kind === 'binary' ? (
+          <Empty>Binary file — preview unavailable.</Empty>
+        ) : (
+          <ScrollView
+            horizontal
+            style={{
+              backgroundColor: t.sunken, borderWidth: 1, borderColor: t.border, borderRadius: t.radius,
+            }}
+            contentContainerStyle={{ padding: 14 }}
+          >
+            <Text style={{ fontFamily: t.mono(), fontSize: 12, lineHeight: 18.6, color: t.text }}>
+              {state.data?.kind === 'text' ? state.data.text || '(empty)' : ''}
+            </Text>
+          </ScrollView>
+        )}
       </ScrollView>
-    </Screen>
+    </View>
   )
 }

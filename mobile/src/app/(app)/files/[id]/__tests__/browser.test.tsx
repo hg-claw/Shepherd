@@ -1,8 +1,9 @@
 import React from 'react'
 import { render, fireEvent } from '@testing-library/react-native'
 import FileBrowser from '../index'
-jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: '7' }), useRouter: () => ({ push: jest.fn() }), Stack: Object.assign(() => null, { Screen: () => null }) }))
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: '7' }), useRouter: () => ({ push: jest.fn(), back: jest.fn() }) }))
 jest.mock('@/api/files', () => ({ useDir: jest.fn() }))
+jest.mock('@/api/servers', () => ({ useServer: () => undefined }))
 import { useDir } from '@/api/files'
 
 test('renders entries dirs-first and cd into a dir', () => {
@@ -13,5 +14,6 @@ test('renders entries dirs-first and cd into a dir', () => {
   const { getByText } = render(<FileBrowser />)
   expect(getByText('sub/')).toBeTruthy()
   expect(getByText('file.txt')).toBeTruthy()
+  expect(getByText(/read-only/i)).toBeTruthy()
   fireEvent.press(getByText('sub/'))
 })

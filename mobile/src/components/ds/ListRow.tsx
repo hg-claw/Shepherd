@@ -5,11 +5,12 @@ import { Icon } from './Icon'
 
 // .lrow: min-height 52, pad 10/14, gap 12. icon tile 30x30 r7 bg-sunken; title flex md; detail mono 12 muted; chevron fg-dim.
 export function ListRow({
-  icon, iconColor, title, detail, chevron = true, mono, onPress, right,
+  icon, iconColor, title, titleColor, detail, chevron = true, mono, onPress, right,
 }: {
   icon?: string
   iconColor?: string
   title: React.ReactNode
+  titleColor?: string
   detail?: React.ReactNode
   chevron?: boolean
   mono?: boolean
@@ -36,7 +37,7 @@ export function ListRow({
       ) : null}
       <Text
         numberOfLines={1}
-        style={{ flex: 1, fontSize: t.fs.md, color: t.text, fontFamily: mono ? t.mono() : t.font() }}
+        style={{ flex: 1, fontSize: t.fs.md, color: titleColor ?? t.text, fontFamily: mono ? t.mono() : t.font() }}
       >
         {title}
       </Text>

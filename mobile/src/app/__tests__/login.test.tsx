@@ -8,7 +8,7 @@ test('submitting calls store.login with entered values', () => {
   useAuth.setState({ status: 'signedOut', baseURL: null, token: null, admin: null, error: null, login } as never)
   const { getByPlaceholderText, getByText } = render(<LoginScreen />)
   fireEvent.changeText(getByPlaceholderText('https://your-server'), 'https://h')
-  fireEvent.changeText(getByPlaceholderText('username'), 'alice')
+  fireEvent.changeText(getByPlaceholderText('admin'), 'alice')
   fireEvent.changeText(getByPlaceholderText('password'), 'pw')
   fireEvent.press(getByText('Sign in'))
   expect(login).toHaveBeenCalledWith('https://h', 'alice', 'pw')

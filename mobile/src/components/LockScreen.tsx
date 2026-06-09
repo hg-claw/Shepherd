@@ -3,9 +3,11 @@ import { Modal, View, Text, Pressable } from 'react-native'
 import { authenticate } from '@/lib/biometrics'
 import { useLock } from '@/store/lock'
 import { useAuth } from '@/store/auth'
-import { theme } from '@/theme'
+import { useTheme } from '@/theme'
+import { BrandMark, Button, Icon } from '@/components/ds'
 
 export function LockScreen() {
+  const t = useTheme()
   const unlock = useLock((s) => s.unlock)
   const logout = useAuth((s) => s.logout)
   const [failed, setFailed] = useState(false)
@@ -34,12 +36,26 @@ export function LockScreen() {
   // scroll) can't leak through to the protected content while locked.
   return (
     <Modal visible animationType="fade" transparent={false} onRequestClose={() => {}}>
-      <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center', gap: theme.space(5) }}>
-        <Text style={{ color: theme.text, fontSize: 20, fontWeight: '700' }}>🔒 Shepherd locked</Text>
-        <Pressable onPress={tryAuth} style={{ backgroundColor: theme.accent, paddingVertical: theme.space(3), paddingHorizontal: theme.space(8), borderRadius: 8 }}>
-          <Text style={{ color: theme.bg, fontWeight: '600' }}>Unlock</Text>
-        </Pressable>
-        {failed ? <Pressable onPress={logout}><Text style={{ color: theme.textDim }}>Sign out</Text></Pressable> : null}
+      <View style={{
+        flex: 1, backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center',
+        gap: 22, padding: 40,
+      }}>
+        <BrandMark />
+        <View style={{
+          width: 84, height: 84, borderRadius: 9999, alignItems: 'center', justifyContent: 'center',
+          backgroundColor: t.sunken, borderWidth: 1, borderColor: t.border,
+        }}>
+          <Icon name="scan-face" size={38} color={t.primary} />
+        </View>
+        <Text style={{ textAlign: 'center', fontSize: 13, color: t.muted }}>
+          Locked · authenticate to continue
+        </Text>
+        <Button icon="scan-face" onPress={tryAuth}>Unlock with Face ID</Button>
+        {failed ? (
+          <Pressable onPress={() => { void logout() }}>
+            <Text style={{ color: t.textDim }}>Sign out</Text>
+          </Pressable>
+        ) : null}
       </View>
     </Modal>
   )

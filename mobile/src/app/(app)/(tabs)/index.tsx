@@ -1,77 +1,110 @@
 import { useState } from 'react'
-import { FlatList, View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native'
+import { ScrollView, View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useServers, useServersLatest, type ServerRow } from '@/api/servers'
 import { isOnline, memPct, firstDiskPct, nullStr } from '@/api/metrics'
-import { bps, countryFlag, cmpStr } from '@/lib/format'
-import { useAuth } from '@/store/auth'
+import { bps, cmpStr } from '@/lib/format'
 import { useWallLiveStore } from '@/api/wallLive'
 import { LiveNet } from '@/components/LiveNet'
-import { MetricBar } from '@/components/MetricBar'
-import { OnlineDot } from '@/components/OnlineDot'
-import { Screen } from '@/components/Screen'
-import { theme } from '@/theme'
+import {
+  Header, Kpi, Card, MetricBar, Pill, OnlineDot, Cc, Icon, IconButton, Empty, statusOf,
+} from '@/components/ds'
+import { useTheme, useThemeMode } from '@/theme'
 
 const aliasOf = (r: ServerRow) => nullStr(r.public_alias) || r.name
+const alertingScore = (l: ServerRow['latest']) =>
+  Math.max(l?.cpu_pct ?? 0, memPct(l) ?? 0, firstDiskPct(l?.disks_json) ?? 0)
 
-function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: 'ok' | 'err' }) {
-  return (
-    <View style={{ flexGrow: 1, flexBasis: 90, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, borderRadius: 8, padding: theme.space(2) }}>
-      <Text style={{ color: theme.textDim, fontSize: 10 }}>{label}</Text>
-      <Text style={{ color: tone === 'err' ? theme.error : tone === 'ok' ? '#4ade80' : theme.text, fontSize: 16, fontWeight: '700' }}>{value}</Text>
-      {sub ? <Text style={{ color: theme.textDim, fontSize: 10 }}>{sub}</Text> : null}
-    </View>
-  )
-}
-
-function RealtimeStat({ onlineRows }: { onlineRows: ServerRow[] }) {
+// Subscribes to the live store so only this strip re-renders on a frame.
+function TrafficCard({ onlineRows }: { onlineRows: ServerRow[] }) {
+  const t = useTheme()
   const live = useWallLiveStore((s) => s.live)
   const rx = onlineRows.reduce((a, r) => a + (live[r.id]?.rx_bps ?? r.latest?.net_rx_bps ?? 0), 0)
   const tx = onlineRows.reduce((a, r) => a + (live[r.id]?.tx_bps ?? r.latest?.net_tx_bps ?? 0), 0)
-  return <Stat label="Realtime" value={`↓ ${bps(rx)}`} sub={`↑ ${bps(tx)}`} />
-}
-
-function SummaryStrip({ total, online, offline, onlineRows }: { total: number; online: number; offline: number; onlineRows: ServerRow[] }) {
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.space(2), padding: theme.space(3) }}>
-      <Stat label="Nodes" value={String(total)} />
-      <Stat label="Online" value={String(online)} tone="ok" />
-      <Stat label="Offline" value={String(offline)} tone={offline > 0 ? 'err' : undefined} />
-      <RealtimeStat onlineRows={onlineRows} />
-    </View>
+    <Card>
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 14 }}>
+        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Icon name="arrow-down" size={15} color={t.primary} />
+          <Text style={{ fontFamily: t.mono(500), fontSize: 14, color: t.text }}>{bps(rx)}</Text>
+          <Text style={{ fontFamily: t.mono(), fontSize: 10.5, color: t.fgDim }}>in</Text>
+        </View>
+        <View style={{ width: 1, alignSelf: 'stretch', marginHorizontal: 14, marginVertical: -2, backgroundColor: t.border }} />
+        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+          <Icon name="arrow-up" size={15} color={t.muted} />
+          <Text style={{ fontFamily: t.mono(500), fontSize: 14, color: t.text }}>{bps(tx)}</Text>
+          <Text style={{ fontFamily: t.mono(), fontSize: 10.5, color: t.fgDim }}>out</Text>
+        </View>
+      </View>
+    </Card>
   )
 }
 
-function ServerCard({ row, onPress }: { row: ServerRow; onPress: () => void }) {
+function HostCard({ row, onPress }: { row: ServerRow; onPress: () => void }) {
+  const t = useTheme()
   const online = isOnline(row)
   const l = row.latest
-  const flag = countryFlag(nullStr(row.country_code))
+  const alias = aliasOf(row)
+  const cc = nullStr(row.country_code)
+  const os = nullStr(row.agent_os)
+  const st = statusOf({
+    online,
+    cpu: l?.cpu_pct ?? 0,
+    mem: memPct(l) ?? 0,
+    disk: firstDiskPct(l?.disks_json) ?? 0,
+  })
   return (
-    <Pressable onPress={onPress} style={{ backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, borderRadius: 10, padding: theme.space(3), marginBottom: theme.space(2), opacity: online ? 1 : 0.6 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space(2) }}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        backgroundColor: t.surface, borderWidth: 1,
+        borderColor: pressed ? t.borderStrong : t.border,
+        borderRadius: t.radiusLg, padding: 14, opacity: online ? 1 : 0.6,
+      })}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <OnlineDot online={online} />
-        {flag ? <Text style={{ fontSize: 14 }}>{flag}</Text> : null}
-        <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }} numberOfLines={1}>{aliasOf(row)}</Text>
-        {online && l ? <Text style={{ color: theme.textDim, fontSize: 11 }}>load {l.load_1?.toFixed(2) ?? '—'}</Text> : null}
+        {cc ? <Cc code={cc} /> : null}
+        <Text numberOfLines={1} style={{ flex: 1, fontFamily: t.mono(500), fontSize: t.fs.md, color: t.text }}>{alias}</Text>
+        {online ? <Pill kind={st.kind}>{st.label}</Pill> : null}
       </View>
-      {l ? (
-        <View style={{ marginTop: theme.space(2), gap: theme.space(1) }}>
-          {nullStr(row.agent_os) ? <Text style={{ color: theme.textDim, fontSize: 10 }}>{nullStr(row.agent_os)}{nullStr(row.agent_arch) ? ` · ${nullStr(row.agent_arch)}` : ''}</Text> : null}
-          <MetricBar label="CPU" value={l.cpu_pct ?? null} />
-          <MetricBar label="MEM" value={memPct(l)} />
-          <MetricBar label="DSK" value={firstDiskPct(l.disks_json)} />
-          <LiveNet id={row.id} fallbackRx={l.net_rx_bps ?? 0} fallbackTx={l.net_tx_bps ?? 0}>
-            {(rx, tx) => <Text style={{ color: theme.textDim, fontFamily: 'monospace', fontSize: 11, marginTop: theme.space(1) }}>↓ {bps(rx)}   ↑ {bps(tx)}</Text>}
+      {online ? (
+        <>
+          {os || l?.load_1 != null ? (
+            <Text style={{ fontFamily: t.mono(), fontSize: 10.5, color: t.fgDim, marginTop: 6 }}>
+              {[os, l?.load_1 != null ? `load ${l.load_1.toFixed(2)}` : null].filter(Boolean).join(' · ')}
+            </Text>
+          ) : null}
+          <View style={{ marginTop: 11, gap: 7 }}>
+            <MetricBar label="CPU" value={l?.cpu_pct ?? null} />
+            <MetricBar label="MEM" value={memPct(l)} />
+            <MetricBar label="DSK" value={firstDiskPct(l?.disks_json)} />
+          </View>
+          <LiveNet id={row.id} fallbackRx={l?.net_rx_bps ?? 0} fallbackTx={l?.net_tx_bps ?? 0}>
+            {(rx, tx) => (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 9 }}>
+                <Text style={{ fontFamily: t.mono(), fontSize: 11, color: t.muted }}>↓ {bps(rx)}</Text>
+                <Text style={{ fontFamily: t.mono(), fontSize: 11, color: t.muted }}>↑ {bps(tx)}</Text>
+                {l?.tcp_conn != null ? (
+                  <Text style={{ marginLeft: 'auto', fontFamily: t.mono(), fontSize: 11, color: t.fgDim }}>
+                    {l.tcp_conn.toLocaleString()} conns
+                  </Text>
+                ) : null}
+              </View>
+            )}
           </LiveNet>
-        </View>
-      ) : online ? null : <Text style={{ color: theme.textDim, fontSize: 11, marginTop: theme.space(1) }}>offline</Text>}
+        </>
+      ) : (
+        <Text style={{ fontFamily: t.mono(), fontSize: 10.5, color: t.fgDim, marginTop: 8 }}>agent offline</Text>
+      )}
     </Pressable>
   )
 }
 
 export default function Home() {
+  const t = useTheme()
   const router = useRouter()
-  const logout = useAuth((s) => s.logout)
+  const toggleTheme = useThemeMode((s) => s.toggle)
   const list = useServers()          // fast — paints the list immediately
   const latest = useServersLatest()  // metrics — fills the bars in after
   const [refreshing, setRefreshing] = useState(false)
@@ -84,6 +117,8 @@ export default function Home() {
   const rows = (list.data ?? []).map((s) => byId.get(s.id) ?? s)
   const total = rows.length
   const onlineRows = rows.filter(isOnline)
+  const alerting = onlineRows.filter((r) => alertingScore(r.latest) >= 80).length
+  const offline = total - onlineRows.length
 
   const groups = new Map<string, ServerRow[]>()
   for (const r of rows) {
@@ -95,39 +130,60 @@ export default function Home() {
   const ordered = [...groups.entries()].sort(([a], [b]) => cmpStr(a, b))
 
   return (
-    <Screen>
-      <View style={{ flexDirection: 'row', alignItems: 'center', padding: theme.space(3), borderBottomWidth: 1, borderColor: theme.border }}>
-        <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600', flex: 1 }}>Servers</Text>
-        <Pressable onPress={() => router.push('/(app)/(tabs)/plugins')} style={{ marginRight: theme.space(3) }}><Text style={{ color: theme.accent }}>Plugins</Text></Pressable>
-        <Pressable onPress={() => router.push('/(app)/(tabs)/settings')} style={{ marginRight: theme.space(3) }}><Text style={{ color: theme.accent }}>Settings</Text></Pressable>
-        <Pressable onPress={logout}><Text style={{ color: theme.accent }}>Log out</Text></Pressable>
-      </View>
-      {list.isLoading ? <ActivityIndicator color={theme.accent} style={{ marginTop: theme.space(8) }} />
-        : list.isError ? <Text style={{ color: theme.error, padding: theme.space(4) }}>{list.error instanceof Error ? list.error.message : 'failed to load'}</Text>
-        : <FlatList
-            data={ordered}
-            keyExtractor={([g]) => g || '_'}
-            ListHeaderComponent={<SummaryStrip total={total} online={onlineRows.length} offline={total - onlineRows.length} onlineRows={onlineRows} />}
-            renderItem={({ item }: { item: [string, ServerRow[]] }) => {
-              const [group, ss] = item
-              const gOnline = ss.filter(isOnline).length
-              const sorted = ss.slice().sort((a, b) => {
-                const oa = isOnline(a) ? 0 : 1, ob = isOnline(b) ? 0 : 1
-                return oa - ob || cmpStr(aliasOf(a), aliasOf(b))
-              })
-              return (
-                <View style={{ paddingHorizontal: theme.space(3), paddingTop: theme.space(3) }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.space(2), marginBottom: theme.space(2) }}>
-                    <Text style={{ color: theme.text, fontWeight: '600', fontSize: 13 }}>{group || 'Ungrouped'}</Text>
-                    <Text style={{ color: theme.textDim, fontSize: 11 }}>{gOnline}/{ss.length} online</Text>
-                  </View>
-                  {sorted.map((r) => <ServerCard key={r.id} row={r} onPress={() => router.push(`/(app)/server/${r.id}`)} />)}
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <Header
+        title="Servers"
+        sub="Fleet at a glance"
+        actions={
+          <>
+            <IconButton name={t.mode === 'dark' ? 'sun' : 'moon'} size={19} onPress={() => { void toggleTheme() }} />
+            <IconButton name="plus" size={20} />
+          </>
+        }
+      />
+      {list.isLoading ? (
+        <ActivityIndicator color={t.primary} style={{ marginTop: 32 }} />
+      ) : list.isError ? (
+        <Text style={{ color: t.error, padding: 16 }}>
+          {list.error instanceof Error ? list.error.message : 'failed to load'}
+        </Text>
+      ) : (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 92, gap: 16 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.primary} />}
+        >
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+            <View style={{ flexGrow: 1, flexBasis: '46%' }}><Kpi label="Nodes" value={total} /></View>
+            <View style={{ flexGrow: 1, flexBasis: '46%' }}><Kpi label="Online" value={onlineRows.length} tone="ok" /></View>
+            <View style={{ flexGrow: 1, flexBasis: '46%' }}><Kpi label="Offline" value={offline} tone={offline > 0 ? 'err' : undefined} /></View>
+            <View style={{ flexGrow: 1, flexBasis: '46%' }}><Kpi label="Alerting" value={alerting} tone={alerting > 0 ? 'warn' : undefined} /></View>
+          </View>
+
+          <TrafficCard onlineRows={onlineRows} />
+
+          {ordered.length === 0 ? <Empty>No servers.</Empty> : null}
+
+          {ordered.map(([group, ss]) => {
+            const gOnline = ss.filter(isOnline).length
+            const sorted = ss.slice().sort((a, b) => {
+              const oa = isOnline(a) ? 0 : 1, ob = isOnline(b) ? 0 : 1
+              return oa - ob || cmpStr(aliasOf(a), aliasOf(b))
+            })
+            return (
+              <View key={group || '_'} style={{ gap: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingHorizontal: 2 }}>
+                  <Text style={{ fontFamily: t.mono(600), fontSize: 12.5, color: t.text }}>{group || 'Ungrouped'}</Text>
+                  <Text style={{ fontFamily: t.mono(), fontSize: 11, color: t.fgDim }}>{gOnline}/{ss.length} online</Text>
                 </View>
-              )
-            }}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} />}
-            ListEmptyComponent={<Text style={{ color: theme.textDim, padding: theme.space(4) }}>No servers.</Text>}
-          />}
-    </Screen>
+                {sorted.map((r) => (
+                  <HostCard key={r.id} row={r} onPress={() => router.push(`/(app)/server/${r.id}`)} />
+                ))}
+              </View>
+            )
+          })}
+        </ScrollView>
+      )}
+    </View>
   )
 }

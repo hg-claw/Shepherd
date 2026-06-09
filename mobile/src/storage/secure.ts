@@ -28,3 +28,13 @@ export async function saveLockEnabled(enabled: boolean): Promise<void> {
 export async function loadLockEnabled(): Promise<boolean> {
   return (await AsyncStorage.getItem(LOCK_ENABLED_KEY)) === 'true'
 }
+
+const THEME_KEY = 'shepherd_theme'
+
+export async function saveThemeMode(mode: 'light' | 'dark'): Promise<void> {
+  await AsyncStorage.setItem(THEME_KEY, mode)
+}
+export async function loadThemeMode(): Promise<'light' | 'dark' | null> {
+  const v = await AsyncStorage.getItem(THEME_KEY)
+  return v === 'light' || v === 'dark' ? v : null
+}

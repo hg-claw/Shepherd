@@ -1,16 +1,18 @@
 import React from 'react'
 import { View, Text, Pressable } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '@/theme'
 import { Icon } from './Icon'
 
-// .hdr: pad 56/16/12, bg-elev, bottom border. title 26/600; sub sm muted; actions right.
+// .hdr: pad (inset+12)/16/12, bg-elev, bottom border. title 26/600; sub sm muted; actions right.
 export function Header({ title, sub, actions }: {
   title: React.ReactNode; sub?: React.ReactNode; actions?: React.ReactNode
 }) {
   const t = useTheme()
+  const insets = useSafeAreaInsets()
   return (
     <View style={{
-      paddingTop: 56, paddingHorizontal: 16, paddingBottom: 12,
+      paddingTop: Math.max(insets.top, 24) + 12, paddingHorizontal: 16, paddingBottom: 12,
       backgroundColor: t.surface, borderBottomWidth: 1, borderBottomColor: t.border,
     }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -33,9 +35,11 @@ export function NavBar({ title, onBack, backLabel = 'Back', actions }: {
   title?: React.ReactNode; onBack?: () => void; backLabel?: string; actions?: React.ReactNode
 }) {
   const t = useTheme()
+  const insets = useSafeAreaInsets()
+  const top = Math.max(insets.top, 24)
   return (
     <View style={{
-      minHeight: 92, paddingTop: 54, paddingHorizontal: 8, paddingBottom: 10,
+      minHeight: top + 48, paddingTop: top + 10, paddingHorizontal: 8, paddingBottom: 10,
       backgroundColor: t.surface, borderBottomWidth: 1, borderBottomColor: t.border,
       flexDirection: 'row', alignItems: 'center', gap: 4,
     }}>

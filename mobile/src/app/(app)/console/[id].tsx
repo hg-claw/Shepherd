@@ -12,7 +12,6 @@ import { useAuth } from '@/store/auth'
 import { useServer } from '@/api/servers'
 import { nullStr } from '@/api/metrics'
 import { useTheme } from '@/theme'
-import { Screen } from '@/components/Screen'
 import { NavBar, IconButton, Pill, type PillKind } from '@/components/ds'
 
 const BAR: { label: string; bytes: Uint8Array }[] = [
@@ -88,7 +87,7 @@ export default function ConsoleScreen() {
   const pill = STATUS_PILL[status] ?? STATUS_PILL.connecting
 
   return (
-    <Screen edges={['top']}>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
       <NavBar
         title={`console · ${host}`}
         backLabel="Host"
@@ -151,6 +150,6 @@ export default function ConsoleScreen() {
           </Pressable>
         ))}
       </ScrollView>
-    </Screen>
+    </View>
   )
 }

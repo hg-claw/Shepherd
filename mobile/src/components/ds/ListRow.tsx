@@ -5,12 +5,13 @@ import { Icon } from './Icon'
 
 // .lrow: min-height 52, pad 10/14, gap 12. icon tile 30x30 r7 bg-sunken; title flex md; detail mono 12 muted; chevron fg-dim.
 export function ListRow({
-  icon, iconColor, title, titleColor, detail, chevron = true, mono, onPress, right,
+  icon, iconColor, title, titleColor, sub, detail, chevron = true, mono, onPress, right,
 }: {
   icon?: string
   iconColor?: string
   title: React.ReactNode
   titleColor?: string
+  sub?: React.ReactNode
   detail?: React.ReactNode
   chevron?: boolean
   mono?: boolean
@@ -35,12 +36,18 @@ export function ListRow({
           <Icon name={icon} size={16} color={iconColor ?? t.muted} />
         </View>
       ) : null}
-      <Text
-        numberOfLines={1}
-        style={{ flex: 1, fontSize: t.fs.md, color: titleColor ?? t.text, fontFamily: mono ? t.mono() : t.font() }}
-      >
-        {title}
-      </Text>
+      {/* A node title (e.g. a two-line View) must render as a sibling, NOT inside a
+          <Text> — a View nested in Text crashes on native. Wrap only string titles. */}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        {typeof title === 'string' ? (
+          <Text numberOfLines={1} style={{ fontSize: t.fs.md, color: titleColor ?? t.text, fontFamily: mono ? t.mono() : t.font() }}>
+            {title}
+          </Text>
+        ) : title}
+        {sub != null && sub !== '' ? (
+          <Text numberOfLines={1} style={{ fontSize: t.fs.xs, color: t.muted, marginTop: 1, fontFamily: t.font() }}>{sub}</Text>
+        ) : null}
+      </View>
       {detail != null && detail !== '' ? (
         <Text numberOfLines={1} style={{ fontFamily: t.mono(), fontSize: 12, color: t.muted }}>{detail}</Text>
       ) : null}

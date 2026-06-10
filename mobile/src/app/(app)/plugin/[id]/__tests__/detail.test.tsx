@@ -25,27 +25,39 @@ test('a Logs row navigates to the logs screen (host-aware only)', () => {
   expect(mockPush).toHaveBeenCalledWith('/(app)/plugin/xray/logs')
 })
 
-test('a Status row navigates to the status screen for plugins with a status view', () => {
+test('a Status row navigates to the status screen for proxy plugins', () => {
   const { getByText } = render(<PluginDetail />)
   fireEvent.press(getByText('Status'))
   expect(mockPush).toHaveBeenCalledWith('/(app)/plugin/xray/status')
 })
 
-test('Status row renders for singbox and netquality too', () => {
-  for (const id of ['singbox', 'netquality']) {
+test('proxy plugins (singbox/xray) get Inbounds + Status rows', () => {
+  for (const id of ['singbox', 'xray']) {
     mockRouteId = id
     mockQ = { data: [{ ...mockPlugins[0], id }], isLoading: false }
     const { getByText, unmount } = render(<PluginDetail />)
     expect(getByText('Status')).toBeTruthy()
+    fireEvent.press(getByText('Inbounds'))
+    expect(mockPush).toHaveBeenCalledWith(`/(app)/plugin/${id}/inbounds`)
     unmount()
   }
 })
 
-test('plugins without a status view get no Status row', () => {
-  mockRouteId = 'cloudflare'
-  mockQ = { data: [{ ...mockPlugins[0], id: 'cloudflare' }], isLoading: false }
-  const { queryByText } = render(<PluginDetail />)
-  expect(queryByText('Status')).toBeNull()
+test('each managed plugin routes to its dedicated screen', () => {
+  const cases: [string, string, string][] = [
+    ['cloudflare', 'Cloudflare', '/(app)/plugin/cloudflare/cloudflare'],
+    ['netquality', 'Network Quality', '/(app)/plugin/netquality/netquality'],
+    ['subgen', 'Subscriptions', '/(app)/plugin/subgen/subgen'],
+  ]
+  for (const [id, label, route] of cases) {
+    mockRouteId = id
+    mockQ = { data: [{ ...mockPlugins[0], id, meta: { ...mockPlugins[0].meta, host_aware: false } }], isLoading: false }
+    const { getByText, queryByText, unmount } = render(<PluginDetail />)
+    expect(queryByText('Status')).toBeNull() // non-proxy → no traffic/cert status row
+    fireEvent.press(getByText(label))
+    expect(mockPush).toHaveBeenCalledWith(route)
+    unmount()
+  }
 })
 
 test('non-host-aware plugins get neither Hosts nor Logs rows', () => {

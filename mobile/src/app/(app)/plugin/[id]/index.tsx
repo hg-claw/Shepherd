@@ -5,9 +5,10 @@ import { usePlugins, enablePlugin, disablePlugin } from '@/api/plugins'
 import { useTheme } from '@/theme'
 import { NavBar, List, ListRow, Switch, Pill, Icon, Empty } from '@/components/ds'
 
-// Plugins with a read-only status view on mobile (see ./status.tsx — it falls
-// back to an empty state for any other id, so this set only gates the row).
-const STATUS_VIEW_IDS = new Set(['singbox', 'xray', 'netquality'])
+// Plugins with a read-only traffic/cert status view on mobile (see ./status.tsx).
+const STATUS_VIEW_IDS = new Set(['singbox', 'xray'])
+// Proxy plugins that get the inbounds management screen (./inbounds.tsx).
+const INBOUNDS_IDS = new Set(['singbox', 'xray'])
 
 export default function PluginDetail() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -69,6 +70,34 @@ export default function PluginDetail() {
             chevron={false}
             right={<Switch testID="detail-toggle" on={p.enabled} disabled={busy} onChange={toggle} />}
           />
+          {p.id === 'cloudflare' ? (
+            <ListRow
+              icon="cloud"
+              title="Cloudflare"
+              onPress={() => router.push(`/(app)/plugin/${p.id}/cloudflare`)}
+            />
+          ) : null}
+          {p.id === 'netquality' ? (
+            <ListRow
+              icon="gauge"
+              title="Network Quality"
+              onPress={() => router.push(`/(app)/plugin/${p.id}/netquality`)}
+            />
+          ) : null}
+          {INBOUNDS_IDS.has(p.id) ? (
+            <ListRow
+              icon="network"
+              title="Inbounds"
+              onPress={() => router.push(`/(app)/plugin/${p.id}/inbounds`)}
+            />
+          ) : null}
+          {p.id === 'subgen' ? (
+            <ListRow
+              icon="rss"
+              title="Subscriptions"
+              onPress={() => router.push(`/(app)/plugin/${p.id}/subgen`)}
+            />
+          ) : null}
           <ListRow
             icon="settings"
             title="Edit config"

@@ -2,20 +2,20 @@ import { useMemo, useState } from 'react'
 import { View, Text, ScrollView, Pressable, ActivityIndicator, RefreshControl } from 'react-native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import {
-  usePluginHosts, useProxyInbounds, useTrafficBatch, useSingboxCerts, useNetqualityLatest,
+  usePluginHosts, useProxyInbounds, useTrafficBatch, useSingboxCerts,
   type ProxyPluginID, type ProxyInbound, type TrafficSeries,
-  type NetqualityISP, type NetqualityLatestRow,
 } from '@/api/plugins'
 import { useServers, type ServerRow } from '@/api/servers'
 import { nullStr } from '@/api/metrics'
-import { bytes, cmpStr, relTime } from '@/lib/format'
+import { bytes } from '@/lib/format'
 import { useTheme } from '@/theme'
 import { Screen } from '@/components/Screen'
 import { NavBar, Card, CardHead, Pill, Button, Empty, AreaChart, type PillKind } from '@/components/ds'
 
 // Plugins that get a status view; index.tsx keeps a matching set for the row.
+// Netquality has its own dedicated screen (./netquality.tsx) — not here.
 export function hasStatusView(id?: string): boolean {
-  return id === 'singbox' || id === 'xray' || id === 'netquality'
+  return id === 'singbox' || id === 'xray'
 }
 
 // ── pure helpers (exported for tests) ────────────────────────────────────────
@@ -281,102 +281,6 @@ function ProxyStatus({ plugin }: { plugin: ProxyPluginID }) {
   )
 }
 
-// ── netquality: latest samples grid ───────────────────────────────────────────
-
-const ISP_ORDER: NetqualityISP[] = ['telecom', 'unicom', 'mobile', 'overseas']
-const ISP_LABEL: Record<NetqualityISP, string> = {
-  telecom: '电信',
-  unicom: '联通',
-  mobile: '移动',
-  overseas: '海外',
-}
-
-function NetqualityRow({ row }: { row: NetqualityLatestRow }) {
-  const t = useTheme()
-  return (
-    <View style={{
-      flexDirection: 'row', alignItems: 'center', gap: 8,
-      paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, borderTopColor: t.border,
-    }}>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text numberOfLines={1} style={{ fontFamily: t.font(500), fontSize: t.fs.sm, color: t.text }}>
-          {row.label}
-        </Text>
-        <Text numberOfLines={1} style={{ fontFamily: t.font(), fontSize: t.fs.xs, color: t.muted, marginTop: 1 }}>
-          {row.region}{row.ts ? ` · ${relTime(row.ts)}` : ''}
-        </Text>
-      </View>
-      <Pill kind={rttKind(row.rtt_avg_ms, row.loss_pct)}>{fmtRTT(row.rtt_avg_ms)}</Pill>
-      <Text style={{ fontFamily: t.mono(), fontSize: t.fs.xs, color: t.muted }}>{fmtLoss(row.loss_pct)}</Text>
-    </View>
-  )
-}
-
-function NetqualityStatus() {
-  const t = useTheme()
-  const hostsQ = usePluginHosts('netquality')
-  const hosts = hostsQ.data ?? []
-  const [picked, setPicked] = useState<number | null>(null)
-  const serverID = picked ?? hosts[0]?.server_id ?? null
-  const latestQ = useNetqualityLatest(serverID)
-
-  const grouped = useMemo(() => {
-    const m = new Map<NetqualityISP, NetqualityLatestRow[]>()
-    for (const r of latestQ.data ?? []) {
-      const arr = m.get(r.isp) ?? []
-      arr.push(r)
-      m.set(r.isp, arr)
-    }
-    for (const arr of m.values()) arr.sort((a, b) => cmpStr(a.label, b.label))
-    return m
-  }, [latestQ.data])
-
-  const onRefresh = () => {
-    void hostsQ.refetch()
-    void latestQ.refetch()
-  }
-
-  if (hostsQ.isLoading) {
-    return <ActivityIndicator testID="status-loading" color={t.primary} style={{ marginTop: 32 }} />
-  }
-  if (hostsQ.isError) {
-    return <ErrorRetry onRetry={() => { void hostsQ.refetch() }}>Failed to load hosts.</ErrorRetry>
-  }
-  if (hosts.length === 0) return <Empty>Not deployed anywhere.</Empty>
-
-  return (
-    <View style={{ flex: 1 }}>
-      <HostChips hosts={hosts} serverID={serverID} onPick={setPicked} />
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 16, paddingBottom: 44, gap: 16 }}
-        refreshControl={
-          <RefreshControl refreshing={hostsQ.isRefetching || latestQ.isRefetching} onRefresh={onRefresh} tintColor={t.primary} />
-        }
-      >
-        {latestQ.isLoading ? (
-          <ActivityIndicator testID="latest-loading" color={t.primary} style={{ marginTop: 24 }} />
-        ) : latestQ.isError ? (
-          <ErrorRetry onRetry={() => { void latestQ.refetch() }}>Failed to load samples.</ErrorRetry>
-        ) : (latestQ.data ?? []).length === 0 ? (
-          <Empty>No samples yet — wait one sample interval.</Empty>
-        ) : (
-          ISP_ORDER.map((isp) => {
-            const rows = grouped.get(isp) ?? []
-            if (rows.length === 0) return null
-            return (
-              <Card key={isp}>
-                <CardHead>{ISP_LABEL[isp]}</CardHead>
-                {rows.map((r) => <NetqualityRow key={String(r.target_id)} row={r} />)}
-              </Card>
-            )
-          })
-        )}
-      </ScrollView>
-    </View>
-  )
-}
-
 // ── screen ────────────────────────────────────────────────────────────────────
 
 export default function PluginStatusScreen() {
@@ -388,8 +292,6 @@ export default function PluginStatusScreen() {
       <NavBar title="Status" onBack={() => router.back()} backLabel="Plugin" />
       {id === 'singbox' || id === 'xray' ? (
         <ProxyStatus plugin={id} />
-      ) : id === 'netquality' ? (
-        <NetqualityStatus />
       ) : (
         <Empty>No status view for this plugin.</Empty>
       )}

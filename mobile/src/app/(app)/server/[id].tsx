@@ -1,12 +1,13 @@
-import React from 'react'
-import { ScrollView, View, Text } from 'react-native'
+import React, { useState } from 'react'
+import { ScrollView, View, Text, ActivityIndicator } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useServer } from '@/api/servers'
-import { isOnline, memPct, firstDiskPct, nullStr } from '@/api/metrics'
+import { useServersLatest } from '@/api/servers'
+import { isOnline, memPct, firstDiskPct, nullStr, useTelemetrySeries, type TelemetryRange } from '@/api/metrics'
 import { bps, pct, relTime } from '@/lib/format'
 import { LiveNet } from '@/components/LiveNet'
 import {
-  NavBar, IconButton, Pill, Card, Button, Cc, Empty, Kpi, statusOf, barKind,
+  NavBar, IconButton, Pill, Card, CardHead, Button, Cc, Empty, Kpi, statusOf, barKind,
+  Segmented, AreaChart,
 } from '@/components/ds'
 import { useTheme } from '@/theme'
 
@@ -28,12 +29,67 @@ function Row({ label, value, first }: { label: string; value: React.ReactNode; f
   )
 }
 
+const RANGES: { value: TelemetryRange; label: string }[] = [
+  { value: '1h', label: '1h' }, { value: '24h', label: '24h' }, { value: '7d', label: '7d' },
+]
+
+// One labelled chart inside the History card: mono label left, sparkline below.
+function ChartBlock({ label, values, color, format }: {
+  label: string; values: (number | null)[]; color?: string; format?: (v: number) => string
+}) {
+  const t = useTheme()
+  return (
+    <View style={{ gap: 6 }}>
+      <Text style={{ fontFamily: t.mono(), fontSize: 10, letterSpacing: 0.4, color: t.muted }}>{label}</Text>
+      <AreaChart data={values} height={56} color={color} format={format} />
+    </View>
+  )
+}
+
+// History: telemetry charts (CPU / MEM / NET) with a 1h/24h/7d range selector.
+function History({ id }: { id: number }) {
+  const t = useTheme()
+  const [range, setRange] = useState<TelemetryRange>('1h')
+  const q = useTelemetrySeries(id, range)
+  const pts = q.data ?? []
+  const fmtPct = (v: number) => pct(v)
+  return (
+    <Card>
+      <CardHead>
+        <Text style={{ flex: 1, fontFamily: t.font(500), fontSize: 12.5, color: t.text }}>History</Text>
+        <Segmented value={range} onChange={setRange} options={RANGES} />
+      </CardHead>
+      <View style={{ padding: 14, gap: 14 }}>
+        {q.isLoading ? (
+          <ActivityIndicator color={t.primary} style={{ marginVertical: 40 }} />
+        ) : (
+          <>
+            <ChartBlock label="CPU %" values={pts.map((p) => p.cpu_pct ?? null)} format={fmtPct} />
+            <ChartBlock label="MEM %" values={pts.map((p) => memPct(p))} color={t.ok} format={fmtPct} />
+            <ChartBlock label="NET ↓ RX" values={pts.map((p) => p.net_rx_bps ?? null)} format={bps} />
+            <ChartBlock label="NET ↑ TX" values={pts.map((p) => p.net_tx_bps ?? null)} color={t.warn} format={bps} />
+          </>
+        )}
+      </View>
+    </Card>
+  )
+}
+
 export default function ServerDetail() {
   const t = useTheme()
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
-  const row = useServer(Number(id))
+  const latest = useServersLatest()
+  const row = latest.data?.find((s) => s.id === Number(id))
 
+  if (!row && latest.isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: t.bg }}>
+        <NavBar backLabel="Servers" onBack={() => router.back()} />
+        <ActivityIndicator color={t.primary} style={{ marginTop: 32 }} />
+      </View>
+    )
+  }
   if (!row) {
     return (
       <View style={{ flex: 1, backgroundColor: t.bg }}>
@@ -109,6 +165,8 @@ export default function ServerDetail() {
           <Row label="Kernel" value={kernel || EM_DASH} />
           <Row label="Last seen" value={lastSeen ? relTime(lastSeen) : EM_DASH} />
         </Card>
+
+        <History id={row.id} />
 
         <View style={{ gap: 12 }}>
           <Button variant="primary" block icon="square-terminal" onPress={openConsole}>Open console</Button>

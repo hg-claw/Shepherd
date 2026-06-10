@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ScrollView, View, Text } from 'react-native'
+import { ScrollView, View, Text, Alert } from 'react-native'
 import { Stack } from 'expo-router'
 import { useLock } from '@/store/lock'
 import { useAuth } from '@/store/auth'
@@ -104,7 +104,19 @@ export default function Settings() {
           <List>
             <ListRow icon="user" title="Signed in as" detail={username} chevron={false} />
             <ListRow icon="globe" title="Server" detail={baseURL ?? '—'} chevron={false} mono />
-            <ListRow icon="log-out" iconColor={t.err} title="Sign out" titleColor={t.err} chevron={false} onPress={() => { void logout() }} />
+            <ListRow
+              icon="log-out"
+              iconColor={t.err}
+              title="Sign out"
+              titleColor={t.err}
+              chevron={false}
+              onPress={() => {
+                Alert.alert('Sign out', `Sign out of ${host}?`, [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Sign out', style: 'destructive', onPress: () => { void logout() } },
+                ])
+              }}
+            />
           </List>
         </View>
 

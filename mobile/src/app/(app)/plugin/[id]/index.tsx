@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, ScrollView } from 'react-native'
+import { View, Text, ScrollView, ActivityIndicator } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { usePlugins, enablePlugin, disablePlugin } from '@/api/plugins'
 import { useTheme } from '@/theme'
@@ -12,6 +12,17 @@ export default function PluginDetail() {
   const q = usePlugins()
   const p = q.data?.find((x) => x.id === id)
   const [busy, setBusy] = useState(false)
+
+  // While the plugins query loads, show a spinner — otherwise "not found"
+  // flashes before the data arrives.
+  if (q.isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: t.bg }}>
+        <NavBar title="Plugin" onBack={() => router.back()} backLabel="Plugins" />
+        <ActivityIndicator testID="plugin-loading" color={t.primary} style={{ marginTop: 32 }} />
+      </View>
+    )
+  }
 
   if (!p) {
     return (

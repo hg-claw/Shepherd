@@ -13,3 +13,14 @@ test('submitting calls store.login with entered values', () => {
   fireEvent.press(getByText('Sign in'))
   expect(login).toHaveBeenCalledWith('https://h', 'alice', 'pw')
 })
+
+test('password field returnKey "go" submits the form', () => {
+  const login = jest.fn()
+  useAuth.setState({ status: 'signedOut', baseURL: null, token: null, admin: null, error: null, login } as never)
+  const { getByPlaceholderText } = render(<LoginScreen />)
+  fireEvent.changeText(getByPlaceholderText('https://your-server'), 'https://h')
+  fireEvent.changeText(getByPlaceholderText('admin'), 'alice')
+  fireEvent.changeText(getByPlaceholderText('password'), 'pw')
+  fireEvent(getByPlaceholderText('password'), 'submitEditing')
+  expect(login).toHaveBeenCalledWith('https://h', 'alice', 'pw')
+})

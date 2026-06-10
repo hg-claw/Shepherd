@@ -1,8 +1,13 @@
-import { useState } from 'react'
-import { View, Text } from 'react-native'
+import { useRef, useState } from 'react'
+import { View, Text, TextInput, KeyboardAvoidingView, ScrollView, Platform, type TextInputProps } from 'react-native'
 import { useAuth } from '@/store/auth'
 import { useTheme } from '@/theme'
 import { BrandMark, Field, Input, Button, ErrLine } from '@/components/ds'
+
+// React 19 forwards `ref` as a regular prop, and the ds Input spreads its props
+// onto the underlying TextInput — RN's public TextInputProps type just doesn't
+// declare `ref`, so widen the component type once for focus chaining.
+const RefInput = Input as React.ComponentType<TextInputProps & { mono?: boolean; ref?: React.Ref<TextInput> }>
 
 export default function LoginScreen() {
   const t = useTheme()
@@ -12,16 +17,26 @@ export default function LoginScreen() {
   const [user, setUser] = useState('')
   const [pass, setPass] = useState('')
   const [busy, setBusy] = useState(false)
+  const userRef = useRef<TextInput>(null)
+  const passRef = useRef<TextInput>(null)
 
   const submit = async () => {
+    if (busy) return
     setBusy(true)
     await login(url, user, pass)
     setBusy(false)
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 28, paddingBottom: 40, gap: 14 }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: t.bg }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 40, gap: 14 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={{ marginBottom: 14, alignItems: 'center' }}>
           <BrandMark />
         </View>
@@ -36,23 +51,38 @@ export default function LoginScreen() {
             onChangeText={setUrl}
             autoCapitalize="none"
             autoCorrect={false}
+            keyboardType="url"
+            textContentType="URL"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => userRef.current?.focus()}
             placeholder="https://your-server"
           />
         </Field>
         <Field label="Username">
-          <Input
+          <RefInput
+            ref={userRef}
             value={user}
             onChangeText={setUser}
             autoCapitalize="none"
             autoCorrect={false}
+            textContentType="username"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => passRef.current?.focus()}
             placeholder="admin"
           />
         </Field>
         <Field label="Password">
-          <Input
+          <RefInput
+            ref={passRef}
             value={pass}
             onChangeText={setPass}
             secureTextEntry
+            autoCapitalize="none"
+            textContentType="password"
+            returnKeyType="go"
+            onSubmitEditing={() => { void submit() }}
             placeholder="password"
           />
         </Field>
@@ -68,7 +98,7 @@ export default function LoginScreen() {
         <Text style={{ textAlign: 'center', fontFamily: t.mono(), fontSize: 11, color: t.fgDim, marginTop: 4 }}>
           token stored in secure enclave · v1.0.0
         </Text>
-      </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   )
 }

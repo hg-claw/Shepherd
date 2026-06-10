@@ -1,6 +1,23 @@
+import { useQuery, type UseQueryResult } from '@tanstack/react-query'
+import { authedFetch } from './authed'
 import type { Point, ServerRow, NullStr } from './servers'
 
+export type { Point } from './servers'
+
 const ONLINE_WINDOW_MS = 90_000
+
+export type TelemetryRange = '1h' | '24h' | '7d'
+
+// useTelemetrySeries fetches the history series for one server. 1h is raw 30s
+// samples so it refreshes at that cadence; the rolled-up ranges move slower.
+export function useTelemetrySeries(id: number, range: TelemetryRange): UseQueryResult<Point[]> {
+  return useQuery({
+    queryKey: ['telemetry', id, range],
+    queryFn: () => authedFetch<Point[]>(`/api/servers/${id}/telemetry?range=${range}`),
+    refetchInterval: range === '1h' ? 30000 : 60000,
+    staleTime: 10000,
+  })
+}
 
 // nullStr extracts a plain string from a Go sql.NullString ({String, Valid}),
 // a plain string, or null/undefined → '' when absent.

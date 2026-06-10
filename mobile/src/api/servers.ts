@@ -18,6 +18,7 @@ export type ServerRow = {
   public_alias?: NullStr | string | null
   public_group?: NullStr | string | null
   country_code?: NullStr | string | null
+  ssh_host?: NullStr | string | null
 }
 
 // useServers is the FAST list — plain /api/servers, no telemetry join. Used to

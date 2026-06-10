@@ -140,7 +140,7 @@ test('sumSeries folds per-tag totals and the combined sparkline series', () => {
 test('hasStatusView gates the known plugin ids', () => {
   expect(hasStatusView('singbox')).toBe(true)
   expect(hasStatusView('xray')).toBe(true)
-  expect(hasStatusView('netquality')).toBe(true)
+  expect(hasStatusView('netquality')).toBe(false)
   expect(hasStatusView('cloudflare')).toBe(false)
   expect(hasStatusView(undefined)).toBe(false)
 })
@@ -222,41 +222,14 @@ test('undeployed proxy plugin shows the traffic empty state', () => {
   expect(getByText('Not deployed anywhere.')).toBeTruthy()
 })
 
-// ── netquality ────────────────────────────────────────────────────────────────
+// ── non-proxy plugins (netquality has its own dedicated screen now) ─────────────
 
-test('netquality: rows grouped by ISP with RTT/loss and relative sample time', () => {
+test('netquality renders the no-status empty state here (it has a dedicated screen)', () => {
   mockId = 'netquality'
-  mockHosts.mockReturnValue(ok([{ id: 5, plugin_id: 'netquality', server_id: 7, status: 'running', updated_at: '' }]))
-  mockLatest.mockReturnValue(ok([
-    { target_id: 1, isp: 'telecom', region: '上海', label: '电信上海', ts: new Date(Date.now() - 30_000).toISOString(), rtt_avg_ms: 42.31, loss_pct: 0, status: 'ok' },
-    { target_id: 2, isp: 'overseas', region: 'US-West', label: 'google-dns', ts: new Date(Date.now() - 120_000).toISOString(), rtt_avg_ms: 187.5, loss_pct: 2.4, status: 'ok' },
-    { target_id: 3, isp: 'unicom', region: '北京', label: '联通北京' }, // no samples yet
-  ]))
-  const { getByText, getAllByText } = render(<PluginStatusScreen />)
-  expect(mockLatest).toHaveBeenCalledWith(7)
-  // ISP group headers
-  expect(getByText('电信')).toBeTruthy()
-  expect(getByText('联通')).toBeTruthy()
-  expect(getByText('海外')).toBeTruthy()
-  // sampled rows: RTT + loss + relTime
-  expect(getByText('42.3 ms')).toBeTruthy()
-  expect(getByText('0%')).toBeTruthy()
-  expect(getByText(/上海 · 30s ago/)).toBeTruthy()
-  expect(getByText('187.5 ms')).toBeTruthy()
-  expect(getByText('2%')).toBeTruthy()
-  // target with no samples yet → em-dashes
-  expect(getAllByText('—').length).toBe(2)
-})
-
-test('netquality: empty sample set explains the wait', () => {
-  mockId = 'netquality'
-  mockHosts.mockReturnValue(ok([{ id: 5, plugin_id: 'netquality', server_id: 7, status: 'running', updated_at: '' }]))
-  mockLatest.mockReturnValue(ok([]))
   const { getByText } = render(<PluginStatusScreen />)
-  expect(getByText(/No samples yet/)).toBeTruthy()
+  expect(getByText('No status view for this plugin.')).toBeTruthy()
+  expect(mockHosts).not.toHaveBeenCalled()
 })
-
-// ── unknown plugin ────────────────────────────────────────────────────────────
 
 test('unknown plugin id renders the no-status empty state', () => {
   mockId = 'cloudflare'

@@ -35,3 +35,18 @@ test('reconnect closes the previous session', async () => {
   fireEvent.press(getByLabelText('Reconnect'))
   await waitFor(() => expect(firstClose).toHaveBeenCalled())
 })
+
+test('open failure shows an error status and tapping the pill retries', async () => {
+  ;(openConsole as jest.Mock).mockRejectedValueOnce(new Error('agent offline'))
+  const { getByText, getByTestId, findByText } = render(<ConsoleScreen />)
+  // open() threw → not stuck on 'connecting': explicit error + message in the strip
+  expect(await findByText('agent offline')).toBeTruthy()
+  expect(getByText(/error · tap to reconnect/)).toBeTruthy()
+  expect(mockCloses.length).toBe(0) // no session was created
+  const callsBefore = (openConsole as jest.Mock).mock.calls.length
+  // tap the status pill to retry; the default mock now resolves
+  fireEvent.press(getByTestId('status-pill'))
+  await waitFor(() => expect((openConsole as jest.Mock).mock.calls.length).toBe(callsBefore + 1))
+  await waitFor(() => expect(mockCloses.length).toBe(1)) // session created on retry
+  expect(getByText('connecting')).toBeTruthy()
+})

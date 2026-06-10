@@ -51,6 +51,9 @@ export default function ConsoleScreen() {
   const readyRef = useRef(false)
   const bufRef = useRef<Uint8Array[]>([])
   const [status, setStatus] = useState<ConsoleStatus>('connecting')
+  // Set when POST /console/open itself fails (e.g. agent offline) — without this
+  // the screen would sit on 'connecting' forever with no way to retry.
+  const [openError, setOpenError] = useState<string | null>(null)
   const [kbVisible, setKbVisible] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -79,11 +82,17 @@ export default function ConsoleScreen() {
     sessionRef.current?.close()
     sessionRef.current = null
     setStatus('connecting')
-    const { sid } = await openConsole(Number(id), 24, 80)
-    sessionRef.current = new ConsoleSession(baseURL ?? '', token, sid, 24, 80, {
-      onData: pushData,
-      onStatus: setStatus,
-    })
+    setOpenError(null)
+    try {
+      const { sid } = await openConsole(Number(id), 24, 80)
+      sessionRef.current = new ConsoleSession(baseURL ?? '', token, sid, 24, 80, {
+        onData: pushData,
+        onStatus: setStatus,
+      })
+    } catch (e) {
+      setOpenError(e instanceof Error ? e.message : 'failed to open console')
+      setStatus('error')
+    }
   }
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -115,6 +124,8 @@ export default function ConsoleScreen() {
   const insets = useSafeAreaInsets()
   const t = useTheme()
   const pill = STATUS_PILL[status] ?? STATUS_PILL.connecting
+  const canRetry = status === 'closed' || status === 'error'
+  const statusDetail = copied ? 'Copied ✓' : openError ?? '24×80 · UTF-8'
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
@@ -133,8 +144,20 @@ export default function ConsoleScreen() {
         paddingHorizontal: 14, paddingVertical: 9,
         backgroundColor: t.surface, borderBottomWidth: 1, borderBottomColor: t.border,
       }}>
-        <Pill kind={pill.kind}>{pill.label}</Pill>
-        <Text style={{ fontFamily: t.mono(), fontSize: 11, color: copied ? t.ok : t.fgDim }}>{copied ? 'Copied ✓' : '24×80 · UTF-8'}</Text>
+        <Pressable
+          testID="status-pill"
+          disabled={!canRetry}
+          onPress={() => { void start() }}
+          accessibilityLabel={canRetry ? 'Tap to reconnect' : pill.label}
+        >
+          <Pill kind={pill.kind}>{canRetry ? `${pill.label} · tap to reconnect` : pill.label}</Pill>
+        </Pressable>
+        <Text
+          numberOfLines={1}
+          style={{ flex: 1, fontFamily: t.mono(), fontSize: 11, color: copied ? t.ok : openError ? t.err : t.fgDim }}
+        >
+          {statusDetail}
+        </Text>
         <Pressable onPress={closeBack} style={{ marginLeft: 'auto' }}>
           <Text style={{ fontFamily: t.mono(), fontSize: 12, color: t.muted }}>Close</Text>
         </Pressable>

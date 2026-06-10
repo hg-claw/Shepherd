@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, RefreshControl, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, RefreshControl, ActivityIndicator, Alert } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { usePluginHosts, deployHost, undeployHost, startHost, stopHost, restartHost, refreshHost, type HostDeployment } from '@/api/plugins'
 import { useTheme } from '@/theme'
@@ -19,29 +19,70 @@ export default function PluginHosts() {
   const router = useRouter()
   const q = usePluginHosts(id)
   const [serverId, setServerId] = useState('')
-  const run = async (fn: () => Promise<unknown>) => { await fn(); await q.refetch() }
+  // Which mutation is in flight, e.g. "7:restart" (server_id:action). Guards
+  // double-taps: while set, that host's buttons are disabled.
+  const [busy, setBusy] = useState<string | null>(null)
+  // Last mutation error per server id, rendered inline in that host's card.
+  const [actionErrors, setActionErrors] = useState<Record<number, string>>({})
+
+  const run = async (server: number, action: string, fn: () => Promise<unknown>) => {
+    if (busy) return
+    setBusy(`${server}:${action}`)
+    setActionErrors((e) => ({ ...e, [server]: '' }))
+    try {
+      await fn()
+      await q.refetch()
+    } catch (e) {
+      setActionErrors((prev) => ({ ...prev, [server]: e instanceof Error ? e.message : `${action} failed` }))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const confirmUndeploy = (h: HostDeployment) => {
+    Alert.alert(
+      `Undeploy from server #${h.server_id}?`,
+      'This removes the plugin from the host.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Undeploy', style: 'destructive', onPress: () => { void run(h.server_id, 'undeploy', () => undeployHost(id, h.server_id)) } },
+      ],
+    )
+  }
+
   const rows = q.data ?? []
 
-  const renderRow = (h: HostDeployment) => (
-    <Card key={String(h.id)} style={{ padding: 14, gap: 10 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Text numberOfLines={1} style={{ flex: 1, fontFamily: t.mono(500), fontSize: t.fs.md, color: t.text }}>
-          server #{h.server_id}{h.deployed_version ? ` · ${h.deployed_version}` : ''}
-        </Text>
-        <Pill kind={pillFor(h.status)}>{h.status}</Pill>
-      </View>
-      {h.last_error ? (
-        <Text style={{ fontFamily: t.mono(), fontSize: 12, color: t.err }}>{h.last_error}</Text>
-      ) : null}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        <Button testID={`start-${h.server_id}`} variant="outline" onPress={() => run(() => startHost(id, h.server_id))}>Start</Button>
-        <Button testID={`stop-${h.server_id}`} variant="outline" onPress={() => run(() => stopHost(id, h.server_id))}>Stop</Button>
-        <Button testID={`restart-${h.server_id}`} variant="outline" onPress={() => run(() => restartHost(id, h.server_id))}>Restart</Button>
-        <Button testID={`refresh-${h.server_id}`} variant="outline" onPress={() => run(() => refreshHost(id, h.server_id))}>Refresh</Button>
-        <Button testID={`undeploy-${h.server_id}`} variant="danger" onPress={() => run(() => undeployHost(id, h.server_id))}>Undeploy</Button>
-      </View>
-    </Card>
-  )
+  const renderRow = (h: HostDeployment) => {
+    const hostBusy = busy != null && busy.startsWith(`${h.server_id}:`)
+    const actionError = actionErrors[h.server_id]
+    return (
+      <Card key={String(h.id)} style={{ padding: 14, gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text numberOfLines={1} style={{ flex: 1, fontFamily: t.mono(500), fontSize: t.fs.md, color: t.text }}>
+            server #{h.server_id}{h.deployed_version ? ` · ${h.deployed_version}` : ''}
+          </Text>
+          {hostBusy ? <ActivityIndicator size="small" color={t.primary} testID={`busy-${h.server_id}`} /> : null}
+          <Pill kind={pillFor(h.status)}>{h.status}</Pill>
+        </View>
+        {h.last_error ? (
+          <Text style={{ fontFamily: t.mono(), fontSize: 12, color: t.err }}>{h.last_error}</Text>
+        ) : null}
+        {actionError ? (
+          <Text testID={`action-error-${h.server_id}`} style={{ fontFamily: t.mono(), fontSize: 12, color: t.err }}>{actionError}</Text>
+        ) : null}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, opacity: hostBusy ? 0.55 : 1 }}>
+          <Button testID={`start-${h.server_id}`} variant="outline" disabled={hostBusy} onPress={() => run(h.server_id, 'start', () => startHost(id, h.server_id))}>Start</Button>
+          <Button testID={`stop-${h.server_id}`} variant="outline" disabled={hostBusy} onPress={() => run(h.server_id, 'stop', () => stopHost(id, h.server_id))}>Stop</Button>
+          <Button testID={`restart-${h.server_id}`} variant="outline" disabled={hostBusy} onPress={() => run(h.server_id, 'restart', () => restartHost(id, h.server_id))}>Restart</Button>
+          <Button testID={`refresh-${h.server_id}`} variant="outline" disabled={hostBusy} onPress={() => run(h.server_id, 'refresh', () => refreshHost(id, h.server_id))}>Refresh</Button>
+          <Button testID={`undeploy-${h.server_id}`} variant="danger" disabled={hostBusy} onPress={() => confirmUndeploy(h)}>Undeploy</Button>
+        </View>
+      </Card>
+    )
+  }
+
+  const deployTarget = Number(serverId)
+  const deployError = actionErrors[deployTarget]
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
@@ -65,11 +106,15 @@ export default function PluginHosts() {
             <Button
               variant="primary"
               icon="plus"
-              onPress={() => { if (serverId.trim()) run(() => deployHost(id, { server_id: Number(serverId) })) }}
+              disabled={busy != null}
+              onPress={() => { if (serverId.trim()) void run(deployTarget, 'deploy', () => deployHost(id, { server_id: deployTarget })) }}
             >
               Deploy
             </Button>
           </View>
+          {deployError && !rows.some((r) => r.server_id === deployTarget) ? (
+            <Text style={{ fontFamily: t.mono(), fontSize: 12, color: t.err, marginTop: 6 }}>{deployError}</Text>
+          ) : null}
         </Field>
 
         {q.isLoading ? (

@@ -64,7 +64,7 @@ export default function ScriptsList() {
                 <ScriptRow
                   key={s.id}
                   script={s}
-                  onPress={() => router.push(`/(app)/scripts/${s.id}?serverId=${serverId}`)}
+                  onPress={() => router.push(serverId ? `/(app)/scripts/${s.id}?serverId=${serverId}` : `/(app)/scripts/${s.id}`)}
                 />
               ))}
             </List>

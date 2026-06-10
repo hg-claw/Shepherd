@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ScrollView, View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useServers, useServersLatest, type ServerRow } from '@/api/servers'
@@ -7,13 +7,22 @@ import { bps, cmpStr } from '@/lib/format'
 import { useWallLiveStore } from '@/api/wallLive'
 import { LiveNet } from '@/components/LiveNet'
 import {
-  Header, Kpi, Card, MetricBar, Pill, OnlineDot, Cc, Icon, IconButton, Empty, statusOf,
+  Header, Kpi, Card, MetricBar, Pill, OnlineDot, Cc, Icon, IconButton, Empty, Input, Segmented, statusOf,
 } from '@/components/ds'
 import { useTheme, useThemeMode } from '@/theme'
 
 const aliasOf = (r: ServerRow) => nullStr(r.public_alias) || r.name
 const alertingScore = (l: ServerRow['latest']) =>
   Math.max(l?.cpu_pct ?? 0, memPct(l) ?? 0, firstDiskPct(l?.disks_json) ?? 0)
+
+type StatusFilter = 'all' | 'online' | 'warn' | 'offline'
+// "warn" mirrors the Alerting KPI / statusOf warn threshold (any gauge ≥ 80).
+const isWarnRow = (r: ServerRow) => isOnline(r) && alertingScore(r.latest) >= 80
+const matchesStatus = (r: ServerRow, f: StatusFilter): boolean =>
+  f === 'all' ? true
+  : f === 'online' ? isOnline(r)
+  : f === 'offline' ? !isOnline(r)
+  : isWarnRow(r)
 
 // Subscribes to the live store so only this strip re-renders on a frame.
 function TrafficCard({ onlineRows }: { onlineRows: ServerRow[] }) {
@@ -112,22 +121,48 @@ export default function Home() {
     setRefreshing(true)
     try { await Promise.all([list.refetch(), latest.refetch()]) } finally { setRefreshing(false) }
   }
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   // Merge: prefer the metric-enriched row once it arrives, else the plain row.
-  const byId = new Map((latest.data ?? []).map((s) => [s.id, s]))
-  const rows = (list.data ?? []).map((s) => byId.get(s.id) ?? s)
+  const rows = useMemo(() => {
+    const byId = new Map((latest.data ?? []).map((s) => [s.id, s]))
+    return (list.data ?? []).map((s) => byId.get(s.id) ?? s)
+  }, [list.data, latest.data])
   const total = rows.length
   const onlineRows = rows.filter(isOnline)
   const alerting = onlineRows.filter((r) => alertingScore(r.latest) >= 80).length
   const offline = total - onlineRows.length
 
-  const groups = new Map<string, ServerRow[]>()
-  for (const r of rows) {
-    const k = nullStr(r.public_group)
-    const a = groups.get(k) ?? []
-    a.push(r)
-    groups.set(k, a)
-  }
-  const ordered = [...groups.entries()].sort(([a], [b]) => cmpStr(a, b))
+  // Search first (name / alias / ssh host, case-insensitive includes), then the
+  // status chip — chip counts are live against the searched set.
+  const searched = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter((r) =>
+      [r.name, nullStr(r.public_alias), nullStr(r.ssh_host)]
+        .some((s) => s.toLowerCase().includes(q)))
+  }, [rows, query])
+  const counts = useMemo(() => ({
+    all: searched.length,
+    online: searched.filter(isOnline).length,
+    warn: searched.filter(isWarnRow).length,
+    offline: searched.filter((r) => !isOnline(r)).length,
+  }), [searched])
+  const filtered = useMemo(
+    () => (statusFilter === 'all' ? searched : searched.filter((r) => matchesStatus(r, statusFilter))),
+    [searched, statusFilter],
+  )
+
+  const ordered = useMemo(() => {
+    const groups = new Map<string, ServerRow[]>()
+    for (const r of filtered) {
+      const k = nullStr(r.public_group)
+      const a = groups.get(k) ?? []
+      a.push(r)
+      groups.set(k, a)
+    }
+    return [...groups.entries()].sort(([a], [b]) => cmpStr(a, b))
+  }, [filtered])
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
@@ -135,10 +170,7 @@ export default function Home() {
         title="Servers"
         sub="Fleet at a glance"
         actions={
-          <>
-            <IconButton name={t.mode === 'dark' ? 'sun' : 'moon'} size={19} onPress={() => { void toggleTheme() }} />
-            <IconButton name="plus" size={20} />
-          </>
+          <IconButton name={t.mode === 'dark' ? 'sun' : 'moon'} size={19} onPress={() => { void toggleTheme() }} />
         }
       />
       {list.isLoading ? (
@@ -162,7 +194,44 @@ export default function Home() {
 
           <TrafficCard onlineRows={onlineRows} />
 
-          {ordered.length === 0 ? <Empty>No servers.</Empty> : null}
+          <View style={{ gap: 10 }}>
+            <View style={{ justifyContent: 'center' }}>
+              <Input
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Search name, alias, or host"
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="search"
+                accessibilityLabel="Search servers"
+                style={{ height: 38, fontSize: t.fs.sm, paddingRight: 38 }}
+              />
+              {query !== '' ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear search"
+                  onPress={() => setQuery('')}
+                  style={{ position: 'absolute', right: 0, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Icon name="x" size={15} color={t.muted} />
+                </Pressable>
+              ) : null}
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ paddingHorizontal: 16 }}>
+              <Segmented<StatusFilter>
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={[
+                  { value: 'all', label: `All ${counts.all}` },
+                  { value: 'online', label: `Online ${counts.online}` },
+                  { value: 'warn', label: `Warn ${counts.warn}` },
+                  { value: 'offline', label: `Offline ${counts.offline}` },
+                ]}
+              />
+            </ScrollView>
+          </View>
+
+          {ordered.length === 0 ? <Empty>{total === 0 ? 'No servers.' : 'No matches.'}</Empty> : null}
 
           {ordered.map(([group, ss]) => {
             const gOnline = ss.filter(isOnline).length

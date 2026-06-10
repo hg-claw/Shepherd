@@ -3,7 +3,11 @@ import { Alert } from 'react-native'
 import { render, fireEvent, waitFor } from '@testing-library/react-native'
 import Settings from '../settings'
 
-jest.mock('expo-router', () => ({ Stack: Object.assign(() => null, { Screen: () => null }) }))
+const mockPush = jest.fn()
+jest.mock('expo-router', () => ({
+  Stack: Object.assign(() => null, { Screen: () => null }),
+  useRouter: () => ({ push: mockPush, back: jest.fn() }),
+}))
 
 const mockSetEnabled = jest.fn().mockResolvedValue(undefined)
 const mockLock = jest.fn()
@@ -30,7 +34,7 @@ jest.mock('@/theme', () => {
 jest.mock('@/lib/biometrics', () => ({ hasHardware: jest.fn(async () => true), isEnrolled: jest.fn(async () => true) }))
 
 beforeEach(() => {
-  mockSetEnabled.mockClear(); mockLock.mockClear(); mockToggle.mockClear(); mockLogout.mockClear()
+  mockSetEnabled.mockClear(); mockLock.mockClear(); mockToggle.mockClear(); mockLogout.mockClear(); mockPush.mockClear()
   jest.restoreAllMocks()
 })
 
@@ -45,6 +49,12 @@ test('toggling dark mode calls the theme store toggle', () => {
   const { getByTestId } = render(<Settings />)
   fireEvent.press(getByTestId('darkmode-toggle'))
   expect(mockToggle).toHaveBeenCalled()
+})
+
+test('audit log row navigates to the audit screen', () => {
+  const { getByText } = render(<Settings />)
+  fireEvent.press(getByText('Audit log'))
+  expect(mockPush).toHaveBeenCalledWith('/(app)/audit')
 })
 
 test('sign out asks for confirmation and only logs out on confirm', () => {

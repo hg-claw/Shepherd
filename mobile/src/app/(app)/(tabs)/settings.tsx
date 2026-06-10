@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ScrollView, View, Text, Alert } from 'react-native'
-import { Stack } from 'expo-router'
+import { Stack, useRouter, type Href } from 'expo-router'
 import { useLock } from '@/store/lock'
 import { useAuth } from '@/store/auth'
 import { hasHardware, isEnrolled } from '@/lib/biometrics'
@@ -41,6 +41,7 @@ function SwitchRow({ icon, title, sub, on, disabled, onChange, testID }: {
 
 export default function Settings() {
   const t = useTheme()
+  const router = useRouter()
   const { enabled, setEnabled } = useLock()
   const logout = useAuth((s) => s.logout)
   const admin = useAuth((s) => s.admin)
@@ -95,6 +96,20 @@ export default function Settings() {
               title="Lock now"
               chevron={false}
               onPress={() => { if (enabled) useLock.getState().lock() }}
+            />
+          </List>
+        </View>
+
+        <View style={{ gap: 8 }}>
+          <SectionLabel>Admin</SectionLabel>
+          <List>
+            <ListRow
+              icon="shield"
+              title="Audit log"
+              sub="Recent admin actions"
+              // Href cast: generated route types (.expo/types) only refresh on the
+              // next `expo start`, so a brand-new route isn't in the union yet.
+              onPress={() => router.push('/(app)/audit' as Href)}
             />
           </List>
         </View>

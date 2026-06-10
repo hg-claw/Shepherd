@@ -50,3 +50,42 @@ export function useServersLatest(): UseQueryResult<ServerRow[]> {
 export function useServer(id: number): ServerRow | undefined {
   return useServersLatest().data?.find((s) => s.id === id)
 }
+
+// --- Traffic cycle (read-only on mobile; reset-day editing stays on web) ---
+
+export type HostTraffic = {
+  server_id: number
+  cum_bytes_up: number
+  cum_bytes_down: number
+  prev_bytes_up: number
+  prev_bytes_down: number
+  reset_day: number
+  last_reset_at: string | null
+}
+
+export function useHostTraffic(id: number): UseQueryResult<HostTraffic> {
+  return useQuery({
+    queryKey: ['host-traffic', id],
+    queryFn: () => authedFetch<HostTraffic>(`/api/servers/${id}/traffic`),
+    enabled: !!id,
+    refetchInterval: 10000,
+  })
+}
+
+// --- Per-host actions (plain authed mutations, same shape as api/plugins.ts) ---
+
+// updateAgent asks the host's agent to self-update. 202 = accepted (fire-and-
+// forget); 409 = agent offline. `cn` routes the download via the CN mirror.
+export function updateAgent(id: number, cn?: boolean): Promise<unknown> {
+  return authedFetch<unknown>(`/api/servers/${id}/update-agent${cn ? '?cn=1' : ''}`, { method: 'POST' })
+}
+
+// repairServer issues a short-lived enrollment token the user runs on the host
+// to re-enroll a broken agent.
+export function repairServer(id: number): Promise<{ enrollment_token: string; expires_at: string }> {
+  return authedFetch<{ enrollment_token: string; expires_at: string }>(`/api/servers/${id}/repair`, { method: 'POST' })
+}
+
+export function deleteServer(id: number): Promise<unknown> {
+  return authedFetch<unknown>(`/api/servers/${id}`, { method: 'DELETE' })
+}

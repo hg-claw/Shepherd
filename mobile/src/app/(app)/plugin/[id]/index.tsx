@@ -78,6 +78,13 @@ export default function PluginDetail() {
               onPress={() => router.push(`/(app)/plugin/${p.id}/hosts`)}
             />
           ) : null}
+          {p.meta.host_aware ? (
+            <ListRow
+              icon="scroll-text"
+              title="Logs"
+              onPress={() => router.push(`/(app)/plugin/${p.id}/logs`)}
+            />
+          ) : null}
         </List>
 
         <Text style={{ textAlign: 'center', fontFamily: t.mono(), fontSize: 11, color: t.fgDim }}>plugin id · {p.id}</Text>

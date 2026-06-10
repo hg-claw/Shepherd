@@ -1,5 +1,6 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { authedFetch } from './authed'
+import { wsURL } from '@/lib/wsurl'
 
 export type PluginMeta = { name: string; description: string; icon: string; category: string; host_aware: boolean }
 export type Plugin = { id: string; meta: PluginMeta; enabled: boolean; enabled_at?: string | null; host_count?: number | null }
@@ -51,4 +52,12 @@ export function restartHost(id: string, serverId: number): Promise<{ status: str
 }
 export function refreshHost(id: string, serverId: number): Promise<HostDeployment> {
   return authedFetch<HostDeployment>(`/api/admin/plugins/${id}/hosts/${serverId}/refresh-status`)
+}
+
+// pluginLogsWSURL builds the admin live-log WS endpoint for one plugin host.
+// The bearer token is deliberately NOT in the URL — RN passes it via the
+// WebSocket headers option (same as the console session), so it never leaks
+// into server logs or proxies.
+export function pluginLogsWSURL(baseURL: string, pluginId: string, serverId: number): string {
+  return wsURL(baseURL, `/api/admin/plugins/${encodeURIComponent(pluginId)}/hosts/${serverId}/logs`)
 }

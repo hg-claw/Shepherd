@@ -9,6 +9,17 @@ export function pct(n: number | null | undefined): string {
   return n == null ? '—' : `${Math.round(n)}%`
 }
 
+// Hermes builds without Intl, so no toLocaleString — humanize cumulative byte
+// counts manually (same scale rules as web/src/lib/bytes.ts).
+const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+export function bytes(n: number | null | undefined): string {
+  if (n == null || !isFinite(n) || n < 0) return '—'
+  let v = n
+  let i = 0
+  while (v >= 1024 && i < BYTE_UNITS.length - 1) { v /= 1024; i++ }
+  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${BYTE_UNITS[i]}`
+}
+
 // cmpStr is an engine-independent string comparator for Array.sort. Hermes builds
 // without Intl don't expose String.prototype.localeCompare (it crashes with
 // "undefined is not a function"), so we compare by code unit instead.

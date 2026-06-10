@@ -96,7 +96,7 @@ function HostCard({ row, onPress }: { row: ServerRow; onPress: () => void }) {
                 <Text style={{ fontFamily: t.mono(), fontSize: 11, color: t.muted }}>↑ {bps(tx)}</Text>
                 {l?.tcp_conn != null ? (
                   <Text style={{ marginLeft: 'auto', fontFamily: t.mono(), fontSize: 11, color: t.fgDim }}>
-                    {l.tcp_conn.toLocaleString()} conns
+                    {String(l.tcp_conn)} conns
                   </Text>
                 ) : null}
               </View>
@@ -170,7 +170,10 @@ export default function Home() {
         title="Servers"
         sub="Fleet at a glance"
         actions={
-          <IconButton name={t.mode === 'dark' ? 'sun' : 'moon'} size={19} onPress={() => { void toggleTheme() }} />
+          <>
+            <IconButton name={t.mode === 'dark' ? 'sun' : 'moon'} size={19} onPress={() => { void toggleTheme() }} />
+            <IconButton name="plus" size={20} accessibilityLabel="Add server" onPress={() => router.push('/(app)/server-new')} />
+          </>
         }
       />
       {list.isLoading ? (

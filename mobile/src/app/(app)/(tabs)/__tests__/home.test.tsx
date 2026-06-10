@@ -34,6 +34,12 @@ test('renders grouped cards, summary counts, and navigates on tap', () => {
   expect(mockPush).toHaveBeenCalledWith('/(app)/server/1')
 })
 
+test("the header '+' opens the add-server flow", () => {
+  const { getByLabelText } = render(<Home />)
+  fireEvent.press(getByLabelText('Add server'))
+  expect(mockPush).toHaveBeenCalledWith('/(app)/server-new')
+})
+
 test('search narrows by name, NullString alias, and ssh_host (case-insensitive)', () => {
   const { getByPlaceholderText, getByText, queryByText } = render(<Home />)
   const input = getByPlaceholderText('Search name, alias, or host')

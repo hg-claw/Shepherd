@@ -25,6 +25,7 @@ const failed: Q = { data: undefined, isLoading: false, isError: true, isRefetchi
 const mockSubs = jest.fn<Q, []>()
 const mockTpls = jest.fn<Q, []>()
 const mockSubInbounds = jest.fn<Q, [number | null]>()
+const mockProxy = jest.fn<Q, [string, boolean]>()
 const mockUpdate = jest.fn().mockResolvedValue({})
 const mockDelete = jest.fn().mockResolvedValue({})
 const mockRotate = jest.fn().mockResolvedValue({ token: 'new' })
@@ -34,16 +35,11 @@ jest.mock('@/api/subgen', () => ({
   useSubscriptions: () => mockSubs(),
   useTemplates: () => mockTpls(),
   useSubscriptionInbounds: (id: number | null) => mockSubInbounds(id),
+  useAllProxyInbounds: (plugin: string, enabled: boolean) => mockProxy(plugin, enabled),
   updateSubscription: (...a: unknown[]) => mockUpdate(...a),
   deleteSubscription: (...a: unknown[]) => mockDelete(...a),
   rotateToken: (...a: unknown[]) => mockRotate(...a),
   deleteTemplate: (...a: unknown[]) => mockDelTpl(...a),
-}))
-
-const mockProxy = jest.fn<Q, [string, number | null]>()
-jest.mock('@/api/plugins', () => ({
-  ...jest.requireActual('@/api/plugins'),
-  useProxyInbounds: (plugin: string, sid: number | null) => mockProxy(plugin, sid),
 }))
 
 const SUBS = [
@@ -112,14 +108,27 @@ test('expanding a row builds the public /sub URL on the ROOT origin and re-targe
 })
 
 test('expanded row resolves bundled nodes read-only via the inbound lists', () => {
-  const { getByTestId, getByText } = renderScreen()
+  const { getByTestId, getByText, queryByText } = renderScreen()
   fireEvent.press(getByTestId('sub-1'))
-  // xray #5 + singbox #8 resolve to tag · server
+  // xray #5 + singbox #8 resolve to tag · server — NOT the `#id` placeholder
   expect(getByText('· hy2-8 · beta')).toBeTruthy()
   expect(getByText('· vless-5 · alpha')).toBeTruthy()
-  // proxy inbound lists requested across all servers (sid -1)
-  expect(mockProxy).toHaveBeenCalledWith('xray', -1)
-  expect(mockProxy).toHaveBeenCalledWith('singbox', -1)
+  expect(queryByText('· singbox #8')).toBeNull()
+  expect(queryByText('· xray #5')).toBeNull()
+  // FULL (unfiltered) proxy inbound lists requested once the row is open — a
+  // server_id filter (e.g. -1) returns empty and breaks node resolution.
+  expect(mockProxy).toHaveBeenCalledWith('xray', true)
+  expect(mockProxy).toHaveBeenCalledWith('singbox', true)
+})
+
+test('an unresolvable Selection keeps the graceful `source #id` fallback', () => {
+  // singbox #8 has NO matching inbound (only xray #5 is present) → it must fall
+  // back to the `singbox #8` placeholder while the resolvable xray node renders.
+  mockProxy.mockImplementation((plugin) => ok(plugin === 'xray' ? INBOUNDS_X : []))
+  const { getByTestId, getByText } = renderScreen()
+  fireEvent.press(getByTestId('sub-1'))
+  expect(getByText('· vless-5 · alpha')).toBeTruthy()
+  expect(getByText('· singbox #8')).toBeTruthy()
 })
 
 test('copy uses the guarded expo-clipboard and shows confirmation', async () => {

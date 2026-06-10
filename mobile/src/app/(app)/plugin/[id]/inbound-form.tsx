@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { View, Text, ScrollView, Pressable, KeyboardAvoidingView, Platform } from 'react-native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
@@ -6,13 +6,14 @@ import {
   useInbounds, createInbound, patchInbound, invalidateInbounds,
   generateX25519, generateShortID, randomUUID, randomPort, randomPassword, randomSSKey,
   needsUUID, needsPassword, needsSS, needsReality, needsCertAndSNI, needsTransport,
-  singboxCreatableOnMobile,
+  certDaysLeft, certUrgency, certExpiryLabel,
   SINGBOX_PROTOCOLS, SINGBOX_SS_METHODS, XRAY_PROTOCOLS, XRAY_SS_METHODS,
   type ProxyPluginID, type ProxyInboundFull,
 } from '@/api/inbounds'
+import { useSingboxCerts, type SingboxCertificate } from '@/api/plugins'
 import { useTheme } from '@/theme'
 import { Screen } from '@/components/Screen'
-import { NavBar, Card, Field, Input, Hint, ErrLine, Button, Empty } from '@/components/ds'
+import { NavBar, Card, Field, Input, Hint, ErrLine, Button, Empty, Pill } from '@/components/ds'
 
 function isInboundsPlugin(id?: string): id is ProxyPluginID {
   return id === 'singbox' || id === 'xray'
@@ -67,6 +68,74 @@ function OptionList<T extends string>({
   )
 }
 
+// ── inline certificate picker (selectable rows; the ds kit has no Modal) ───────
+// Mirrors the web InboundDialog cert <select>: only ACTIVE certs are selectable,
+// plus a "manual" row that clears cert_id (sing-box then expects an externally
+// managed cert / self-signed path — same as leaving the web select empty).
+// certID === null means "none / manual". Each cert row shows its domain and an
+// expiry Pill carrying the urgency tone (— while still issuing).
+
+type CertRowSpec = { id: number | null; label: string; right: ReactNode; testID: string }
+
+function CertPicker({
+  certs, certID, onChange,
+}: {
+  certs: SingboxCertificate[]
+  certID: number | null
+  onChange: (id: number | null) => void
+}) {
+  const t = useTheme()
+
+  // Flatten to plain row specs so the rows are mapped inline (no component
+  // declared during render — matches OptionList's pattern, satisfies the
+  // react-hooks/static-components rule).
+  const rows: CertRowSpec[] = [
+    { id: null, label: '— None (manual TLS) —', right: null, testID: 'cert-none' },
+    ...certs.map((c): CertRowSpec => {
+      const days = certDaysLeft(c.expires_at)
+      return {
+        id: c.id,
+        label: c.domain,
+        right: <Pill kind={certUrgency(days)}>{certExpiryLabel(days)}</Pill>,
+        testID: `cert-${c.id}`,
+      }
+    }),
+  ]
+
+  return (
+    <View
+      testID="cert-picker"
+      style={{ borderWidth: 1, borderColor: t.border, borderRadius: t.radius, overflow: 'hidden' }}
+    >
+      {rows.map((r, idx) => {
+        const active = r.id === certID
+        return (
+          <Pressable
+            key={r.testID}
+            testID={r.testID}
+            onPress={() => onChange(r.id)}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 8,
+              paddingVertical: 11, paddingHorizontal: 12,
+              backgroundColor: active ? t.sunken : 'transparent',
+              borderTopWidth: idx > 0 ? 1 : 0, borderTopColor: t.border,
+            }}
+          >
+            <Text
+              numberOfLines={1}
+              style={{ flex: 1, fontFamily: t.mono(active ? 500 : 400), fontSize: 13, color: active ? t.text : t.muted }}
+            >
+              {r.label}
+            </Text>
+            {r.right}
+            {active ? <Text style={{ fontFamily: t.mono(), fontSize: 13, color: t.primary }}>✓</Text> : null}
+          </Pressable>
+        )
+      })}
+    </View>
+  )
+}
+
 // ─── sing-box form ─────────────────────────────────────────────────────────────
 
 function SingboxForm({ mode, serverIdParam, editing }: {
@@ -87,6 +156,8 @@ function SingboxForm({ mode, serverIdParam, editing }: {
   const [uuid, setUUID] = useState<string>(editing?.uuid ?? randomUUID())
   const [password, setPassword] = useState<string>(editing?.password ?? '')
   const [sni, setSNI] = useState<string>(editing?.sni ?? '')
+  // cert_id is *int64 (present-but-null) on the wire — seed from editing, guard != null.
+  const [certID, setCertID] = useState<number | null>(editing?.cert_id != null ? editing.cert_id : null)
   const [transportPath, setTransportPath] = useState<string>(editing?.transport_path ?? '/proxy')
   const [transportHost, setTransportHost] = useState<string>(editing?.transport_host ?? '')
   const [privKey, setPrivKey] = useState<string>('') // never seeded — redacted
@@ -109,9 +180,13 @@ function SingboxForm({ mode, serverIdParam, editing }: {
     ss: needsSS(protocol),
   }), [protocol])
 
-  // On create, cert-requiring TLS protocols are deferred to web (no cert picker
-  // on phone for v1). Edit of such a row is still allowed.
-  const createBlocked = !isEdit && !singboxCreatableOnMobile(protocol)
+  // Managed certs for the inline picker — only fetched when a cert-backed TLS
+  // protocol is selected (mirrors the web, which lists status==='active' certs).
+  const certsQ = useSingboxCerts(groups.certAndSNI)
+  const validCerts = useMemo(
+    () => (certsQ.data ?? []).filter((c) => c.status === 'active'),
+    [certsQ.data],
+  )
 
   const genKeypair = async () => {
     try {
@@ -133,7 +208,13 @@ function SingboxForm({ mode, serverIdParam, editing }: {
     const body: Record<string, unknown> = { port: portN, alias }
     if (groups.uuid) body.uuid = uuid
     if (groups.password) body.password = password
-    if (groups.certAndSNI) body.sni = sni
+    if (groups.certAndSNI) {
+      body.sni = sni
+      // cert_id is *int64 on the wire: send the chosen id, or explicit null to
+      // clear it (manual / self-signed TLS) — the web leaves the select empty for
+      // the same effect. Always present so an edit can drop a previously set cert.
+      body.cert_id = certID
+    }
     if (groups.transport) { body.transport_path = transportPath; body.transport_host = transportHost }
     if (groups.reality) {
       body.sni = sni
@@ -183,7 +264,9 @@ function SingboxForm({ mode, serverIdParam, editing }: {
             testID="protocol"
             value={protocol}
             options={SINGBOX_PROTOCOLS}
-            onChange={(p) => { setProtocol(p); setError(null) }}
+            // Reset the cert selection when the protocol changes (the previously
+            // picked cert may not apply) — done in the event handler, never an effect.
+            onChange={(p) => { setProtocol(p); setCertID(null); setError(null) }}
           />
         )}
       </Field>
@@ -234,10 +317,22 @@ function SingboxForm({ mode, serverIdParam, editing }: {
       ) : null}
 
       {groups.certAndSNI ? (
-        <Field label="SNI">
-          <Input testID="sni" mono value={sni} onChangeText={setSNI} autoCapitalize="none" autoCorrect={false} placeholder="cert domain" />
-          {!isEdit ? <Hint>Creating cert-backed TLS inbounds is web-only for now; this stays editable.</Hint> : null}
-        </Field>
+        <>
+          <Field label="SNI / Domain">
+            <Input testID="sni" mono value={sni} onChangeText={setSNI} autoCapitalize="none" autoCorrect={false} placeholder="proxy.example.com" />
+          </Field>
+          <Field label="Certificate">
+            {certsQ.isLoading ? (
+              <Hint>Loading certificates…</Hint>
+            ) : certsQ.isError ? (
+              <ErrLine>Failed to load certificates.</ErrLine>
+            ) : validCerts.length === 0 ? (
+              <Hint>No active certificates — issue one on the web console, or leave SNI for manual/self-signed TLS.</Hint>
+            ) : (
+              <CertPicker certs={validCerts} certID={certID} onChange={setCertID} />
+            )}
+          </Field>
+        </>
       ) : null}
 
       {groups.transport ? (
@@ -264,10 +359,9 @@ function SingboxForm({ mode, serverIdParam, editing }: {
         </>
       ) : null}
 
-      {createBlocked ? <ErrLine>Create this protocol on the web console (needs a TLS cert).</ErrLine> : null}
       {error ? <ErrLine>{error}</ErrLine> : null}
 
-      <Button testID="save" variant="primary" icon="play" block disabled={busy || createBlocked} onPress={() => { void save() }}>
+      <Button testID="save" variant="primary" icon="play" block disabled={busy} onPress={() => { void save() }}>
         {busy ? 'Saving…' : isEdit ? 'Save changes' : 'Create inbound'}
       </Button>
     </ScrollView>

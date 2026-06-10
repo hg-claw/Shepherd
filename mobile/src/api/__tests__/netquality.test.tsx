@@ -5,6 +5,7 @@ import {
   listNetqualityTargets, createNetqualityTarget, patchNetqualityTarget, deleteNetqualityTarget,
   listNetqualityHostConfigs, putNetqualityHost,
   listNetqualityHostTargets, updateNetqualityHostTargets,
+  fetchNetqualitySamples, rangeParams, useNetqualitySamples,
   useNetqualityTargets, useNetqualityHostConfigs, useNetqualityHostTargets,
 } from '../netquality'
 jest.mock('../authed', () => ({ authedFetch: jest.fn() }))
@@ -140,4 +141,56 @@ test('useNetqualityHostTargets is disabled without a server and resolves with on
   await waitFor(() => expect(result.current.isSuccess).toBe(true))
   expect(authedFetch).toHaveBeenCalledWith('/api/admin/plugins/netquality/hosts/7/targets')
   expect(result.current.data).toHaveLength(2)
+})
+
+// ── sample history ─────────────────────────────────────────────────────────────
+
+// querySamples wire shape: {resolution, points:[…]}. rtt_avg_ms may be null on
+// a fully-lost bucket (raw values, NOT sql.Null wrappers).
+const WIRE_SAMPLES = {
+  resolution: 'raw',
+  points: [
+    { ts: '2026-06-09T01:00:00Z', rtt_avg_ms: 41.2, loss_pct: 0, status: 'ok' },
+    { ts: '2026-06-09T01:05:00Z', rtt_avg_ms: null, loss_pct: 100, status: 'lost' },
+  ],
+}
+
+test('rangeParams maps 1h→raw and 24h→minute (matches the server auto-resolution)', () => {
+  expect(rangeParams('1h')).toEqual({ resolution: 'raw', ms: 60 * 60 * 1000 })
+  expect(rangeParams('24h')).toEqual({ resolution: 'minute', ms: 24 * 60 * 60 * 1000 })
+})
+
+test('fetchNetqualitySamples GETs /samples with server_id, target_id, range + resolution', async () => {
+  ;(authedFetch as jest.Mock).mockResolvedValue(WIRE_SAMPLES)
+  const res = await fetchNetqualitySamples({
+    server_id: 7, target_id: 1,
+    from: '2026-06-09T00:00:00.000Z', to: '2026-06-09T01:00:00.000Z',
+    resolution: 'raw',
+  })
+  expect(authedFetch).toHaveBeenCalledWith(
+    '/api/admin/plugins/netquality/samples?server_id=7&target_id=1&from=2026-06-09T00%3A00%3A00.000Z&to=2026-06-09T01%3A00%3A00.000Z&resolution=raw',
+  )
+  expect(res.resolution).toBe('raw')
+  expect(res.points[1].rtt_avg_ms).toBeNull() // null survives (no nullStr coercion)
+})
+
+test('useNetqualitySamples is disabled until both ids are present, then queries /samples', async () => {
+  ;(authedFetch as jest.Mock).mockResolvedValue(WIRE_SAMPLES)
+  const windowEnd = Date.UTC(2026, 5, 9, 1, 0, 0)
+  renderHook(
+    () => useNetqualitySamples({ serverID: null, targetID: 1, range: '1h', windowEnd }),
+    { wrapper },
+  )
+  expect(authedFetch).not.toHaveBeenCalled()
+  const { result } = renderHook(
+    () => useNetqualitySamples({ serverID: 7, targetID: 1, range: '1h', windowEnd }),
+    { wrapper },
+  )
+  await waitFor(() => expect(result.current.isSuccess).toBe(true))
+  const url = (authedFetch as jest.Mock).mock.calls.at(-1)![0] as string
+  expect(url).toContain('/api/admin/plugins/netquality/samples?')
+  expect(url).toContain('server_id=7')
+  expect(url).toContain('target_id=1')
+  expect(url).toContain('resolution=raw')
+  expect(result.current.data?.points).toHaveLength(2)
 })

@@ -3,12 +3,12 @@ import { View, Text, ScrollView, ActivityIndicator, RefreshControl, Pressable, A
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  useSubscriptions, useTemplates, useSubscriptionInbounds,
+  useSubscriptions, useTemplates, useSubscriptionInbounds, useAllProxyInbounds,
   updateSubscription, deleteSubscription, rotateToken, deleteTemplate,
   buildSubURL, SUB_TARGETS,
   type Subscription, type Template, type SubTarget, type Selection,
 } from '@/api/subgen'
-import { useProxyInbounds, type ProxyInbound } from '@/api/plugins'
+import { type ProxyInbound } from '@/api/plugins'
 import { useAuth } from '@/store/auth'
 import { cmpStr } from '@/lib/format'
 import { useTheme } from '@/theme'
@@ -83,8 +83,12 @@ function SubRow({
   // Read-only bundled nodes; only fetched once the row is expanded. The grouped
   // multi-select editor + PUT replace are deferred to web.
   const inboundsQ = useSubscriptionInbounds(open ? sub.id : null)
-  const xrayQ = useProxyInbounds('xray', open ? -1 : null) // -1 = all servers
-  const singboxQ = useProxyInbounds('singbox', open ? -1 : null)
+  // Resolve node tags from the FULL (unfiltered) inbound list of each proxy
+  // plugin — passing a server_id (e.g. -1) to the singbox/xray /inbounds handler
+  // filters by exact match and returns EMPTY for a non-existent server, which is
+  // what made every Selection fall back to `${source} #${id}`.
+  const xrayQ = useAllProxyInbounds('xray', open)
+  const singboxQ = useAllProxyInbounds('singbox', open)
 
   const url = buildSubURL(baseURL, sub.token, target)
 

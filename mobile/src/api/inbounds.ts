@@ -349,12 +349,39 @@ export function needsTransport(p: string): boolean {
   return p.includes('-ws-') || p.includes('-h2-') || p.includes('-httpupgrade-') || p === 'vmess-http'
 }
 
-// Protocols whose CREATE is supported on the phone: those NOT requiring an ACME
-// cert (cert-requiring TLS protocols are create-deferred to web for v1 per spec,
-// but stay editable + deletable). REALITY + shadowsocks + vmess-tcp/http create
-// fine without a cert.
-export function singboxCreatableOnMobile(p: string): boolean {
-  return !needsCertAndSNI(p)
+// ─── cert expiry helpers (shared by the form's inline cert picker) ──────────────
+// Ported from the status screen so the inbound form can render a cert's domain +
+// expiry urgency inline without importing a sibling screen's component module.
+// The wire `expires_at` is a plain RFC3339 string and, while a cert is still
+// issuing, the Go ZERO time ("0001-01-01T00:00:00Z") — that must render as "—",
+// never as a real (year-1) date. Hermes-safe: no Intl / toLocaleString.
+
+export type CertUrgency = 'ok' | 'warn' | 'err' | 'neutral'
+
+// certDaysLeft → whole days until expiry (floor), or null when the cert has no
+// real expiry yet (zero time → epoch <= 0) or the string is unparseable.
+export function certDaysLeft(expiresAt: string | null | undefined, now: number = Date.now()): number | null {
+  if (!expiresAt) return null
+  const ms = new Date(expiresAt).getTime()
+  if (!isFinite(ms) || ms <= 0) return null
+  return Math.floor((ms - now) / 86_400_000)
+}
+
+// certUrgency: expiry tone — <14d (or expired) err, <30d warn, else ok; unknown
+// expiry → neutral. Matches the status screen's certTone thresholds.
+export function certUrgency(days: number | null): CertUrgency {
+  if (days == null) return 'neutral'
+  if (days < 14) return 'err'
+  if (days < 30) return 'warn'
+  return 'ok'
+}
+
+// certExpiryLabel: short human label for a cert row ("—" while issuing, "expired",
+// else "Nd left").
+export function certExpiryLabel(days: number | null): string {
+  if (days == null) return '—'
+  if (days < 0) return 'expired'
+  return `${days}d left`
 }
 
 // buildSingboxShareURL — ported 1:1 from web InboundsTab.buildSingboxShareURL.

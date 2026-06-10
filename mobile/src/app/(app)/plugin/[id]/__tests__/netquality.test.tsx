@@ -102,6 +102,20 @@ test('Hosts: lists ALL servers joined with probe config; count reflects netquali
   expect(getByTestId('hosts-count').props.children.join('')).toContain('2 servers')
 })
 
+test('Hosts: probing count counts only enabled rows for REGISTERED servers (ignores orphan config rows)', () => {
+  // An enabled config row for a server that is no longer registered must not
+  // inflate the "probing" count — the count joins through the server list,
+  // mirroring the web HostsTab. This is the "Hosts count" drift fix.
+  mockHostCfgs.mockReturnValue(ok([
+    ...HOST_CFGS,
+    { server_id: 999, enabled: true, sample_interval_seconds: 300 }, // orphan: server 999 not in SERVERS
+  ]))
+  const { getByTestId } = render(<NetqualityScreen />)
+  // still 1: only server 7 (registered + enabled) counts; the orphan is dropped
+  expect(getByTestId('hosts-count').props.children.join('')).toContain('1 probing')
+  expect(getByTestId('hosts-count').props.children.join('')).toContain('2 servers')
+})
+
 test('Hosts: an enabled host shows its interval + Targets; last_error renders', () => {
   const { getByTestId, getByText } = render(<NetqualityScreen />)
   expect(getByTestId('host-enable-7').props.accessibilityState.checked).toBe(true)
@@ -210,6 +224,16 @@ test('Results: picking another host chip re-queries latest for it', () => {
   expect(mockLatest).toHaveBeenLastCalledWith(7)
   fireEvent.press(getByTestId('host-9'))
   expect(mockLatest).toHaveBeenLastCalledWith(9)
+})
+
+test('Results: tapping a row routes to the history screen for that server×target', () => {
+  const { getByText, getByTestId } = render(<NetqualityScreen />)
+  fireEvent.press(getByText('Results'))
+  // server 7 is the default enabled host; target 1 is 电信上海
+  fireEvent.press(getByTestId('result-1'))
+  expect(mockPush).toHaveBeenCalledWith(
+    '/(app)/plugin/netquality/nq-history?serverId=7&targetId=1&label=%E7%94%B5%E4%BF%A1%E4%B8%8A%E6%B5%B7',
+  )
 })
 
 test('Results: empty sample set explains the wait', () => {

@@ -1,5 +1,6 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { authedFetch } from './authed'
+import { listProxyInbounds, type ProxyPluginID, type ProxyInbound } from './plugins'
 
 // Subscription generator (subgen) plugin API client.
 //
@@ -91,6 +92,27 @@ export function useSubscriptionInbounds(id: number | null): UseQueryResult<Selec
     queryKey: ['subgen-sub-inbounds', id],
     queryFn: () => listSubscriptionInbounds(id as number),
     enabled: id != null,
+  })
+}
+
+// useAllProxyInbounds lists EVERY inbound of a proxy plugin (no server filter)
+// so a Selection (source + inbound_id) can be resolved to its tag·server label.
+//
+// WHY NOT useProxyInbounds('singbox', -1): the singbox/xray /inbounds handler
+// (inbounds_routes.go getInboundsHandler) treats a present server_id as an exact
+// match — server_id=-1 matches NOTHING, so the list came back EMPTY and every
+// Selection fell through to the `${source} #${id}` placeholder. The web picker
+// (NodePickerDialog) calls listSingboxInbounds()/listXrayInbounds() with NO
+// server_id, which OMITS the query param and returns all inbounds — mirror that
+// here by passing listProxyInbounds(plugin) with serverId undefined.
+export function useAllProxyInbounds(
+  plugin: ProxyPluginID,
+  enabled: boolean,
+): UseQueryResult<ProxyInbound[]> {
+  return useQuery({
+    queryKey: ['plugin-inbounds', plugin, 'all'],
+    queryFn: () => listProxyInbounds(plugin),
+    enabled,
   })
 }
 

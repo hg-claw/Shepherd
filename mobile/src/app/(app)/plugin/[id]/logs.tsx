@@ -171,7 +171,14 @@ export default function PluginLogsScreen() {
               const active = h.server_id === serverID
               return (
                 <Pressable
-                  key={String(h.id)}
+                  // Key on server_id, NOT h.id: the netquality plugin's
+                  // /hosts endpoint returns probe-config rows with NO `id`
+                  // field (server_id/enabled only — see api/netquality.ts +
+                  // internal/plugins/netquality/routes.go listHosts). Keying on
+                  // the absent id collapses every chip to key="undefined",
+                  // which React's reconciler flags at this exact render. server_id
+                  // is the stable identity present on EVERY host shape.
+                  key={String(h.server_id)}
                   testID={`host-${h.server_id}`}
                   onPress={() => pickHost(h.server_id)}
                   style={{
@@ -216,8 +223,11 @@ export default function PluginLogsScreen() {
             keyExtractor={(_, i) => String(i)}
             renderItem={({ item }) => (
               <Text selectable style={{ fontFamily: t.mono(), fontSize: 11.5, lineHeight: 17, color: BOX_FG }}>
-                <Text style={{ color: BOX_DIM }}>{`${item.ts.slice(11, 19)}  `}</Text>
-                {item.line}
+                {/* ts/line are strings on the wire, but a malformed frame (parsed
+                    JSON missing a field) must never put a non-string — or call
+                    .slice on undefined — inside <Text>. Coerce defensively. */}
+                <Text style={{ color: BOX_DIM }}>{`${String(item.ts ?? '').slice(11, 19)}  `}</Text>
+                {String(item.line ?? '')}
               </Text>
             )}
             onScroll={onScroll}

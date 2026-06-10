@@ -7,7 +7,8 @@ import {
   buildSingboxShareURL, buildXrayShareURL, shareURLFor,
   SINGBOX_URL_PROTOCOLS, XRAY_URL_PROTOCOLS,
   needsUUID, needsPassword, needsReality, needsCertAndSNI, needsTransport, needsSS,
-  singboxCreatableOnMobile, randomUUID, randomPort, randomPassword, randomSSKey,
+  certDaysLeft, certUrgency, certExpiryLabel,
+  randomUUID, randomPort, randomPassword, randomSSKey,
   type ProxyInboundFull,
 } from '../inbounds'
 
@@ -240,12 +241,31 @@ test('field predicates mirror the web InboundDialog', () => {
   expect(needsTransport('vless-reality')).toBe(false)
 })
 
-test('singboxCreatableOnMobile defers cert-backed TLS protocols, allows reality/ss/vmess-tcp', () => {
-  expect(singboxCreatableOnMobile('vless-reality')).toBe(true)
-  expect(singboxCreatableOnMobile('shadowsocks-2022')).toBe(true)
-  expect(singboxCreatableOnMobile('vmess-tcp')).toBe(true)
-  expect(singboxCreatableOnMobile('vless-ws-tls')).toBe(false) // needs a cert → web-only
-  expect(singboxCreatableOnMobile('hysteria2')).toBe(false)
+// ── cert expiry helpers (inline picker tone + label) ───────────────────────────
+
+test('certDaysLeft floors days, treats the Go zero time / bad strings as unknown', () => {
+  const now = Date.UTC(2026, 0, 1) // 2026-01-01
+  // ~10 days out (plus a few hours → floors to 10)
+  const exp = new Date(now + 10 * 86_400_000 + 5 * 3_600_000).toISOString()
+  expect(certDaysLeft(exp, now)).toBe(10)
+  // Go zero time while issuing → null (never a real year-1 date)
+  expect(certDaysLeft('0001-01-01T00:00:00Z', now)).toBeNull()
+  expect(certDaysLeft('', now)).toBeNull()
+  expect(certDaysLeft(null, now)).toBeNull()
+  expect(certDaysLeft('not-a-date', now)).toBeNull()
+  // already expired → negative
+  expect(certDaysLeft(new Date(now - 3 * 86_400_000).toISOString(), now)).toBe(-3)
+})
+
+test('certUrgency / certExpiryLabel map days to tone + label', () => {
+  expect(certUrgency(null)).toBe('neutral')
+  expect(certUrgency(5)).toBe('err')
+  expect(certUrgency(-1)).toBe('err')
+  expect(certUrgency(20)).toBe('warn')
+  expect(certUrgency(60)).toBe('ok')
+  expect(certExpiryLabel(null)).toBe('—')
+  expect(certExpiryLabel(-2)).toBe('expired')
+  expect(certExpiryLabel(45)).toBe('45d left')
 })
 
 // ── random helpers (RN-safe, deterministic enough to validate shape) ───────────

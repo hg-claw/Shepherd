@@ -2,7 +2,7 @@ import React from 'react'
 import { renderHook, waitFor } from '@testing-library/react-native'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
-  useSubscriptions, useTemplates, useSubscriptionInbounds,
+  useSubscriptions, useTemplates, useSubscriptionInbounds, useAllProxyInbounds,
   listSubscriptions, listTemplates, listSubscriptionInbounds,
   createSubscription, updateSubscription, deleteSubscription, rotateToken, deleteTemplate,
   buildSubURL, SUB_TARGETS,
@@ -65,6 +65,26 @@ test('useSubscriptionInbounds hits /{id}/inbounds and is disabled when id is nul
   await waitFor(() => expect(result.current.isSuccess).toBe(true))
   expect(authedFetch).toHaveBeenCalledWith('/api/admin/plugins/subgen/subscriptions/7/inbounds')
   expect(result.current.data?.[0]).toEqual({ source: 'xray', inbound_id: 5 })
+})
+
+test('useAllProxyInbounds lists EVERY inbound with NO server_id filter (the #id-fallback bug fix)', async () => {
+  // The singbox/xray /inbounds handler treats a present server_id as an exact
+  // match, so server_id=-1 returned EMPTY and every Selection fell back to
+  // `${source} #${id}`. Omitting server_id entirely returns ALL inbounds.
+  ;(authedFetch as jest.Mock).mockResolvedValue([
+    { id: 8, server_id: 9, server_name: 'beta', tag: 'hy2-8', alias: '', port: 443, role: 'landing', protocol: 'hysteria2' },
+  ])
+  const { result, rerender } = renderHook(
+    ({ on }: { on: boolean }) => useAllProxyInbounds('singbox', on),
+    { wrapper, initialProps: { on: false } },
+  )
+  // disabled until the row is open — no fetch
+  expect(authedFetch).not.toHaveBeenCalled()
+  rerender({ on: true })
+  await waitFor(() => expect(result.current.isSuccess).toBe(true))
+  // NO ?server_id= query string — the unfiltered list carries server_id/name.
+  expect(authedFetch).toHaveBeenCalledWith('/api/admin/plugins/singbox/inbounds')
+  expect(result.current.data?.[0].tag).toBe('hy2-8')
 })
 
 // ── plain request fns: exact URLs / methods / bodies ───────────────────────────

@@ -3,6 +3,17 @@ import { render, fireEvent, act } from '@testing-library/react-native'
 import PluginLogsScreen from '../logs'
 import { useAuth } from '@/store/auth'
 
+// Default host rows = the generic deploy-table shape (with `id`). Individual
+// tests can swap mockHosts to the netquality probe-config shape (no `id`).
+let mockHosts: { data: unknown[]; isLoading: boolean; isError: boolean } = {
+  data: [
+    { id: 1, plugin_id: 'xray', server_id: 7, status: 'running', updated_at: '' },
+    { id: 2, plugin_id: 'xray', server_id: 9, status: 'running', updated_at: '' },
+  ],
+  isLoading: false,
+  isError: false,
+}
+
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: 'xray' }),
   useRouter: () => ({ back: jest.fn(), push: jest.fn() }),
@@ -10,14 +21,7 @@ jest.mock('expo-router', () => ({
 }))
 jest.mock('@/api/plugins', () => ({
   ...jest.requireActual('@/api/plugins'), // keep the REAL pluginLogsWSURL
-  usePluginHosts: () => ({
-    data: [
-      { id: 1, plugin_id: 'xray', server_id: 7, status: 'running', updated_at: '' },
-      { id: 2, plugin_id: 'xray', server_id: 9, status: 'running', updated_at: '' },
-    ],
-    isLoading: false,
-    isError: false,
-  }),
+  usePluginHosts: () => mockHosts,
 }))
 jest.mock('@/api/servers', () => ({
   useServers: () => ({
@@ -50,9 +54,19 @@ class FakeWS {
 
 const line = (s: string) => ({ data: JSON.stringify({ ts: '2026-06-09T12:34:56Z', level: 'info', line: s }) })
 
+const DEFAULT_HOSTS = {
+  data: [
+    { id: 1, plugin_id: 'xray', server_id: 7, status: 'running', updated_at: '' },
+    { id: 2, plugin_id: 'xray', server_id: 9, status: 'running', updated_at: '' },
+  ],
+  isLoading: false,
+  isError: false,
+}
+
 beforeEach(() => {
   jest.useFakeTimers()
   FakeWS.instances = []
+  mockHosts = DEFAULT_HOSTS
   ;(global as unknown as { WebSocket: unknown }).WebSocket = FakeWS
   useAuth.setState({ status: 'signedIn', baseURL: 'https://h', token: 'SEKRIT123', admin: null, error: null })
 })
@@ -125,4 +139,55 @@ test('unmount closes the socket', () => {
   const ws = FakeWS.last
   unmount()
   expect(ws.close).toHaveBeenCalled()
+})
+
+// ── regression: netquality host shape (no `id`) ───────────────────────────────
+// netquality is host-aware, so its plugin detail screen shows a "Logs" row that
+// opens THIS screen with id='netquality'. But /api/admin/plugins/netquality/hosts
+// returns probe-config rows ({server_id, enabled, sample_interval_seconds}) with
+// NO `id` field (see api/netquality.ts + internal/plugins/netquality/routes.go).
+// Keying the host chips on the absent `h.id` collapsed every chip to
+// key="undefined", which React's reconciler flagged at the chip render on device.
+test('netquality host shape (no id) renders chips without a duplicate-key warning', () => {
+  mockHosts = {
+    data: [
+      { server_id: 7, enabled: true, sample_interval_seconds: 300 },
+      { server_id: 9, enabled: true, sample_interval_seconds: 300 },
+    ],
+    isLoading: false,
+    isError: false,
+  }
+  const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+  const { getByText, getByTestId } = render(<PluginLogsScreen />)
+
+  // Both chips resolve their server labels (alias via nullStr, else name).
+  expect(getByText('alpha')).toBeTruthy()
+  expect(getByText('edge-9')).toBeTruthy()
+  // Both chips are individually addressable (distinct keys → both kept).
+  expect(getByTestId('host-7')).toBeTruthy()
+  expect(getByTestId('host-9')).toBeTruthy()
+  // Connects to the first host derived from the id-less rows (route id is the
+  // mocked 'xray' here; the regression is about the id-less ROW SHAPE).
+  expect(FakeWS.last.url).toBe('wss://h/api/admin/plugins/xray/hosts/7/logs')
+
+  // The whole point: no "two children with the same key, `undefined`" warning.
+  const dupKeyWarning = errSpy.mock.calls.some((c) =>
+    c.some((a) => typeof a === 'string' && /same key/.test(a)),
+  )
+  expect(dupKeyWarning).toBe(false)
+  errSpy.mockRestore()
+})
+
+// A malformed frame (parsed JSON missing ts/line) must never crash the list:
+// item.ts.slice on undefined would throw, and a non-string child inside <Text>
+// is illegal. Both are coerced defensively.
+test('a log frame missing ts/line does not crash the list', () => {
+  const { getByTestId } = render(<PluginLogsScreen />)
+  expect(() => {
+    act(() => {
+      FakeWS.last.onmessage?.({ data: JSON.stringify({ level: 'info' }) }) // no ts, no line
+      jest.advanceTimersByTime(250)
+    })
+  }).not.toThrow()
+  expect(getByTestId('log-list')).toBeTruthy()
 })

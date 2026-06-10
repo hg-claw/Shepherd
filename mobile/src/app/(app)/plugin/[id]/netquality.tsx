@@ -227,7 +227,14 @@ function HostsSection() {
   }
   if (servers.length === 0) return <Empty>No servers registered.</Empty>
 
-  const enabledCount = (cfgQ.data ?? []).filter((c) => c.enabled).length
+  // "probing" = servers whose netquality_hosts row is enabled. We count over
+  // the SAME server⋈config join the cards render from (cfgByServer), not the
+  // raw /hosts rows: listHosts returns one row only once a host has been PUT
+  // (and the catalog can hold rows for servers that no longer exist), so
+  // counting raw rows drifts from what the toggles actually show — that drift
+  // is the "Hosts count shows 0" bug. This mirrors the web HostsTab, which
+  // reads each server's enabled state via hostByID.get(s.id)?.enabled.
+  const enabledCount = servers.filter((s) => cfgByServer.get(s.id)?.enabled).length
 
   return (
     <ScrollView
@@ -377,13 +384,18 @@ function TargetsSection() {
 
 // ── Results section (latest samples grid) ──────────────────────────────────────
 
-function NetqualityRow({ row }: { row: NetqualityLatestRow }) {
+function NetqualityRow({ row, onPress }: { row: NetqualityLatestRow; onPress: () => void }) {
   const t = useTheme()
   return (
-    <View style={{
-      flexDirection: 'row', alignItems: 'center', gap: 8,
-      paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, borderTopColor: t.border,
-    }}>
+    <Pressable
+      testID={`result-${row.target_id}`}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, borderTopColor: t.border,
+        backgroundColor: pressed ? t.sunken : 'transparent',
+      })}
+    >
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text numberOfLines={1} style={{ fontFamily: t.font(500), fontSize: t.fs.sm, color: t.text }}>
           {row.label}
@@ -394,12 +406,14 @@ function NetqualityRow({ row }: { row: NetqualityLatestRow }) {
       </View>
       <Pill kind={rttKind(row.rtt_avg_ms, row.loss_pct)}>{fmtRTT(row.rtt_avg_ms)}</Pill>
       <Text style={{ fontFamily: t.mono(), fontSize: t.fs.xs, color: t.muted }}>{fmtLoss(row.loss_pct)}</Text>
-    </View>
+    </Pressable>
   )
 }
 
 function ResultsSection() {
   const t = useTheme()
+  const router = useRouter()
+  const { id } = useLocalSearchParams<{ id: string }>()
   const cfgQ = useNetqualityHostConfigs()
   const hosts = cfgQ.data ?? []
   const [picked, setPicked] = useState<number | null>(null)
@@ -452,7 +466,18 @@ function ResultsSection() {
             return (
               <Card key={isp}>
                 <CardHead>{ISP_LABEL[isp]}</CardHead>
-                {rows.map((r) => <NetqualityRow key={String(r.target_id)} row={r} />)}
+                {rows.map((r) => (
+                  <NetqualityRow
+                    key={String(r.target_id)}
+                    row={r}
+                    onPress={() => {
+                      if (serverID == null) return
+                      router.push(
+                        `/(app)/plugin/${id}/nq-history?serverId=${serverID}&targetId=${r.target_id}&label=${encodeURIComponent(r.label)}`,
+                      )
+                    }}
+                  />
+                ))}
               </Card>
             )
           })

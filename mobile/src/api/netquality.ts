@@ -131,3 +131,80 @@ export function updateNetqualityHostTargets(serverID: number, targetIDs: number[
     body: { target_ids: targetIDs },
   })
 }
+
+// ── sample history (RTT/loss time-series for one host × target) ────────────────
+
+// querySamples in routes.go returns {resolution, points:[…]}. Each point is a
+// MapScan of the chosen table, so columns are plain JSON values that may be
+// null. rtt_avg_ms is null on a fully-lost bucket — guard with `!= null`, never
+// nullStr (these are NOT sql.Null wrappers, just raw column values).
+export type NetqualitySamplePoint = {
+  ts: string
+  rtt_avg_ms?: number | null
+  loss_pct?: number | null
+  // raw-resolution-only extras (absent on minute/hour rollups)
+  rtt_min_ms?: number | null
+  rtt_max_ms?: number | null
+  jitter_ms?: number | null
+  status?: 'ok' | 'lost' | 'error'
+  // rollup-only
+  samples?: number | null
+}
+
+export type NetqualitySamplesResponse = {
+  resolution: 'raw' | 'minute' | 'hour'
+  points: NetqualitySamplePoint[]
+}
+
+export function fetchNetqualitySamples(params: {
+  server_id: number
+  target_id: number
+  from: string
+  to: string
+  resolution?: 'raw' | 'minute' | 'hour'
+}): Promise<NetqualitySamplesResponse> {
+  const qs = new URLSearchParams({
+    server_id: String(params.server_id),
+    target_id: String(params.target_id),
+    from: params.from,
+    to: params.to,
+  })
+  if (params.resolution) qs.set('resolution', params.resolution)
+  return authedFetch<NetqualitySamplesResponse>(`${ROOT}/samples?${qs.toString()}`)
+}
+
+// useNetqualitySamples drives the history screen. The query key carries the
+// range token so switching 1h/24h refetches cleanly without an effect. Disabled
+// until both ids are present.
+export function useNetqualitySamples(params: {
+  serverID: number | null
+  targetID: number | null
+  range: NetqualityRange
+  windowEnd: number
+}): UseQueryResult<NetqualitySamplesResponse> {
+  const { serverID, targetID, range, windowEnd } = params
+  const { resolution, ms } = rangeParams(range)
+  return useQuery({
+    queryKey: ['netquality-samples', serverID, targetID, range, windowEnd],
+    queryFn: () =>
+      fetchNetqualitySamples({
+        server_id: serverID as number,
+        target_id: targetID as number,
+        from: new Date(windowEnd - ms).toISOString(),
+        to: new Date(windowEnd).toISOString(),
+        resolution,
+      }),
+    enabled: serverID != null && targetID != null,
+    refetchInterval: 30000,
+  })
+}
+
+// Range presets mirror the web HistoryDrawer's rangeToParams (the server's
+// /samples auto-resolution: span ≤ 2h → raw, ≤ 7d → minute, else hour).
+export type NetqualityRange = '1h' | '24h'
+
+export function rangeParams(r: NetqualityRange): { resolution: 'raw' | 'minute' | 'hour'; ms: number } {
+  return r === '1h'
+    ? { resolution: 'raw', ms: 60 * 60 * 1000 }
+    : { resolution: 'minute', ms: 24 * 60 * 60 * 1000 }
+}

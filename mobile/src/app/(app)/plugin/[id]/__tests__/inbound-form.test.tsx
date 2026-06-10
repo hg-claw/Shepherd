@@ -33,6 +33,24 @@ jest.mock('@/api/inbounds', () => ({
   generateShortID: (...a: unknown[]) => mockShortID(...a),
 }))
 
+// The cert picker fetches the singbox cert list via useSingboxCerts — stub it so
+// cert-backed TLS protocols render a selectable list without a network call.
+const mockUseCerts = jest.fn()
+jest.mock('@/api/plugins', () => ({
+  useSingboxCerts: () => mockUseCerts(),
+}))
+
+const ACTIVE_CERT = {
+  id: 5, domain: 'proxy.example.com', status: 'active', issuer: 'LE',
+  expires_at: new Date(Date.now() + 40 * 86_400_000).toISOString(),
+  challenge_type: 'dns-01-cf', last_renew_attempt_at: null, last_error: null,
+}
+const ISSUING_CERT = {
+  id: 6, domain: 'pending.example.com', status: 'issuing', issuer: 'LE',
+  expires_at: '0001-01-01T00:00:00Z',
+  challenge_type: 'dns-01-cf', last_renew_attempt_at: null, last_error: null,
+}
+
 const EDIT_ROW = {
   id: 12, server_id: 7, server_name: 'alpha', tag: 'hy2-443', alias: 'old', port: 443,
   role: 'landing', protocol: 'hysteria2', password: 'pw', sni: 'a.com',
@@ -50,6 +68,7 @@ beforeEach(() => {
   mockPatch.mockResolvedValue({ id: 99 })
   mockX25519.mockResolvedValue({ private_key: 'PRIV', public_key: 'PUB' })
   mockShortID.mockResolvedValue({ short_id: 'SHORT' })
+  mockUseCerts.mockReturnValue({ data: [ACTIVE_CERT, ISSUING_CERT], isLoading: false, isError: false })
 })
 
 // ── sing-box create ──
@@ -95,13 +114,54 @@ test('Generate keypair calls the shared xray endpoint and fills public key', asy
   expect(getByTestId('pubkey').props.value).toBe('PUB')
 })
 
-test('cert-backed TLS protocols are create-blocked on phone (save disabled)', async () => {
-  const { getByTestId, getByText } = render(<InboundFormScreen />)
+test('cert-backed TLS protocols show an inline cert picker (only active certs)', () => {
+  const { getByTestId, queryByTestId } = render(<InboundFormScreen />)
   fireEvent.press(getByTestId('protocol-vless-ws-tls'))
-  expect(getByText(/web console/)).toBeTruthy()
+  expect(getByTestId('cert-picker')).toBeTruthy()
+  expect(getByTestId('sni')).toBeTruthy()
+  // active cert is selectable; the still-issuing cert is filtered out
+  expect(getByTestId('cert-5')).toBeTruthy()
+  expect(queryByTestId('cert-6')).toBeNull()
+  // a "none / manual" row exists and is selected by default
+  expect(getByTestId('cert-none')).toBeTruthy()
+})
+
+test('selecting a cert sets cert_id (+ sni) on a cert-backed create', async () => {
+  const { getByTestId } = render(<InboundFormScreen />)
+  fireEvent.press(getByTestId('protocol-vless-ws-tls'))
+  fireEvent.changeText(getByTestId('port'), '8443')
+  fireEvent.changeText(getByTestId('sni'), 'proxy.example.com')
+  fireEvent.press(getByTestId('cert-5'))
   fireEvent.press(getByTestId('save'))
-  await waitFor(() => {}) // allow any async to settle
-  expect(mockCreate).not.toHaveBeenCalled()
+  await waitFor(() => expect(mockCreate).toHaveBeenCalled())
+  const [plugin, body] = mockCreate.mock.calls[0]
+  expect(plugin).toBe('singbox')
+  expect(body.protocol).toBe('vless-ws-tls')
+  expect(body.role).toBe('landing')
+  expect(body.sni).toBe('proxy.example.com')
+  expect(body.cert_id).toBe(5)
+  expect(mockBack).toHaveBeenCalled()
+})
+
+test('leaving the cert picker on "none" sends cert_id=null (manual TLS)', async () => {
+  const { getByTestId } = render(<InboundFormScreen />)
+  fireEvent.press(getByTestId('protocol-trojan-tls'))
+  fireEvent.changeText(getByTestId('port'), '8443')
+  fireEvent.press(getByTestId('save'))
+  await waitFor(() => expect(mockCreate).toHaveBeenCalled())
+  const body = mockCreate.mock.calls[0][1]
+  expect(body.cert_id).toBeNull()
+})
+
+test('no active certs → a hint (not a web deferral) and create still works', async () => {
+  mockUseCerts.mockReturnValue({ data: [ISSUING_CERT], isLoading: false, isError: false })
+  const { getByTestId, queryByTestId, getByText } = render(<InboundFormScreen />)
+  fireEvent.press(getByTestId('protocol-vless-ws-tls'))
+  expect(queryByTestId('cert-picker')).toBeNull()
+  expect(getByText(/No active certificates/)).toBeTruthy()
+  fireEvent.changeText(getByTestId('port'), '8443')
+  fireEvent.press(getByTestId('save'))
+  await waitFor(() => expect(mockCreate).toHaveBeenCalled())
 })
 
 test('invalid port is rejected before any network call', async () => {

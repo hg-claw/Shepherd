@@ -27,7 +27,14 @@ export function TabBar({ state, navigation }: TabBarProps) {
           if (!focused && !ev.defaultPrevented) navigation.navigate(route.name)
         }
         return (
-          <Pressable key={route.key} onPress={onPress} style={{ flex: 1, alignItems: 'center', gap: 3, paddingVertical: 4 }}>
+          <Pressable
+            key={route.key}
+            onPress={onPress}
+            accessibilityRole="tab"
+            accessibilityLabel={meta.label}
+            accessibilityState={{ selected: focused }}
+            style={{ flex: 1, alignItems: 'center', gap: 3, paddingVertical: 4 }}
+          >
             <Icon name={meta.icon} size={22} color={color} />
             <Text style={{ fontSize: 10.5, fontFamily: t.font(500), color }}>{meta.label}</Text>
           </Pressable>

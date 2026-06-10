@@ -2,7 +2,8 @@ import React from 'react'
 import { render, fireEvent } from '@testing-library/react-native'
 import PluginDetail from '../index'
 const mockPush = jest.fn()
-jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: 'xray' }), useRouter: () => ({ push: mockPush, back: jest.fn() }), Stack: Object.assign(() => null, { Screen: () => null }) }))
+let mockRouteId = 'xray'
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: mockRouteId }), useRouter: () => ({ push: mockPush, back: jest.fn() }), Stack: Object.assign(() => null, { Screen: () => null }) }))
 const mockPlugins = [{ id: 'xray', meta: { name: 'Xray', description: 'proxy', icon: '🛰', category: 'net', host_aware: true }, enabled: true, host_count: 3 }]
 let mockQ: { data?: typeof mockPlugins; isLoading: boolean } = { data: mockPlugins, isLoading: false }
 jest.mock('@/api/plugins', () => ({
@@ -10,7 +11,7 @@ jest.mock('@/api/plugins', () => ({
   enablePlugin: jest.fn(), disablePlugin: jest.fn(),
 }))
 
-beforeEach(() => { mockQ = { data: mockPlugins, isLoading: false }; mockPush.mockClear() })
+beforeEach(() => { mockRouteId = 'xray'; mockQ = { data: mockPlugins, isLoading: false }; mockPush.mockClear() })
 
 test('renders meta and a Hosts row for host-aware plugins', () => {
   const { getAllByText, getByText } = render(<PluginDetail />)
@@ -22,6 +23,29 @@ test('a Logs row navigates to the logs screen (host-aware only)', () => {
   const { getByText } = render(<PluginDetail />)
   fireEvent.press(getByText('Logs'))
   expect(mockPush).toHaveBeenCalledWith('/(app)/plugin/xray/logs')
+})
+
+test('a Status row navigates to the status screen for plugins with a status view', () => {
+  const { getByText } = render(<PluginDetail />)
+  fireEvent.press(getByText('Status'))
+  expect(mockPush).toHaveBeenCalledWith('/(app)/plugin/xray/status')
+})
+
+test('Status row renders for singbox and netquality too', () => {
+  for (const id of ['singbox', 'netquality']) {
+    mockRouteId = id
+    mockQ = { data: [{ ...mockPlugins[0], id }], isLoading: false }
+    const { getByText, unmount } = render(<PluginDetail />)
+    expect(getByText('Status')).toBeTruthy()
+    unmount()
+  }
+})
+
+test('plugins without a status view get no Status row', () => {
+  mockRouteId = 'cloudflare'
+  mockQ = { data: [{ ...mockPlugins[0], id: 'cloudflare' }], isLoading: false }
+  const { queryByText } = render(<PluginDetail />)
+  expect(queryByText('Status')).toBeNull()
 })
 
 test('non-host-aware plugins get neither Hosts nor Logs rows', () => {

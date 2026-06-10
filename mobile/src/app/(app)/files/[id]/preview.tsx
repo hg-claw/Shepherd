@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ScrollView, Text, View, ActivityIndicator } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { previewFile, type Preview as Prev } from '@/api/files'
+import { previewFile, PREVIEW_MAX_BYTES, type Preview as Prev } from '@/api/files'
 import { useTheme } from '@/theme'
 import { NavBar, Pill, Empty } from '@/components/ds'
 
@@ -11,6 +11,8 @@ export default function Preview() {
   const t = useTheme()
   const name = String(path).split('/').filter(Boolean).pop() ?? String(path)
   const [state, setState] = useState<{ loading: boolean; data?: Prev; error?: string }>({ loading: true })
+  // The preview endpoint caps reads at PREVIEW_MAX_BYTES; content at the cap was cut off.
+  const truncated = state.data?.kind === 'text' && state.data.text.length >= PREVIEW_MAX_BYTES
 
   useEffect(() => {
     let live = true
@@ -41,17 +43,24 @@ export default function Preview() {
         ) : state.data?.kind === 'binary' ? (
           <Empty>Binary file — preview unavailable.</Empty>
         ) : (
-          <ScrollView
-            horizontal
-            style={{
-              backgroundColor: t.sunken, borderWidth: 1, borderColor: t.border, borderRadius: t.radius,
-            }}
-            contentContainerStyle={{ padding: 14 }}
-          >
-            <Text style={{ fontFamily: t.mono(), fontSize: 12, lineHeight: 18.6, color: t.text }}>
-              {state.data?.kind === 'text' ? state.data.text || '(empty)' : ''}
-            </Text>
-          </ScrollView>
+          <>
+            {truncated ? (
+              <View style={{ backgroundColor: t.warnSoft, borderRadius: t.radius, paddingHorizontal: 12, paddingVertical: 8 }}>
+                <Text style={{ fontFamily: t.mono(), fontSize: 11.5, color: t.warn }}>Preview truncated at 64 KB.</Text>
+              </View>
+            ) : null}
+            <ScrollView
+              horizontal
+              style={{
+                backgroundColor: t.sunken, borderWidth: 1, borderColor: t.border, borderRadius: t.radius,
+              }}
+              contentContainerStyle={{ padding: 14 }}
+            >
+              <Text style={{ fontFamily: t.mono(), fontSize: 12, lineHeight: 18.6, color: t.text }}>
+                {state.data?.kind === 'text' ? state.data.text || '(empty)' : ''}
+              </Text>
+            </ScrollView>
+          </>
         )}
       </ScrollView>
     </View>

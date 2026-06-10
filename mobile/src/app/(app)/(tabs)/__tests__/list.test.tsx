@@ -1,11 +1,11 @@
 import React from 'react'
 import { render } from '@testing-library/react-native'
 import ServerList from '../index'
+import { useServers, useServersLatest } from '@/api/servers'
 
 jest.mock('expo-router', () => ({ router: { push: jest.fn() }, useRouter: () => ({ push: jest.fn() }) }))
 jest.mock('@/api/servers', () => ({ useServers: jest.fn(), useServersLatest: jest.fn() }))
 jest.mock('@/store/auth', () => ({ useAuth: Object.assign(() => jest.fn(), { getState: () => ({ logout: jest.fn() }) }) }))
-import { useServers, useServersLatest } from '@/api/servers'
 
 const rows = [
   { id: 1, name: 'alpha', connected: true, latest: { ts: '', cpu_pct: 12, mem_used: 1, mem_total: 2, net_rx_bps: 1000, net_tx_bps: 500 } },

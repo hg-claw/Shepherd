@@ -70,7 +70,7 @@ export default function ConsoleScreen() {
 
   const postToWeb = (bytes: Uint8Array) =>
     (webRef.current as WebView & { postMessage(s: string): void } | null)?.postMessage(dataMsg(bytes))
-  // The shell prompt often arrives before xterm has finished loading from the CDN.
+  // The shell prompt often arrives before xterm has finished initializing.
   // Buffer PTY output until the WebView posts {ready}, then flush — otherwise the
   // first prompt (root@host:~#) is written into a not-yet-ready terminal and lost.
   const pushData = (bytes: Uint8Array) => {
@@ -167,9 +167,9 @@ export default function ConsoleScreen() {
         <WebView
           ref={webRef}
           originWhitelist={['*']}
-          // A real https baseUrl gives the page a secure origin; without it the html
-          // string loads from an opaque/null origin and Android blocks the https
-          // xterm CDN scripts → a blank terminal with no cursor.
+          // xterm is vendored into the html (no CDN scripts), but a real https
+          // baseUrl still gives the page a secure origin — harmless, and keeps
+          // origin-sensitive WebView behavior consistent across platforms.
           source={{ html: TERMINAL_HTML, baseUrl: 'https://shepherd.app/' }}
           onMessage={(e) => onMessage(e.nativeEvent.data)}
           javaScriptEnabled

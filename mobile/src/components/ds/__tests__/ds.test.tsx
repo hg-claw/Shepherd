@@ -1,7 +1,7 @@
 import React from 'react'
 import { render, fireEvent } from '@testing-library/react-native'
 import { ThemeProvider } from '@/theme'
-import { Pill, MetricBar, Kpi, Button, ListRow, Switch } from '../index'
+import { Pill, MetricBar, Kpi, Button, ListRow, Switch, TabBar } from '../index'
 import { statusOf, barKind } from '../helpers'
 
 function wrap(ui: React.ReactElement) {
@@ -45,6 +45,22 @@ test('Switch toggles via onChange', () => {
   const { getByRole } = wrap(<Switch on={false} onChange={onChange} />)
   fireEvent.press(getByRole('switch'))
   expect(onChange).toHaveBeenCalledWith(true)
+})
+
+test('TabBar items are accessible tabs with labels and selected state', () => {
+  const navigation = { navigate: jest.fn(), emit: jest.fn(() => ({ defaultPrevented: false })) }
+  const state = {
+    index: 0,
+    routes: [{ key: 'a', name: 'index' }, { key: 'b', name: 'plugins' }, { key: 'c', name: 'settings' }],
+  }
+  const { getByRole, getAllByRole } = wrap(<TabBar state={state} navigation={navigation} />)
+  expect(getAllByRole('tab')).toHaveLength(3)
+  expect(getByRole('tab', { name: 'Servers', selected: true })).toBeTruthy()
+  expect(getByRole('tab', { name: 'Plugins', selected: false })).toBeTruthy()
+  expect(getByRole('tab', { name: 'Settings', selected: false })).toBeTruthy()
+  fireEvent.press(getByRole('tab', { name: 'Plugins' }))
+  expect(navigation.emit).toHaveBeenCalledWith({ type: 'tabPress', target: 'b', canPreventDefault: true })
+  expect(navigation.navigate).toHaveBeenCalledWith('plugins')
 })
 
 test('statusOf / barKind helpers', () => {

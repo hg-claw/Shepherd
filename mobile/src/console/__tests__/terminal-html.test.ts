@@ -13,6 +13,13 @@ test('HTML wires the message protocol', () => {
   expect(TERMINAL_HTML).toContain('getSelection')
 })
 
+test('HTML wires the long-press select-&-copy gesture', () => {
+  expect(TERMINAL_HTML).toContain("'selecttext'") // posts the scrollback for the native sheet
+  expect(TERMINAL_HTML).toContain('touchstart')
+  expect(TERMINAL_HTML).toContain('touchmove') // a move cancels the long-press so scroll/pinch still work
+  expect(TERMINAL_HTML).toContain('bufferText') // shared scrollback extractor reused by copy + select
+})
+
 test('xterm is vendored: no CDN or external script/style references', () => {
   expect(TERMINAL_HTML).not.toContain('cdn.jsdelivr.net/npm')
   expect(TERMINAL_HTML).not.toMatch(/<script[^>]*\ssrc=/i)

@@ -34,6 +34,19 @@ test('renders grouped cards, summary counts, and navigates on tap', () => {
   expect(mockPush).toHaveBeenCalledWith('/(app)/server/1')
 })
 
+test('groups render as SectionList section headers with their rows', () => {
+  const { getByText } = render(<Home />)
+  // Section headers (one per public_group, cmpStr-sorted) with online tallies.
+  expect(getByText('asia')).toBeTruthy()
+  expect(getByText('1/2 online')).toBeTruthy()
+  expect(getByText('eu')).toBeTruthy()
+  expect(getByText('1/1 online')).toBeTruthy()
+  // Rows render under their sections (initialNumToRender covers the fixtures).
+  expect(getByText('alpha')).toBeTruthy()
+  expect(getByText('beta')).toBeTruthy()
+  expect(getByText('edge-1')).toBeTruthy()
+})
+
 test("the header '+' opens the add-server flow", () => {
   const { getByLabelText } = render(<Home />)
   fireEvent.press(getByLabelText('Add server'))

@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { ScrollView, View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native'
+import { memo, useCallback, useMemo, useState } from 'react'
+import { SectionList, ScrollView, View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useServers, useServersLatest, type ServerRow } from '@/api/servers'
 import { isOnline, memPct, firstDiskPct, nullStr } from '@/api/metrics'
@@ -49,7 +49,10 @@ function TrafficCard({ onlineRows }: { onlineRows: ServerRow[] }) {
   )
 }
 
-function HostCard({ row, onPress }: { row: ServerRow; onPress: () => void }) {
+// Memoized list row: re-renders only when its row reference changes (query
+// refresh), not when the list re-renders. Live ↓/↑ traffic stays inside the
+// LiveNet render-prop cell, so WS frames never touch the SectionList.
+const HostCard = memo(function HostCard({ row, onOpen }: { row: ServerRow; onOpen: (id: number) => void }) {
   const t = useTheme()
   const online = isOnline(row)
   const l = row.latest
@@ -64,7 +67,7 @@ function HostCard({ row, onPress }: { row: ServerRow; onPress: () => void }) {
   })
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => onOpen(row.id)}
       style={({ pressed }) => ({
         backgroundColor: t.surface, borderWidth: 1,
         borderColor: pressed ? t.borderStrong : t.border,
@@ -108,7 +111,12 @@ function HostCard({ row, onPress }: { row: ServerRow; onPress: () => void }) {
       )}
     </Pressable>
   )
-}
+})
+
+type Section = { title: string; online: number; total: number; data: ServerRow[] }
+
+// 8px between cards inside a group (was `gap: 8` on the group <View>).
+const RowGap = () => <View style={{ height: 8 }} />
 
 export default function Home() {
   const t = useTheme()
@@ -116,6 +124,8 @@ export default function Home() {
   const toggleTheme = useThemeMode((s) => s.toggle)
   const list = useServers()          // fast — paints the list immediately
   const latest = useServersLatest()  // metrics — fills the bars in after
+  // Manual-only spinner: tied to this state, never isRefetching, so background
+  // refetches don't flash the pull-to-refresh control.
   const [refreshing, setRefreshing] = useState(false)
   const onRefresh = async () => {
     setRefreshing(true)
@@ -153,7 +163,10 @@ export default function Home() {
     [searched, statusFilter],
   )
 
-  const ordered = useMemo(() => {
+  // Sections derive from the already-searched/filtered rows: group by
+  // public_group (cmpStr — Hermes has no Intl, never localeCompare), rows
+  // online-first then by alias.
+  const sections = useMemo<Section[]>(() => {
     const groups = new Map<string, ServerRow[]>()
     for (const r of filtered) {
       const k = nullStr(r.public_group)
@@ -161,8 +174,33 @@ export default function Home() {
       a.push(r)
       groups.set(k, a)
     }
-    return [...groups.entries()].sort(([a], [b]) => cmpStr(a, b))
+    return [...groups.entries()]
+      .sort(([a], [b]) => cmpStr(a, b))
+      .map(([title, ss]) => ({
+        title,
+        online: ss.filter(isOnline).length,
+        total: ss.length,
+        data: ss.slice().sort((a, b) => {
+          const oa = isOnline(a) ? 0 : 1, ob = isOnline(b) ? 0 : 1
+          return oa - ob || cmpStr(aliasOf(a), aliasOf(b))
+        }),
+      }))
   }, [filtered])
+
+  const onOpen = useCallback((id: number) => router.push(`/(app)/server/${id}`), [router])
+  const renderItem = useCallback(
+    ({ item }: { item: ServerRow }) => <HostCard row={item} onOpen={onOpen} />,
+    [onOpen],
+  )
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: Section }) => (
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingHorizontal: 2, marginTop: 16, marginBottom: 8 }}>
+        <Text style={{ fontFamily: t.mono(600), fontSize: 12.5, color: t.text }}>{section.title || 'Ungrouped'}</Text>
+        <Text style={{ fontFamily: t.mono(), fontSize: 11, color: t.fgDim }}>{section.online}/{section.total} online</Text>
+      </View>
+    ),
+    [t],
+  )
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
@@ -183,78 +221,72 @@ export default function Home() {
           {list.error instanceof Error ? list.error.message : 'failed to load'}
         </Text>
       ) : (
-        <ScrollView
+        <SectionList<ServerRow, Section>
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 16, paddingBottom: 92, gap: 16 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 92 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.primary} />}
-        >
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-            <View style={{ flexGrow: 1, flexBasis: '46%' }}><Kpi label="Nodes" value={total} /></View>
-            <View style={{ flexGrow: 1, flexBasis: '46%' }}><Kpi label="Online" value={onlineRows.length} tone="ok" /></View>
-            <View style={{ flexGrow: 1, flexBasis: '46%' }}><Kpi label="Offline" value={offline} tone={offline > 0 ? 'err' : undefined} /></View>
-            <View style={{ flexGrow: 1, flexBasis: '46%' }}><Kpi label="Alerting" value={alerting} tone={alerting > 0 ? 'warn' : undefined} /></View>
-          </View>
-
-          <TrafficCard onlineRows={onlineRows} />
-
-          <View style={{ gap: 10 }}>
-            <View style={{ justifyContent: 'center' }}>
-              <Input
-                value={query}
-                onChangeText={setQuery}
-                placeholder="Search name, alias, or host"
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="search"
-                accessibilityLabel="Search servers"
-                style={{ height: 38, fontSize: t.fs.sm, paddingRight: 38 }}
-              />
-              {query !== '' ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Clear search"
-                  onPress={() => setQuery('')}
-                  style={{ position: 'absolute', right: 0, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <Icon name="x" size={15} color={t.muted} />
-                </Pressable>
-              ) : null}
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ paddingHorizontal: 16 }}>
-              <Segmented<StatusFilter>
-                value={statusFilter}
-                onChange={setStatusFilter}
-                options={[
-                  { value: 'all', label: `All ${counts.all}` },
-                  { value: 'online', label: `Online ${counts.online}` },
-                  { value: 'warn', label: `Warn ${counts.warn}` },
-                  { value: 'offline', label: `Offline ${counts.offline}` },
-                ]}
-              />
-            </ScrollView>
-          </View>
-
-          {ordered.length === 0 ? <Empty>{total === 0 ? 'No servers.' : 'No matches.'}</Empty> : null}
-
-          {ordered.map(([group, ss]) => {
-            const gOnline = ss.filter(isOnline).length
-            const sorted = ss.slice().sort((a, b) => {
-              const oa = isOnline(a) ? 0 : 1, ob = isOnline(b) ? 0 : 1
-              return oa - ob || cmpStr(aliasOf(a), aliasOf(b))
-            })
-            return (
-              <View key={group || '_'} style={{ gap: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingHorizontal: 2 }}>
-                  <Text style={{ fontFamily: t.mono(600), fontSize: 12.5, color: t.text }}>{group || 'Ungrouped'}</Text>
-                  <Text style={{ fontFamily: t.mono(), fontSize: 11, color: t.fgDim }}>{gOnline}/{ss.length} online</Text>
-                </View>
-                {sorted.map((r) => (
-                  <HostCard key={r.id} row={r} onPress={() => router.push(`/(app)/server/${r.id}`)} />
-                ))}
+          sections={sections}
+          keyExtractor={(r) => String(r.id)}
+          renderItem={renderItem}
+          renderSectionHeader={renderSectionHeader}
+          ItemSeparatorComponent={RowGap}
+          stickySectionHeadersEnabled={false}
+          initialNumToRender={30}
+          ListHeaderComponent={
+            <View style={{ gap: 16 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                <View style={{ flexGrow: 1, flexBasis: '46%' }}><Kpi label="Nodes" value={total} /></View>
+                <View style={{ flexGrow: 1, flexBasis: '46%' }}><Kpi label="Online" value={onlineRows.length} tone="ok" /></View>
+                <View style={{ flexGrow: 1, flexBasis: '46%' }}><Kpi label="Offline" value={offline} tone={offline > 0 ? 'err' : undefined} /></View>
+                <View style={{ flexGrow: 1, flexBasis: '46%' }}><Kpi label="Alerting" value={alerting} tone={alerting > 0 ? 'warn' : undefined} /></View>
               </View>
-            )
-          })}
-        </ScrollView>
+
+              <TrafficCard onlineRows={onlineRows} />
+
+              <View style={{ gap: 10 }}>
+                <View style={{ justifyContent: 'center' }}>
+                  <Input
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="Search name, alias, or host"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    returnKeyType="search"
+                    accessibilityLabel="Search servers"
+                    style={{ height: 38, fontSize: t.fs.sm, paddingRight: 38 }}
+                  />
+                  {query !== '' ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Clear search"
+                      onPress={() => setQuery('')}
+                      style={{ position: 'absolute', right: 0, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Icon name="x" size={15} color={t.muted} />
+                    </Pressable>
+                  ) : null}
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ paddingHorizontal: 16 }}>
+                  <Segmented<StatusFilter>
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                    options={[
+                      { value: 'all', label: `All ${counts.all}` },
+                      { value: 'online', label: `Online ${counts.online}` },
+                      { value: 'warn', label: `Warn ${counts.warn}` },
+                      { value: 'offline', label: `Offline ${counts.offline}` },
+                    ]}
+                  />
+                </ScrollView>
+              </View>
+            </View>
+          }
+          ListEmptyComponent={
+            <View style={{ marginTop: 16 }}>
+              <Empty>{total === 0 ? 'No servers.' : 'No matches.'}</Empty>
+            </View>
+          }
+        />
       )}
     </View>
   )

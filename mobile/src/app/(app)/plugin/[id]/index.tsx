@@ -5,6 +5,10 @@ import { usePlugins, enablePlugin, disablePlugin } from '@/api/plugins'
 import { useTheme } from '@/theme'
 import { NavBar, List, ListRow, Switch, Pill, Icon, Empty } from '@/components/ds'
 
+// Plugins with a read-only status view on mobile (see ./status.tsx — it falls
+// back to an empty state for any other id, so this set only gates the row).
+const STATUS_VIEW_IDS = new Set(['singbox', 'xray', 'netquality'])
+
 export default function PluginDetail() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
@@ -83,6 +87,13 @@ export default function PluginDetail() {
               icon="scroll-text"
               title="Logs"
               onPress={() => router.push(`/(app)/plugin/${p.id}/logs`)}
+            />
+          ) : null}
+          {STATUS_VIEW_IDS.has(p.id) ? (
+            <ListRow
+              icon="activity"
+              title="Status"
+              onPress={() => router.push(`/(app)/plugin/${p.id}/status`)}
             />
           ) : null}
         </List>

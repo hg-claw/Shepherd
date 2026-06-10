@@ -61,3 +61,126 @@ export function refreshHost(id: string, serverId: number): Promise<HostDeploymen
 export function pluginLogsWSURL(baseURL: string, pluginId: string, serverId: number): string {
   return wsURL(baseURL, `/api/admin/plugins/${encodeURIComponent(pluginId)}/hosts/${serverId}/logs`)
 }
+
+// ── read-only plugin status views ────────────────────────────────────────────
+// Wire shapes mirror web/src/api/plugins.ts + web/src/api/netquality.ts (and the
+// Go handlers behind them). Only the fields the mobile status screen renders are
+// typed; extra wire fields (keys, transport details) are deliberately ignored.
+
+// singbox and xray expose identical /inbounds + /traffic/batch shapes.
+export type ProxyPluginID = 'singbox' | 'xray'
+
+export type ProxyInbound = {
+  id: number
+  server_id: number
+  server_name: string
+  tag: string
+  alias: string
+  port: number
+  role: 'landing' | 'relay'
+  protocol: string
+}
+
+export function listProxyInbounds(plugin: ProxyPluginID, serverId?: number): Promise<ProxyInbound[]> {
+  const qs = serverId != null ? `?server_id=${serverId}` : ''
+  return authedFetch<ProxyInbound[]>(`/api/admin/plugins/${plugin}/inbounds${qs}`)
+}
+
+export function useProxyInbounds(plugin: ProxyPluginID, serverId: number | null): UseQueryResult<ProxyInbound[]> {
+  return useQuery({
+    queryKey: ['plugin-inbounds', plugin, serverId],
+    queryFn: () => listProxyInbounds(plugin, serverId as number),
+    enabled: serverId != null,
+  })
+}
+
+export type TrafficPoint = { ts: string; bytes_up: number; bytes_down: number }
+export type TrafficSeries = { tag: string; kind: string; points: TrafficPoint[] }
+export type TrafficResolution = 'raw' | 'minute' | 'hour'
+export type TrafficBatchResponse = { resolution: TrafficResolution; series: TrafficSeries[] }
+
+export function fetchTrafficBatch(plugin: ProxyPluginID, params: {
+  server_id: number
+  tags: string[]
+  from: string // ISO 8601
+  to: string   // ISO 8601
+  resolution?: TrafficResolution
+}): Promise<TrafficBatchResponse> {
+  // Tags are comma-joined per the batch handler's contract; each tag is encoded
+  // individually so the commas stay literal separators.
+  let q = `server_id=${params.server_id}`
+    + `&tags=${params.tags.map(encodeURIComponent).join(',')}`
+    + `&from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}`
+  if (params.resolution) q += `&resolution=${params.resolution}`
+  return authedFetch<TrafficBatchResponse>(`/api/admin/plugins/${plugin}/traffic/batch?${q}`)
+}
+
+export function useTrafficBatch(plugin: ProxyPluginID, params: {
+  server_id: number | null
+  tags: string[]
+  from: string
+  to: string
+  resolution?: TrafficResolution
+}): UseQueryResult<TrafficBatchResponse> {
+  const { server_id, tags, from, to, resolution } = params
+  return useQuery({
+    queryKey: ['plugin-traffic-batch', plugin, server_id, tags.join(','), from, to, resolution ?? ''],
+    queryFn: () => fetchTrafficBatch(plugin, { server_id: server_id as number, tags, from, to, resolution }),
+    enabled: server_id != null && tags.length > 0,
+  })
+}
+
+// certResponse in internal/plugins/singbox/cert_routes.go: expires_at is a plain
+// RFC3339 string (the Go ZERO time "0001-01-01T00:00:00Z" while still issuing);
+// last_renew_attempt_at/last_error are *string → null when absent.
+export type SingboxCertificate = {
+  id: number
+  domain: string
+  status: 'issuing' | 'active' | 'failed' | 'revoked'
+  issuer: string
+  expires_at: string
+  challenge_type: 'dns-01-cf' | 'http-01'
+  last_renew_attempt_at: string | null
+  last_error: string | null
+}
+
+export function listSingboxCerts(): Promise<SingboxCertificate[]> {
+  return authedFetch<SingboxCertificate[]>('/api/admin/plugins/singbox/certificates')
+}
+
+export function useSingboxCerts(enabled: boolean = true): UseQueryResult<SingboxCertificate[]> {
+  return useQuery({
+    queryKey: ['singbox-certs'],
+    queryFn: listSingboxCerts,
+    enabled,
+  })
+}
+
+export type NetqualityISP = 'telecom' | 'unicom' | 'mobile' | 'overseas'
+
+// One row per enabled target on a server (latestPerTarget in
+// internal/plugins/netquality/routes.go). ts/rtt_avg_ms/loss_pct/status are
+// pointers with omitempty server-side — a target with no samples yet (LEFT
+// JOIN NULLs) simply omits them.
+export type NetqualityLatestRow = {
+  target_id: number
+  isp: NetqualityISP
+  region: string
+  label: string
+  ts?: string
+  rtt_avg_ms?: number
+  loss_pct?: number
+  status?: 'ok' | 'lost' | 'error'
+}
+
+export function fetchNetqualityLatest(serverId: number): Promise<NetqualityLatestRow[]> {
+  return authedFetch<NetqualityLatestRow[]>(`/api/admin/plugins/netquality/samples/latest?server_id=${serverId}`)
+}
+
+export function useNetqualityLatest(serverId: number | null): UseQueryResult<NetqualityLatestRow[]> {
+  return useQuery({
+    queryKey: ['netquality-latest', serverId],
+    queryFn: () => fetchNetqualityLatest(serverId as number),
+    enabled: serverId != null,
+  })
+}

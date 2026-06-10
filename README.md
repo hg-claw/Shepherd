@@ -4,12 +4,15 @@
 
 Self-hosted server fleet management with zero-credential agents. Monitor a
 fleet of Linux hosts, install agents over SSH (creds discarded after use),
-and remote-operate via a single WebSocket connection per host. Phase 1
-(alpha) ships monitoring + admin UI; remote ops, plugins, xray, relay, and
-alerting are landing in subsequent phases.
+and remote-operate via a single WebSocket connection per host — terminal,
+scripts, files, plugins (xray / sing-box / cloudflare / netquality /
+subscription generator), audit trail, and a mobile companion app.
 
-**Status:** Phase 1 alpha — backend + frontend + e2e smoke pass; first
-release `v0.1.0` available on GitHub Releases.
+**Status:** current release [`v0.32.0`](https://github.com/hg-claw/Shepherd/releases/latest)
+— monitoring + remote ops + plugin system + the Shepherd mobile app
+(Expo / React Native under `mobile/`: live fleet wall, telemetry history
+charts, remote terminal, scripts with per-target logs, file management,
+plugin control with live log streaming, audit viewer, biometric app lock).
 
 ## Quickstart
 
@@ -94,6 +97,10 @@ make web && make server
   identify by machine fingerprint, get a machine token).
 - Bilingual UI (zh-CN + en); light / dark / system theme.
 - Single-binary deployment with embedded frontend; or `docker compose up`.
+- Shepherd mobile app (`mobile/`, Expo / React Native): bearer-token login,
+  live fleet wall, telemetry charts, remote terminal (bundled xterm — no
+  CDN), scripts + per-target logs, file ops, plugin status/logs, audit
+  viewer, biometric lock. Build with EAS or `npx expo run:ios|android`.
 
 ## Architecture
 

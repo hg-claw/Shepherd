@@ -3,11 +3,14 @@
 [English](README.md) · [简体中文](README.zh-CN.md)
 
 自托管的服务器舰队管理工具，agent 零凭据架构。监控一批 Linux 主机、用 SSH 一次性
-装 agent（凭据用完即弃），并通过单一 WebSocket 长连远程运维。Phase 1（alpha）
-提供监控 + admin UI；远程运维、插件、xray、relay、告警是后续 phase 的内容。
+装 agent（凭据用完即弃），并通过单一 WebSocket 长连远程运维——终端、脚本、文件、
+插件（xray / sing-box / cloudflare / 网络质量 / 订阅生成）、审计日志，外加移动端
+配套 App。
 
-**状态：** Phase 1 alpha —— 后端 + 前端 + 端到端 smoke 全过；首个版本 `v0.1.0` 已
-发布到 GitHub Releases。
+**状态：** 当前版本 [`v0.32.0`](https://github.com/hg-claw/Shepherd/releases/latest)
+—— 监控 + 远程运维 + 插件体系 + Shepherd 移动端 App（`mobile/`，Expo / React
+Native：实时监控墙、遥测历史图表、远程终端、脚本多目标运行与日志、文件管理、
+插件控制与实时日志、审计查看、生物识别应用锁）。
 
 ## 特性
 
@@ -20,6 +23,10 @@
 - fleet 自助上线（`AUTO_RECOVER_KEY`）：主机起来后按 fingerprint 识别、领取 machine token
 - 双语 UI（zh-CN + en），三态主题（浅色 / 深色 / 跟随系统）
 - 单二进制部署（前端 embed），或 `docker compose up`
+- Shepherd 移动端 App（`mobile/`，Expo / React Native）：token 登录、实时监控墙、
+  遥测图表、远程终端（xterm 已打包进 App，不依赖 CDN）、脚本运行与每目标日志、
+  文件操作、插件状态/日志、审计查看、生物识别锁。用 EAS 或
+  `npx expo run:ios|android` 构建。
 
 ## 架构
 

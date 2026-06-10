@@ -14,6 +14,8 @@ test('parseFromWebView decodes input/resize/ready, null on garbage', () => {
   expect(parseFromWebView(JSON.stringify({ type: 'resize', rows: 24, cols: 80 }))).toEqual({ type: 'resize', rows: 24, cols: 80 })
   expect(parseFromWebView(JSON.stringify({ type: 'ready' }))).toEqual({ type: 'ready' })
   expect(parseFromWebView(JSON.stringify({ type: 'copy', text: 'hello' }))).toEqual({ type: 'copy', text: 'hello' })
+  expect(parseFromWebView(JSON.stringify({ type: 'selecttext', text: 'a\nb' }))).toEqual({ type: 'selecttext', text: 'a\nb' })
+  expect(parseFromWebView(JSON.stringify({ type: 'selecttext' }))).toBeNull()
   expect(parseFromWebView('not json')).toBeNull()
   expect(parseFromWebView(JSON.stringify({ type: 'nope' }))).toBeNull()
 })

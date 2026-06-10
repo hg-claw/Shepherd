@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { View, Text, Pressable, TextInput, ScrollView, Keyboard, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, Text, Pressable, TextInput, ScrollView, Keyboard, KeyboardAvoidingView, Modal, Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { WebView } from 'react-native-webview'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -56,6 +56,9 @@ export default function ConsoleScreen() {
   const [openError, setOpenError] = useState<string | null>(null)
   const [kbVisible, setKbVisible] = useState(false)
   const [copied, setCopied] = useState(false)
+  // Non-null while the long-press select-&-copy sheet is open (holds the
+  // scrollback text the user can select natively).
+  const [selText, setSelText] = useState<string | null>(null)
 
   // Track the soft keyboard so the control-key bar can sit above it (iOS) and the
   // home-indicator inset can be dropped while the keyboard covers it.
@@ -117,7 +120,20 @@ export default function ConsoleScreen() {
         setCopied(true)
         setTimeout(() => setCopied(false), 1500)
       }
+    } else if (m.type === 'selecttext') {
+      // Long-press → open the native select-&-copy sheet. Dismiss the keyboard so
+      // it doesn't cover the sheet.
+      Keyboard.dismiss()
+      setSelText(m.text)
     }
+  }
+  const copyAllSelected = () => {
+    if (selText && clipboardSet) {
+      clipboardSet(selText)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }
+    setSelText(null)
   }
   const sendKey = (bytes: Uint8Array) => sessionRef.current?.write(bytes)
   const closeBack = () => { sessionRef.current?.close(); router.back() }
@@ -209,6 +225,35 @@ export default function ConsoleScreen() {
         ))}
       </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Long-press select-&-copy sheet: native text selection over the scrollback. */}
+      <Modal visible={selText != null} animationType="slide" transparent onRequestClose={() => setSelText(null)}>
+        <View style={{ flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' }}>
+          <View style={{
+            maxHeight: '82%', backgroundColor: t.surface,
+            borderTopLeftRadius: 16, borderTopRightRadius: 16,
+            paddingTop: 6, paddingBottom: insets.bottom,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 }}>
+              <Text style={{ flex: 1, fontFamily: t.font(600), fontSize: 15, color: t.text }}>Select &amp; copy</Text>
+              <Pressable onPress={copyAllSelected} accessibilityLabel="Copy all" hitSlop={8}>
+                <Text style={{ fontFamily: t.mono(), fontSize: 13, color: t.primary, marginRight: 18 }}>Copy all</Text>
+              </Pressable>
+              <Pressable testID="select-done" onPress={() => setSelText(null)} accessibilityLabel="Done" hitSlop={8}>
+                <Text style={{ fontFamily: t.mono(), fontSize: 13, color: t.muted }}>Done</Text>
+              </Pressable>
+            </View>
+            <Text style={{ fontFamily: t.font(), fontSize: 11.5, color: t.fgDim, paddingHorizontal: 16, paddingBottom: 8 }}>
+              Long-press to select, then use the copy menu — or tap Copy all.
+            </Text>
+            <ScrollView style={{ borderTopWidth: 1, borderTopColor: t.border }} contentContainerStyle={{ padding: 16 }}>
+              <Text testID="select-text" selectable style={{ fontFamily: t.mono(), fontSize: 12.5, lineHeight: 18, color: t.text }}>
+                {selText ?? ''}
+              </Text>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }

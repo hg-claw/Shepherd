@@ -32,12 +32,32 @@ function onMsg(ev){
 }
 document.addEventListener('message',onMsg);window.addEventListener('message',onMsg);
 window.addEventListener('resize',doFit);
+// bufferText: the whole scrollback, trailing blank lines trimmed.
+function bufferText(){var b=term.buffer.active,ls=[];for(var i=0;i<b.length;i++){var ln=b.getLine(i);if(ln)ls.push(ln.translateToString(true));}return ls.join('\\n').replace(/[ \\n]+$/,'');}
 // Copy: the current xterm selection, else the whole scrollback buffer.
 window.__shepCopy=function(){
   var txt=(term.getSelection&&term.getSelection())||'';
-  if(!txt){var b=term.buffer.active,ls=[];for(var i=0;i<b.length;i++){var ln=b.getLine(i);if(ln)ls.push(ln.translateToString(true));}txt=ls.join('\\n').replace(/[ \\n]+$/,'');}
+  if(!txt)txt=bufferText();
   post({type:'copy',text:txt});
 };
+// Long-press anywhere on the terminal → open the native select-&-copy sheet with
+// the scrollback (or the current xterm selection if the user made one). Touch-drag
+// in xterm scrolls, so in-place selection isn't reliable on touch; the native sheet
+// gives real OS selection handles. A move >10px or a second finger cancels it so
+// scrolling and pinch are unaffected.
+var lpTimer=null,lpX=0,lpY=0;
+function lpClear(){if(lpTimer){clearTimeout(lpTimer);lpTimer=null;}}
+document.addEventListener('touchstart',function(e){
+  if(!e.touches||e.touches.length!==1){lpClear();return;}
+  lpX=e.touches[0].clientX;lpY=e.touches[0].clientY;lpClear();
+  lpTimer=setTimeout(function(){lpTimer=null;var txt=(term.getSelection&&term.getSelection())||bufferText();post({type:'selecttext',text:txt});},480);
+},{passive:true});
+document.addEventListener('touchmove',function(e){
+  if(!e.touches||!e.touches.length)return;
+  if(Math.abs(e.touches[0].clientX-lpX)>10||Math.abs(e.touches[0].clientY-lpY)>10)lpClear();
+},{passive:true});
+document.addEventListener('touchend',lpClear,{passive:true});
+document.addEventListener('touchcancel',lpClear,{passive:true});
 setTimeout(function(){doFit();post({type:'ready'})},50);
 }catch(e){fail('Terminal init error: '+e.message);}
 }

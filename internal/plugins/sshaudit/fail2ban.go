@@ -17,6 +17,11 @@ type Fail2banStatus struct {
 	CurrentlyBanned int      `json:"currently_banned"`
 	TotalBanned     int      `json:"total_banned"`
 	BannedIPs       []string `json:"banned_ips"`
+	// The active ban policy for the sshd jail (read live from the running jail,
+	// falling back to the shepherd jail config). 0 when unknown.
+	MaxRetry int `json:"max_retry"` // failed attempts before a ban
+	FindTime int `json:"find_time"` // window (seconds) those attempts are counted in
+	BanTime  int `json:"ban_time"`  // ban duration (seconds)
 }
 
 // fail2banStatusScript probes the host for fail2ban. It prints three
@@ -45,6 +50,16 @@ fi
 echo "JAIL_BEGIN"
 fail2ban-client status sshd 2>/dev/null || true
 echo "JAIL_END"
+JAIL_CONF=/etc/fail2ban/jail.d/shepherd-sshd.local
+F2B_MR=$(fail2ban-client get sshd maxretry 2>/dev/null)
+[ -z "$F2B_MR" ] && F2B_MR=$(sed -n 's/^[[:space:]]*maxretry[[:space:]]*=[[:space:]]*//p' "$JAIL_CONF" 2>/dev/null)
+F2B_FT=$(fail2ban-client get sshd findtime 2>/dev/null)
+[ -z "$F2B_FT" ] && F2B_FT=$(sed -n 's/^[[:space:]]*findtime[[:space:]]*=[[:space:]]*//p' "$JAIL_CONF" 2>/dev/null)
+F2B_BT=$(fail2ban-client get sshd bantime 2>/dev/null)
+[ -z "$F2B_BT" ] && F2B_BT=$(sed -n 's/^[[:space:]]*bantime[[:space:]]*=[[:space:]]*//p' "$JAIL_CONF" 2>/dev/null)
+echo "MAXRETRY=$F2B_MR"
+echo "FINDTIME=$F2B_FT"
+echo "BANTIME=$F2B_BT"
 `
 
 // fail2banEnableScript installs fail2ban if missing, writes the shepherd sshd
@@ -68,16 +83,28 @@ if ! command -v fail2ban-client >/dev/null 2>&1; then
   fi
 fi
 mkdir -p /etc/fail2ban/jail.d
-cat > /etc/fail2ban/jail.d/shepherd-sshd.local <<'EOF'
+# On systemd-journald hosts the default sshd logpath (/var/log/auth.log) often
+# doesn't exist, so the jail fails to start and the whole service stays inactive.
+# Reading from the journal (backend=systemd) is the robust fix; non-systemd
+# hosts keep the file-watching default.
+F2B_BACKEND=auto
+if command -v systemctl >/dev/null 2>&1; then F2B_BACKEND=systemd; fi
+cat > /etc/fail2ban/jail.d/shepherd-sshd.local <<EOF
 [sshd]
 enabled = true
+backend = $F2B_BACKEND
 maxretry = 5
 findtime = 600
 bantime = 3600
 EOF
 if command -v systemctl >/dev/null 2>&1; then
   systemctl enable --now fail2ban
-  systemctl reload fail2ban 2>/dev/null || systemctl restart fail2ban
+  systemctl restart fail2ban
+  sleep 1
+  if ! systemctl is-active --quiet fail2ban; then
+    echo "fail2ban failed to start: $(systemctl status fail2ban --no-pager -l 2>&1 | tail -n 6)" >&2
+    exit 1
+  fi
 elif command -v rc-service >/dev/null 2>&1; then
   rc-update add fail2ban default 2>/dev/null || true
   rc-service fail2ban restart
@@ -116,8 +143,10 @@ func fail2banLiveStatus(ctx context.Context, exec plugins.HostExec, serverID int
 	if code != 0 {
 		return Fail2banStatus{}, fmt.Errorf("fail2ban status probe exited %d on host", code)
 	}
-	installed, active, jail := splitStatusProbe(string(stdout))
-	return parseFail2banStatus(installed, active, jail), nil
+	installed, active, jail, policy := splitStatusProbe(string(stdout))
+	st := parseFail2banStatus(installed, active, jail)
+	st.MaxRetry, st.FindTime, st.BanTime = policy.maxRetry, policy.findTime, policy.banTime
+	return st, nil
 }
 
 // fail2banApply enables or disables fail2ban on the host. enable=true installs
@@ -144,9 +173,17 @@ func fail2banApply(ctx context.Context, exec plugins.HostExec, serverID int64, e
 	return nil
 }
 
-// splitStatusProbe extracts the INSTALLED=/ACTIVE= flags and the jail block
-// (everything between JAIL_BEGIN and JAIL_END) from the probe script output.
-func splitStatusProbe(out string) (installed bool, active bool, jail string) {
+// banPolicy holds the sshd jail's ban thresholds (seconds for the times).
+type banPolicy struct {
+	maxRetry int
+	findTime int
+	banTime  int
+}
+
+// splitStatusProbe extracts the INSTALLED=/ACTIVE= flags, the jail block
+// (everything between JAIL_BEGIN and JAIL_END) and the MAXRETRY=/FINDTIME=/
+// BANTIME= policy markers from the probe script output.
+func splitStatusProbe(out string) (installed bool, active bool, jail string, policy banPolicy) {
 	lines := strings.Split(out, "\n")
 	var jailLines []string
 	inJail := false
@@ -163,9 +200,15 @@ func splitStatusProbe(out string) (installed bool, active bool, jail string) {
 			installed = strings.TrimPrefix(line, "INSTALLED=") == "1"
 		case strings.HasPrefix(line, "ACTIVE="):
 			active = strings.TrimPrefix(line, "ACTIVE=") == "1"
+		case strings.HasPrefix(line, "MAXRETRY="):
+			policy.maxRetry = atoiSafe(strings.TrimPrefix(line, "MAXRETRY="))
+		case strings.HasPrefix(line, "FINDTIME="):
+			policy.findTime = atoiSafe(strings.TrimPrefix(line, "FINDTIME="))
+		case strings.HasPrefix(line, "BANTIME="):
+			policy.banTime = atoiSafe(strings.TrimPrefix(line, "BANTIME="))
 		}
 	}
-	return installed, active, strings.Join(jailLines, "\n")
+	return installed, active, strings.Join(jailLines, "\n"), policy
 }
 
 // parseFail2banStatus builds the status object from the probe flags and the

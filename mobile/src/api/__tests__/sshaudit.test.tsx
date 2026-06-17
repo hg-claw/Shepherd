@@ -188,6 +188,9 @@ const WIRE_FAIL2BAN = {
   currently_banned: 3,
   total_banned: 41,
   banned_ips: ['203.0.113.9', '198.51.100.3', '192.0.2.4'],
+  max_retry: 5,
+  find_time: 600,
+  ban_time: 3600,
 }
 
 test('fetchSshauditFail2ban GETs the per-host /fail2ban path and surfaces plain values', async () => {
@@ -199,6 +202,10 @@ test('fetchSshauditFail2ban GETs the per-host /fail2ban path and surfaces plain 
   expect(res.currently_banned).toBe(3)
   expect(res.total_banned).toBe(41)
   expect(res.banned_ips).toEqual(['203.0.113.9', '198.51.100.3', '192.0.2.4'])
+  // ban policy fields survive as plain numbers
+  expect(res.max_retry).toBe(5)
+  expect(res.find_time).toBe(600)
+  expect(res.ban_time).toBe(3600)
 })
 
 test('useSshauditFail2ban is disabled without a server and resolves with one', async () => {

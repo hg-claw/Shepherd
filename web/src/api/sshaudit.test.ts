@@ -97,15 +97,20 @@ describe('sshaudit api', () => {
     mockGet.mockResolvedValue({
       installed: true, active: true, currently_banned: 2, total_banned: 9,
       banned_ips: ['198.51.100.7'],
+      max_retry: 5, find_time: 600, ban_time: 3600,
     })
     const out = await fetchSSHAuditFail2ban(6)
     expect(mockGet).toHaveBeenCalledWith('/api/admin/plugins/sshaudit/hosts/6/fail2ban')
     expect(out.currently_banned).toBe(2)
+    expect(out.max_retry).toBe(5)
+    expect(out.find_time).toBe(600)
+    expect(out.ban_time).toBe(3600)
   })
 
   it('setSSHAuditFail2ban POSTs the enabled flag', async () => {
     mockPost.mockResolvedValue({
       installed: true, active: true, currently_banned: 0, total_banned: 0, banned_ips: [],
+      max_retry: 5, find_time: 600, ban_time: 3600,
     })
     const out = await setSSHAuditFail2ban(6, true)
     expect(mockPost).toHaveBeenCalledWith('/api/admin/plugins/sshaudit/hosts/6/fail2ban', { enabled: true })
@@ -115,6 +120,7 @@ describe('sshaudit api', () => {
   it('setSSHAuditFail2ban POSTs enabled:false to disable', async () => {
     mockPost.mockResolvedValue({
       installed: true, active: false, currently_banned: 0, total_banned: 0, banned_ips: [],
+      max_retry: 0, find_time: 0, ban_time: 0,
     })
     await setSSHAuditFail2ban(6, false)
     expect(mockPost).toHaveBeenCalledWith('/api/admin/plugins/sshaudit/hosts/6/fail2ban', { enabled: false })

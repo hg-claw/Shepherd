@@ -175,6 +175,11 @@ export type SshauditFail2ban = {
   currently_banned: number
   total_banned: number
   banned_ips: string[]
+  // The ban policy: max_retry failed attempts within find_time seconds → a
+  // ban of ban_time seconds. All 0 when unknown. Plain numbers, no sql.Null.
+  max_retry: number
+  find_time: number
+  ban_time: number
 }
 
 export function fetchSshauditFail2ban(serverID: number): Promise<SshauditFail2ban> {

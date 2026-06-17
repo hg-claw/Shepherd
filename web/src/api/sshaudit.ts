@@ -81,6 +81,12 @@ export interface SSHFail2banStatus {
   currently_banned: number
   total_banned: number
   banned_ips: string[]
+  // Ban policy from the jail config. max_retry failed attempts within find_time
+  // seconds triggers a ban_time-second ban. All 0 when the host couldn't report
+  // them (older agent / parse miss) — the UI hides the policy line then.
+  max_retry: number
+  find_time: number
+  ban_time: number
 }
 
 // 1. List configured hosts (only servers with a config row).

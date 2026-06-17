@@ -46,6 +46,9 @@ describe('sshaudit/HardeningTab', () => {
       currently_banned: 2,
       total_banned: 9,
       banned_ips: ['198.51.100.7', '203.0.113.4'],
+      max_retry: 5,
+      find_time: 600,
+      ban_time: 3600,
     })
     renderTab()
     expect(await screen.findByText('active')).toBeTruthy()
@@ -55,6 +58,27 @@ describe('sshaudit/HardeningTab', () => {
     // banned IPs surfaced as pills
     expect(screen.getByText('198.51.100.7')).toBeTruthy()
     expect(screen.getByText('203.0.113.4')).toBeTruthy()
+    // ban policy line: "5 failed attempts within 10m → ban for 1h"
+    expect(screen.getByText('Ban policy')).toBeTruthy()
+    expect(screen.getByText('5')).toBeTruthy()
+    expect(screen.getByText('10m')).toBeTruthy()
+    expect(screen.getByText('1h')).toBeTruthy()
+  })
+
+  it('hides the ban policy line when the policy fields are unknown (0)', async () => {
+    mockStatus.mockResolvedValue({
+      installed: true,
+      active: true,
+      currently_banned: 0,
+      total_banned: 0,
+      banned_ips: [],
+      max_retry: 0,
+      find_time: 0,
+      ban_time: 0,
+    })
+    renderTab()
+    expect(await screen.findByText('active')).toBeTruthy()
+    expect(screen.queryByText('Ban policy')).toBeNull()
   })
 
   it('shows an offline state on a 502', async () => {
@@ -70,6 +94,9 @@ describe('sshaudit/HardeningTab', () => {
       currently_banned: 0,
       total_banned: 0,
       banned_ips: [],
+      max_retry: 0,
+      find_time: 0,
+      ban_time: 0,
     })
     mockSet.mockResolvedValue({
       installed: true,
@@ -77,6 +104,9 @@ describe('sshaudit/HardeningTab', () => {
       currently_banned: 0,
       total_banned: 0,
       banned_ips: [],
+      max_retry: 5,
+      find_time: 600,
+      ban_time: 3600,
     })
     // Enabling is confirmed via window.confirm.
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
@@ -96,6 +126,9 @@ describe('sshaudit/HardeningTab', () => {
       currently_banned: 0,
       total_banned: 0,
       banned_ips: [],
+      max_retry: 0,
+      find_time: 0,
+      ban_time: 0,
     })
     vi.spyOn(window, 'confirm').mockReturnValue(false)
     renderTab()

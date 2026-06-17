@@ -194,6 +194,19 @@ function StatusCard({
         <StatCard label="Banned IPs" value={status.banned_ips.length} />
       </div>
 
+      {status.max_retry > 0 && status.find_time > 0 && status.ban_time > 0 ? (
+        <div className="border rounded-md p-3">
+          <div className="text-muted-foreground text-[11px] uppercase tracking-wide mb-1">
+            Ban policy
+          </div>
+          <div className="text-[12.5px]">
+            <span className="font-mono tabular-nums">{status.max_retry}</span> failed attempts within{' '}
+            <span className="font-mono tabular-nums">{humanSeconds(status.find_time)}</span> → ban for{' '}
+            <span className="font-mono tabular-nums">{humanSeconds(status.ban_time)}</span>
+          </div>
+        </div>
+      ) : null}
+
       <div className="border rounded-md p-3">
         <div className="text-muted-foreground text-[11px] uppercase tracking-wide mb-2">
           Banned IPs
@@ -212,6 +225,15 @@ function StatusCard({
       </div>
     </div>
   )
+}
+
+// Compact, locale-free duration: 600→"10m", 3600→"1h", 86400→"24h". Falls back
+// to "{n}s" for values that aren't a whole number of minutes/hours. We top out
+// at hours (so a 1-day ban reads "24h"), matching how the jail config is shown.
+function humanSeconds(n: number): string {
+  if (n % 3600 === 0) return `${n / 3600}h`
+  if (n % 60 === 0) return `${n / 60}m`
+  return `${n}s`
 }
 
 function StatCard({ label, value, tone }: { label: string; value: number; tone?: 'warn' }) {

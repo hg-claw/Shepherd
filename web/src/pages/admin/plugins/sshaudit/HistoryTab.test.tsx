@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import HistoryTab from './HistoryTab'
+import { fetchSSHAuditSummary, fetchSSHAuditEvents } from '@/api/sshaudit'
 
 vi.mock('@/api/servers', () => ({
   useServers: () => ({
@@ -36,6 +37,9 @@ function renderTab() {
   )
 }
 
+const mockSummary = fetchSSHAuditSummary as unknown as ReturnType<typeof vi.fn>
+const mockEvents = fetchSSHAuditEvents as unknown as ReturnType<typeof vi.fn>
+
 describe('sshaudit/HistoryTab', () => {
   it('renders the summary strip and event rows', async () => {
     renderTab()
@@ -48,5 +52,26 @@ describe('sshaudit/HistoryTab', () => {
     expect(screen.getAllByText('198.51.100.7').length).toBeGreaterThan(0)
     // failed counts in the summary strip
     expect(screen.getByText('34')).toBeTruthy()
+  })
+
+  it('defaults to the 24h window', async () => {
+    mockSummary.mockClear()
+    mockEvents.mockClear()
+    renderTab()
+    await screen.findByText('oracle')
+    expect(mockSummary).toHaveBeenCalledWith(1, { window: '24h' })
+    expect(mockEvents).toHaveBeenCalledWith(1, { result: 'all', limit: 200, window: '24h' })
+  })
+
+  it('switching the window refetches summary + events with the new window', async () => {
+    mockSummary.mockClear()
+    mockEvents.mockClear()
+    renderTab()
+    await screen.findByText('oracle')
+
+    fireEvent.click(screen.getByText('7d'))
+
+    await waitFor(() => expect(mockSummary).toHaveBeenCalledWith(1, { window: '7d' }))
+    expect(mockEvents).toHaveBeenCalledWith(1, { result: 'all', limit: 200, window: '7d' })
   })
 })

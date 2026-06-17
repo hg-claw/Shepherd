@@ -9,6 +9,7 @@ import {
   fetchSSHAuditEvents,
   fetchSSHAuditSummary,
   type SSHEvent,
+  type SSHAuditWindow,
 } from '@/api/sshaudit'
 
 type ResultFilter = 'all' | 'accepted' | 'failed'
@@ -19,6 +20,12 @@ const FILTER_OPTIONS: { value: ResultFilter; label: string }[] = [
   { value: 'failed',   label: 'Failed' },
 ]
 
+const WINDOW_OPTIONS: { value: SSHAuditWindow; label: string }[] = [
+  { value: '24h', label: '24h' },
+  { value: '7d',  label: '7d' },
+  { value: '30d', label: '30d' },
+]
+
 export default function HistoryTab() {
   const [sp, setSP] = useSearchParams()
   const initialID = Number(sp.get('server_id') || 0) || undefined
@@ -26,21 +33,22 @@ export default function HistoryTab() {
   const { data: servers = [] } = useServers()
   const [serverID, setServerID] = useState<number | undefined>(initialID)
   const [filter, setFilter] = useState<ResultFilter>('all')
+  const [window, setWindow] = useState<SSHAuditWindow>('24h')
 
   // Pick the first server when nothing is selected so the operator
   // doesn't see an empty page on first open.
   const effectiveID = serverID ?? (servers[0]?.id as number | undefined)
 
   const summaryQ = useQuery({
-    queryKey: ['sshaudit', 'summary', effectiveID],
-    queryFn: () => fetchSSHAuditSummary(effectiveID!),
+    queryKey: ['sshaudit', 'summary', effectiveID, window],
+    queryFn: () => fetchSSHAuditSummary(effectiveID!, { window }),
     enabled: !!effectiveID,
     refetchInterval: 30_000,
   })
 
   const eventsQ = useQuery({
-    queryKey: ['sshaudit', 'events', effectiveID, filter],
-    queryFn: () => fetchSSHAuditEvents(effectiveID!, { result: filter, limit: 200 }),
+    queryKey: ['sshaudit', 'events', effectiveID, filter, window],
+    queryFn: () => fetchSSHAuditEvents(effectiveID!, { result: filter, limit: 200, window }),
     enabled: !!effectiveID,
     refetchInterval: 30_000,
   })
@@ -81,6 +89,20 @@ export default function HistoryTab() {
               variant={o.value === filter ? 'default' : 'outline'}
               className="h-7 px-2.5 text-[11.5px]"
               onClick={() => setFilter(o.value)}
+            >
+              {o.label}
+            </Button>
+          ))}
+        </div>
+
+        <div className="flex gap-1">
+          {WINDOW_OPTIONS.map((o) => (
+            <Button
+              key={o.value}
+              size="sm"
+              variant={o.value === window ? 'default' : 'outline'}
+              className="h-7 px-2.5 text-[11.5px]"
+              onClick={() => setWindow(o.value)}
             >
               {o.label}
             </Button>

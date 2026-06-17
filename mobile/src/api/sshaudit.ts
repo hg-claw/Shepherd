@@ -95,24 +95,31 @@ export type SshauditEvent = {
 // The result filter the History tab drives. 'all' omits the per-result filter.
 export type SshauditEventFilter = SshauditResult | 'all'
 
+// The time window the History tab drives. Maps to summary.window_hours
+// 24/168/720 server-side; threaded into the events + summary querystrings.
+export type SshauditWindow = '24h' | '7d' | '30d'
+
 export function fetchSshauditEvents(
   serverID: number,
   result: SshauditEventFilter = 'all',
+  window: SshauditWindow = '24h',
   limit: number = 200,
 ): Promise<SshauditEvent[]> {
-  const qs = new URLSearchParams({ result, limit: String(limit) })
+  const qs = new URLSearchParams({ result, limit: String(limit), window })
   return authedFetch<SshauditEvent[]>(`${ROOT}/hosts/${serverID}/events?${qs.toString()}`)
 }
 
-// Newest-first event list. Query key carries the filter so switching All/
-// Accepted/Failed refetches cleanly without an effect. Disabled until picked.
+// Newest-first event list. Query key carries the filter + window so switching
+// All/Accepted/Failed or 24h/7d/30d refetches cleanly without an effect.
+// Disabled until picked.
 export function useSshauditEvents(
   serverID: number | null,
   result: SshauditEventFilter = 'all',
+  window: SshauditWindow = '24h',
 ): UseQueryResult<SshauditEvent[]> {
   return useQuery({
-    queryKey: ['sshaudit-events', serverID, result],
-    queryFn: () => fetchSshauditEvents(serverID as number, result),
+    queryKey: ['sshaudit-events', serverID, result, window],
+    queryFn: () => fetchSshauditEvents(serverID as number, result, window),
     enabled: serverID != null,
   })
 }
@@ -129,14 +136,23 @@ export type SshauditSummary = {
   top_failed_users: { username: string; count: number }[]
 }
 
-export function fetchSshauditSummary(serverID: number): Promise<SshauditSummary> {
-  return authedFetch<SshauditSummary>(`${ROOT}/hosts/${serverID}/summary`)
+export function fetchSshauditSummary(
+  serverID: number,
+  window: SshauditWindow = '24h',
+): Promise<SshauditSummary> {
+  const qs = new URLSearchParams({ window })
+  return authedFetch<SshauditSummary>(`${ROOT}/hosts/${serverID}/summary?${qs.toString()}`)
 }
 
-export function useSshauditSummary(serverID: number | null): UseQueryResult<SshauditSummary> {
+// Window-scoped rollup. Query key carries the window so 24h/7d/30d switches
+// refetch the right summary (window_hours comes back 24/168/720).
+export function useSshauditSummary(
+  serverID: number | null,
+  window: SshauditWindow = '24h',
+): UseQueryResult<SshauditSummary> {
   return useQuery({
-    queryKey: ['sshaudit-summary', serverID],
-    queryFn: () => fetchSshauditSummary(serverID as number),
+    queryKey: ['sshaudit-summary', serverID, window],
+    queryFn: () => fetchSshauditSummary(serverID as number, window),
     enabled: serverID != null,
   })
 }
@@ -146,4 +162,40 @@ export function useSshauditSummary(serverID: number | null): UseQueryResult<Ssha
 // Force an immediate collection pass. 502 {error} on failure (host offline).
 export function collectSshaudit(serverID: number): Promise<{ ok: true; inserted: number }> {
   return authedFetch<{ ok: true; inserted: number }>(`${ROOT}/hosts/${serverID}/collect`, { method: 'POST' })
+}
+
+// ── fail2ban hardening (per host) ───────────────────────────────────────────────
+
+// fail2banStatus in routes.go — all plain values, no sql.Null wrappers.
+// fail2ban is an SSH brute-force mitigation; this is defensive hardening of the
+// operator's own managed hosts (install + enable/disable the local service).
+export type SshauditFail2ban = {
+  installed: boolean
+  active: boolean
+  currently_banned: number
+  total_banned: number
+  banned_ips: string[]
+}
+
+export function fetchSshauditFail2ban(serverID: number): Promise<SshauditFail2ban> {
+  return authedFetch<SshauditFail2ban>(`${ROOT}/hosts/${serverID}/fail2ban`)
+}
+
+// LIVE query — may 502 {error} when the host is offline; the Hardening tab
+// renders a graceful retry/offline state off isError. Disabled until picked.
+export function useSshauditFail2ban(serverID: number | null): UseQueryResult<SshauditFail2ban> {
+  return useQuery({
+    queryKey: ['sshaudit-fail2ban', serverID],
+    queryFn: () => fetchSshauditFail2ban(serverID as number),
+    enabled: serverID != null,
+  })
+}
+
+// Enable installs the package + starts the service (can be slow → busy state);
+// disable stops it. Returns the resulting status. 502 {error} on host offline.
+export function setSshauditFail2ban(serverID: number, enabled: boolean): Promise<SshauditFail2ban> {
+  return authedFetch<SshauditFail2ban>(`${ROOT}/hosts/${serverID}/fail2ban`, {
+    method: 'POST',
+    body: { enabled },
+  })
 }

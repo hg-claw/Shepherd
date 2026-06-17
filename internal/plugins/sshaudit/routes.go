@@ -1,6 +1,7 @@
 package sshaudit
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -30,6 +31,8 @@ func (p *Plugin) RegisterRoutes(mux plugins.Mux, deps plugins.Deps) {
 	mux.HandleFunc("GET /hosts/{server_id}/events", p.listEvents)
 	mux.HandleFunc("GET /hosts/{server_id}/summary", p.getSummary)
 	mux.HandleFunc("POST /hosts/{server_id}/collect", p.collectNow)
+	mux.HandleFunc("GET /hosts/{server_id}/fail2ban", p.getFail2ban)
+	mux.HandleFunc("POST /hosts/{server_id}/fail2ban", p.setFail2ban)
 }
 
 // hostRow is the JSON shape returned by GET /hosts. Only rows actually
@@ -145,7 +148,14 @@ func (p *Plugin) listEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	limit := clampLimit(q.Get("limit"))
-	rows, err := queryEvents(r.Context(), p.deps.DB, sid, result, limit)
+	// window is optional: present → bound events to ts >= now-window; absent →
+	// no time filter (historical behavior). The UIs always send it.
+	var since *time.Time
+	if wq := q.Get("window"); wq != "" {
+		t := p.now().UTC().Add(-parseWindow(wq))
+		since = &t
+	}
+	rows, err := queryEvents(r.Context(), p.deps.DB, sid, result, limit, since)
 	if err != nil {
 		writeErr(w, 500, err)
 		return
@@ -159,7 +169,8 @@ func (p *Plugin) getSummary(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, err)
 		return
 	}
-	s, err := buildSummary(r.Context(), p.deps.DB, sid, p.now().UTC())
+	window := parseWindow(r.URL.Query().Get("window"))
+	s, err := buildSummary(r.Context(), p.deps.DB, sid, p.now().UTC(), window)
 	if err != nil {
 		writeErr(w, 500, err)
 		return
@@ -181,6 +192,68 @@ func (p *Plugin) collectNow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]any{"ok": true, "inserted": inserted})
+}
+
+// fail2banActionTimeout bounds the synchronous enable/disable action, which may
+// apt/dnf-install fail2ban. The HTTP server has no WriteTimeout, so a generous
+// timeout here is the only bound on the host command.
+const fail2banActionTimeout = 180 * time.Second
+
+// getFail2ban reports live fail2ban status read from the host. This is
+// per-host live state (no DB row); it's queried fresh on every call.
+func (p *Plugin) getFail2ban(w http.ResponseWriter, r *http.Request) {
+	sid, err := strconv.ParseInt(r.PathValue("server_id"), 10, 64)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	if p.deps.HostExec == nil {
+		writeErr(w, 502, errors.New("host exec unavailable"))
+		return
+	}
+	st, err := fail2banLiveStatus(r.Context(), p.deps.HostExec, sid)
+	if err != nil {
+		writeErr(w, 502, err)
+		return
+	}
+	writeJSON(w, 200, st)
+}
+
+type setFail2banBody struct {
+	Enabled bool `json:"enabled"`
+}
+
+// setFail2ban installs+enables (on enabled=true) or stops+disables (on false)
+// fail2ban on the host, then re-queries and returns the resulting status. The
+// action runs synchronously under a generous timeout (apt/dnf install can be
+// slow); 502 on any host/agent failure.
+func (p *Plugin) setFail2ban(w http.ResponseWriter, r *http.Request) {
+	sid, err := strconv.ParseInt(r.PathValue("server_id"), 10, 64)
+	if err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	var b setFail2banBody
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
+		writeErr(w, 400, err)
+		return
+	}
+	if p.deps.HostExec == nil {
+		writeErr(w, 502, errors.New("host exec unavailable"))
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), fail2banActionTimeout)
+	defer cancel()
+	if err := fail2banApply(ctx, p.deps.HostExec, sid, b.Enabled); err != nil {
+		writeErr(w, 502, err)
+		return
+	}
+	st, err := fail2banLiveStatus(ctx, p.deps.HostExec, sid)
+	if err != nil {
+		writeErr(w, 502, err)
+		return
+	}
+	writeJSON(w, 200, st)
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────

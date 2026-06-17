@@ -20,15 +20,19 @@ jest.mock('@/api/servers', () => ({ useServers: () => mockServers() }))
 
 const mockHosts = jest.fn<Q, []>()
 const mockSessions = jest.fn<Q, [number | null]>()
-const mockEvents = jest.fn<Q, [number | null, string]>()
-const mockSummary = jest.fn<Q, [number | null]>()
+const mockEvents = jest.fn<Q, [number | null, string, string]>()
+const mockSummary = jest.fn<Q, [number | null, string]>()
+const mockFail2ban = jest.fn<Q, [number | null]>()
 const mockCollect = jest.fn().mockResolvedValue({ ok: true, inserted: 3 })
+const mockSetFail2ban = jest.fn().mockResolvedValue({ installed: true, active: true, currently_banned: 0, total_banned: 0, banned_ips: [] })
 jest.mock('@/api/sshaudit', () => ({
   useSshauditHosts: () => mockHosts(),
   useSshauditSessions: (sid: number | null) => mockSessions(sid),
-  useSshauditEvents: (sid: number | null, result: string) => mockEvents(sid, result),
-  useSshauditSummary: (sid: number | null) => mockSummary(sid),
+  useSshauditEvents: (sid: number | null, result: string, window: string) => mockEvents(sid, result, window),
+  useSshauditSummary: (sid: number | null, window: string) => mockSummary(sid, window),
+  useSshauditFail2ban: (sid: number | null) => mockFail2ban(sid),
   collectSshaudit: (...a: unknown[]) => mockCollect(...a),
+  setSshauditFail2ban: (...a: unknown[]) => mockSetFail2ban(...a),
 }))
 
 // Wire fixtures — server public_alias as Go sql.NullString {String,Valid}.
@@ -59,6 +63,13 @@ const SUMMARY = {
   top_sources: [{ source_ip: '203.0.113.9', count: 60, last_ts: new Date().toISOString() }],
   top_failed_users: [{ username: 'admin', count: 40 }],
 }
+const FAIL2BAN = {
+  installed: true,
+  active: true,
+  currently_banned: 3,
+  total_banned: 41,
+  banned_ips: ['203.0.113.9', '198.51.100.3', '192.0.2.4'],
+}
 
 beforeEach(() => {
   jest.clearAllMocks()
@@ -67,6 +78,8 @@ beforeEach(() => {
   mockSessions.mockReturnValue(ok(SESSIONS))
   mockEvents.mockReturnValue(ok(EVENTS))
   mockSummary.mockReturnValue(ok(SUMMARY))
+  mockFail2ban.mockReturnValue(ok(FAIL2BAN))
+  mockSetFail2ban.mockResolvedValue({ installed: true, active: true, currently_banned: 0, total_banned: 41, banned_ips: [] })
   jest.spyOn(Alert, 'alert').mockImplementation(() => {})
 })
 
@@ -128,7 +141,7 @@ const gotoHistory = (getByText: (t: string) => unknown) => fireEvent.press(getBy
 test('History: renders accepted/failed pills + invalid badge for the events', () => {
   const { getByText, getByTestId } = render(<SshauditScreen />)
   gotoHistory(getByText)
-  expect(mockEvents).toHaveBeenCalledWith(7, 'all')
+  expect(mockEvents).toHaveBeenCalledWith(7, 'all', '24h')
   // result pills
   expect(getByText('failed')).toBeTruthy()
   expect(getByText('accepted')).toBeTruthy()
@@ -150,9 +163,28 @@ test('History: summary strip shows 24h accepted/failed/unique-IP counts', () => 
 test('History: result filter switches the events query (Failed)', () => {
   const { getByText } = render(<SshauditScreen />)
   gotoHistory(getByText)
-  expect(mockEvents).toHaveBeenLastCalledWith(7, 'all')
+  expect(mockEvents).toHaveBeenLastCalledWith(7, 'all', '24h')
   fireEvent.press(getByText('Failed'))
-  expect(mockEvents).toHaveBeenLastCalledWith(7, 'failed')
+  expect(mockEvents).toHaveBeenLastCalledWith(7, 'failed', '24h')
+})
+
+test('History: window Segmented switches both the events and summary queries', () => {
+  const { getByText } = render(<SshauditScreen />)
+  gotoHistory(getByText)
+  expect(mockEvents).toHaveBeenLastCalledWith(7, 'all', '24h')
+  expect(mockSummary).toHaveBeenLastCalledWith(7, '24h')
+  fireEvent.press(getByText('7d'))
+  expect(mockEvents).toHaveBeenLastCalledWith(7, 'all', '7d')
+  expect(mockSummary).toHaveBeenLastCalledWith(7, '7d')
+  fireEvent.press(getByText('30d'))
+  expect(mockEvents).toHaveBeenLastCalledWith(7, 'all', '30d')
+  expect(mockSummary).toHaveBeenLastCalledWith(7, '30d')
+})
+
+test('History: shows the summary-reflects-window label', () => {
+  const { getByText } = render(<SshauditScreen />)
+  gotoHistory(getByText)
+  expect(getByText('summary reflects window')).toBeTruthy()
 })
 
 test('History: empty event set shows an empty state', () => {
@@ -169,6 +201,85 @@ test('History: a load error offers retry', () => {
   gotoHistory(getByText)
   fireEvent.press(getByText('Retry'))
   expect(fq.refetch).toHaveBeenCalled()
+})
+
+// ── Hardening tab ─────────────────────────────────────────────────────────────
+
+const gotoHardening = (getByText: (t: string) => unknown) => fireEvent.press(getByText('Hardening') as never)
+
+test('Hardening: fetches fail2ban status for the first host and shows installed/active state', () => {
+  const { getByText, getByTestId } = render(<SshauditScreen />)
+  gotoHardening(getByText)
+  expect(mockFail2ban).toHaveBeenCalledWith(7)
+  expect(getByText('active')).toBeTruthy()
+  expect(getByTestId('fail2ban-switch')).toBeTruthy()
+})
+
+test('Hardening: renders currently-banned + total-banned counts and the banned IP list', () => {
+  const { getByText, getByTestId } = render(<SshauditScreen />)
+  gotoHardening(getByText)
+  expect(getByText('3')).toBeTruthy() // currently banned
+  expect(getByText('41')).toBeTruthy() // total banned
+  expect(getByText('currently banned')).toBeTruthy()
+  expect(getByText('total banned')).toBeTruthy()
+  // banned IP rows (mono)
+  expect(getByText('203.0.113.9')).toBeTruthy()
+  expect(getByText('198.51.100.3')).toBeTruthy()
+  expect(getByTestId('banned-0')).toBeTruthy()
+})
+
+test('Hardening: a 502 / host-offline error shows a graceful retry state', () => {
+  const fq = { ...failed, refetch: jest.fn() }
+  mockFail2ban.mockReturnValue(fq)
+  const { getByText } = render(<SshauditScreen />)
+  gotoHardening(getByText)
+  expect(getByText(/Host offline/)).toBeTruthy()
+  fireEvent.press(getByText('Retry'))
+  expect(fq.refetch).toHaveBeenCalled()
+})
+
+test('Hardening: not-installed shows an Enable hardening CTA', () => {
+  mockFail2ban.mockReturnValue(ok({ installed: false, active: false, currently_banned: 0, total_banned: 0, banned_ips: [] }))
+  const { getByText, getByTestId } = render(<SshauditScreen />)
+  gotoHardening(getByText)
+  expect(getByText('fail2ban is not installed')).toBeTruthy()
+  expect(getByTestId('fail2ban-enable')).toBeTruthy()
+})
+
+test('Hardening: enabling confirms via Alert then calls setSshauditFail2ban(true)', async () => {
+  // Make the Alert "Enable" button fire its onPress synchronously.
+  jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
+    const enable = (buttons ?? []).find((b) => b.text === 'Enable')
+    enable?.onPress?.()
+  })
+  mockFail2ban.mockReturnValue(ok({ installed: false, active: false, currently_banned: 0, total_banned: 0, banned_ips: [] }))
+  const refetch = jest.fn()
+  mockFail2ban.mockReturnValue({ ...ok({ installed: false, active: false, currently_banned: 0, total_banned: 0, banned_ips: [] }), refetch })
+  const { getByText, getByTestId } = render(<SshauditScreen />)
+  gotoHardening(getByText)
+  fireEvent.press(getByTestId('fail2ban-enable'))
+  expect(Alert.alert).toHaveBeenCalled()
+  await waitFor(() => expect(mockSetFail2ban).toHaveBeenCalledWith(7, true))
+  await waitFor(() => expect(refetch).toHaveBeenCalled())
+})
+
+test('Hardening: toggling the switch off disables fail2ban without an Alert', async () => {
+  const refetch = jest.fn()
+  mockFail2ban.mockReturnValue({ ...ok(FAIL2BAN), refetch })
+  const { getByText, getByTestId } = render(<SshauditScreen />)
+  gotoHardening(getByText)
+  fireEvent(getByTestId('fail2ban-switch'), 'press')
+  expect(Alert.alert).not.toHaveBeenCalled()
+  await waitFor(() => expect(mockSetFail2ban).toHaveBeenCalledWith(7, false))
+  await waitFor(() => expect(refetch).toHaveBeenCalled())
+})
+
+test('Hardening: picking another host chip re-queries fail2ban for it', () => {
+  const { getByText, getByTestId } = render(<SshauditScreen />)
+  gotoHardening(getByText)
+  expect(mockFail2ban).toHaveBeenLastCalledWith(7)
+  fireEvent.press(getByTestId('host-9'))
+  expect(mockFail2ban).toHaveBeenLastCalledWith(9)
 })
 
 // ── host-level states ───────────────────────────────────────────────────────────

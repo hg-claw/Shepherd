@@ -3,23 +3,30 @@ import { View, Text, ScrollView, Pressable, ActivityIndicator, RefreshControl, A
 import { Stack, useRouter } from 'expo-router'
 import {
   useSshauditHosts, useSshauditSessions, useSshauditEvents, useSshauditSummary,
-  collectSshaudit,
-  type SshauditHost, type SshauditEventFilter, type SshauditEvent,
+  useSshauditFail2ban, setSshauditFail2ban, collectSshaudit,
+  type SshauditHost, type SshauditEventFilter, type SshauditWindow, type SshauditEvent,
 } from '@/api/sshaudit'
 import { useServers, type ServerRow } from '@/api/servers'
 import { nullStr } from '@/api/metrics'
 import { cmpStr, relTime } from '@/lib/format'
 import { useTheme } from '@/theme'
 import { Screen } from '@/components/Screen'
-import { NavBar, Card, CardHead, Pill, Segmented, Button, Empty } from '@/components/ds'
+import { NavBar, Card, CardHead, Pill, Segmented, Switch, Button, Empty } from '@/components/ds'
 
-type Tab = 'sessions' | 'history'
+type Tab = 'sessions' | 'history' | 'hardening'
 
 // Result filter options for the History tab (mirrors the GET /events ?result).
 const RESULT_FILTERS: { value: SshauditEventFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'accepted', label: 'Accepted' },
   { value: 'failed', label: 'Failed' },
+]
+
+// Time-window options for the History tab (drives both summary + events).
+const WINDOWS: { value: SshauditWindow; label: string }[] = [
+  { value: '24h', label: '24h' },
+  { value: '7d', label: '7d' },
+  { value: '30d', label: '30d' },
 ]
 
 // ── pure helpers (exported for tests) ────────────────────────────────────────
@@ -181,18 +188,23 @@ function SessionsTab({ serverID }: { serverID: number }) {
 
 // ── History tab (login success/failure) ──────────────────────────────────────
 
-function SummaryStrip({ serverID }: { serverID: number }) {
+function SummaryStrip({ serverID, window }: { serverID: number; window: SshauditWindow }) {
   const t = useTheme()
-  const q = useSshauditSummary(serverID)
+  const q = useSshauditSummary(serverID, window)
   const s = q.data
   if (!s) return null
   const topSource = s.top_sources[0]
   const topFailed = s.top_failed_users[0]
   return (
     <Card style={{ padding: 14, gap: 10 }}>
-      <Text style={{ fontFamily: t.font(500), fontSize: 12.5, color: t.text }}>
-        {`Last ${s.window_hours}h`}
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Text style={{ flex: 1, fontFamily: t.font(500), fontSize: 12.5, color: t.text }}>
+          {`Last ${s.window_hours}h`}
+        </Text>
+        <Text style={{ fontFamily: t.mono(), fontSize: 10, color: t.fgDim }}>
+          summary reflects window
+        </Text>
+      </View>
       <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
         <Pill kind="ok">{`${s.accepted} accepted`}</Pill>
         <Pill kind={s.failed > 0 ? 'err' : 'neutral'}>{`${s.failed} failed`}</Pill>
@@ -251,8 +263,9 @@ function EventRow({ ev, index }: { ev: SshauditEvent; index: number }) {
 function HistoryTab({ serverID }: { serverID: number }) {
   const t = useTheme()
   const [filter, setFilter] = useState<SshauditEventFilter>('all')
-  const summaryQ = useSshauditSummary(serverID)
-  const eventsQ = useSshauditEvents(serverID, filter)
+  const [window, setWindow] = useState<SshauditWindow>('24h')
+  const summaryQ = useSshauditSummary(serverID, window)
+  const eventsQ = useSshauditEvents(serverID, filter, window)
 
   const onRefresh = () => { void summaryQ.refetch(); void eventsQ.refetch() }
 
@@ -266,8 +279,9 @@ function HistoryTab({ serverID }: { serverID: number }) {
         <RefreshControl refreshing={summaryQ.isRefetching || eventsQ.isRefetching} onRefresh={onRefresh} tintColor={t.primary} />
       }
     >
-      <SummaryStrip serverID={serverID} />
-      <View style={{ alignItems: 'center' }}>
+      <SummaryStrip serverID={serverID} window={window} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <Segmented<SshauditWindow> value={window} onChange={setWindow} options={WINDOWS} />
         <Segmented<SshauditEventFilter> value={filter} onChange={setFilter} options={RESULT_FILTERS} />
       </View>
       {eventsQ.isLoading ? (
@@ -288,6 +302,146 @@ function HistoryTab({ serverID }: { serverID: number }) {
   )
 }
 
+// ── Hardening tab (fail2ban per host) ────────────────────────────────────────
+
+// A labelled numeric stat cell for the fail2ban status card.
+function Stat({ label, value, tone }: { label: string; value: number; tone?: 'err' }) {
+  const t = useTheme()
+  return (
+    <View style={{ flex: 1, gap: 2 }}>
+      <Text style={{ fontFamily: t.mono(600), fontSize: 18, color: tone === 'err' && value > 0 ? t.err : t.text }}>
+        {String(value)}
+      </Text>
+      <Text style={{ fontFamily: t.mono(), fontSize: t.fs.xs, color: t.muted }}>{label}</Text>
+    </View>
+  )
+}
+
+function HardeningTab({ serverID }: { serverID: number }) {
+  const t = useTheme()
+  const q = useSshauditFail2ban(serverID)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const s = q.data
+
+  // The toggle: enabling installs a package + starts the service, so confirm
+  // first; disabling is immediate. Both can be slow → a busy state.
+  const apply = async (enabled: boolean) => {
+    if (busy) return
+    setBusy(true)
+    setErr(null)
+    try {
+      await setSshauditFail2ban(serverID, enabled)
+      await q.refetch()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'request failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onToggle = (next: boolean) => {
+    if (busy) return
+    if (next) {
+      Alert.alert(
+        'Enable fail2ban?',
+        'This installs the fail2ban package and starts the service on this host. It may take a moment.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Enable', onPress: () => { void apply(true) } },
+        ],
+      )
+    } else {
+      void apply(false)
+    }
+  }
+
+  if (q.isLoading) {
+    return <ActivityIndicator testID="fail2ban-loading" color={t.primary} style={{ marginTop: 32 }} />
+  }
+  // A 502 from an offline host surfaces as isError — graceful retry/offline.
+  if (q.isError) {
+    return (
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+        refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={q.refetch} tintColor={t.primary} />}
+      >
+        <ErrorRetry onRetry={() => { void q.refetch() }}>
+          {'Host offline — could not read fail2ban status.'}
+        </ErrorRetry>
+      </ScrollView>
+    )
+  }
+
+  return (
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={{ padding: 16, paddingBottom: 44, gap: 14 }}
+      refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={q.refetch} tintColor={t.primary} />}
+    >
+      {s == null ? null : !s.installed ? (
+        // Not installed → a clear call-to-action to enable hardening.
+        <Card style={{ padding: 16, gap: 12, alignItems: 'flex-start' }}>
+          <Text style={{ fontFamily: t.font(500), fontSize: t.fs.md, color: t.text }}>
+            fail2ban is not installed
+          </Text>
+          <Text style={{ fontFamily: t.font(), fontSize: t.fs.sm, color: t.muted }}>
+            Enable hardening to install fail2ban and automatically ban IPs after repeated failed SSH logins.
+          </Text>
+          {err ? (
+            <Text testID="fail2ban-error" style={{ fontFamily: t.mono(), fontSize: t.fs.xs, color: t.err }}>{err}</Text>
+          ) : null}
+          <Button testID="fail2ban-enable" icon="shield" disabled={busy} onPress={() => onToggle(true)}>
+            {busy ? 'Installing…' : 'Enable hardening'}
+          </Button>
+        </Card>
+      ) : (
+        <>
+          <Card style={{ padding: 14, gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ fontFamily: t.font(500), fontSize: 12.5, color: t.text }}>fail2ban</Text>
+                <Text style={{ fontFamily: t.mono(), fontSize: t.fs.xs, color: t.muted }}>
+                  {busy ? 'Installing…' : s.active ? 'active — banning brute-force IPs' : 'installed, stopped'}
+                </Text>
+              </View>
+              {s.active ? <Pill kind="ok">active</Pill> : <Pill kind="neutral">stopped</Pill>}
+              <Switch testID="fail2ban-switch" on={s.active} disabled={busy} onChange={onToggle} />
+            </View>
+            {err ? (
+              <Text testID="fail2ban-error" style={{ fontFamily: t.mono(), fontSize: t.fs.xs, color: t.err }}>{err}</Text>
+            ) : null}
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Stat label="currently banned" value={s.currently_banned} tone="err" />
+              <Stat label="total banned" value={s.total_banned} />
+            </View>
+          </Card>
+          {s.banned_ips.length > 0 ? (
+            <Card>
+              <CardHead>{`Banned IPs · ${s.banned_ips.length}`}</CardHead>
+              {s.banned_ips.map((ip, i) => (
+                <View
+                  key={ip}
+                  testID={`banned-${i}`}
+                  style={{
+                    paddingHorizontal: 14, paddingVertical: 9,
+                    borderTopWidth: i > 0 ? 1 : 0, borderTopColor: t.border,
+                  }}
+                >
+                  <Text style={{ fontFamily: t.mono(), fontSize: t.fs.sm, color: t.text }}>{ip}</Text>
+                </View>
+              ))}
+            </Card>
+          ) : (
+            <Empty>No IPs currently banned.</Empty>
+          )}
+        </>
+      )}
+    </ScrollView>
+  )
+}
+
 // ── tab body (host-aware) ──────────────────────────────────────────────────────
 
 function TabBody({ tab, hosts }: { tab: Tab; hosts: SshauditHost[] }) {
@@ -302,9 +456,13 @@ function TabBody({ tab, hosts }: { tab: Tab; hosts: SshauditHost[] }) {
   return (
     <View style={{ flex: 1 }}>
       <HostChips hosts={hosts} serverID={serverID} onPick={setPicked} />
-      {tab === 'sessions'
-        ? <SessionsTab key={serverID} serverID={serverID} />
-        : <HistoryTab key={serverID} serverID={serverID} />}
+      {tab === 'sessions' ? (
+        <SessionsTab key={serverID} serverID={serverID} />
+      ) : tab === 'history' ? (
+        <HistoryTab key={serverID} serverID={serverID} />
+      ) : (
+        <HardeningTab key={serverID} serverID={serverID} />
+      )}
     </View>
   )
 }
@@ -334,6 +492,7 @@ export default function SshauditScreen() {
           options={[
             { value: 'sessions', label: 'Sessions' },
             { value: 'history', label: 'History' },
+            { value: 'hardening', label: 'Hardening' },
           ]}
         />
       </View>

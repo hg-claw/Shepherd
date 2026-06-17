@@ -64,9 +64,10 @@ export const PluginRegistry: Record<string, PluginUIEntry> = {
   sshaudit: {
     module: () => import('./sshaudit'),
     tabs: [
-      { key: 'hosts',    label: 'Hosts' },
-      { key: 'sessions', label: 'Sessions' },
-      { key: 'history',  label: 'Login History' },
+      { key: 'hosts',     label: 'Hosts' },
+      { key: 'sessions',  label: 'Sessions' },
+      { key: 'history',   label: 'Login History' },
+      { key: 'hardening', label: 'Hardening' },
     ],
   },
 }

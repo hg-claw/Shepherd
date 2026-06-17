@@ -176,6 +176,102 @@ func TestRoutes_CollectThenEventsAndSummary(t *testing.T) {
 	}
 }
 
+// seedEvent inserts one stored event directly, bypassing collect, so windowed
+// queries can be exercised against events at controlled ages.
+func seedEvent(t *testing.T, p *Plugin, sid int64, ts time.Time, result, user, ip string) {
+	t.Helper()
+	if _, err := p.deps.DB.Exec(`
+		INSERT INTO sshaudit_events
+		  (server_id, ts, result, method, invalid_user, username, source_ip, port, created_at)
+		VALUES (?, ?, ?, 'password', 0, ?, ?, 22, ?)`,
+		sid, ts.UTC(), result, user, ip, ts.UTC()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRoutes_SummaryWindowSelectsRange(t *testing.T) {
+	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+	p, mux := setupRoutes(t, &fakeHostExec{}, now)
+
+	// Three failed events from distinct IPs at increasing ages: within 24h,
+	// within 7d (but not 24h), within 30d (but not 7d).
+	seedEvent(t, p, 1, now.Add(-1*time.Hour), "failed", "alice", "1.1.1.1")     // 24h window
+	seedEvent(t, p, 1, now.Add(-3*24*time.Hour), "failed", "bob", "2.2.2.2")    // 7d window
+	seedEvent(t, p, 1, now.Add(-10*24*time.Hour), "failed", "carol", "3.3.3.3") // 30d window
+
+	get := func(window string) summary {
+		req := httptest.NewRequest("GET", "/hosts/1/summary?window="+window, nil)
+		req.SetPathValue("server_id", "1")
+		w := httptest.NewRecorder()
+		mux.h["GET /hosts/{server_id}/summary"](w, req)
+		if w.Code != 200 {
+			t.Fatalf("summary(%s) status=%d body=%s", window, w.Code, w.Body.String())
+		}
+		var s summary
+		_ = json.Unmarshal(w.Body.Bytes(), &s)
+		return s
+	}
+
+	s24 := get("24h")
+	if s24.WindowHours != 24 || s24.Failed != 1 || s24.UniqueSourceIPs != 1 {
+		t.Errorf("24h: window=%d failed=%d uniq=%d want 24/1/1", s24.WindowHours, s24.Failed, s24.UniqueSourceIPs)
+	}
+	s7 := get("7d")
+	if s7.WindowHours != 168 || s7.Failed != 2 || s7.UniqueSourceIPs != 2 {
+		t.Errorf("7d: window=%d failed=%d uniq=%d want 168/2/2", s7.WindowHours, s7.Failed, s7.UniqueSourceIPs)
+	}
+	s30 := get("30d")
+	if s30.WindowHours != 720 || s30.Failed != 3 || s30.UniqueSourceIPs != 3 {
+		t.Errorf("30d: window=%d failed=%d uniq=%d want 720/3/3", s30.WindowHours, s30.Failed, s30.UniqueSourceIPs)
+	}
+
+	// Unknown/absent window → default 24h.
+	def := get("bogus")
+	if def.WindowHours != 24 || def.Failed != 1 {
+		t.Errorf("bogus window: window=%d failed=%d want 24/1", def.WindowHours, def.Failed)
+	}
+}
+
+func TestRoutes_EventsWindowFilters(t *testing.T) {
+	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+	p, mux := setupRoutes(t, &fakeHostExec{}, now)
+
+	seedEvent(t, p, 1, now.Add(-1*time.Hour), "failed", "alice", "1.1.1.1")
+	seedEvent(t, p, 1, now.Add(-3*24*time.Hour), "failed", "bob", "2.2.2.2")
+	seedEvent(t, p, 1, now.Add(-10*24*time.Hour), "failed", "carol", "3.3.3.3")
+
+	count := func(url string) int {
+		req := httptest.NewRequest("GET", url, nil)
+		req.SetPathValue("server_id", "1")
+		w := httptest.NewRecorder()
+		mux.h["GET /hosts/{server_id}/events"](w, req)
+		if w.Code != 200 {
+			t.Fatalf("events %q status=%d body=%s", url, w.Code, w.Body.String())
+		}
+		var rows []eventRow
+		_ = json.Unmarshal(w.Body.Bytes(), &rows)
+		return len(rows)
+	}
+
+	if n := count("/hosts/1/events?window=24h"); n != 1 {
+		t.Errorf("window=24h → %d events, want 1", n)
+	}
+	if n := count("/hosts/1/events?window=7d"); n != 2 {
+		t.Errorf("window=7d → %d events, want 2", n)
+	}
+	if n := count("/hosts/1/events?window=30d"); n != 3 {
+		t.Errorf("window=30d → %d events, want 3", n)
+	}
+	// No window → no time filter (all rows).
+	if n := count("/hosts/1/events"); n != 3 {
+		t.Errorf("no window → %d events, want 3 (unfiltered)", n)
+	}
+	// window combined with result filter still applies both.
+	if n := count("/hosts/1/events?window=24h&result=accepted"); n != 0 {
+		t.Errorf("window=24h&result=accepted → %d events, want 0", n)
+	}
+}
+
 func TestRoutes_EventsBadResultRejected(t *testing.T) {
 	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
 	_, mux := setupRoutes(t, &fakeHostExec{}, now)

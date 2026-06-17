@@ -38,6 +38,15 @@ function serverLabel(servers: ServerRow[], sid: number): string {
   return s ? (nullStr(s.public_alias) || s.name || `#${sid}`) : `#${sid}`
 }
 
+// humanSeconds renders a duration in seconds as a compact label (600→"10m",
+// 3600→"1h", 86400→"24h"), falling back to "{n}s". Pure, no Intl/toLocaleString.
+function humanSeconds(n: number): string {
+  if (n <= 0) return `${n}s`
+  if (n % 3600 === 0) return `${n / 3600}h`
+  if (n % 60 === 0) return `${n / 60}m`
+  return `${n}s`
+}
+
 // ── shared bits ───────────────────────────────────────────────────────────────
 
 function ErrorRetry({ children, onRetry }: { children: string; onRetry: () => void }) {
@@ -416,6 +425,17 @@ function HardeningTab({ serverID }: { serverID: number }) {
               <Stat label="currently banned" value={s.currently_banned} tone="err" />
               <Stat label="total banned" value={s.total_banned} />
             </View>
+            {s.max_retry > 0 && s.find_time > 0 && s.ban_time > 0 ? (
+              <View
+                testID="fail2ban-policy"
+                style={{ borderTopWidth: 1, borderTopColor: t.border, paddingTop: 10, gap: 2 }}
+              >
+                <Text style={{ fontFamily: t.mono(), fontSize: t.fs.xs, color: t.muted }}>Ban policy</Text>
+                <Text style={{ fontFamily: t.mono(), fontSize: t.fs.sm, color: t.text }}>
+                  {`${s.max_retry} failed attempts within ${humanSeconds(s.find_time)} → ban for ${humanSeconds(s.ban_time)}`}
+                </Text>
+              </View>
+            ) : null}
           </Card>
           {s.banned_ips.length > 0 ? (
             <Card>

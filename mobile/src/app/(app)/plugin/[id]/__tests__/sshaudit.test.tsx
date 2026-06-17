@@ -69,6 +69,9 @@ const FAIL2BAN = {
   currently_banned: 3,
   total_banned: 41,
   banned_ips: ['203.0.113.9', '198.51.100.3', '192.0.2.4'],
+  max_retry: 5,
+  find_time: 600,
+  ban_time: 3600,
 }
 
 beforeEach(() => {
@@ -226,6 +229,21 @@ test('Hardening: renders currently-banned + total-banned counts and the banned I
   expect(getByText('203.0.113.9')).toBeTruthy()
   expect(getByText('198.51.100.3')).toBeTruthy()
   expect(getByTestId('banned-0')).toBeTruthy()
+})
+
+test('Hardening: renders the ban policy line when installed+active with policy values', () => {
+  const { getByText, getByTestId } = render(<SshauditScreen />)
+  gotoHardening(getByText)
+  expect(getByTestId('fail2ban-policy')).toBeTruthy()
+  // "5 failed attempts within 10m → ban for 1h" — humanized seconds
+  expect(getByText(/5 failed attempts within 10m → ban for 1h/)).toBeTruthy()
+})
+
+test('Hardening: hides the ban policy line when policy values are 0', () => {
+  mockFail2ban.mockReturnValue(ok({ ...FAIL2BAN, max_retry: 0, find_time: 0, ban_time: 0 }))
+  const { getByText, queryByTestId } = render(<SshauditScreen />)
+  gotoHardening(getByText)
+  expect(queryByTestId('fail2ban-policy')).toBeNull()
 })
 
 test('Hardening: a 502 / host-offline error shows a graceful retry state', () => {

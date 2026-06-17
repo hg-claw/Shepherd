@@ -80,13 +80,16 @@ func TestParseFail2banStatus_NotInstalled(t *testing.T) {
 }
 
 func TestSplitStatusProbe(t *testing.T) {
-	out := "INSTALLED=1\nACTIVE=1\nJAIL_BEGIN\nStatus for the jail: sshd\n|- Currently banned: 1\nJAIL_END\n"
-	installed, active, jail := splitStatusProbe(out)
+	out := "INSTALLED=1\nACTIVE=1\nJAIL_BEGIN\nStatus for the jail: sshd\n|- Currently banned: 1\nJAIL_END\nMAXRETRY=5\nFINDTIME=600\nBANTIME=3600\n"
+	installed, active, jail, policy := splitStatusProbe(out)
 	if !installed || !active {
 		t.Errorf("flags installed=%v active=%v want true/true", installed, active)
 	}
 	if !strings.Contains(jail, "Currently banned: 1") || strings.Contains(jail, "INSTALLED") {
 		t.Errorf("jail block leaked or missing: %q", jail)
+	}
+	if policy.maxRetry != 5 || policy.findTime != 600 || policy.banTime != 3600 {
+		t.Errorf("policy = %+v, want {5 600 3600}", policy)
 	}
 }
 
@@ -123,10 +126,13 @@ func (f *f2bExec) RunCmd(_ context.Context, _ int64, name string, args ...string
 	return nil, nil, f.applyCode, f.applyErr
 }
 
-// ranScript reports whether any recorded `sh -c` script contains needle.
-func (f *f2bExec) ranScript(needle string) bool {
+// ranApplyScript reports whether an enable/disable apply script contains needle.
+// It ignores the status-probe script (which
+// reads the jail config for the ban-policy display) so content assertions about
+// the enable/disable action aren't confused by the re-query.
+func (f *f2bExec) ranApplyScript(needle string) bool {
 	for _, c := range f.cmds {
-		if len(c) == 3 && c[0] == "sh" && c[1] == "-c" && strings.Contains(c[2], needle) {
+		if len(c) == 3 && c[0] == "sh" && c[1] == "-c" && !strings.Contains(c[2], "JAIL_BEGIN") && strings.Contains(c[2], needle) {
 			return true
 		}
 	}
@@ -144,7 +150,7 @@ func setupF2B(t *testing.T, exec *f2bExec) *collectMux {
 }
 
 func TestFail2ban_GetStatus_Parsed(t *testing.T) {
-	exec := &f2bExec{statusOut: "INSTALLED=1\nACTIVE=1\nJAIL_BEGIN\n" + sampleJailStatus + "\nJAIL_END\n"}
+	exec := &f2bExec{statusOut: "INSTALLED=1\nACTIVE=1\nJAIL_BEGIN\n" + sampleJailStatus + "\nJAIL_END\nMAXRETRY=5\nFINDTIME=600\nBANTIME=3600\n"}
 	mux := setupF2B(t, exec)
 
 	req := httptest.NewRequest("GET", "/hosts/1/fail2ban", nil)
@@ -163,6 +169,9 @@ func TestFail2ban_GetStatus_Parsed(t *testing.T) {
 	}
 	if len(st.BannedIPs) != 3 || st.BannedIPs[0] != "1.2.3.4" {
 		t.Errorf("banned_ips=%v", st.BannedIPs)
+	}
+	if st.MaxRetry != 5 || st.FindTime != 600 || st.BanTime != 3600 {
+		t.Errorf("ban policy = retry %d find %d ban %d, want 5/600/3600", st.MaxRetry, st.FindTime, st.BanTime)
 	}
 }
 
@@ -209,11 +218,14 @@ func TestFail2ban_PostEnable_RunsInstallScript(t *testing.T) {
 		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 	}
 	// The enable script must have run (writes the shepherd jail config).
-	if !exec.ranScript("/etc/fail2ban/jail.d/shepherd-sshd.local") {
+	if !exec.ranApplyScript("/etc/fail2ban/jail.d/shepherd-sshd.local") {
 		t.Errorf("enable script did not write the shepherd jail; cmds=%v", exec.cmds)
 	}
-	if !exec.ranScript("systemctl enable --now fail2ban") {
+	if !exec.ranApplyScript("systemctl enable --now fail2ban") {
 		t.Errorf("enable script did not enable the service; cmds=%v", exec.cmds)
+	}
+	if !exec.ranApplyScript("F2B_BACKEND=systemd") || !exec.ranApplyScript("backend = $F2B_BACKEND") {
+		t.Errorf("enable script did not set backend=systemd on the systemd path; cmds=%v", exec.cmds)
 	}
 	// Response is the re-queried status.
 	var st Fail2banStatus
@@ -235,11 +247,11 @@ func TestFail2ban_PostDisable_RunsDisableScript(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 	}
-	if !exec.ranScript("systemctl disable --now fail2ban") {
+	if !exec.ranApplyScript("systemctl disable --now fail2ban") {
 		t.Errorf("disable script did not disable the service; cmds=%v", exec.cmds)
 	}
 	// Disable must NOT install/remove the package or rewrite the jail.
-	if exec.ranScript("apt-get install") || exec.ranScript("shepherd-sshd.local") {
+	if exec.ranApplyScript("apt-get install") || exec.ranApplyScript("shepherd-sshd.local") {
 		t.Errorf("disable script touched package/jail config; cmds=%v", exec.cmds)
 	}
 	var st Fail2banStatus

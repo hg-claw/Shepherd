@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import HostsTab from './HostsTab'
 import SessionsTab from './SessionsTab'
 import HistoryTab from './HistoryTab'
+import HardeningTab from './HardeningTab'
 
 export default function SSHAuditPlugin() {
   return (
@@ -10,6 +11,7 @@ export default function SSHAuditPlugin() {
       <Route path="hosts" element={<HostsTab />} />
       <Route path="sessions" element={<SessionsTab />} />
       <Route path="history" element={<HistoryTab />} />
+      <Route path="hardening" element={<HardeningTab />} />
     </Routes>
   )
 }

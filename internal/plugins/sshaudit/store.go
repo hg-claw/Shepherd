@@ -15,8 +15,21 @@ import (
 const (
 	retentionDays   = 30
 	defaultLookback = 24 * time.Hour
-	summaryWindow   = 24 * time.Hour
 )
+
+// parseWindow maps the UI's window query param onto a duration. Accepts
+// "24h" | "7d" | "30d"; anything unknown or empty falls back to 24h. 30d is
+// the max meaningful range (it equals the event retention horizon).
+func parseWindow(s string) time.Duration {
+	switch s {
+	case "7d":
+		return 7 * 24 * time.Hour
+	case "30d":
+		return 30 * 24 * time.Hour
+	default:
+		return 24 * time.Hour
+	}
+}
 
 // hostConfig is the persisted per-server row.
 type hostConfig struct {
@@ -186,21 +199,26 @@ type eventRow struct {
 }
 
 // queryEvents returns stored events newest-first, optionally filtered by
-// result ("accepted"|"failed"|"all"), capped at limit.
-func queryEvents(ctx context.Context, db *sqlx.DB, serverID int64, result string, limit int) ([]eventRow, error) {
+// result ("accepted"|"failed"|"all"), capped at limit. When since is non-nil
+// the result set is additionally bounded to ts >= since; a nil since keeps the
+// historical behavior of applying no time filter.
+func queryEvents(ctx context.Context, db *sqlx.DB, serverID int64, result string, limit int, since *time.Time) ([]eventRow, error) {
 	rows := []eventRow{}
+	// Build positional placeholders incrementally so the result and window
+	// filters can each be optional without colliding parameter indexes.
 	q := `SELECT id, ts, result, method, invalid_user, username, source_ip, port
 	        FROM sshaudit_events WHERE server_id = $1`
 	args := []any{serverID}
 	if result == "accepted" || result == "failed" {
-		q += ` AND result = $2`
 		args = append(args, result)
-		q += ` ORDER BY ts DESC, id DESC LIMIT $3`
-		args = append(args, limit)
-	} else {
-		q += ` ORDER BY ts DESC, id DESC LIMIT $2`
-		args = append(args, limit)
+		q += ` AND result = $` + strconv.Itoa(len(args))
 	}
+	if since != nil {
+		args = append(args, since.UTC())
+		q += ` AND ts >= $` + strconv.Itoa(len(args))
+	}
+	args = append(args, limit)
+	q += ` ORDER BY ts DESC, id DESC LIMIT $` + strconv.Itoa(len(args))
 	if err := db.SelectContext(ctx, &rows, q, args...); err != nil {
 		return nil, err
 	}
@@ -227,11 +245,12 @@ type summary struct {
 	TopFailedUsers  []userStat   `json:"top_failed_users"`
 }
 
-// buildSummary aggregates the last 24h of stored events for a server.
-func buildSummary(ctx context.Context, db *sqlx.DB, serverID int64, now time.Time) (summary, error) {
-	since := now.Add(-summaryWindow).UTC()
+// buildSummary aggregates stored events for a server over the given window
+// (e.g. 24h / 7d / 30d). window_hours in the response reflects that range.
+func buildSummary(ctx context.Context, db *sqlx.DB, serverID int64, now time.Time, window time.Duration) (summary, error) {
+	since := now.Add(-window).UTC()
 	s := summary{
-		WindowHours:    int(summaryWindow / time.Hour),
+		WindowHours:    int(window / time.Hour),
 		TopSources:     []sourceStat{},
 		TopFailedUsers: []userStat{},
 	}

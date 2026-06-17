@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Cloud, Box, Activity, Package, Bell, Route } from 'lucide-react'
 import * as icons from 'lucide-react'
 import { listPlugins, enablePlugin, disablePlugin, type PluginEntry } from '@/api/plugins'
+import { fetchSSHAuditOverview } from '@/api/sshaudit'
 import { Button } from '@/components/ui/button'
 import { KpiCard } from '@/components/KpiCard'
 import { Pill } from '@/components/Pill'
@@ -145,6 +146,16 @@ interface PluginCardProps {
 function PluginCard({ p, isPending, onEnable, onDisable }: PluginCardProps) {
   const { t } = useTranslation()
 
+  // Fleet-wide 24h login tally for the sshaudit card only. The `enabled` gate
+  // keeps this a no-op for every other plugin (and disabled sshaudit).
+  const isSSHAudit = p.id === 'sshaudit' && p.enabled
+  const overview = useQuery({
+    queryKey: ['sshaudit', 'overview'],
+    queryFn: fetchSSHAuditOverview,
+    enabled: isSSHAudit,
+    refetchInterval: 60_000,
+  })
+
   return (
     <div className="bg-elev border rounded-lg flex flex-col">
       {/* Clickable top area */}
@@ -178,6 +189,17 @@ function PluginCard({ p, isPending, onEnable, onDisable }: PluginCardProps) {
             <span>·</span>
             <span>{p.host_count} {t('plugins.hosts', 'hosts')}</span>
           </>
+        )}
+        {isSSHAudit && overview.data && (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full bg-sunken border border-border px-2 h-5 text-[11px] tracking-wide whitespace-nowrap"
+            title={t('plugins.sshaudit.tally_title', 'Fleet-wide SSH logins, last 24h')}
+          >
+            <span className="text-fg-dim">24h</span>
+            <span className="text-ok">✓ {overview.data.accepted}</span>
+            <span className="text-fg-dim">·</span>
+            <span className="text-err">✗ {overview.data.failed}</span>
+          </span>
         )}
         <span className="ml-auto">
           {p.enabled ? (

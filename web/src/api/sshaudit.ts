@@ -68,6 +68,14 @@ export interface SSHAuditSummary {
   top_failed_users: SSHTopFailedUser[]
 }
 
+// Fleet-wide accepted/failed SSH login counts over the last 24h, aggregated
+// across every configured host. Counts stay 0 until the poller collects.
+export interface SSHAuditOverview {
+  window_hours: number
+  accepted: number
+  failed: number
+}
+
 // Rolling window for the login-history views. The summary/events endpoints
 // map these to window_hours of 24 / 168 / 720 respectively.
 export type SSHAuditWindow = '24h' | '7d' | '30d'
@@ -141,3 +149,8 @@ export const fetchSSHAuditFail2ban = (serverID: number) =>
 //    status. 502 {error} when the host is offline.
 export const setSSHAuditFail2ban = (serverID: number, enabled: boolean) =>
   api.post<SSHFail2banStatus>(`${ROOT}/hosts/${serverID}/fail2ban`, { enabled })
+
+// 9. Fleet-wide 24h login tally across every configured host. Used for the
+//    plugin LIST card badge. Counts are 0 until the poller has collected.
+export const fetchSSHAuditOverview = () =>
+  api.get<SSHAuditOverview>(`${ROOT}/overview`)

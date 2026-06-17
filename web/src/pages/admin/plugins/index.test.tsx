@@ -12,24 +12,44 @@ vi.mock('@/api/plugins', () => ({
       enabled: true, enabled_at: '2026-05-16T00:00:00Z', host_count: 2 },
     { id: 'cloudflare', meta: { name: 'Cloudflare', description: 'd2', icon: 'cloud', category: 'dns', host_aware: false },
       enabled: false, enabled_at: null, host_count: null },
+    { id: 'sshaudit', meta: { name: 'SSH Audit', description: 'd3', icon: 'shield', category: 'security', host_aware: true },
+      enabled: true, enabled_at: '2026-05-16T00:00:00Z', host_count: 3 },
   ]),
   enablePlugin: vi.fn(),
   disablePlugin: vi.fn(),
 }))
 
+const fetchSSHAuditOverview = vi.fn(() => Promise.resolve({ window_hours: 24, accepted: 12, failed: 340 }))
+vi.mock('@/api/sshaudit', () => ({
+  fetchSSHAuditOverview: () => fetchSSHAuditOverview(),
+}))
+
+function renderPage() {
+  const qc = new QueryClient()
+  return render(
+    <I18nextProvider i18n={i18n}>
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <PluginsIndex />
+        </MemoryRouter>
+      </QueryClientProvider>
+    </I18nextProvider>,
+  )
+}
+
 describe('PluginsIndex', () => {
   it('renders cards for each plugin', async () => {
-    const qc = new QueryClient()
-    render(
-      <I18nextProvider i18n={i18n}>
-        <QueryClientProvider client={qc}>
-          <MemoryRouter>
-            <PluginsIndex />
-          </MemoryRouter>
-        </QueryClientProvider>
-      </I18nextProvider>,
-    )
+    renderPage()
     expect(await screen.findByText('xray')).toBeTruthy()
     expect(await screen.findByText('Cloudflare')).toBeTruthy()
+    expect(await screen.findByText('SSH Audit')).toBeTruthy()
+  })
+
+  it('shows the 24h login tally badge on the enabled sshaudit card', async () => {
+    renderPage()
+    // Wait for the overview query to resolve and render the badge.
+    expect(await screen.findByText('✓ 12')).toBeTruthy()
+    expect(await screen.findByText('✗ 340')).toBeTruthy()
+    expect(fetchSSHAuditOverview).toHaveBeenCalled()
   })
 })

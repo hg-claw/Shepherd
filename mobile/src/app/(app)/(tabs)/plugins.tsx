@@ -2,15 +2,34 @@ import { useState } from 'react'
 import { View, Text, ScrollView, RefreshControl, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { usePlugins, enablePlugin, disablePlugin, type Plugin } from '@/api/plugins'
+import { useSshauditOverview } from '@/api/sshaudit'
 import { cmpStr } from '@/lib/format'
 import { Header, List, ListRow, Switch, Empty } from '@/components/ds'
 import { useTheme } from '@/theme'
+
+// Compact fleet-wide 24h SSH login tally — only rendered on the enabled
+// sshaudit row. Counts via String(n) (Hermes has no toLocaleString).
+function SshauditBadge() {
+  const t = useTheme()
+  const q = useSshauditOverview(true)
+  const d = q.data
+  if (!d) return null
+  return (
+    <Text numberOfLines={1} style={{ fontFamily: t.mono(), fontSize: 11.5, marginTop: 1 }}>
+      <Text style={{ color: t.muted }}>24h </Text>
+      <Text style={{ color: t.ok }}>{`✓${String(d.accepted)}`}</Text>
+      <Text style={{ color: t.muted }}>{' '}</Text>
+      <Text style={{ color: t.err }}>{`✗${String(d.failed)}`}</Text>
+    </Text>
+  )
+}
 
 function PluginRow({ p, onToggle, onOpen }: { p: Plugin; onToggle: (on: boolean) => Promise<void>; onOpen: () => void }) {
   const t = useTheme()
   const [busy, setBusy] = useState(false)
   const toggle = async (on: boolean) => { setBusy(true); try { await onToggle(on) } finally { setBusy(false) } }
   const sub = p.meta.host_aware && p.enabled && p.host_count ? `${p.host_count} hosts` : p.meta.category.toLowerCase()
+  const showSshauditBadge = p.id === 'sshaudit' && p.enabled
   return (
     <ListRow
       icon={p.meta.icon || 'puzzle'}
@@ -19,6 +38,7 @@ function PluginRow({ p, onToggle, onOpen }: { p: Plugin; onToggle: (on: boolean)
         <View>
           <Text numberOfLines={1} style={{ fontFamily: t.font(500), fontSize: t.fs.md, color: t.text }}>{p.meta.name}</Text>
           <Text numberOfLines={1} style={{ fontFamily: t.mono(), fontSize: 11.5, color: t.muted, marginTop: 1 }}>{sub}</Text>
+          {showSshauditBadge ? <SshauditBadge /> : null}
         </View>
       }
       chevron={false}

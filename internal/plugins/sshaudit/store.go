@@ -247,6 +247,30 @@ type summary struct {
 
 // buildSummary aggregates stored events for a server over the given window
 // (e.g. 24h / 7d / 30d). window_hours in the response reflects that range.
+// fleetOverview returns accepted/failed login counts across ALL hosts within
+// the window — used by the plugin-list card to show a glanceable 24h tally.
+func fleetOverview(ctx context.Context, db *sqlx.DB, now time.Time, window time.Duration) (accepted, failed int, err error) {
+	since := now.Add(-window).UTC()
+	var counts []struct {
+		Result string `db:"result"`
+		N      int    `db:"n"`
+	}
+	if err = db.SelectContext(ctx, &counts, `
+		SELECT result, COUNT(*) AS n FROM sshaudit_events
+		 WHERE ts >= $1 GROUP BY result`, since); err != nil {
+		return 0, 0, err
+	}
+	for _, c := range counts {
+		switch c.Result {
+		case "accepted":
+			accepted = c.N
+		case "failed":
+			failed = c.N
+		}
+	}
+	return accepted, failed, nil
+}
+
 func buildSummary(ctx context.Context, db *sqlx.DB, serverID int64, now time.Time, window time.Duration) (summary, error) {
 	since := now.Add(-window).UTC()
 	s := summary{

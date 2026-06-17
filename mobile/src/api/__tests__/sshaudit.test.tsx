@@ -6,6 +6,7 @@ import {
   fetchSshauditSessions, useSshauditSessions,
   fetchSshauditEvents, useSshauditEvents,
   fetchSshauditSummary, useSshauditSummary,
+  fetchSshauditOverview, useSshauditOverview,
   fetchSshauditFail2ban, useSshauditFail2ban, setSshauditFail2ban,
   collectSshaudit,
   useSshauditHosts,
@@ -168,6 +169,30 @@ test('useSshauditSummary is disabled without a server and carries the window int
   const { result } = renderHook(() => useSshauditSummary(7, '7d'), { wrapper })
   await waitFor(() => expect(result.current.isSuccess).toBe(true))
   expect(authedFetch).toHaveBeenCalledWith('/api/admin/plugins/sshaudit/hosts/7/summary?window=7d')
+})
+
+// ── fleet-wide 24h overview (plugins-list badge) ──────────────────────────────
+
+// overview wire shape: plain numbers only (zeros until the poller collects).
+const WIRE_OVERVIEW = { window_hours: 24, accepted: 12, failed: 87 }
+
+test('fetchSshauditOverview GETs the fleet-wide /overview path and surfaces plain numbers', async () => {
+  ;(authedFetch as jest.Mock).mockResolvedValue(WIRE_OVERVIEW)
+  const res = await fetchSshauditOverview()
+  expect(authedFetch).toHaveBeenCalledWith('/api/admin/plugins/sshaudit/overview')
+  expect(res.window_hours).toBe(24)
+  expect(res.accepted).toBe(12)
+  expect(res.failed).toBe(87)
+})
+
+test('useSshauditOverview is gated by enabled and fetches /overview when on', async () => {
+  ;(authedFetch as jest.Mock).mockResolvedValue(WIRE_OVERVIEW)
+  renderHook(() => useSshauditOverview(false), { wrapper })
+  expect(authedFetch).not.toHaveBeenCalled()
+  const { result } = renderHook(() => useSshauditOverview(true), { wrapper })
+  await waitFor(() => expect(result.current.isSuccess).toBe(true))
+  expect(authedFetch).toHaveBeenCalledWith('/api/admin/plugins/sshaudit/overview')
+  expect(result.current.data?.failed).toBe(87)
 })
 
 // ── collect ─────────────────────────────────────────────────────────────────────

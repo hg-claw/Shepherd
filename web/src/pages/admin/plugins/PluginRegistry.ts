@@ -61,6 +61,14 @@ export const PluginRegistry: Record<string, PluginUIEntry> = {
       { key: 'templates',     label: 'Templates' },
     ],
   },
+  sshaudit: {
+    module: () => import('./sshaudit'),
+    tabs: [
+      { key: 'hosts',    label: 'Hosts' },
+      { key: 'sessions', label: 'Sessions' },
+      { key: 'history',  label: 'Login History' },
+    ],
+  },
 }
 
 export const lazyPluginPage = (id: string) => {

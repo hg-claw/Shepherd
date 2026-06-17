@@ -98,6 +98,13 @@ export default function PluginDetail() {
               onPress={() => router.push(`/(app)/plugin/${p.id}/subgen`)}
             />
           ) : null}
+          {p.id === 'sshaudit' ? (
+            <ListRow
+              icon="shield"
+              title="SSH Audit"
+              onPress={() => router.push(`/(app)/plugin/${p.id}/sshaudit`)}
+            />
+          ) : null}
           <ListRow
             icon="settings"
             title="Edit config"

@@ -309,6 +309,14 @@ func main() {
 				// continue — don't crash boot
 			}
 		}
+		// Start the plugin's runtime for an already-enabled plugin. The enable
+		// handler runs OnEnable on the enable transition, but a plugin that was
+		// enabled in a previous session needs it re-run at boot — otherwise
+		// background loops (e.g. the sshaudit collection poller) never start
+		// after a restart. OnEnable is idempotent across all plugins.
+		if err := p.OnEnable(rootCtx, pluginsDeps); err != nil {
+			log.Printf("plugin %s: boot OnEnable: %v", p.Meta().ID, err)
+		}
 	}
 
 	// sing-box cert renewal loop.

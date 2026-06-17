@@ -157,6 +157,30 @@ export function useSshauditSummary(
   })
 }
 
+// ── fleet-wide 24h overview (plugins-list badge) ────────────────────────────────
+
+// overview in routes.go — fleet-wide accepted/failed login tally over a fixed
+// 24h window. All plain numbers (zeros until the poller collects); no sql.Null.
+export type SshauditOverview = {
+  window_hours: number
+  accepted: number
+  failed: number
+}
+
+export function fetchSshauditOverview(): Promise<SshauditOverview> {
+  return authedFetch<SshauditOverview>(`${ROOT}/overview`)
+}
+
+// Drives the compact 24h badge on the plugins list. Gated by `enabled` so we
+// only hit the endpoint when the sshaudit plugin is actually turned on.
+export function useSshauditOverview(enabled: boolean): UseQueryResult<SshauditOverview> {
+  return useQuery({
+    queryKey: ['sshaudit-overview'],
+    queryFn: fetchSshauditOverview,
+    enabled,
+  })
+}
+
 // ── on-demand collect ──────────────────────────────────────────────────────────
 
 // Force an immediate collection pass. 502 {error} on failure (host offline).

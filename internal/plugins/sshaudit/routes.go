@@ -25,6 +25,7 @@ func (p *Plugin) RegisterRoutes(mux plugins.Mux, deps plugins.Deps) {
 		p.running = map[int64]bool{}
 	}
 
+	mux.HandleFunc("GET /overview", p.getOverview)
 	mux.HandleFunc("GET /hosts", p.listHosts)
 	mux.HandleFunc("PUT /hosts/{server_id}", p.upsertHost)
 	mux.HandleFunc("GET /hosts/{server_id}/sessions", p.liveSessions)
@@ -161,6 +162,17 @@ func (p *Plugin) listEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, rows)
+}
+
+// getOverview returns the fleet-wide accepted/failed login tally over the last
+// 24h — shown on the plugin-list card. Empty (zeros) until the poller collects.
+func (p *Plugin) getOverview(w http.ResponseWriter, r *http.Request) {
+	accepted, failed, err := fleetOverview(r.Context(), p.deps.DB, p.now().UTC(), 24*time.Hour)
+	if err != nil {
+		writeErr(w, 500, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"window_hours": 24, "accepted": accepted, "failed": failed})
 }
 
 func (p *Plugin) getSummary(w http.ResponseWriter, r *http.Request) {

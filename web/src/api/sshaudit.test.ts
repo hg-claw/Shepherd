@@ -8,6 +8,7 @@ import {
   collectSSHAuditHost,
   fetchSSHAuditFail2ban,
   setSSHAuditFail2ban,
+  fetchSSHAuditOverview,
 } from './sshaudit'
 import { api } from './client'
 
@@ -124,5 +125,14 @@ describe('sshaudit api', () => {
     })
     await setSSHAuditFail2ban(6, false)
     expect(mockPost).toHaveBeenCalledWith('/api/admin/plugins/sshaudit/hosts/6/fail2ban', { enabled: false })
+  })
+
+  it('fetchSSHAuditOverview GETs the fleet-wide overview', async () => {
+    mockGet.mockResolvedValue({ window_hours: 24, accepted: 12, failed: 340 })
+    const out = await fetchSSHAuditOverview()
+    expect(mockGet).toHaveBeenCalledWith('/api/admin/plugins/sshaudit/overview')
+    expect(out.accepted).toBe(12)
+    expect(out.failed).toBe(340)
+    expect(out.window_hours).toBe(24)
   })
 })

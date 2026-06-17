@@ -189,6 +189,32 @@ func seedEvent(t *testing.T, p *Plugin, sid int64, ts time.Time, result, user, i
 	}
 }
 
+func TestRoutes_FleetOverview24h(t *testing.T) {
+	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+	p, mux := setupRoutes(t, &fakeHostExec{}, now)
+	// Two hosts; mixed results within and outside the 24h window.
+	seedEvent(t, p, 1, now.Add(-1*time.Hour), "accepted", "root", "1.1.1.1")
+	seedEvent(t, p, 1, now.Add(-2*time.Hour), "failed", "alice", "2.2.2.2")
+	seedEvent(t, p, 2, now.Add(-3*time.Hour), "failed", "bob", "3.3.3.3")
+	seedEvent(t, p, 2, now.Add(-30*time.Hour), "failed", "old", "4.4.4.4") // outside 24h
+
+	req := httptest.NewRequest("GET", "/overview", nil)
+	w := httptest.NewRecorder()
+	mux.h["GET /overview"](w, req)
+	if w.Code != 200 {
+		t.Fatalf("overview status=%d body=%s", w.Code, w.Body.String())
+	}
+	var o struct {
+		WindowHours int `json:"window_hours"`
+		Accepted    int `json:"accepted"`
+		Failed      int `json:"failed"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &o)
+	if o.WindowHours != 24 || o.Accepted != 1 || o.Failed != 2 {
+		t.Errorf("fleet overview = %+v, want {24 1 2} (fleet-wide, 24h only)", o)
+	}
+}
+
 func TestRoutes_SummaryWindowSelectsRange(t *testing.T) {
 	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
 	p, mux := setupRoutes(t, &fakeHostExec{}, now)

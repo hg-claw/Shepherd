@@ -25,6 +25,7 @@ import (
 	_ "github.com/hg-claw/Shepherd/internal/plugins/cloudflare"                // registers via init()
 	netqualityplugin "github.com/hg-claw/Shepherd/internal/plugins/netquality" // registers via init() + WS push helper
 	singboxplugin "github.com/hg-claw/Shepherd/internal/plugins/singbox"       // registers via init()
+	_ "github.com/hg-claw/Shepherd/internal/plugins/sshaudit"                  // registers via init()
 	subgen "github.com/hg-claw/Shepherd/internal/plugins/subgen"               // registers via init() + public /sub wiring
 	xrayplugin "github.com/hg-claw/Shepherd/internal/plugins/xray"             // registers via init() + Migrate0003
 

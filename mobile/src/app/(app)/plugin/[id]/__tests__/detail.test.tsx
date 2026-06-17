@@ -48,6 +48,7 @@ test('each managed plugin routes to its dedicated screen', () => {
     ['cloudflare', 'Cloudflare', '/(app)/plugin/cloudflare/cloudflare'],
     ['netquality', 'Network Quality', '/(app)/plugin/netquality/netquality'],
     ['subgen', 'Subscriptions', '/(app)/plugin/subgen/subgen'],
+    ['sshaudit', 'SSH Audit', '/(app)/plugin/sshaudit/sshaudit'],
   ]
   for (const [id, label, route] of cases) {
     mockRouteId = id

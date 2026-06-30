@@ -483,7 +483,7 @@ export function TemplateEditor({
                 <div>
                   <Label className="text-[12px]">Custom groups</Label>
                   <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
-                    One group per line: <code>Name = type, member1, member2</code> (type = select or url-test). Members are free text (node names, PROXY/DIRECT/REJECT, <code>DEVICE:Name</code> for Surge Ponte, or other group names). Target a group from a custom rule. <code>DEVICE:</code> members render only for Surge.
+                    One group per line: <code>Name = type, member1, member2</code> (type = select or url-test). Members are free text (node names, PROXY/DIRECT/REJECT, <code>DEVICE:Name</code> for Surge Ponte, or other group names). Use <code>{'{{NODES}}'}</code> as a member to include all selected proxy nodes (e.g. <code>All = select, {'{{NODES}}'}, DIRECT</code>). Target a group from a custom rule. <code>DEVICE:</code> members render only for Surge.
                   </p>
                   <textarea
                     value={customGroupsText}

@@ -83,7 +83,7 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, _ string) string {
 	// {{CUSTOM_GROUPS}}: custom groups as proxy-group list items.
 	var cgroups strings.Builder
 	for _, g := range im.Groups {
-		members := dropDevicePolicies(g.Members)
+		members := expandGroupNodes(dropDevicePolicies(g.Members), names)
 		if len(members) == 0 {
 			continue
 		}

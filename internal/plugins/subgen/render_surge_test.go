@@ -43,6 +43,25 @@ func TestSurge_FillsTemplate(t *testing.T) {
 // owner data (the oixCloud managed-config URL + sub-info account token) was
 // stripped: the output must carry exactly ONE managed-config header (ours) and
 // leak no oics.net token.
+// TestSurge_CustomGroupNodesPlaceholder: a {{NODES}} member in a custom group
+// expands to every selected node name (comma-joined), not the literal token.
+func TestSurge_CustomGroupNodesPlaceholder(t *testing.T) {
+	im := Intermediate{
+		Nodes: []Node{
+			{Name: "🟢 A", Protocol: "shadowsocks", Server: "1.1.1.1", Port: 8388, SSMethod: "aes-256-gcm", Password: "p"},
+			{Name: "🔵 B", Protocol: "shadowsocks", Server: "2.2.2.2", Port: 8388, SSMethod: "aes-256-gcm", Password: "p"},
+		},
+		Groups: []Group{{Name: "All", Type: "select", Members: []string{"{{NODES}}"}, Verbatim: true}},
+	}
+	out := (&SurgeRenderer{}).Render(im, "https://sub", DefaultRulesetBase)
+	if strings.Contains(out, "{{NODES}}") {
+		t.Fatalf("placeholder not expanded in custom group:\n%s", out)
+	}
+	if !strings.Contains(out, "All = select, 🟢 A, 🔵 B") {
+		t.Errorf("custom group did not expand {{NODES}} to both nodes:\n%s", out)
+	}
+}
+
 func TestSurge_NoResidualOwnerData(t *testing.T) {
 	out := (&SurgeRenderer{}).Render(Intermediate{}, "https://sub", DefaultRulesetBase)
 	if strings.Contains(out, "oics.net") {

@@ -142,10 +142,13 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 
 	var cgroups strings.Builder
 	for _, g := range im.Groups {
+		members := g.Members
 		if filterDevice {
-			if g.Members = dropDevicePolicies(g.Members); len(g.Members) == 0 {
-				continue
-			}
+			members = dropDevicePolicies(members)
+		}
+		g.Members = expandGroupNodes(members, names)
+		if len(g.Members) == 0 {
+			continue
 		}
 		cgroups.WriteString(r.groupLine(g) + "\n")
 	}

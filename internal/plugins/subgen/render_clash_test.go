@@ -35,6 +35,30 @@ func TestClash_FillsTemplate(t *testing.T) {
 	}
 }
 
+// TestClash_CustomGroupNodesPlaceholder: a {{NODES}} member in a custom group
+// expands to every selected node name (quoted), not the literal token.
+func TestClash_CustomGroupNodesPlaceholder(t *testing.T) {
+	im := Intermediate{
+		Nodes: []Node{
+			{Name: "🟢 A", Protocol: "trojan", Server: "1.1.1.1", Port: 443, Password: "p", SNI: "s.com"},
+			{Name: "🔵 B", Protocol: "trojan", Server: "2.2.2.2", Port: 443, Password: "p", SNI: "s.com"},
+		},
+		Groups: []Group{{Name: "All", Type: "select", Members: []string{"{{NODES}}", "DIRECT"}, Verbatim: true}},
+	}
+	out := (&ClashRenderer{}).Render(im, "", DefaultRulesetBase)
+	if strings.Contains(out, "{{NODES}}") {
+		t.Fatalf("placeholder not expanded in custom group:\n%s", out)
+	}
+	if err := yaml.Unmarshal([]byte(out), &map[string]any{}); err != nil {
+		t.Fatalf("not valid YAML: %v\n%s", err, out)
+	}
+	// The custom group line must contain both node names + DIRECT, quoted.
+	if !strings.Contains(out, "name: 'All'") ||
+		!strings.Contains(out, "proxies: ['🟢 A', '🔵 B', 'DIRECT']") {
+		t.Errorf("custom group did not expand {{NODES}} to both nodes:\n%s", out)
+	}
+}
+
 // TestClash_DeterministicProviders guards against map-iteration churn: multiple
 // DOMAIN-SET custom rules must render the rule-providers block in a stable
 // (first-seen) order so a regenerated subscription doesn't diff for no reason.

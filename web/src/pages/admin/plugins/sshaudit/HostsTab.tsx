@@ -68,6 +68,7 @@ export default function HostsTab() {
             <th className="text-left py-2 pr-4 font-medium">Enabled</th>
             <th className="text-left py-2 pr-4 font-medium">Interval</th>
             <th className="text-left py-2 pr-4 font-medium">Last collect</th>
+            <th className="text-left py-2 pr-4 font-medium">24h logins</th>
             <th className="text-left py-2 pr-4 font-medium">Last error</th>
             <th className="py-2"></th>
           </tr>
@@ -86,7 +87,7 @@ export default function HostsTab() {
           ))}
           {servers.length === 0 && (
             <tr>
-              <td colSpan={6} className="py-6 text-center text-muted-foreground text-[13px]">
+              <td colSpan={7} className="py-6 text-center text-muted-foreground text-[13px]">
                 No servers registered yet.
               </td>
             </tr>
@@ -170,6 +171,16 @@ function HostRow({
       </td>
       <td className="py-2 pr-4 text-[12px] text-muted-foreground">
         {rel ? t(rel.key, { n: rel.n }) : '—'}
+      </td>
+      <td className="py-2 pr-4 text-[12px]">
+        {host ? (
+          <span className="inline-flex items-center gap-2 font-mono tabular-nums">
+            <span className="text-ok">✓ {host.accepted_24h}</span>
+            <span className="text-err">✗ {host.failed_24h}</span>
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
       </td>
       <td className="py-2 pr-4">
         {lastErr ? (

@@ -22,6 +22,10 @@ export type SshauditHost = {
   poll_interval_seconds: number
   last_collect_at: string | null
   last_error: string | null
+  // This host's SSH login tally over the last 24h — plain numbers (zeros until
+  // the poller collects), no sql.Null wrappers.
+  accepted_24h: number
+  failed_24h: number
 }
 
 export function listSshauditHosts(): Promise<SshauditHost[]> {

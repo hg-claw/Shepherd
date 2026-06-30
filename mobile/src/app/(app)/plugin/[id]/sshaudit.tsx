@@ -62,7 +62,7 @@ function ErrorRetry({ children, onRetry }: { children: string; onRetry: () => vo
 // Host picker chips — same pattern as netquality; here over the configured
 // sshaudit hosts (server_id is the stable key).
 function HostChips({ hosts, serverID, onPick }: {
-  hosts: { server_id: number }[]
+  hosts: { server_id: number; accepted_24h: number; failed_24h: number }[]
   serverID: number | null
   onPick: (sid: number) => void
 }) {
@@ -83,13 +83,19 @@ function HostChips({ hosts, serverID, onPick }: {
             testID={`host-${h.server_id}`}
             onPress={() => onPick(h.server_id)}
             style={{
-              height: 30, paddingHorizontal: 12, borderRadius: t.radius, justifyContent: 'center',
+              minHeight: 30, paddingHorizontal: 12, paddingVertical: 4, borderRadius: t.radius, justifyContent: 'center',
               backgroundColor: active ? t.sunken : 'transparent',
               borderWidth: 1, borderColor: active ? t.borderStrong : t.border,
             }}
           >
             <Text style={{ fontFamily: t.mono(active ? 500 : 400), fontSize: 12, color: active ? t.text : t.muted }}>
               {serverLabel(servers, h.server_id)}
+            </Text>
+            {/* Compact 24h login tally — accepted in ok color, failed in err. */}
+            <Text testID={`host-tally-${h.server_id}`} style={{ fontFamily: t.mono(), fontSize: 10, marginTop: 1 }}>
+              <Text style={{ color: t.ok }}>{`✓${String(h.accepted_24h)}`}</Text>
+              <Text style={{ color: t.muted }}>{' '}</Text>
+              <Text style={{ color: t.err }}>{`✗${String(h.failed_24h)}`}</Text>
             </Text>
           </Pressable>
         )

@@ -79,6 +79,48 @@ func TestRoutes_UpsertAndListHosts(t *testing.T) {
 	}
 }
 
+func TestRoutes_ListHostsPerHost24hCounts(t *testing.T) {
+	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+	p, mux := setupRoutes(t, &fakeHostExec{}, now)
+	if _, err := p.deps.DB.Exec(`INSERT INTO servers (id, name) VALUES (2, 's2')`); err != nil {
+		t.Fatal(err)
+	}
+
+	// Two enabled hosts with distinct tallies; one event older than 24h is excluded.
+	for _, sid := range []string{"1", "2"} {
+		req := httptest.NewRequest("PUT", "/hosts/"+sid, bytes.NewBufferString(`{"enabled":true}`))
+		req.SetPathValue("server_id", sid)
+		w := httptest.NewRecorder()
+		mux.h["PUT /hosts/{server_id}"](w, req)
+		if w.Code != 200 {
+			t.Fatalf("upsert %s status=%d body=%s", sid, w.Code, w.Body.String())
+		}
+	}
+	p.wg.Wait()
+	seedEvent(t, p, 1, now.Add(-1*time.Hour), "accepted", "root", "1.1.1.1")
+	seedEvent(t, p, 1, now.Add(-2*time.Hour), "failed", "alice", "2.2.2.2")
+	seedEvent(t, p, 1, now.Add(-3*time.Hour), "failed", "bob", "3.3.3.3")
+	seedEvent(t, p, 2, now.Add(-1*time.Hour), "accepted", "root", "4.4.4.4")
+	seedEvent(t, p, 1, now.Add(-30*time.Hour), "failed", "old", "9.9.9.9") // outside 24h
+
+	w := httptest.NewRecorder()
+	mux.h["GET /hosts"](w, httptest.NewRequest("GET", "/hosts", nil))
+	var rows []hostRow
+	if err := json.Unmarshal(w.Body.Bytes(), &rows); err != nil {
+		t.Fatal(err)
+	}
+	byID := map[int64]hostRow{}
+	for _, r := range rows {
+		byID[r.ServerID] = r
+	}
+	if byID[1].Accepted24h != 1 || byID[1].Failed24h != 2 {
+		t.Errorf("host 1 = ✓%d ✗%d, want ✓1 ✗2 (30h-old excluded)", byID[1].Accepted24h, byID[1].Failed24h)
+	}
+	if byID[2].Accepted24h != 1 || byID[2].Failed24h != 0 {
+		t.Errorf("host 2 = ✓%d ✗%d, want ✓1 ✗0", byID[2].Accepted24h, byID[2].Failed24h)
+	}
+}
+
 func TestRoutes_CollectThenEventsAndSummary(t *testing.T) {
 	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
 	exec := &fakeHostExec{journalOut: `2026-06-16T10:33:01+0000 h sshd[1]: Accepted password for root from 1.2.3.4 port 55012 ssh2

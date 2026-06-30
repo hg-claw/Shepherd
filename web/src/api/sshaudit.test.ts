@@ -30,10 +30,12 @@ describe('sshaudit api', () => {
   })
 
   it('listSSHAuditHosts GETs the hosts list', async () => {
-    mockGet.mockResolvedValue([{ server_id: 1, enabled: true, poll_interval_seconds: 300, last_collect_at: null, last_error: null }])
+    mockGet.mockResolvedValue([{ server_id: 1, enabled: true, poll_interval_seconds: 300, last_collect_at: null, last_error: null, accepted_24h: 12, failed_24h: 47 }])
     const out = await listSSHAuditHosts()
     expect(mockGet).toHaveBeenCalledWith('/api/admin/plugins/sshaudit/hosts')
     expect(out[0].server_id).toBe(1)
+    expect(out[0].accepted_24h).toBe(12)
+    expect(out[0].failed_24h).toBe(47)
   })
 
   it('putSSHAuditHost PUTs enabled + interval', async () => {

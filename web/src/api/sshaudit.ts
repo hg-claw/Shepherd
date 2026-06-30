@@ -15,6 +15,10 @@ export interface SSHAuditHost {
   poll_interval_seconds: number
   last_collect_at: string | null
   last_error: string | null
+  // This host's accepted/failed SSH login tally over the last 24h. Stays 0
+  // until the poller collects.
+  accepted_24h: number
+  failed_24h: number
 }
 
 // A live SSH session as reported by the agent. pid is null when the agent

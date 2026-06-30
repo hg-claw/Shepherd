@@ -41,8 +41,8 @@ const SERVERS = [
   { id: 9, name: 'beta', connected: true, latest: null, public_alias: { String: 'edge-9', Valid: true } },
 ]
 const HOSTS = [
-  { server_id: 7, enabled: true, poll_interval_seconds: 60, last_collect_at: new Date(Date.now() - 30_000).toISOString(), last_error: null },
-  { server_id: 9, enabled: false, poll_interval_seconds: 300, last_collect_at: null, last_error: 'ssh dial failed' },
+  { server_id: 7, enabled: true, poll_interval_seconds: 60, last_collect_at: new Date(Date.now() - 30_000).toISOString(), last_error: null, accepted_24h: 12, failed_24h: 87 },
+  { server_id: 9, enabled: false, poll_interval_seconds: 300, last_collect_at: null, last_error: 'ssh dial failed', accepted_24h: 0, failed_24h: 0 },
 ]
 const SESSIONS = {
   collected_at: new Date(Date.now() - 10_000).toISOString(),
@@ -135,6 +135,17 @@ test('Sessions: host chips render server names via nullStr(public_alias)||name',
   const { getByText } = render(<SshauditScreen />)
   expect(getByText('alpha')).toBeTruthy()
   expect(getByText('edge-9')).toBeTruthy()
+})
+
+test('Sessions: host chips show the per-host 24h ✓N ✗M login tally', () => {
+  const { getByText, getByTestId } = render(<SshauditScreen />)
+  // host 7 tally: 12 accepted / 87 failed (split across colored Text spans)
+  expect(getByTestId('host-tally-7')).toBeTruthy()
+  expect(getByText('✓12')).toBeTruthy()
+  expect(getByText('✗87')).toBeTruthy()
+  // host 9 tally: zeros
+  expect(getByText('✓0')).toBeTruthy()
+  expect(getByText('✗0')).toBeTruthy()
 })
 
 // ── History tab ───────────────────────────────────────────────────────────────

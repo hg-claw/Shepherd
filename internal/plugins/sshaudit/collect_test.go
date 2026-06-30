@@ -51,6 +51,11 @@ func openTestDB(t *testing.T) *sqlx.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A bare :memory: DB is per-connection — every pooled connection gets its
+	// own empty database, so a seed on one connection is invisible to a query on
+	// another. Pin the pool to a single connection so the schema + seeds are
+	// shared across all queries in the test.
+	db.SetMaxOpenConns(1)
 	t.Cleanup(func() { _ = db.Close() })
 	if _, err := db.Exec(`
 		CREATE TABLE servers (id INTEGER PRIMARY KEY, name TEXT);

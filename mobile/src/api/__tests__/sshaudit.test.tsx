@@ -26,8 +26,8 @@ beforeEach(() => { (authedFetch as jest.Mock).mockReset() })
 // hostRow wire shape: plain values; last_collect_at/last_error are nullable
 // columns → string-or-JSON-null, NOT sql.Null {String,Valid}.
 const WIRE_HOSTS = [
-  { server_id: 7, enabled: true, poll_interval_seconds: 60, last_collect_at: '2026-06-16T01:00:00Z', last_error: null },
-  { server_id: 9, enabled: false, poll_interval_seconds: 300, last_collect_at: null, last_error: 'ssh dial failed' },
+  { server_id: 7, enabled: true, poll_interval_seconds: 60, last_collect_at: '2026-06-16T01:00:00Z', last_error: null, accepted_24h: 12, failed_24h: 87 },
+  { server_id: 9, enabled: false, poll_interval_seconds: 300, last_collect_at: null, last_error: 'ssh dial failed', accepted_24h: 0, failed_24h: 0 },
 ]
 
 test('listSshauditHosts GETs the /hosts path and surfaces null/plain values', async () => {

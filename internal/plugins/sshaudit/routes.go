@@ -38,19 +38,31 @@ func (p *Plugin) RegisterRoutes(mux plugins.Mux, deps plugins.Deps) {
 
 // hostRow is the JSON shape returned by GET /hosts. Only rows actually
 // present in sshaudit_hosts are returned (the UI joins with the server list).
+// accepted_24h/failed_24h are this host's login tally over the last 24h.
 type hostRow struct {
 	ServerID            int64      `db:"server_id"             json:"server_id"`
 	Enabled             bool       `db:"enabled"               json:"enabled"`
 	PollIntervalSeconds int        `db:"poll_interval_seconds" json:"poll_interval_seconds"`
 	LastCollectAt       *time.Time `db:"last_collect_at"       json:"last_collect_at"`
 	LastError           *string    `db:"last_error"            json:"last_error"`
+	Accepted24h         int        `db:"accepted_24h"          json:"accepted_24h"`
+	Failed24h           int        `db:"failed_24h"            json:"failed_24h"`
 }
 
 func (p *Plugin) listHosts(w http.ResponseWriter, r *http.Request) {
+	since := p.now().UTC().Add(-24 * time.Hour)
 	rows := []hostRow{}
+	// One query with conditional aggregation over a 24h LEFT JOIN — avoids an
+	// N+1 of per-host summary calls. GROUP BY lists every non-aggregated column
+	// for Postgres strictness; the CASE-SUM form is SQLite + Postgres safe.
 	if err := p.deps.DB.SelectContext(r.Context(), &rows, `
-		SELECT server_id, enabled, poll_interval_seconds, last_collect_at, last_error
-		  FROM sshaudit_hosts ORDER BY server_id`); err != nil {
+		SELECT h.server_id, h.enabled, h.poll_interval_seconds, h.last_collect_at, h.last_error,
+		       COALESCE(SUM(CASE WHEN e.result = 'accepted' THEN 1 ELSE 0 END), 0) AS accepted_24h,
+		       COALESCE(SUM(CASE WHEN e.result = 'failed'   THEN 1 ELSE 0 END), 0) AS failed_24h
+		  FROM sshaudit_hosts h
+		  LEFT JOIN sshaudit_events e ON e.server_id = h.server_id AND e.ts >= $1
+		 GROUP BY h.server_id, h.enabled, h.poll_interval_seconds, h.last_collect_at, h.last_error
+		 ORDER BY h.server_id`, since); err != nil {
 		writeErr(w, 500, err)
 		return
 	}

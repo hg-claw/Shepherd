@@ -17,7 +17,7 @@ vi.mock('@/api/servers', () => ({
 
 vi.mock('@/api/sshaudit', () => ({
   listSSHAuditHosts: vi.fn().mockResolvedValue([
-    { server_id: 1, enabled: true, poll_interval_seconds: 300, last_collect_at: '2026-06-16T00:00:00Z', last_error: null },
+    { server_id: 1, enabled: true, poll_interval_seconds: 300, last_collect_at: '2026-06-16T00:00:00Z', last_error: null, accepted_24h: 12, failed_24h: 47 },
   ]),
   putSSHAuditHost: vi.fn().mockResolvedValue({ ok: true }),
   collectSSHAuditHost: vi.fn().mockResolvedValue({ ok: true, inserted: 0 }),
@@ -47,5 +47,12 @@ describe('sshaudit/HostsTab', () => {
     renderTab()
     await screen.findByText('Server 1')
     await waitFor(() => expect(screen.getAllByText('Collect now').length).toBeGreaterThan(0))
+  })
+
+  it('renders the 24h accepted/failed login counts for configured hosts', async () => {
+    renderTab()
+    await screen.findByText('Server 1')
+    await waitFor(() => expect(screen.getByText('✓ 12')).toBeTruthy())
+    expect(screen.getByText('✗ 47')).toBeTruthy()
   })
 })

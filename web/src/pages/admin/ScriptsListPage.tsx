@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { PageHeader } from '@/components/PageHeader'
 import { LoadingState } from '@/components/LoadingState'
 import { EmptyState } from '@/components/EmptyState'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { cn } from '@/lib/utils'
 
 const scriptSortAccessors = {
@@ -36,6 +37,7 @@ export default function ScriptsListPage() {
   const del = useDeleteScript()
   const [filter, setFilter] = useState('')
   const [expandedRunId, setExpandedRunId] = useState<number | null>(null)
+  const [pendingDeleteScript, setPendingDeleteScript] = useState<Script | null>(null)
 
   const serverName = (id: number) =>
     serversData?.find((s) => s.id === id)?.name ?? `#${id}`
@@ -264,7 +266,7 @@ export default function ScriptsListPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => del.mutate(s.id)}
+                          onClick={() => setPendingDeleteScript(s)}
                           disabled={del.isPending}
                           className="h-7 w-7 p-0"
                           aria-label="delete"
@@ -280,6 +282,14 @@ export default function ScriptsListPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={pendingDeleteScript != null}
+        onOpenChange={(open) => { if (!open) setPendingDeleteScript(null) }}
+        title={t('scripts.delete_script')}
+        description={t('scripts.delete_script_confirm', { name: pendingDeleteScript?.name ?? '' })}
+        onConfirm={() => { if (pendingDeleteScript) del.mutate(pendingDeleteScript.id) }}
+      />
 
       {/* Recent runs */}
       <div className="border rounded-lg bg-elev overflow-hidden">

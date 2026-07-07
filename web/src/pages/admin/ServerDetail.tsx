@@ -215,7 +215,7 @@ export default function AdminServerDetail() {
                   }}
                 />
               </div>
-              <KV k="上次重置" v={traffic.data.last_reset_at ? new Date(traffic.data.last_reset_at).toLocaleString() : '—'} />
+              <KV k={t('servers.last_reset', 'Last reset')} v={traffic.data.last_reset_at ? new Date(traffic.data.last_reset_at).toLocaleString() : '—'} />
               <div className="sm:col-span-2">
                 <Button
                   size="sm"
@@ -224,7 +224,7 @@ export default function AdminServerDetail() {
                     setConfirmReset(true)
                   }}
                 >
-                  立即重置
+                  {t('servers.reset_now', 'Reset now')}
                 </Button>
               </div>
             </>

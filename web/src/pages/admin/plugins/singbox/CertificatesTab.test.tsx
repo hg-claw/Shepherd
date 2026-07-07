@@ -1,6 +1,8 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { I18nextProvider } from 'react-i18next'
+import i18n from '@/i18n'
 import CertificatesTab from './CertificatesTab'
 import type { SingboxCertificate } from '@/api/plugins'
 import { APIError } from '@/api/client'
@@ -48,11 +50,16 @@ vi.mock('@/store/ui', () => ({
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  return (
+    <I18nextProvider i18n={i18n}>
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    </I18nextProvider>
+  )
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   mockToast.mockClear()
+  await i18n.changeLanguage('en')
 })
 
 // ─── TestCertificatesTab_RendersCerts ─────────────────────────────────────────
@@ -83,6 +90,10 @@ describe('singbox/CertificatesTab', () => {
 
     const deleteButtons = await screen.findAllByRole('button', { name: /delete/i })
     fireEvent.click(deleteButtons[0])
+
+    // ConfirmDialog appears — confirm the destructive action
+    await screen.findByRole('dialog')
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
 
     await waitFor(() => {
       expect(mockToast).toHaveBeenCalledWith(

@@ -98,7 +98,7 @@ export default function Dashboard() {
   const recentAudit = (auditQ.data ?? []).slice(0, 8)
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       {/* Header */}
       <div>
         <PageHeader title={t('admin.dashboard', 'Dashboard')} />

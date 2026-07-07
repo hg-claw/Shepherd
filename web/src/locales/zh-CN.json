@@ -189,12 +189,16 @@
   "servers": {
     "empty": "暂无主机",
     "reset_traffic": "立即重置",
-    "reset_traffic_confirm": "确认立即重置流量统计？"
+    "reset_traffic_confirm": "确认立即重置流量统计？",
+    "reset_now": "立即重置",
+    "last_reset": "上次重置"
   },
   "scripts": {
     "title": "脚本",
     "new": "新建",
     "empty": "暂无脚本",
+    "delete_script": "删除脚本",
+    "delete_script_confirm": "确认删除脚本 \"{{name}}\"？此操作不可撤销。",
     "edit": "编辑脚本",
     "name": "名称",
     "description": "描述",
@@ -253,7 +257,8 @@
     "action_filter": "筛选动作…",
     "server_id_filter": "服务器 ID",
     "from": "起始（RFC3339）",
-    "to": "终止（RFC3339）"
+    "to": "终止（RFC3339）",
+    "empty": "暂无审计记录"
   },
   "recording": {
     "title": "录制回放",
@@ -262,6 +267,16 @@
   "sshaudit": {
     "enable_fail2ban": "启用 fail2ban",
     "enable_fail2ban_confirm": "将在此主机上安装、配置并启动 SSH 暴力破解防护（fail2ban）。"
+  },
+  "singbox": {
+    "delete_inbound": "删除入站",
+    "delete_inbound_confirm": "确认删除入站 \"{{name}}\"？",
+    "delete_certificate": "删除证书",
+    "delete_certificate_confirm": "确认删除证书 \"{{name}}\"？"
+  },
+  "xray": {
+    "delete_inbound": "删除入站",
+    "delete_inbound_confirm": "确认删除入站 \"{{name}}\"？"
   },
   "netquality": {
     "delete_target": "删除目标",

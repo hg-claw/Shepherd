@@ -170,12 +170,16 @@
   "servers": {
     "empty": "No servers yet",
     "reset_traffic": "Reset traffic",
-    "reset_traffic_confirm": "Reset traffic counters now?"
+    "reset_traffic_confirm": "Reset traffic counters now?",
+    "reset_now": "Reset now",
+    "last_reset": "Last reset"
   },
   "scripts": {
     "title": "Scripts",
     "new": "New",
     "empty": "No scripts yet",
+    "delete_script": "Delete script",
+    "delete_script_confirm": "Delete script \"{{name}}\"? This cannot be undone.",
     "edit": "Edit script",
     "name": "Name",
     "description": "Description",
@@ -234,7 +238,8 @@
     "action_filter": "filter action…",
     "server_id_filter": "server id",
     "from": "from (RFC3339)",
-    "to": "to (RFC3339)"
+    "to": "to (RFC3339)",
+    "empty": "No audit entries"
   },
   "recording": {
     "title": "Recording",
@@ -243,6 +248,16 @@
   "sshaudit": {
     "enable_fail2ban": "Enable fail2ban",
     "enable_fail2ban_confirm": "Install, configure, and start the SSH brute-force jail on this host."
+  },
+  "singbox": {
+    "delete_inbound": "Delete inbound",
+    "delete_inbound_confirm": "Delete inbound \"{{name}}\"?",
+    "delete_certificate": "Delete certificate",
+    "delete_certificate_confirm": "Delete certificate \"{{name}}\"?"
+  },
+  "xray": {
+    "delete_inbound": "Delete inbound",
+    "delete_inbound_confirm": "Delete inbound \"{{name}}\"?"
   },
   "netquality": {
     "delete_target": "Delete target",

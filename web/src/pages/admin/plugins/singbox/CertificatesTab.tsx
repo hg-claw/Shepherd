@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -8,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { useUI } from '@/store/ui'
 import {
   listSingboxCerts,
@@ -177,9 +179,11 @@ export function IssueCertDialog({ open, onOpenChange }: IssueCertDialogProps) {
 // ─── CertificatesTab ──────────────────────────────────────────────────────────
 
 export default function CertificatesTab() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const [showIssue, setShowIssue] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<SingboxCertificate | null>(null)
 
   // Poll fast (2s) whenever any cert is mid-issuance — ACME completes
   // in seconds-to-minutes and the user wants the status pill to flip
@@ -334,7 +338,7 @@ export default function CertificatesTab() {
                           ? 'cert is in use by inbound(s); remove them first'
                           : undefined
                       }
-                      onClick={() => del.mutate(c.id)}
+                      onClick={() => setPendingDelete(c)}
                     >
                       Delete
                     </Button>
@@ -348,6 +352,14 @@ export default function CertificatesTab() {
 
       {/* Issue cert dialog */}
       <IssueCertDialog open={showIssue} onOpenChange={setShowIssue} />
+
+      <ConfirmDialog
+        open={pendingDelete != null}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null) }}
+        title={t('singbox.delete_certificate')}
+        description={t('singbox.delete_certificate_confirm', { name: pendingDelete?.domain ?? '' })}
+        onConfirm={() => { if (pendingDelete) del.mutate(pendingDelete.id) }}
+      />
     </div>
   )
 }

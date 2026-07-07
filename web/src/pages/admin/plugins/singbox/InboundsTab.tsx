@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/Pill'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { useUI } from '@/store/ui'
 import { copyText } from '@/lib/clipboard'
 import {
@@ -167,6 +169,7 @@ function buildSingboxShareURL(inbound: SingboxInbound, hostname: string): string
 }
 
 export default function InboundsTab() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const serversQ = useServers({ refetchInterval: 30_000 })
@@ -278,6 +281,7 @@ export default function InboundsTab() {
   >(null)
 
   const [bulkRelayTarget, setBulkRelayTarget] = useState<SingboxInbound | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<SingboxInbound | null>(null)
 
   return (
     <div className="space-y-4">
@@ -439,7 +443,7 @@ export default function InboundsTab() {
                         <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-destructive"
                           disabled={del.isPending || dep > 0}
                           title={dep > 0 ? `${dep} relay(s) depend on this landing; delete them first` : undefined}
-                          onClick={() => del.mutate(i.id)}>
+                          onClick={() => setPendingDelete(i)}>
                           Delete
                         </Button>
                       </td>
@@ -451,6 +455,14 @@ export default function InboundsTab() {
           </div>
         )
       })}
+
+      <ConfirmDialog
+        open={pendingDelete != null}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null) }}
+        title={t('singbox.delete_inbound')}
+        description={t('singbox.delete_inbound_confirm', { name: pendingDelete?.alias || (pendingDelete?.tag ?? '') })}
+        onConfirm={() => { if (pendingDelete) del.mutate(pendingDelete.id) }}
+      />
 
       {dialog?.kind === 'new' && (
         <InboundDialog
@@ -506,7 +518,7 @@ function VersionInline({ serverID, current }: { serverID: number; current: strin
   return (
     <span className="inline-flex items-center gap-1">
       <Input value={value} onChange={(e) => setValue(e.target.value)}
-        className="h-6 w-20 font-mono text-2xs" />
+        className="h-7 w-20 font-mono text-2xs" />
       <Button size="sm" className="h-7 px-2 text-2xs" disabled={apply.isPending}
         onClick={() => apply.mutate()}>Apply</Button>
       <button className="text-fg-dim text-2xs" onClick={() => setEditing(false)}>cancel</button>

@@ -35,7 +35,7 @@ export default function SessionsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <span className="text-[12.5px] text-muted-foreground">Server</span>
+        <span className="text-sm text-muted-foreground">Server</span>
         <Select
           value={effectiveID ? String(effectiveID) : ''}
           onValueChange={(v) => {
@@ -45,12 +45,12 @@ export default function SessionsTab() {
             setSP(sp, { replace: true })
           }}
         >
-          <SelectTrigger className="h-8 w-72 text-[12.5px]">
+          <SelectTrigger className="h-8 w-72 text-sm">
             <SelectValue placeholder="Pick a server" />
           </SelectTrigger>
           <SelectContent>
             {servers.map((s: ServerRecord) => (
-              <SelectItem key={s.id} value={String(s.id)} className="text-[12.5px]">
+              <SelectItem key={s.id} value={String(s.id)} className="text-sm">
                 {s.name}
               </SelectItem>
             ))}
@@ -59,7 +59,7 @@ export default function SessionsTab() {
         <Button
           variant="outline"
           size="sm"
-          className="h-8 text-[12px]"
+          className="h-8 text-xs"
           disabled={!effectiveID || sessionsQ.isFetching}
           onClick={() => sessionsQ.refetch()}
         >
@@ -67,7 +67,7 @@ export default function SessionsTab() {
           Refresh
         </Button>
         {sessionsQ.data?.collected_at && !offline && (
-          <span className="text-[11.5px] text-muted-foreground font-mono">
+          <span className="text-2xs text-muted-foreground font-mono">
             as of {new Date(sessionsQ.data.collected_at).toLocaleTimeString()}
           </span>
         )}
@@ -75,19 +75,19 @@ export default function SessionsTab() {
 
       {offline ? (
         <div className="border rounded-md p-6 text-center bg-elev">
-          <div className="text-[13px] font-medium">Host offline / no agent</div>
-          <div className="text-[12px] text-muted-foreground mt-1">
+          <div className="text-sm font-medium">Host offline / no agent</div>
+          <div className="text-xs text-muted-foreground mt-1">
             Couldn't reach the agent to read live sessions. Make sure the server is online and try
             again.
           </div>
         </div>
       ) : err ? (
-        <p className="text-[12.5px] text-err">{err.message}</p>
+        <p className="text-sm text-err">{err.message}</p>
       ) : (
         <div className="border rounded-md overflow-hidden">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-[11px] text-muted-foreground uppercase tracking-wide">
+              <tr className="border-b text-2xs text-muted-foreground uppercase tracking-wide">
                 <th className="text-left py-2 pl-3 pr-4 font-medium">User</th>
                 <th className="text-left py-2 pr-4 font-medium font-mono">Source IP</th>
                 <th className="text-left py-2 pr-4 font-medium">TTY</th>
@@ -99,24 +99,24 @@ export default function SessionsTab() {
               {sessions.map((s, i) => (
                 <tr key={`${s.tty}-${s.pid ?? i}`} className="border-b last:border-0">
                   <td className="py-2 pl-3 pr-4 font-medium">{s.user}</td>
-                  <td className="py-2 pr-4 font-mono text-[12px] text-muted-foreground">{s.source_ip || '—'}</td>
-                  <td className="py-2 pr-4 font-mono text-[12px]">{s.tty || '—'}</td>
-                  <td className="py-2 pr-4 text-[12px]">
+                  <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">{s.source_ip || '—'}</td>
+                  <td className="py-2 pr-4 font-mono text-xs">{s.tty || '—'}</td>
+                  <td className="py-2 pr-4 text-xs">
                     {s.login_at ? new Date(s.login_at).toLocaleString() : '—'}
                   </td>
-                  <td className="py-2 pr-3 font-mono text-[12px] text-muted-foreground">{s.pid ?? '—'}</td>
+                  <td className="py-2 pr-3 font-mono text-xs text-muted-foreground">{s.pid ?? '—'}</td>
                 </tr>
               ))}
               {sessions.length === 0 && !sessionsQ.isLoading && (
                 <tr>
-                  <td colSpan={5} className="py-6 text-center text-muted-foreground text-[13px]">
+                  <td colSpan={5} className="py-6 text-center text-muted-foreground text-sm">
                     No active SSH sessions.
                   </td>
                 </tr>
               )}
               {sessionsQ.isLoading && (
                 <tr>
-                  <td colSpan={5} className="py-6 text-center text-muted-foreground text-[13px]">
+                  <td colSpan={5} className="py-6 text-center text-muted-foreground text-sm">
                     Loading…
                   </td>
                 </tr>

@@ -43,7 +43,7 @@ export function PluginLogsTab({ plugin }: { plugin: 'xray' | 'singbox' }) {
         <select
           value={serverID ?? ''}
           onChange={(e) => setServerID(Number(e.target.value))}
-          className="h-8 px-2 rounded-md border bg-background text-[13px] font-mono"
+          className="h-8 px-2 rounded-md border bg-background text-sm font-mono"
         >
           {(hostsQ.data ?? []).map((h) => (
             <option key={h.id} value={h.server_id}>#{h.server_id}</option>
@@ -56,14 +56,14 @@ export function PluginLogsTab({ plugin }: { plugin: 'xray' | 'singbox' }) {
           Clear
         </Button>
       </div>
-      <div className="h-[440px] bg-[#0a0a0b] text-zinc-100 rounded-lg overflow-auto p-3 font-mono text-[12px] leading-relaxed">
+      <div className="h-[440px] bg-console text-console-fg rounded-lg overflow-auto p-3 font-mono text-xs leading-relaxed">
         {lines.map((l, i) => (
           <div key={i} className="whitespace-pre-wrap">
-            <span className="text-zinc-500 mr-2">{l.ts.slice(11, 19)}</span>
+            <span className="text-console-muted mr-2">{l.ts.slice(11, 19)}</span>
             <span>{l.line}</span>
           </div>
         ))}
-        {lines.length === 0 && <div className="text-zinc-500">waiting for log lines…</div>}
+        {lines.length === 0 && <div className="text-console-muted">waiting for log lines…</div>}
       </div>
     </div>
   )

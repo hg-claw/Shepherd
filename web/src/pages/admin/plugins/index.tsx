@@ -9,6 +9,7 @@ import { fetchSSHAuditOverview } from '@/api/sshaudit'
 import { Button } from '@/components/ui/button'
 import { StatCard } from '@/components/StatCard'
 import { Pill } from '@/components/Pill'
+import { PageHeader } from '@/components/PageHeader'
 import { cn } from '@/lib/utils'
 
 // Map well-known plugin icon names to Lucide components
@@ -71,16 +72,10 @@ export default function PluginsIndex() {
   return (
     <div className="flex flex-col gap-5">
       {/* Header */}
-      <div className="flex items-end justify-between flex-wrap gap-2">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight m-0">
-            {t('nav.plugins', 'Plugins')}
-          </h1>
-          <p className="text-[13px] text-muted-foreground mt-1 max-w-[720px]">
-            {t('plugins.subtitle', 'Extend the Shepherd agent with log parsers, extra metric collectors, proxy runtimes, and alert routers.')}
-          </p>
-        </div>
-      </div>
+      <PageHeader title={t('nav.plugins', 'Plugins')} />
+      <p className="text-sm text-muted-foreground -mt-3 max-w-[720px]">
+        {t('plugins.subtitle', 'Extend the Shepherd agent with log parsers, extra metric collectors, proxy runtimes, and alert routers.')}
+      </p>
 
       {/* KPI strip */}
       <div className="grid grid-cols-3 gap-3">
@@ -109,13 +104,13 @@ export default function PluginsIndex() {
             key={c.key}
             onClick={() => setFilter(c.key)}
             className={cn(
-              'inline-flex items-center gap-1.5 h-[26px] px-2.5 rounded-full text-[12px] transition-colors',
+              'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-xs transition-colors',
               'bg-sunken border border-transparent text-muted-foreground hover:text-foreground',
               filter === c.key && 'bg-accent text-accent-foreground',
             )}
           >
             {c.label}
-            <span className="font-mono text-[11px] opacity-70">{c.count}</span>
+            <span className="font-mono text-2xs opacity-70">{c.count}</span>
           </button>
         ))}
       </div>
@@ -168,21 +163,21 @@ function PluginCard({ p, isPending, onEnable, onDisable }: PluginCardProps) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="font-mono font-medium text-[13.5px] truncate flex-1 min-w-0 text-foreground">
+            <span className="font-mono font-medium text-sm truncate flex-1 min-w-0 text-foreground">
               {p.meta.name}
             </span>
             <Pill kind={p.enabled ? 'ok' : 'neutral'}>
               {p.enabled ? t('plugins.pill.enabled', 'enabled') : t('plugins.pill.disabled', 'disabled')}
             </Pill>
           </div>
-          <p className="text-[12.5px] text-muted-foreground mt-1.5 leading-[1.45] min-h-[2.4em] line-clamp-2">
+          <p className="text-sm text-muted-foreground mt-1.5 leading-[1.45] min-h-[2.4em] line-clamp-2">
             {p.meta.description}
           </p>
         </div>
       </Link>
 
       {/* Footer row */}
-      <div className="border-t border-dashed px-[14px] py-[10px] flex items-center gap-3 font-mono text-[11.5px] text-fg-dim mt-auto">
+      <div className="border-t border-dashed px-[14px] py-[10px] flex items-center gap-3 font-mono text-2xs text-fg-dim mt-auto">
         <span>{p.meta.category}</span>
         {p.enabled && p.host_count != null && (
           <>
@@ -192,7 +187,7 @@ function PluginCard({ p, isPending, onEnable, onDisable }: PluginCardProps) {
         )}
         {isSSHAudit && overview.data && (
           <span
-            className="inline-flex items-center gap-1.5 rounded-full bg-sunken border border-border px-2 h-5 text-[11px] tracking-wide whitespace-nowrap"
+            className="inline-flex items-center gap-1.5 rounded-full bg-sunken border border-border px-2 h-5 text-2xs tracking-wide whitespace-nowrap"
             title={t('plugins.sshaudit.tally_title', 'Fleet-wide SSH logins, last 24h')}
           >
             <span className="text-fg-dim">24h</span>
@@ -206,7 +201,7 @@ function PluginCard({ p, isPending, onEnable, onDisable }: PluginCardProps) {
             <Button
               size="sm"
               variant="outline"
-              className="h-[26px] text-[12px]"
+              className="h-7 text-xs"
               disabled={isPending}
               onClick={onDisable}
             >
@@ -215,7 +210,7 @@ function PluginCard({ p, isPending, onEnable, onDisable }: PluginCardProps) {
           ) : (
             <Button
               size="sm"
-              className="h-[26px] text-[12px]"
+              className="h-7 text-xs"
               disabled={isPending}
               onClick={onEnable}
             >

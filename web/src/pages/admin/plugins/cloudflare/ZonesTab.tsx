@@ -11,26 +11,26 @@ export default function ZonesTab() {
   })
   const zones = q.data ?? []
   if (q.isError) {
-    return <div className="text-err text-[13px]">Failed to load zones: {(q.error as Error).message}</div>
+    return <div className="text-err text-sm">Failed to load zones: {(q.error as Error).message}</div>
   }
   return (
     <div className="rounded-lg border bg-elev overflow-x-auto">
-      <table className="w-full text-[13px] border-collapse">
+      <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="text-left">
-            <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Name</th>
-            <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Status</th>
-            <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Plan</th>
-            <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">ID</th>
+            <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Name</th>
+            <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Status</th>
+            <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Plan</th>
+            <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">ID</th>
           </tr>
         </thead>
         <tbody>
           {zones.map((z) => (
             <tr key={z.id} className="border-t">
               <td className="px-3 py-2 font-mono">{z.name}</td>
-              <td className="px-3 py-2 text-[12px] text-muted-foreground">{z.status ?? '—'}</td>
-              <td className="px-3 py-2 text-[12px] text-muted-foreground">{z.plan?.name ?? '—'}</td>
-              <td className="px-3 py-2 font-mono text-[11px] text-fg-dim">{z.id}</td>
+              <td className="px-3 py-2 text-xs text-muted-foreground">{z.status ?? '—'}</td>
+              <td className="px-3 py-2 text-xs text-muted-foreground">{z.plan?.name ?? '—'}</td>
+              <td className="px-3 py-2 font-mono text-2xs text-fg-dim">{z.id}</td>
             </tr>
           ))}
           {zones.length === 0 && (

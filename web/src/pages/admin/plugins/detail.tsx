@@ -7,6 +7,8 @@ import * as icons from 'lucide-react'
 import { listPlugins } from '@/api/plugins'
 import { lazyPluginPage, PluginRegistry } from './PluginRegistry'
 import { Pill } from '@/components/Pill'
+import { PageHeader } from '@/components/PageHeader'
+import { LoadingState } from '@/components/LoadingState'
 import { cn } from '@/lib/utils'
 
 // Mirror the same icon map used by the index page
@@ -41,17 +43,15 @@ export default function PluginDetail() {
   if (!entry || !ui || !PluginPage) {
     return (
       <div className="flex flex-col gap-3">
-        <h1 className="text-[22px] font-semibold tracking-tight m-0">
-          {t('plugins.unknown', 'Unknown plugin')}
-        </h1>
-        <p className="text-muted-foreground text-[13px]">
+        <PageHeader title={t('plugins.unknown', 'Unknown plugin')} />
+        <p className="text-muted-foreground text-sm">
           {t('plugins.unknown_body', 'No plugin registered with id')}{' '}
-          <code className="font-mono bg-sunken px-1 rounded text-[12px]">{id}</code>
+          <code className="font-mono bg-sunken px-1 rounded text-xs">{id}</code>
         </p>
         <div>
           <Link
             to="/admin/plugins"
-            className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             ← {t('plugins.back', 'Back to plugins')}
           </Link>
@@ -68,7 +68,7 @@ export default function PluginDetail() {
   return (
     <div className="flex flex-col gap-4">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+      <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Link to="/admin/plugins" className="hover:text-foreground transition-colors">
           {t('nav.plugins', 'Plugins')}
         </Link>
@@ -86,21 +86,22 @@ export default function PluginDetail() {
         {/* Title + meta */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-[22px] font-semibold tracking-tight m-0">{entry.meta.name}</h1>
+            {/* ui-token-ignore: h1 is inline in a flex row alongside Pill/metadata — PageHeader layout not applicable */}
+            <h1 className="text-title font-semibold tracking-tight m-0">{entry.meta.name}</h1>
             <Pill kind={entry.enabled ? 'ok' : 'neutral'}>
               {entry.enabled ? t('plugins.pill.enabled', 'enabled') : t('plugins.pill.disabled', 'disabled')}
             </Pill>
-            <span className="font-mono text-[11.5px] text-fg-dim">{entry.meta.category}</span>
+            <span className="font-mono text-2xs text-fg-dim">{entry.meta.category}</span>
             {entry.host_count != null && (
               <>
-                <span className="font-mono text-[11.5px] text-fg-dim">·</span>
-                <span className="font-mono text-[11.5px] text-fg-dim">
+                <span className="font-mono text-2xs text-fg-dim">·</span>
+                <span className="font-mono text-2xs text-fg-dim">
                   {entry.host_count} {t('plugins.hosts', 'hosts')}
                 </span>
               </>
             )}
           </div>
-          <p className="text-[13px] text-muted-foreground mt-1.5 max-w-[720px]">
+          <p className="text-sm text-muted-foreground mt-1.5 max-w-[720px]">
             {entry.meta.description}
           </p>
         </div>
@@ -113,7 +114,7 @@ export default function PluginDetail() {
             key={tab.key}
             to={`/admin/plugins/${id}/${tab.key}`}
             className={cn(
-              'px-3 py-2 text-[13px] whitespace-nowrap -mb-px border-b-2 transition-colors',
+              'px-3 py-2 text-sm whitespace-nowrap -mb-px border-b-2 transition-colors',
               activeTab === tab.key
                 ? 'border-foreground text-foreground font-medium'
                 : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -125,7 +126,7 @@ export default function PluginDetail() {
       </div>
 
       {/* Tab content */}
-      <Suspense fallback={<div className="text-muted-foreground text-[13px]">{t('common.loading', 'Loading…')}</div>}>
+      <Suspense fallback={<LoadingState />}>
         <PluginPage />
       </Suspense>
       <Outlet />

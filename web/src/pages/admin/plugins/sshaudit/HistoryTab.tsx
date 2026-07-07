@@ -59,7 +59,7 @@ export default function HistoryTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-[12.5px] text-muted-foreground">Server</span>
+        <span className="text-sm text-muted-foreground">Server</span>
         <Select
           value={effectiveID ? String(effectiveID) : ''}
           onValueChange={(v) => {
@@ -69,12 +69,12 @@ export default function HistoryTab() {
             setSP(sp, { replace: true })
           }}
         >
-          <SelectTrigger className="h-8 w-64 text-[12.5px]">
+          <SelectTrigger className="h-8 w-64 text-sm">
             <SelectValue placeholder="Pick a server" />
           </SelectTrigger>
           <SelectContent>
             {servers.map((s: ServerRecord) => (
-              <SelectItem key={s.id} value={String(s.id)} className="text-[12.5px]">
+              <SelectItem key={s.id} value={String(s.id)} className="text-sm">
                 {s.name}
               </SelectItem>
             ))}
@@ -87,7 +87,7 @@ export default function HistoryTab() {
               key={o.value}
               size="sm"
               variant={o.value === filter ? 'default' : 'outline'}
-              className="h-7 px-2.5 text-[11.5px]"
+              className="h-7 px-2.5 text-2xs"
               onClick={() => setFilter(o.value)}
             >
               {o.label}
@@ -101,7 +101,7 @@ export default function HistoryTab() {
               key={o.value}
               size="sm"
               variant={o.value === window ? 'default' : 'outline'}
-              className="h-7 px-2.5 text-[11.5px]"
+              className="h-7 px-2.5 text-2xs"
               onClick={() => setWindow(o.value)}
             >
               {o.label}
@@ -112,19 +112,19 @@ export default function HistoryTab() {
 
       {/* Summary strip */}
       {summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[12.5px]">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
           <SummaryCard label={`Accepted (${summary.window_hours}h)`} value={summary.accepted} tone="ok" />
           <SummaryCard label={`Failed (${summary.window_hours}h)`} value={summary.failed} tone="err" />
           <SummaryCard label="Unique source IPs" value={summary.unique_source_ips} />
           <div className="border rounded-md p-3 space-y-1.5">
-            <div className="text-muted-foreground text-[11px] uppercase tracking-wide">Top sources</div>
+            <div className="text-muted-foreground text-2xs uppercase tracking-wide">Top sources</div>
             {summary.top_sources.length === 0 ? (
-              <div className="text-[12px] text-muted-foreground">—</div>
+              <div className="text-xs text-muted-foreground">—</div>
             ) : (
               summary.top_sources.slice(0, 3).map((t) => (
                 <div key={t.source_ip} className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-[11.5px] truncate">{t.source_ip}</span>
-                  <span className="font-mono text-[11.5px] text-muted-foreground tabular-nums">{t.count}</span>
+                  <span className="font-mono text-2xs truncate">{t.source_ip}</span>
+                  <span className="font-mono text-2xs text-muted-foreground tabular-nums">{t.count}</span>
                 </div>
               ))
             )}
@@ -134,7 +134,7 @@ export default function HistoryTab() {
 
       {summary && summary.top_failed_users.length > 0 && (
         <div className="border rounded-md p-3">
-          <div className="text-muted-foreground text-[11px] uppercase tracking-wide mb-2">
+          <div className="text-muted-foreground text-2xs uppercase tracking-wide mb-2">
             Top failed usernames
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -149,9 +149,9 @@ export default function HistoryTab() {
 
       {/* Events table */}
       <div className="border rounded-md overflow-hidden">
-        <table className="w-full text-[13px]">
+        <table className="w-full text-sm">
           <thead>
-            <tr className="border-b text-[11px] text-muted-foreground uppercase tracking-wide">
+            <tr className="border-b text-2xs text-muted-foreground uppercase tracking-wide">
               <th className="text-left py-2 pl-3 pr-4 font-medium">Time</th>
               <th className="text-left py-2 pr-4 font-medium">Result</th>
               <th className="text-left py-2 pr-4 font-medium">Username</th>
@@ -168,7 +168,7 @@ export default function HistoryTab() {
                   key={e.id}
                   className={`border-b last:border-0 ${failed ? 'bg-err-soft/30' : ''}`}
                 >
-                  <td className="py-2 pl-3 pr-4 font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+                  <td className="py-2 pl-3 pr-4 font-mono text-2xs text-muted-foreground whitespace-nowrap">
                     {e.ts ? new Date(e.ts).toLocaleString() : '—'}
                   </td>
                   <td className="py-2 pr-4">
@@ -182,22 +182,22 @@ export default function HistoryTab() {
                       {e.invalid_user && <Pill kind="warn">invalid</Pill>}
                     </span>
                   </td>
-                  <td className="py-2 pr-4 text-[12px]">{e.method || '—'}</td>
-                  <td className="py-2 pr-4 font-mono text-[12px] text-muted-foreground">{e.source_ip || '—'}</td>
-                  <td className="py-2 pr-3 font-mono text-[12px] text-muted-foreground">{e.port ?? '—'}</td>
+                  <td className="py-2 pr-4 text-xs">{e.method || '—'}</td>
+                  <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">{e.source_ip || '—'}</td>
+                  <td className="py-2 pr-3 font-mono text-xs text-muted-foreground">{e.port ?? '—'}</td>
                 </tr>
               )
             })}
             {events.length === 0 && !eventsQ.isLoading && (
               <tr>
-                <td colSpan={6} className="py-6 text-center text-muted-foreground text-[13px]">
+                <td colSpan={6} className="py-6 text-center text-muted-foreground text-sm">
                   No login events recorded yet.
                 </td>
               </tr>
             )}
             {eventsQ.isLoading && (
               <tr>
-                <td colSpan={6} className="py-6 text-center text-muted-foreground text-[13px]">
+                <td colSpan={6} className="py-6 text-center text-muted-foreground text-sm">
                   Loading…
                 </td>
               </tr>
@@ -213,8 +213,8 @@ function SummaryCard({ label, value, tone }: { label: string; value: number; ton
   const toneClass = tone === 'ok' ? 'text-ok' : tone === 'err' ? 'text-err' : ''
   return (
     <div className="border rounded-md p-3">
-      <div className="text-muted-foreground text-[11px] uppercase tracking-wide">{label}</div>
-      <div className={`text-[20px] font-mono tabular-nums ${toneClass}`}>{value}</div>
+      <div className="text-muted-foreground text-2xs uppercase tracking-wide">{label}</div>
+      <div className={`text-title font-mono tabular-nums ${toneClass}`}>{value}</div>
     </div>
   )
 }

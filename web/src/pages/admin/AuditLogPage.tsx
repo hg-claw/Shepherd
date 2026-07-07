@@ -6,6 +6,9 @@ import { StatCard } from '@/components/StatCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import { PageHeader } from '@/components/PageHeader'
+import { LoadingState } from '@/components/LoadingState'
+import { EmptyState } from '@/components/EmptyState'
 
 function rowsToCSV(rows: AuditRow[]): string {
   const headers = ['ts', 'admin_id', 'server_id', 'action', 'result', 'details']
@@ -55,21 +58,23 @@ export default function AuditLogPage() {
   const uniqueAdmins = new Set(rows.map((r) => r.admin_id).filter(Boolean)).size
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight m-0">{t('audit.title', 'Audit log')}</h1>
-          <p className="text-muted-foreground text-[13px] mt-1">
-            {t('audit.sub', 'Every privileged operation.')}{' '}
-            <span className="font-mono">30 days</span>{' '}
-            {t('audit.retention_hint', 'retention · exportable as CSV.')}
-          </p>
-        </div>
-        <Button size="sm" variant="outline" onClick={handleDownloadCSV} className="gap-1.5">
-          <Download className="h-3.5 w-3.5" />
-          CSV
-        </Button>
+      <div>
+        <PageHeader
+          title={t('audit.title', 'Audit log')}
+          actions={
+            <Button size="sm" variant="outline" onClick={handleDownloadCSV} className="gap-1.5">
+              <Download className="h-3.5 w-3.5" />
+              CSV
+            </Button>
+          }
+        />
+        <p className="text-muted-foreground text-sm mt-1">
+          {t('audit.sub', 'Every privileged operation.')}{' '}
+          <span className="font-mono">30 days</span>{' '}
+          {t('audit.retention_hint', 'retention · exportable as CSV.')}
+        </p>
       </div>
 
       {/* KPI strip */}
@@ -93,60 +98,60 @@ export default function AuditLogPage() {
             placeholder={t('audit.action_filter', 'filter action…')}
             value={action}
             onChange={(e) => setAction(e.target.value)}
-            className="pl-8 font-mono text-[12px]"
+            className="pl-8 font-mono text-xs"
           />
         </div>
         <Input
           placeholder={t('audit.server_id_filter', 'server id')}
           value={serverID}
           onChange={(e) => setServerID(e.target.value)}
-          className="font-mono text-[12px]"
+          className="font-mono text-xs"
         />
         <Input
           placeholder={t('audit.from', 'from (RFC3339)')}
           value={from}
           onChange={(e) => setFrom(e.target.value)}
-          className="font-mono text-[12px]"
+          className="font-mono text-xs"
         />
         <Input
           placeholder={t('audit.to', 'to (RFC3339)')}
           value={to}
           onChange={(e) => setTo(e.target.value)}
-          className="font-mono text-[12px]"
+          className="font-mono text-xs"
         />
       </div>
 
       {/* Table */}
       {isLoading ? (
-        <div className="text-muted-foreground text-[13px]">{t('common.loading')}</div>
+        <LoadingState />
       ) : (
         <div className="border rounded-lg bg-elev overflow-hidden">
           <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-            <span className="text-foreground font-medium text-[12.5px]">
+            <span className="text-foreground font-medium text-sm">
               {t('audit.events', 'Events')}
             </span>
-            <span className="text-fg-dim font-mono text-[11px] ml-auto">{rows.length} rows</span>
+            <span className="text-fg-dim font-mono text-2xs ml-auto">{rows.length} rows</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-[12.5px] border-collapse">
+            <table className="w-full text-sm border-collapse">
               <thead>
                 <tr>
-                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b whitespace-nowrap">
+                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b whitespace-nowrap">
                     {t('audit.ts', 'Time')}
                   </th>
-                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b">
+                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b">
                     {t('audit.action', 'Action')}
                   </th>
-                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
+                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
                     {t('audit.admin', 'Admin')}
                   </th>
-                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
+                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
                     {t('audit.server', 'Server')}
                   </th>
-                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b">
+                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b">
                     {t('audit.result', 'Result')}
                   </th>
-                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b hidden md:table-cell">
+                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden md:table-cell">
                     {t('audit.details', 'Details')}
                   </th>
                 </tr>
@@ -154,8 +159,8 @@ export default function AuditLogPage() {
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-fg-dim font-mono text-[12px]">
-                      {t('audit.empty', 'no events in this range')}
+                    <td colSpan={6}>
+                      <EmptyState title={t('audit.empty')} />
                     </td>
                   </tr>
                 ) : (
@@ -166,30 +171,30 @@ export default function AuditLogPage() {
                         'border-t transition-colors',
                         r.result === 'error'
                           ? 'bg-err-soft/20 hover:bg-err-soft/30'
-                          : 'hover:bg-sunken/70',
+                          : 'hover:bg-sunken/60',
                       )}
                     >
-                      <td className="px-4 py-2 font-mono text-[11.5px] text-fg-dim whitespace-nowrap">
+                      <td className="px-4 py-2 font-mono text-2xs text-fg-dim whitespace-nowrap">
                         {r.ts}
                       </td>
-                      <td className="px-4 py-2 font-mono text-[12px]">{r.action}</td>
-                      <td className="px-4 py-2 hidden sm:table-cell font-mono text-[12px] text-fg-dim">
+                      <td className="px-4 py-2 font-mono text-xs">{r.action}</td>
+                      <td className="px-4 py-2 hidden sm:table-cell font-mono text-xs text-fg-dim">
                         {r.admin_id ?? '—'}
                       </td>
-                      <td className="px-4 py-2 hidden sm:table-cell font-mono text-[12px] text-fg-dim">
+                      <td className="px-4 py-2 hidden sm:table-cell font-mono text-xs text-fg-dim">
                         {r.server_id ?? '—'}
                       </td>
                       <td className="px-4 py-2">
                         <span
                           className={cn(
-                            'font-mono text-[12px]',
+                            'font-mono text-xs',
                             r.result === 'error' ? 'text-err' : 'text-ok',
                           )}
                         >
                           {r.result}
                         </span>
                       </td>
-                      <td className="px-4 py-2 hidden md:table-cell font-mono text-[11.5px] text-fg-dim max-w-md">
+                      <td className="px-4 py-2 hidden md:table-cell font-mono text-2xs text-fg-dim max-w-md">
                         <span className="truncate block">{r.details}</span>
                       </td>
                     </tr>

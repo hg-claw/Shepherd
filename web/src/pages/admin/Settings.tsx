@@ -11,6 +11,7 @@ import { useSettings, usePatchSettings } from '@/api/settings'
 import { useVersion } from '@/api/version'
 import { useUI } from '@/store/ui'
 import { cn } from '@/lib/utils'
+import { PageHeader } from '@/components/PageHeader'
 
 const schema = z.object({
   public_display_mode: z.enum(['raw', 'level', 'both']),
@@ -109,15 +110,15 @@ export default function Settings() {
   })
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-[22px] font-semibold tracking-tight m-0">{t('admin.settings')}</h1>
-        <p className="text-muted-foreground text-[13px] mt-1">
+        <PageHeader title={t('admin.settings')} />
+        <p className="text-muted-foreground text-sm mt-1">
           {t(
             'settings.sub',
             'Shepherd instance configuration. Changes write to the ',
           )}
-          <code className="bg-sunken px-1 py-0.5 rounded text-[12px] font-mono">settings</code>
+          <code className="bg-sunken px-1 py-0.5 rounded text-xs font-mono">settings</code>
           {t('settings.sub2', ' table immediately.')}
         </p>
       </div>
@@ -129,7 +130,7 @@ export default function Settings() {
               key={it.key}
               onClick={() => setTab(it.key)}
               className={cn(
-                'text-left px-3 py-2 rounded-md text-[13px] transition-colors whitespace-nowrap',
+                'text-left px-3 py-2 rounded-md text-sm transition-colors whitespace-nowrap',
                 'text-muted-foreground hover:text-foreground hover:bg-sunken',
                 tab === it.key && 'bg-sunken text-foreground font-medium',
               )}
@@ -176,8 +177,8 @@ export default function Settings() {
 function KV({ k, v }: { k: string; v: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[180px_1fr] gap-3.5 py-3 border-b border-dashed">
-      <span className="text-muted-foreground text-[12.5px]">{k}</span>
-      <span className="font-mono text-[12.5px]">{v}</span>
+      <span className="text-muted-foreground text-sm">{k}</span>
+      <span className="font-mono text-sm">{v}</span>
     </div>
   )
 }
@@ -189,7 +190,7 @@ function AboutTab() {
     <div className="space-y-4">
       <div className="border rounded-lg bg-elev overflow-hidden">
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-          <span className="text-foreground font-medium text-[12.5px]">About this install</span>
+          <span className="text-foreground font-medium text-sm">About this install</span>
         </div>
         <div className="px-4 py-1">
           <KV k="Version" v={versionQ.data?.version ?? '…'} />
@@ -198,7 +199,7 @@ function AboutTab() {
           <KV k="Public wall" v={<span>enabled · /</span>} />
         </div>
       </div>
-      <p className="text-muted-foreground text-[12px]">
+      <p className="text-muted-foreground text-xs">
         Workspace name, default channels, timezone, and team membership are not configurable in
         this release.
       </p>
@@ -220,15 +221,15 @@ function StorageTab({
     <div className="space-y-4">
       <div className="border rounded-lg bg-elev overflow-hidden">
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-          <span className="text-foreground font-medium text-[12.5px]">Database</span>
-          <span className="text-fg-dim font-mono text-[11px] ml-auto">
+          <span className="text-foreground font-medium text-sm">Database</span>
+          <span className="text-fg-dim font-mono text-2xs ml-auto">
             Set DATABASE_URL=postgres://… and restart to migrate to Postgres.
           </span>
         </div>
         <div className="px-4 py-3.5">
           <div className="flex flex-wrap items-center gap-3">
             <Pill kind="ok">SQLite</Pill>
-            <span className="font-mono text-[12px] text-muted-foreground truncate">
+            <span className="font-mono text-xs text-muted-foreground truncate">
               configured via SHEPHERD_DSN or default ./shepherd.db
             </span>
           </div>
@@ -237,8 +238,8 @@ function StorageTab({
 
       <div className="border rounded-lg bg-elev overflow-hidden">
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-          <span className="text-foreground font-medium text-[12.5px]">Retention</span>
-          <span className="text-fg-dim font-mono text-[11px] ml-auto">
+          <span className="text-foreground font-medium text-sm">Retention</span>
+          <span className="text-fg-dim font-mono text-2xs ml-auto">
             Older points get pruned every hour.
           </span>
         </div>
@@ -264,16 +265,16 @@ function StorageTab({
 
       <div className="border rounded-lg bg-elev overflow-hidden">
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-          <span className="text-foreground font-medium text-[12.5px]">Default telemetry interval</span>
+          <span className="text-foreground font-medium text-sm">Default telemetry interval</span>
         </div>
         <div className="px-4 py-3.5">
           <div className="flex items-center gap-3">
             <Input
               type="number"
               {...register('default_telemetry_interval_seconds')}
-              className="w-28 h-8 font-mono text-[12.5px]"
+              className="w-28 h-8 font-mono text-sm"
             />
-            <span className="text-fg-dim font-mono text-[12px]">seconds · 5–3600</span>
+            <span className="text-fg-dim font-mono text-xs">seconds · 5–3600</span>
           </div>
           {errors.default_telemetry_interval_seconds?.message && (
             <p className="text-xs text-destructive mt-1">
@@ -285,8 +286,8 @@ function StorageTab({
 
       <div className="border rounded-lg bg-elev overflow-hidden">
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-          <span className="text-foreground font-medium text-[12.5px]">Diagnostics</span>
-          <span className="text-fg-dim font-mono text-[11px] ml-auto">
+          <span className="text-foreground font-medium text-sm">Diagnostics</span>
+          <span className="text-fg-dim font-mono text-2xs ml-auto">
             pushed to online agents · no restart
           </span>
         </div>
@@ -307,20 +308,20 @@ function KeysTab() {
   return (
     <div className="border rounded-lg bg-elev overflow-hidden">
       <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-        <span className="text-foreground font-medium text-[12.5px]">
+        <span className="text-foreground font-medium text-sm">
           Recovery key (AUTO_RECOVER_KEY)
         </span>
       </div>
       <div className="px-4 py-3.5 space-y-3">
-        <p className="text-fg-dim text-[12px]">
+        <p className="text-fg-dim text-xs">
           Pre-shared, server-global. Embedded into agent config at install time so an agent can
           re-enroll after a fingerprint change (disk swap, container rebuild). View / rotate from
           the server CLI for now.
         </p>
-        <code className="block bg-sunken rounded-md border px-3 py-2.5 font-mono text-[12px] text-muted-foreground break-all">
+        <code className="block bg-sunken rounded-md border px-3 py-2.5 font-mono text-xs text-muted-foreground break-all">
           configured via AUTO_RECOVER_KEY env var; not exposed over the admin API
         </code>
-        <p className="text-fg-dim text-[12px]">
+        <p className="text-fg-dim text-xs">
           To rotate: stop the server, change AUTO_RECOVER_KEY, restart. Agents pick up the new
           value on their next reconnect.
         </p>
@@ -336,8 +337,8 @@ function SecurityTab({ form }: { form: ReturnType<typeof useForm<FormVals>> }) {
     <div className="space-y-4">
       <div className="border rounded-lg bg-elev overflow-hidden">
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-          <span className="text-foreground font-medium text-[12.5px]">File browser sandbox</span>
-          <span className="text-fg-dim font-mono text-[11px] ml-auto">
+          <span className="text-foreground font-medium text-sm">File browser sandbox</span>
+          <span className="text-fg-dim font-mono text-2xs ml-auto">
             Outside paths return 403 even with sudo.
           </span>
         </div>
@@ -349,13 +350,13 @@ function SecurityTab({ form }: { form: ReturnType<typeof useForm<FormVals>> }) {
             onChange={(v) => form.setValue('file_sandbox_enabled', v)}
           />
           <div>
-            <Label className="text-[12px]">Allowed paths (one per line)</Label>
+            <Label className="text-xs">Allowed paths (one per line)</Label>
             <textarea
-              className="mt-1.5 w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-[12.5px] font-mono ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y"
+              className="mt-1.5 w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y"
               placeholder="/var/log&#10;/etc/shepherd"
               {...form.register('file_sandbox_paths')}
             />
-            <p className="text-fg-dim font-mono text-[11px] mt-1">
+            <p className="text-fg-dim font-mono text-2xs mt-1">
               default · /tmp /var/log /etc/shepherd /home /opt /srv
             </p>
           </div>
@@ -373,8 +374,8 @@ function SecurityTab({ form }: { form: ReturnType<typeof useForm<FormVals>> }) {
 
       <div className="border rounded-lg bg-elev overflow-hidden">
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-          <span className="text-foreground font-medium text-[12.5px]">PTY sessions</span>
-          <span className="text-fg-dim font-mono text-[11px] ml-auto">
+          <span className="text-foreground font-medium text-sm">PTY sessions</span>
+          <span className="text-fg-dim font-mono text-2xs ml-auto">
             Recordings stored as asciicast v2.
           </span>
         </div>
@@ -408,8 +409,8 @@ function AuditTab({
   return (
     <div className="border rounded-lg bg-elev overflow-hidden">
       <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-        <span className="text-foreground font-medium text-[12.5px]">Retention</span>
-        <span className="text-fg-dim font-mono text-[11px] ml-auto">
+        <span className="text-foreground font-medium text-sm">Retention</span>
+        <span className="text-fg-dim font-mono text-2xs ml-auto">
           Covers PTY sessions, file transfers, batch runs, settings changes.
         </span>
       </div>
@@ -422,7 +423,7 @@ function AuditTab({
           register={register('audit_retention_days')}
           error={errors.audit_retention_days?.message}
         />
-        <p className="text-fg-dim font-mono text-[11.5px]">
+        <p className="text-fg-dim font-mono text-2xs">
           PTY recordings are pruned alongside their session row; storage used is reported in the
           server logs.
         </p>
@@ -436,10 +437,10 @@ function AppearanceTab() {
   return (
     <div className="border rounded-lg bg-elev overflow-hidden">
       <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-        <span className="text-foreground font-medium text-[12.5px]">Appearance</span>
+        <span className="text-foreground font-medium text-sm">Appearance</span>
       </div>
       <div className="px-4 py-3.5">
-        <p className="text-muted-foreground text-[12.5px]">
+        <p className="text-muted-foreground text-sm">
           {t(
             'settings.appearance_hint',
             'Theme and language live in the top bar so you can change them on any page.',
@@ -463,13 +464,13 @@ function TrafficTab({
   return (
     <div className="border rounded-lg bg-elev overflow-hidden">
       <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-        <span className="text-foreground font-medium text-[12.5px]">Traffic reset</span>
+        <span className="text-foreground font-medium text-sm">Traffic reset</span>
       </div>
       <div className="px-4 py-3.5 space-y-3">
         <div className="flex items-center gap-3">
-          <Label className="text-[12px] w-40 shrink-0">traffic_reset_tz</Label>
+          <Label className="text-xs w-40 shrink-0">traffic_reset_tz</Label>
           <Input
-            className="w-48 h-8 font-mono text-[12.5px]"
+            className="w-48 h-8 font-mono text-sm"
             defaultValue={currentTz}
             onBlur={async (e) => {
               const v = e.target.value.trim() || 'UTC'
@@ -483,7 +484,7 @@ function TrafficTab({
             }}
           />
         </div>
-        <p className="text-fg-dim font-mono text-[11px]">
+        <p className="text-fg-dim font-mono text-2xs">
           IANA timezone name (e.g. Asia/Shanghai, America/New_York). Default: UTC.
         </p>
       </div>
@@ -505,10 +506,10 @@ function RetentionRow({
   return (
     <div className="flex items-center px-4 py-3 border-b last:border-b-0 gap-3">
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-[13px]">{label}</div>
-        <div className="text-fg-dim font-mono text-[11.5px]">{desc}</div>
+        <div className="font-medium text-sm">{label}</div>
+        <div className="text-fg-dim font-mono text-2xs">{desc}</div>
       </div>
-      <Input {...register} className="w-24 h-8 font-mono text-[12.5px]" />
+      <Input {...register} className="w-24 h-8 font-mono text-sm" />
       {error && <span className="text-xs text-destructive">{error}</span>}
     </div>
   )
@@ -528,14 +529,14 @@ function ToggleRow({
   return (
     <div className="flex items-start gap-3 py-1">
       <div className="flex-1">
-        <div className="font-medium text-[13px]">{label}</div>
-        {hint && <div className="text-fg-dim text-[12px]">{hint}</div>}
+        <div className="font-medium text-sm">{label}</div>
+        {hint && <div className="text-fg-dim text-xs">{hint}</div>}
       </div>
       <button
         type="button"
         onClick={() => onChange(!value)}
         className={cn(
-          'px-3 h-7 rounded-full border text-[12px] font-mono transition-colors shrink-0',
+          'px-3 h-7 rounded-full border text-xs font-mono transition-colors shrink-0',
           value
             ? 'bg-accent text-accent-foreground border-transparent'
             : 'bg-sunken text-muted-foreground hover:text-foreground',
@@ -566,16 +567,16 @@ function NumberRow({
 }) {
   return (
     <div className="flex items-center gap-3 py-1">
-      <div className="flex-1 font-medium text-[13px]">{label}</div>
+      <div className="flex-1 font-medium text-sm">{label}</div>
       <Input
         type="number"
         min={min}
         max={max}
         step={step}
         {...register}
-        className="w-24 h-8 font-mono text-[12.5px]"
+        className="w-24 h-8 font-mono text-sm"
       />
-      {suffix && <span className="text-fg-dim text-[12px] font-mono w-12">{suffix}</span>}
+      {suffix && <span className="text-fg-dim text-xs font-mono w-12">{suffix}</span>}
       {error && <span className="text-xs text-destructive">{error}</span>}
     </div>
   )

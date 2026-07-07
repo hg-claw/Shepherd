@@ -18,6 +18,8 @@ import { pct } from '@/lib/bytes'
 import { relativeTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { Search } from 'lucide-react'
+import { PageHeader } from '@/components/PageHeader'
+import { LoadingState } from '@/components/LoadingState'
 
 type HostStatus = 'ok' | 'warn' | 'err' | 'offline'
 
@@ -109,7 +111,7 @@ function Bar({ value }: { value: number | null | undefined }) {
           style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
         />
       </div>
-      <span className="font-mono tabular-nums text-[12.5px]">{value.toFixed(0)}%</span>
+      <span className="font-mono tabular-nums text-sm">{value.toFixed(0)}%</span>
     </div>
   )
 }
@@ -177,7 +179,7 @@ export default function ServerList() {
     return sum / online.length
   }, [all])
 
-  if (isLoading) return <div className="text-muted-foreground">{t('common.loading')}</div>
+  if (isLoading) return <LoadingState />
 
   const servers = all.filter((s) => {
     if (statusFilter !== 'all' && hostStatus(s) !== statusFilter) return false
@@ -252,32 +254,32 @@ export default function ServerList() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight m-0">
-            {t('nav.hosts', 'Hosts')}
-          </h1>
-          <p className="text-muted-foreground text-[13px] mt-1">
-            {servers.length} {t('hosts.of', 'of')} {all.length}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Seg
-            value={view}
-            onChange={setViewPersist}
-            size="sm"
-            options={[
-              { value: 'grid' as const, icon: LayoutGrid, label: t('view.grid', 'Grid') },
-              { value: 'table' as const, icon: Rows3, label: t('view.table', 'Table') },
-            ]}
-          />
-          <Button asChild size="sm" className="h-8">
-            <Link to="/admin/servers/new">
-              <Plus className="mr-1 h-3.5 w-3.5" />
-              {t('admin.add_server', 'Add server')}
-            </Link>
-          </Button>
-        </div>
+      <div>
+        <PageHeader
+          title={t('nav.hosts', 'Hosts')}
+          actions={
+            <>
+              <Seg
+                value={view}
+                onChange={setViewPersist}
+                size="sm"
+                options={[
+                  { value: 'grid' as const, icon: LayoutGrid, label: t('view.grid', 'Grid') },
+                  { value: 'table' as const, icon: Rows3, label: t('view.table', 'Table') },
+                ]}
+              />
+              <Button asChild size="sm" className="h-8">
+                <Link to="/admin/servers/new">
+                  <Plus className="mr-1 h-3.5 w-3.5" />
+                  {t('admin.add_server', 'Add server')}
+                </Link>
+              </Button>
+            </>
+          }
+        />
+        <p className="text-muted-foreground text-sm mt-1">
+          {servers.length} {t('hosts.of', 'of')} {all.length}
+        </p>
       </div>
 
       {/* KPI strip */}
@@ -313,7 +315,7 @@ export default function ServerList() {
             placeholder={t('common.filter', 'Filter…')}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="pl-7 max-w-full sm:max-w-[240px] h-7 text-[13px]"
+            className="pl-7 max-w-full sm:max-w-[240px] h-7 text-sm"
           />
         </div>
         {chipDefs.map((c) => (
@@ -322,14 +324,14 @@ export default function ServerList() {
             type="button"
             onClick={() => setStatusFilter(c.key)}
             className={cn(
-              'h-[26px] px-2.5 rounded-full text-[12px] inline-flex items-center gap-1.5 border transition-colors',
+              'h-7 px-2.5 rounded-full text-xs inline-flex items-center gap-1.5 border transition-colors',
               statusFilter === c.key
                 ? 'bg-accent text-accent-foreground border-transparent'
                 : 'bg-sunken text-muted-foreground border-transparent hover:text-foreground',
             )}
           >
             {c.label}
-            <span className="font-mono text-[11px] opacity-70">{c.count}</span>
+            <span className="font-mono text-2xs opacity-70">{c.count}</span>
           </button>
         ))}
       </div>
@@ -345,14 +347,14 @@ export default function ServerList() {
             variant="outline"
             disabled={batchUpdate.isPending}
             onClick={handleBatchUpdate}
-            className="h-7 text-[12.5px]"
+            className="h-7 text-sm"
           >
             <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
             {batchUpdate.isPending
               ? t('server.updating', 'Updating…')
               : t('server.batch_update_agents', 'Update {{n}} agents', { n: selected.size })}
           </Button>
-          <label className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground cursor-pointer select-none">
+          <label className="inline-flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
             <input type="checkbox" checked={batchCN} onChange={(e) => setBatchCN(e.target.checked)} />
             {t('server.cn_mirror', 'CN mirror')}
           </label>
@@ -380,7 +382,7 @@ export default function ServerList() {
         </div>
       ) : (
         <div className="rounded-lg border bg-elev overflow-x-auto">
-          <table className="w-full border-collapse text-[13px]">
+          <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="text-left">
                 <Th className="w-8">
@@ -439,10 +441,10 @@ export default function ServerList() {
                         )}
                       </div>
                     </Td>
-                    <Td className="hidden md:table-cell font-mono text-[12px] text-muted-foreground">
+                    <Td className="hidden md:table-cell font-mono text-xs text-muted-foreground">
                       {s.ssh_host?.String ?? '—'}
                     </Td>
-                    <Td className="hidden lg:table-cell font-mono text-[12px] text-fg-dim">
+                    <Td className="hidden lg:table-cell font-mono text-xs text-fg-dim">
                       {[s.agent_os?.String, s.agent_arch?.String].filter(Boolean).join('/') || '—'}
                     </Td>
                     <Td className="hidden md:table-cell">
@@ -455,7 +457,7 @@ export default function ServerList() {
                         )
                       })()}
                     </Td>
-                    <Td className="hidden lg:table-cell text-[12px] text-muted-foreground font-mono tabular-nums">
+                    <Td className="hidden lg:table-cell text-xs text-muted-foreground font-mono tabular-nums">
                       {lastSeen ? t(lastSeen.key, { n: lastSeen.n, lng: i18n.language }) : '—'}
                     </Td>
                     <Td><Bar value={s.latest?.cpu_pct} /></Td>
@@ -464,7 +466,7 @@ export default function ServerList() {
                       {(stage === 'install-failed' || stage === 'not-installed') && (
                         <ReinstallButton server={s} t={t} />
                       )}
-                      <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-[12.5px]">
+                      <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-sm">
                         <Link to={`/admin/servers/${s.id}`}>{t('admin.details', 'Details')}</Link>
                       </Button>
                       <DeleteButton server={s} onDelete={() => handleDelete(s)} t={t} />
@@ -524,7 +526,7 @@ function ReinstallButton({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-[12.5px]">
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-sm">
           {t('server.reinstall', 'Reinstall')}
         </Button>
       </DialogTrigger>
@@ -540,15 +542,15 @@ function ReinstallButton({
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <label className="text-[12px] text-fg-dim">ssh_user</label>
-            <Input value={user} onChange={(e) => setUser(e.target.value)} placeholder="root" className="mt-1 h-8 text-[12.5px]" />
+            <label className="text-xs text-fg-dim">ssh_user</label>
+            <Input value={user} onChange={(e) => setUser(e.target.value)} placeholder="root" className="mt-1 h-8 text-sm" />
           </div>
           <div>
-            <label className="text-[12px] text-fg-dim">ssh_password</label>
-            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 h-8 text-[12.5px]" />
+            <label className="text-xs text-fg-dim">ssh_password</label>
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 h-8 text-sm" />
           </div>
           <div>
-            <label className="text-[12px] text-fg-dim">ssh_key (PEM)</label>
+            <label className="text-xs text-fg-dim">ssh_key (PEM)</label>
             <textarea
               rows={4}
               value={key}
@@ -556,12 +558,12 @@ function ReinstallButton({
               placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
               className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-vertical"
             />
-            <p className="text-fg-dim text-[11px] mt-1">
+            <p className="text-fg-dim text-2xs mt-1">
               {t('server.reinstall_cred_hint', 'Provide either password or key. Passphrase-protected keys are not supported.')}
             </p>
           </div>
           <div>
-            <label className="text-[12px] text-fg-dim">arch</label>
+            <label className="text-xs text-fg-dim">arch</label>
             <div className="mt-1">
               <Seg
                 value={arch}
@@ -648,11 +650,11 @@ function HostCard({
         <div className="flex-1 min-w-0">
           <Link
             to={`/admin/servers/${server.id}`}
-            className="font-mono font-medium text-[13.5px] hover:underline truncate block"
+            className="font-mono font-medium text-sm hover:underline truncate block"
           >
             {server.name}
           </Link>
-          <div className="font-mono text-[11.5px] text-muted-foreground mt-0.5 truncate">
+          <div className="font-mono text-2xs text-muted-foreground mt-0.5 truncate">
             {(server.agent_os?.String ?? '—')} · {server.public_group?.String ?? '—'}
           </div>
         </div>
@@ -665,7 +667,7 @@ function HostCard({
         <Stat label="TCP" v={online ? tcp.toLocaleString() : '—'} />
       </div>
       <div className="flex items-center gap-1 mt-3 pt-2.5 border-t border-dashed">
-        <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-[12px]">
+        <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-xs">
           <Link to={`/admin/servers/${server.id}`}>{t('admin.details', 'Details')}</Link>
         </Button>
         <div className="ml-auto" onClick={(e) => e.stopPropagation()}>
@@ -698,8 +700,8 @@ function HostCard({
 function Stat({ label, v }: { label: string; v: string }) {
   return (
     <div>
-      <div className="text-[10.5px] text-fg-dim uppercase tracking-[0.05em]">{label}</div>
-      <div className="font-mono font-medium text-[14px] tabular-nums mt-0.5">{v}</div>
+      <div className="text-2xs text-fg-dim uppercase tracking-[0.05em]">{label}</div>
+      <div className="font-mono font-medium text-sm tabular-nums mt-0.5">{v}</div>
     </div>
   )
 }
@@ -708,7 +710,7 @@ function Th({ children, className }: { children: React.ReactNode; className?: st
   return (
     <th
       className={cn(
-        'font-medium text-muted-foreground text-[11px] uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0 text-left',
+        'font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0 text-left',
         className,
       )}
     >

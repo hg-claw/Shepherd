@@ -7,6 +7,8 @@ import { StatCard } from '@/components/StatCard'
 import { TopList } from '@/components/TopList'
 import { Pill } from '@/components/Pill'
 import { relativeTime } from '@/lib/time'
+import { PageHeader } from '@/components/PageHeader'
+import { LoadingState } from '@/components/LoadingState'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -65,7 +67,7 @@ export default function Dashboard() {
   const { data, isLoading } = useServers({ withLatest: true, refetchInterval: 30_000 })
   const auditQ = useAuditLog({})
 
-  if (isLoading) return <div className="text-muted-foreground">{t('common.loading')}</div>
+  if (isLoading) return <LoadingState />
 
   const servers = data ?? []
   const total = servers.length
@@ -99,10 +101,8 @@ export default function Dashboard() {
     <div className="flex flex-col gap-5">
       {/* Header */}
       <div>
-        <h1 className="text-[22px] font-semibold tracking-tight m-0">
-          {t('admin.dashboard', 'Dashboard')}
-        </h1>
-        <p className="text-muted-foreground text-[13px] mt-1">
+        <PageHeader title={t('admin.dashboard', 'Dashboard')} />
+        <p className="text-muted-foreground text-sm mt-1">
           {t('admin.dashboard_sub', 'Fleet at a glance.')}
         </p>
       </div>
@@ -152,11 +152,11 @@ export default function Dashboard() {
         {/* Regions card */}
         <div className="bg-elev border rounded-lg overflow-hidden">
           <div className="px-4 pt-3 pb-2.5 flex items-center gap-2 border-b">
-            <span className="text-foreground font-medium text-[12.5px]">
+            <span className="text-foreground font-medium text-sm">
               {t('admin.regions', 'Regions')}
             </span>
             <button
-              className="ml-auto text-[12px] text-muted-foreground underline underline-offset-[3px] hover:text-foreground transition-colors"
+              className="ml-auto text-xs text-muted-foreground underline underline-offset-[3px] hover:text-foreground transition-colors"
               onClick={() => navigate('/admin/servers')}
             >
               {t('admin.all_hosts', 'all hosts →')}
@@ -164,7 +164,7 @@ export default function Dashboard() {
           </div>
           <div className="py-1">
             {sortedGroups.length === 0 && (
-              <p className="text-muted-foreground text-[12.5px] px-4 py-3">—</p>
+              <p className="text-muted-foreground text-sm px-4 py-3">—</p>
             )}
             {sortedGroups.map(([name, g]) => {
               const avgCpu = g.cpuCount > 0 ? g.cpuSum / g.cpuCount : 0
@@ -174,10 +174,10 @@ export default function Dashboard() {
                   key={name}
                   className="flex items-center gap-3 px-4 py-2.5 border-b border-dashed last:border-b-0"
                 >
-                  <span className="font-mono text-[13px] font-medium text-foreground w-28 shrink-0 truncate">
+                  <span className="font-mono text-sm font-medium text-foreground w-28 shrink-0 truncate">
                     {name}
                   </span>
-                  <span className="font-mono tabular-nums text-[12px] text-muted-foreground w-20 shrink-0">
+                  <span className="font-mono tabular-nums text-xs text-muted-foreground w-20 shrink-0">
                     {g.online}/{g.total} {t('admin.online_suffix', 'online')}
                   </span>
                   {/* progress bar */}
@@ -191,7 +191,7 @@ export default function Dashboard() {
                       }}
                     />
                   </div>
-                  <span className="font-mono tabular-nums text-[12px] w-16 text-right shrink-0">
+                  <span className="font-mono tabular-nums text-xs w-16 text-right shrink-0">
                     {avgCpu.toFixed(0)}%{' '}
                     <span className="text-muted-foreground">cpu</span>
                   </span>
@@ -209,11 +209,11 @@ export default function Dashboard() {
         {/* Recent activity card */}
         <div className="bg-elev border rounded-lg overflow-hidden">
           <div className="px-4 pt-3 pb-2.5 flex items-center gap-2 border-b">
-            <span className="text-foreground font-medium text-[12.5px]">
+            <span className="text-foreground font-medium text-sm">
               {t('admin.recent_activity', 'Recent activity')}
             </span>
             <button
-              className="ml-auto text-[12px] text-muted-foreground underline underline-offset-[3px] hover:text-foreground transition-colors"
+              className="ml-auto text-xs text-muted-foreground underline underline-offset-[3px] hover:text-foreground transition-colors"
               onClick={() => navigate('/admin/audit')}
             >
               {t('admin.audit_log', 'audit log →')}
@@ -221,7 +221,7 @@ export default function Dashboard() {
           </div>
           <div className="py-1">
             {recentAudit.length === 0 && !auditQ.isLoading && (
-              <p className="text-muted-foreground text-[12.5px] px-4 py-3">—</p>
+              <p className="text-muted-foreground text-sm px-4 py-3">—</p>
             )}
             {recentAudit.map((r, i) => {
               const rel = relativeTime(r.ts)
@@ -243,8 +243,8 @@ export default function Dashboard() {
                     className="w-1.5 h-1.5 rounded-full shrink-0"
                     style={{ background: toneDot }}
                   />
-                  <span className="font-mono text-[12px] font-medium shrink-0">{r.action}</span>
-                  <span className="text-muted-foreground text-[12px] min-w-0 flex-1 truncate">
+                  <span className="font-mono text-xs font-medium shrink-0">{r.action}</span>
+                  <span className="text-muted-foreground text-xs min-w-0 flex-1 truncate">
                     {r.server_id != null && (
                       <span className="font-mono"> · #{r.server_id}</span>
                     )}
@@ -252,7 +252,7 @@ export default function Dashboard() {
                       <span className="text-fg-dim"> · {r.details}</span>
                     )}
                   </span>
-                  <span className="font-mono text-[11px] text-fg-dim ml-auto whitespace-nowrap shrink-0">
+                  <span className="font-mono text-2xs text-fg-dim ml-auto whitespace-nowrap shrink-0">
                     {relLabel}
                   </span>
                 </div>

@@ -92,7 +92,7 @@ function ServerRow({
               <li key={d.id} className="flex items-center gap-2 text-sm">
                 <span className="font-mono">{d.domain}</span>
                 <span className="text-fg-dim text-2xs">→ {d.content} ({d.type})</span>
-                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 ml-auto"
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 ml-auto"
                   onClick={() => onRemove(d.id)} disabled={pending} aria-label="remove">
                   <Trash2 className="h-3.5 w-3.5 text-destructive" />
                 </Button>

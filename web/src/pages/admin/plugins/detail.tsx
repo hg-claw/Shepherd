@@ -86,7 +86,7 @@ export default function PluginDetail() {
         {/* Title + meta */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            {/* ui-token-ignore: h1 is inline in a flex row alongside Pill/metadata — PageHeader layout not applicable */}
+            {/* PageHeader not used: h1 is part of a flex row with Pill/metadata — restructuring would change layout */}
             <h1 className="text-title font-semibold tracking-tight m-0">{entry.meta.name}</h1>
             <Pill kind={entry.enabled ? 'ok' : 'neutral'}>
               {entry.enabled ? t('plugins.pill.enabled', 'enabled') : t('plugins.pill.disabled', 'disabled')}

@@ -148,7 +148,7 @@ export default function SubscriptionsTab() {
                         <option value="clash">clash</option>
                       </select>
                       <code className="font-mono text-2xs text-fg-dim truncate max-w-[22rem]">{url}</code>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0"
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
                         onClick={() => copy(url)} aria-label="copy url">
                         <Copy className="h-3.5 w-3.5" />
                       </Button>

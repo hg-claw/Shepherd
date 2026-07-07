@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 import { Search } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { LoadingState } from '@/components/LoadingState'
+import { EmptyState } from '@/components/EmptyState'
 
 type HostStatus = 'ok' | 'warn' | 'err' | 'offline'
 
@@ -369,7 +370,27 @@ export default function ServerList() {
       )}
 
       {/* Views */}
-      {view === 'grid' ? (
+      {servers.length === 0 ? (
+        all.length === 0 ? (
+          <EmptyState
+            title={t('servers.empty')}
+            action={
+              <Button asChild className="h-8">
+                <Link to="/admin/servers/new">{t('admin.add_server')}</Link>
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            title={t('common.no_results')}
+            action={
+              <Button variant="outline" className="h-7" onClick={() => { setFilter(''); setStatusFilter('all') }}>
+                {t('common.clear_filter')}
+              </Button>
+            }
+          />
+        )
+      ) : view === 'grid' ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
           {servers.map((s) => (
             <HostCard

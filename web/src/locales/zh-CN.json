@@ -186,9 +186,13 @@
     "day_ago": "{{n}} 天前",
     "just_now": "刚刚"
   },
+  "servers": {
+    "empty": "暂无主机"
+  },
   "scripts": {
     "title": "脚本",
     "new": "新建",
+    "empty": "暂无脚本",
     "edit": "编辑脚本",
     "name": "名称",
     "description": "描述",

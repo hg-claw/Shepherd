@@ -167,9 +167,13 @@
     "day_ago": "{{n}} days ago",
     "just_now": "just now"
   },
+  "servers": {
+    "empty": "No servers yet"
+  },
   "scripts": {
     "title": "Scripts",
     "new": "New",
+    "empty": "No scripts yet",
     "edit": "Edit script",
     "name": "Name",
     "description": "Description",

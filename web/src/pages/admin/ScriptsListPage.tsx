@@ -125,7 +125,28 @@ export default function ScriptsListPage() {
         </div>
 
         {filtered.length === 0 ? (
-          <EmptyState title={filter ? t('scripts.no_match', 'no matching commands') : t('scripts.empty', 'no scripts yet')} />
+          scripts.length === 0 ? (
+            <EmptyState
+              title={t('scripts.empty')}
+              action={
+                <Button asChild className="h-8">
+                  <Link to="/admin/scripts/new">
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    {t('scripts.new')}
+                  </Link>
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              title={t('common.no_results')}
+              action={
+                <Button variant="outline" className="h-7" onClick={() => setFilter('')}>
+                  {t('common.clear_filter')}
+                </Button>
+              }
+            />
+          )
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">

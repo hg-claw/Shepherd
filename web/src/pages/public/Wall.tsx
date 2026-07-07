@@ -61,10 +61,10 @@ export default function Wall() {
       {/* Header */}
       <div className="flex flex-wrap items-baseline gap-3">
         <div>
-          <h1 className="font-mono text-[18px] tracking-tight m-0">
+          <h1 className="font-mono text-lg tracking-tight m-0">
             {t('wall.title', 'Server status')}
           </h1>
-          <p className="text-[12px] text-muted-foreground mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             {t('wall.subtitle', 'Public health overview — identifying data redacted.')}
           </p>
         </div>
@@ -109,10 +109,10 @@ export default function Wall() {
           <section key={group} className="flex flex-col gap-2.5">
             {/* Group header */}
             <div className="flex items-baseline gap-3 border-b border-dashed px-0.5 pt-0.5 pb-2">
-              <h2 className="font-mono text-[13.5px] tracking-tight m-0 whitespace-nowrap">
+              <h2 className="font-mono text-sm tracking-tight m-0 whitespace-nowrap">
                 {group || t('wall.ungrouped', 'Ungrouped')}
               </h2>
-              <span className="font-mono text-[11.5px] text-muted-foreground">
+              <span className="font-mono text-2xs text-muted-foreground">
                 {groupOnline}/{ss.length} {t('wall.online', 'online')}
               </span>
             </div>
@@ -166,7 +166,7 @@ function ServerListTable({
   return (
     <div className="bg-elev border rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-[13px]" style={{ minWidth: 900 }}>
+        <table className="w-full border-collapse text-sm" style={{ minWidth: 900 }}>
           <thead>
             <tr className="text-left">
               <Th>{t('wall.col.node', 'Node')}</Th>
@@ -205,7 +205,7 @@ function ServerListTable({
                 {/* Platform */}
                 <Td>
                   {s.online ? (
-                    <span className="font-mono text-[12px] text-muted-foreground">
+                    <span className="font-mono text-xs text-muted-foreground">
                       {s.platform ?? ''}
                       {s.arch ? <span className="text-fg-dim"> · {s.arch}</span> : null}
                     </span>
@@ -240,7 +240,7 @@ function ServerListTable({
                 {/* Network ↓↑ */}
                 <Td>
                   {s.online ? (
-                    <div className="flex flex-col gap-[1px] font-mono tabular-nums text-[11.5px] whitespace-nowrap">
+                    <div className="flex flex-col gap-[1px] font-mono tabular-nums text-2xs whitespace-nowrap">
                       <LiveNetCell id={s.id} fallbackRx={s.latest?.net_rx_bps ?? 0} fallbackTx={s.latest?.net_tx_bps ?? 0}>
                         {(rx, tx) => (
                           <>
@@ -256,13 +256,13 @@ function ServerListTable({
                 </Td>
                 {/* Traffic ↓↑ */}
                 <Td>
-                  <div className="flex flex-col gap-[1px] font-mono tabular-nums text-[11.5px] text-muted-foreground whitespace-nowrap">
+                  <div className="flex flex-col gap-[1px] font-mono tabular-nums text-2xs text-muted-foreground whitespace-nowrap">
                     <span>↓ {bytes(s.traffic_rx_bytes ?? 0)}</span>
                     <span>↑ {bytes(s.traffic_tx_bytes ?? 0)}</span>
                   </div>
                 </Td>
                 {/* Load */}
-                <Td className="text-right font-mono tabular-nums text-[12.5px]">
+                <Td className="text-right font-mono tabular-nums text-sm">
                   {s.online && s.latest != null ? s.latest.load_1.toFixed(2) : <span className="text-fg-dim">—</span>}
                 </Td>
               </tr>
@@ -306,13 +306,13 @@ function WallServerCard({
       <div className="flex items-center gap-2 min-w-0">
         <OnlineDot online={s.online} />
         <CountryFlag code={s.country_code} />
-        <span className="font-mono font-medium text-[13.5px] truncate flex-1">{s.alias}</span>
+        <span className="font-mono font-medium text-sm truncate flex-1">{s.alias}</span>
       </div>
 
       {s.online && l ? (
         <>
           {/* Platform · arch */}
-          <div className="font-mono text-fg-dim text-[10.5px]">
+          <div className="font-mono text-fg-dim text-2xs">
             {s.platform ?? ''}
             {s.arch ? ` · ${s.arch}` : ''}
           </div>
@@ -323,7 +323,7 @@ function WallServerCard({
           <MetricBar label="DSK" value={l.disks_pct?.[0] ?? 0} />
 
           {/* Net + load */}
-          <div className="flex items-center gap-3 font-mono tabular-nums text-[11px] mt-0.5">
+          <div className="flex items-center gap-3 font-mono tabular-nums text-2xs mt-0.5">
             <LiveNetCell id={s.id} fallbackRx={s.latest?.net_rx_bps ?? 0} fallbackTx={s.latest?.net_tx_bps ?? 0}>
               {(rx, tx) => (
                 <>
@@ -338,13 +338,13 @@ function WallServerCard({
           </div>
 
           {/* Cumulative traffic */}
-          <div className="font-mono tabular-nums text-[11px] text-muted-foreground flex gap-3">
+          <div className="font-mono tabular-nums text-2xs text-muted-foreground flex gap-3">
             <span>↓ {bytes(s.traffic_rx_bytes ?? 0)}</span>
             <span>↑ {bytes(s.traffic_tx_bytes ?? 0)}</span>
           </div>
         </>
       ) : (
-        <div className="font-mono text-fg-dim text-[11.5px] py-2">offline</div>
+        <div className="font-mono text-fg-dim text-2xs py-2">offline</div>
       )}
     </Link>
   )
@@ -364,7 +364,7 @@ function Th({
   return (
     <th
       className={cn(
-        'font-medium text-muted-foreground text-[11px] uppercase tracking-[0.05em] px-3.5 py-2 bg-elev text-left',
+        'font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3.5 py-2 bg-elev text-left',
         className,
       )}
       style={style}

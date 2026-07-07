@@ -61,14 +61,14 @@ export default function PublicServerDetail() {
   if (wall.error || !card)
     return (
       <div className="flex flex-col gap-3">
-        <h1 className="text-[22px] font-semibold m-0">{t('common.not_found', 'Not found')}</h1>
+        <h1 className="text-title font-semibold m-0">{t('common.not_found', 'Not found')}</h1>
         <p className="text-muted-foreground">
           {t('public_detail.not_found', 'Host #{{id}} was not found.', { id })}
         </p>
         <div>
           <Link
             to="/"
-            className="inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground hover:text-foreground"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             {t('common.back', 'Back')}
@@ -100,7 +100,7 @@ export default function PublicServerDetail() {
       <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b">
         <Link
           to="/"
-          className="inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           {t('common.back', 'Back')}
@@ -116,7 +116,7 @@ export default function PublicServerDetail() {
               kind === 'neutral' && 'bg-fg-dim',
             )}
           />
-          <span className="font-mono font-medium text-[14px]">{card.alias}</span>
+          <span className="font-mono font-medium text-sm">{card.alias}</span>
         </span>
         {card.group && <Pill kind="neutral">{card.group}</Pill>}
         {card.country_code && (
@@ -125,7 +125,7 @@ export default function PublicServerDetail() {
             <span className="ml-1">{card.country_code}</span>
           </Pill>
         )}
-        <span className="ml-auto flex items-center gap-2 text-[12px] font-mono text-muted-foreground">
+        <span className="ml-auto flex items-center gap-2 text-xs font-mono text-muted-foreground">
           status ·{' '}
           <span
             className={cn(
@@ -150,7 +150,7 @@ export default function PublicServerDetail() {
 
       {/* Range toggle — uses Seg primitive (same as design) */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-3 border-b">
-        <span className="text-[12px] text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           {t('public_detail.window', 'Telemetry window')}
         </span>
         <Seg<Range>
@@ -221,7 +221,7 @@ export default function PublicServerDetail() {
       )}
 
       {/* Redaction disclaimer — identifying fields are intentionally omitted */}
-      <div className="px-4 py-3 border-t text-center text-[11.5px] font-mono text-fg-dim">
+      <div className="px-4 py-3 border-t text-center text-2xs font-mono text-fg-dim">
         {t(
           'public_detail.redaction',
           'Identifying details (hostname, IP, datacenter) are intentionally redacted on the public status page.',
@@ -244,13 +244,13 @@ function MiniKpi({
 }) {
   return (
     <div className="border rounded-lg bg-background px-3 py-2.5">
-      <div className="text-[10.5px] uppercase tracking-[0.05em] text-fg-dim">{label}</div>
+      <div className="text-2xs uppercase tracking-[0.05em] text-fg-dim">{label}</div>
       <div
         className={cn(
-          'font-mono text-[22px] mt-0.5 tracking-tight tabular-nums leading-none',
+          'font-mono text-title mt-0.5 tracking-tight tabular-nums leading-none',
           tone === 'warn' && 'text-warn',
           tone === 'err' && 'text-err',
-          mono && 'text-[14px] mt-1',
+          mono && 'text-sm mt-1',
         )}
       >
         {value}
@@ -270,7 +270,7 @@ function ChartCard({
 }) {
   return (
     <div className={cn('flex flex-col min-w-0', className)}>
-      <div className="px-4 py-2.5 text-[11.5px] uppercase tracking-[0.05em] text-muted-foreground">
+      <div className="px-4 py-2.5 text-2xs uppercase tracking-[0.05em] text-muted-foreground">
         {title}
       </div>
       <div className="px-4 pb-4 min-w-0">{children}</div>

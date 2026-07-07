@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Download, Search } from 'lucide-react'
 import { useAuditLog, type AuditRow } from '@/api/audit'
 import { useTableSort } from '@/lib/useTableSort'
+import { useVirtualRows } from '@/lib/useVirtualRows'
 import { SortableTh } from '@/components/SortableTh'
 import { StatCard } from '@/components/StatCard'
 import { Button } from '@/components/ui/button'
@@ -50,6 +51,8 @@ export default function AuditLogPage() {
 
   const rows = data ?? []
   const { sorted: sortedRows, sort: auditSort, toggle: auditToggle } = useTableSort(rows, auditSortAccessors)
+  const COLS = 6
+  const { parentRef, items, padTop, padBottom } = useVirtualRows(sortedRows)
 
   const handleDownloadCSV = () => {
     const csv = rowsToCSV(rows)
@@ -141,7 +144,7 @@ export default function AuditLogPage() {
             </span>
             <span className="text-fg-dim font-mono text-2xs ml-auto">{rows.length} rows</span>
           </div>
-          <div className="overflow-x-auto">
+          <div ref={parentRef} className="max-h-[70vh] overflow-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr>
@@ -180,46 +183,54 @@ export default function AuditLogPage() {
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={COLS}>
                       <EmptyState title={t('audit.empty')} />
                     </td>
                   </tr>
                 ) : (
-                  sortedRows.map((r) => (
-                    <tr
-                      key={r.id}
-                      className={cn(
-                        'border-t transition-colors',
-                        r.result === 'error'
-                          ? 'bg-err-soft/20 hover:bg-err-soft/30'
-                          : 'hover:bg-sunken/60',
-                      )}
-                    >
-                      <td className="px-4 py-2 font-mono text-2xs text-fg-dim whitespace-nowrap">
-                        {r.ts}
-                      </td>
-                      <td className="px-4 py-2 font-mono text-xs">{r.action}</td>
-                      <td className="px-4 py-2 hidden sm:table-cell font-mono text-xs text-fg-dim">
-                        {r.admin_id ?? '—'}
-                      </td>
-                      <td className="px-4 py-2 hidden sm:table-cell font-mono text-xs text-fg-dim">
-                        {r.server_id ?? '—'}
-                      </td>
-                      <td className="px-4 py-2">
-                        <span
+                  <>
+                    {padTop > 0 && <tr aria-hidden><td colSpan={COLS} style={{ height: padTop }} /></tr>}
+                    {items.map((vi) => {
+                      const r = sortedRows[vi.index]
+                      return (
+                        <tr
+                          key={r.id}
+                          data-index={vi.index}
                           className={cn(
-                            'font-mono text-xs',
-                            r.result === 'error' ? 'text-err' : 'text-ok',
+                            'border-t transition-colors',
+                            r.result === 'error'
+                              ? 'bg-err-soft/20 hover:bg-err-soft/30'
+                              : 'hover:bg-sunken/60',
                           )}
                         >
-                          {r.result}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2 hidden md:table-cell font-mono text-2xs text-fg-dim max-w-md">
-                        <span className="truncate block">{r.details}</span>
-                      </td>
-                    </tr>
-                  ))
+                          <td className="px-4 py-2 font-mono text-2xs text-fg-dim whitespace-nowrap">
+                            {r.ts}
+                          </td>
+                          <td className="px-4 py-2 font-mono text-xs">{r.action}</td>
+                          <td className="px-4 py-2 hidden sm:table-cell font-mono text-xs text-fg-dim">
+                            {r.admin_id ?? '—'}
+                          </td>
+                          <td className="px-4 py-2 hidden sm:table-cell font-mono text-xs text-fg-dim">
+                            {r.server_id ?? '—'}
+                          </td>
+                          <td className="px-4 py-2">
+                            <span
+                              className={cn(
+                                'font-mono text-xs',
+                                r.result === 'error' ? 'text-err' : 'text-ok',
+                              )}
+                            >
+                              {r.result}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 hidden md:table-cell font-mono text-2xs text-fg-dim max-w-md">
+                            <span className="truncate block">{r.details}</span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {padBottom > 0 && <tr aria-hidden><td colSpan={COLS} style={{ height: padBottom }} /></tr>}
+                  </>
                 )}
               </tbody>
             </table>

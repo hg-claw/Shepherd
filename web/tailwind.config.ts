@@ -70,6 +70,19 @@ const config: Config = {
           DEFAULT: 'hsl(var(--err))',
           soft: 'hsl(var(--err-soft))',
         },
+        chart: {
+          1: 'hsl(var(--chart-1))',
+          2: 'hsl(var(--chart-2))',
+          3: 'hsl(var(--chart-3))',
+          4: 'hsl(var(--chart-4))',
+        },
+        console: {
+          DEFAULT: 'hsl(var(--console-bg))',
+          elev: 'hsl(var(--console-elev))',
+          border: 'hsl(var(--console-border))',
+          fg: 'hsl(var(--console-fg))',
+          muted: 'hsl(var(--console-muted))',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',

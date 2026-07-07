@@ -45,6 +45,17 @@
     --level-mid: 38 87% 53%;
     --level-high: 22 90% 53%;
     --level-alert: 0 78% 50%;
+    /* Chart series palette */
+    --chart-1: 217 89% 47%;   /* blue — matches primary */
+    --chart-2: 145 53% 41%;   /* green — matches ok */
+    --chart-3: 38 87% 53%;    /* amber — matches warn */
+    --chart-4: 262 60% 55%;   /* purple */
+    /* Console (terminal) surfaces — always dark by design, theme-invariant */
+    --console-bg: 240 6% 4%;
+    --console-elev: 240 5% 12%;
+    --console-border: 240 6% 18%;
+    --console-fg: 0 0% 96%;
+    --console-muted: 0 0% 63%;
   }
 
   .dark {
@@ -81,6 +92,10 @@
     --level-mid: 38 85% 60%;
     --level-high: 22 85% 60%;
     --level-alert: 0 75% 65%;
+    --chart-1: 213 92% 67%;
+    --chart-2: 145 50% 55%;
+    --chart-3: 38 85% 60%;
+    --chart-4: 262 70% 70%;
   }
 }
 

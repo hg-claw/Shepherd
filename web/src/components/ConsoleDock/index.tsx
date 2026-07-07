@@ -13,8 +13,8 @@ export function ConsoleDock() {
     <div
       className={cn(
         'fixed bottom-0 left-0 right-0 z-50 flex flex-col',
-        'border-t border-zinc-800',
-        'bg-[#09090b] text-zinc-100',
+        'border-t border-console-border',
+        'bg-console text-console-fg',
         'font-mono',
         'transition-[height] duration-150',
         'pb-[env(safe-area-inset-bottom)]',
@@ -25,8 +25,8 @@ export function ConsoleDock() {
       <div
         className={cn(
           'flex items-center gap-1 px-2 py-1 overflow-x-auto shrink-0',
-          'bg-zinc-900',
-          !collapsed && 'border-b border-zinc-800',
+          'bg-console',
+          !collapsed && 'border-b border-console-border',
         )}
       >
         {/* Tabs */}
@@ -39,11 +39,11 @@ export function ConsoleDock() {
                 setCollapsed(false)
               }}
               className={cn(
-                'group flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-sm shrink-0 max-w-[12rem]',
+                'group flex items-center gap-1.5 px-2.5 py-1 text-2xs rounded-sm shrink-0 max-w-[12rem]',
                 'transition-colors',
                 t.id === active
-                  ? 'bg-zinc-700 text-zinc-50'
-                  : 'bg-zinc-800/60 text-zinc-400 hover:bg-zinc-700/70 hover:text-zinc-200',
+                  ? 'bg-console-elev text-console-fg'
+                  : 'bg-console-elev text-console-muted hover:bg-console-elev hover:text-console-fg',
                 t.status === 'exited' && 'opacity-60',
               )}
             >
@@ -51,7 +51,7 @@ export function ConsoleDock() {
               <span
                 className={cn(
                   'inline-block h-1.5 w-1.5 rounded-full shrink-0',
-                  t.status === 'open' ? 'bg-emerald-400' : 'bg-zinc-500',
+                  t.status === 'open' ? 'bg-ok' : 'bg-console-muted',
                 )}
               />
               <span className="truncate">
@@ -63,7 +63,7 @@ export function ConsoleDock() {
                 aria-label="close tab"
                 className={cn(
                   'ml-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded',
-                  'opacity-0 group-hover:opacity-100 hover:bg-zinc-600',
+                  'opacity-0 group-hover:opacity-100 hover:bg-console-elev',
                   'transition-opacity',
                 )}
                 onClick={(e) => {
@@ -81,7 +81,7 @@ export function ConsoleDock() {
         <div className="flex items-center gap-1 ml-auto shrink-0">
           <button
             onClick={() => setCollapsed((v) => !v)}
-            className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 transition-colors"
+            className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-console-elev text-console-muted hover:text-console-fg transition-colors"
             aria-label={collapsed ? 'expand console' : 'collapse console'}
           >
             {collapsed ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}

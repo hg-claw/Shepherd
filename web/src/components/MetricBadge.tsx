@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { levelClass, levelForNetBps, levelForPct, type Level, type Metric } from '@/lib/thresholds'
+import { levelForNetBps, levelForPct, type Metric } from '@/lib/thresholds'
+import { levelClass, type Level } from '@/lib/status'
 import { bps } from '@/lib/bytes'
 import { cn } from '@/lib/utils'
 

@@ -38,6 +38,8 @@ jobs:
           cache-dependency-path: 'web/package-lock.json'
       - name: Install web deps
         run: cd web && npm ci
+      - name: UI token check
+        run: ./scripts/check-ui-tokens.sh
       - name: Vitest
         run: cd web && npm test
       - name: Build (typescript + vite)

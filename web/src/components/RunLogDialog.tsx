@@ -14,7 +14,7 @@ export function RunLogDialog({
   ptySessionId,
   running = false,
   triggerLabel,
-  triggerClassName = 'text-[12px] text-muted-foreground hover:underline',
+  triggerClassName = 'text-xs text-muted-foreground hover:underline',
   title,
 }: {
   ptySessionId: number | null | undefined
@@ -46,17 +46,17 @@ function LogBody({ ptySessionId, running }: { ptySessionId: number; running: boo
   const { t } = useTranslation()
   const { data, isLoading, error } = useTargetLog(ptySessionId, running ? 2000 : undefined)
   if (isLoading) {
-    return <div className="text-fg-dim text-[12px] py-2">{t('common.loading', 'Loading…')}</div>
+    return <div className="text-fg-dim text-xs py-2">{t('common.loading', 'Loading…')}</div>
   }
   if (error) {
-    return <div className="text-err text-[12px] py-2">{t('scripts.no_log', 'No log recorded for this run.')}</div>
+    return <div className="text-err text-xs py-2">{t('scripts.no_log', 'No log recorded for this run.')}</div>
   }
   const text = data ?? ''
   if (text.trim() === '') {
-    return <div className="text-fg-dim text-[12px] py-2">{t('scripts.empty_log', 'No output was captured.')}</div>
+    return <div className="text-fg-dim text-xs py-2">{t('scripts.empty_log', 'No output was captured.')}</div>
   }
   return (
-    <pre className="max-h-[60vh] overflow-auto rounded-md border bg-sunken px-3 py-2 font-mono text-[12px] leading-relaxed whitespace-pre-wrap break-words">
+    <pre className="max-h-[60vh] overflow-auto rounded-md border bg-sunken px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words">
       {text}
     </pre>
   )

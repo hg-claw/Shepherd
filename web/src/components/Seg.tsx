@@ -35,7 +35,7 @@ export function Seg<T extends string>({ value, onChange, options, size = 'defaul
           type="button"
           onClick={() => onChange(o.value)}
           className={cn(
-            'px-2.5 font-mono text-[12px] inline-flex items-center gap-1.5 transition-colors',
+            'px-2.5 font-mono text-xs inline-flex items-center gap-1.5 transition-colors',
             i < options.length - 1 && 'border-r',
             value === o.value
               ? 'bg-sunken text-foreground'

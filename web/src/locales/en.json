@@ -159,6 +159,8 @@
     "copied": "Copied",
     "back": "Back",
     "not_found": "Not found",
+    "no_results": "No matches",
+    "clear_filter": "Clear filter",
     "minute_ago": "{{n}} min ago",
     "second_ago": "{{n}} sec ago",
     "hour_ago": "{{n}} hr ago",

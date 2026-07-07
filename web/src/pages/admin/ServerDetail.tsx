@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import { TimeSeriesChart } from '@/components/TimeSeriesChart'
 import { InstallProgress } from '@/components/InstallProgress'
-import { KpiCard } from '@/components/KpiCard'
+import { StatCard } from '@/components/StatCard'
 import { useUI } from '@/store/ui'
 import { bps, bytes, pct } from '@/lib/bytes'
 import type { Range } from '@/api/servers'
@@ -123,19 +123,19 @@ export default function AdminServerDetail() {
 
       {/* Hero metric strip — 4-up KPI cards showing current live values */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard
+        <StatCard
           label={t('metric.cpu', 'CPU')}
           value={isOnline && points.length > 0 ? `${(points[points.length - 1].cpu_pct ?? 0).toFixed(0)}%` : '—'}
         />
-        <KpiCard
+        <StatCard
           label={t('metric.mem', 'MEM')}
           value={isOnline && points.length > 0 ? `${(pct(points[points.length - 1].mem_used, points[points.length - 1].mem_total) ?? 0).toFixed(0)}%` : '—'}
         />
-        <KpiCard
+        <StatCard
           label={t('metric.load1', 'LOAD-1')}
           value={isOnline && points.length > 0 ? (points[points.length - 1].load_1 ?? 0).toFixed(2) : '—'}
         />
-        <KpiCard
+        <StatCard
           label={t('metric.tcp_conn', 'TCP conn')}
           value={isOnline && points.length > 0 ? (points[points.length - 1].tcp_conn ?? 0).toString() : '—'}
         />

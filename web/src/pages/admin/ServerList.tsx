@@ -7,7 +7,7 @@ import { useUI } from '@/store/ui'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Pill, type PillKind } from '@/components/Pill'
-import { KpiCard } from '@/components/KpiCard'
+import { StatCard } from '@/components/StatCard'
 import { OnlineDot } from '@/components/OnlineDot'
 import { CountryFlag } from '@/components/CountryFlag'
 import { Seg } from '@/components/Seg'
@@ -282,22 +282,22 @@ export default function ServerList() {
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard
+        <StatCard
           label={t('hosts.kpi.online', 'Online')}
           value={`${onlineCount}/${all.length}`}
           sub={`${counts.offline} ${t('wall.offline', 'offline')}`}
         />
-        <KpiCard
+        <StatCard
           label={t('hosts.kpi.cpu', 'Avg CPU')}
           value={`${avgCpu.toFixed(1)}%`}
           sub={t('range.24h', '24h')}
         />
-        <KpiCard
+        <StatCard
           label={t('hosts.kpi.mem', 'Avg memory')}
           value={`${avgMem.toFixed(1)}%`}
           sub={t('range.24h', '24h')}
         />
-        <KpiCard
+        <StatCard
           label={t('hosts.kpi.alerts', 'Alerts')}
           value={String(counts.err + counts.warn)}
           sub={`${counts.err} ${t('filter.err', 'critical')}`}

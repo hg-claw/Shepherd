@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Download, Search } from 'lucide-react'
 import { useAuditLog, type AuditRow } from '@/api/audit'
-import { KpiCard } from '@/components/KpiCard'
+import { StatCard } from '@/components/StatCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -74,15 +74,15 @@ export default function AuditLogPage() {
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard label={t('audit.kpi.total', 'Total events')} value={String(rows.length)} sub={t('audit.kpi.in_view', 'in view')} />
-        <KpiCard label={t('audit.kpi.ok', 'Succeeded')} value={String(okCount)} sub={t('audit.kpi.ok_sub', 'result ok')} tone="ok" />
-        <KpiCard
+        <StatCard label={t('audit.kpi.total', 'Total events')} value={String(rows.length)} sub={t('audit.kpi.in_view', 'in view')} />
+        <StatCard label={t('audit.kpi.ok', 'Succeeded')} value={String(okCount)} sub={t('audit.kpi.ok_sub', 'result ok')} tone="ok" />
+        <StatCard
           label={t('audit.kpi.errors', 'Errors')}
           value={String(errCount)}
           sub={t('audit.kpi.errors_sub', 'result error')}
           tone={errCount > 0 ? 'err' : undefined}
         />
-        <KpiCard label={t('audit.kpi.admins', 'Admins')} value={String(uniqueAdmins)} sub={t('audit.kpi.admins_sub', 'unique')} />
+        <StatCard label={t('audit.kpi.admins', 'Admins')} value={String(uniqueAdmins)} sub={t('audit.kpi.admins_sub', 'unique')} />
       </div>
 
       {/* Filters */}

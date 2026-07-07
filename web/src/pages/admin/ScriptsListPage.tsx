@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { Plus, Search, Trash2, Play, ChevronRight, ChevronDown } from 'lucide-react'
 import { useScripts, useDeleteScript, useScriptRuns, useScriptRunDetail } from '@/api/scripts'
 import { useServers } from '@/api/servers'
-import { KpiCard } from '@/components/KpiCard'
+import { StatCard } from '@/components/StatCard'
 import { Pill } from '@/components/Pill'
 import { RunLogDialog } from '@/components/RunLogDialog'
 import { Button } from '@/components/ui/button'
@@ -76,23 +76,23 @@ export default function ScriptsListPage() {
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard
+        <StatCard
           label={t('scripts.kpi.commands', 'Commands')}
           value={String(scripts.length)}
           sub={t('scripts.kpi.in_library', 'in library')}
         />
-        <KpiCard
+        <StatCard
           label={t('scripts.kpi.runs_today', 'Runs today')}
           value={String(runsToday.length)}
           sub={t('scripts.kpi.last_24h', 'last 24h')}
         />
-        <KpiCard
+        <StatCard
           label={t('scripts.kpi.success_rate', 'Success rate')}
           value={runsToday.length > 0 ? `${((successToday / runsToday.length) * 100).toFixed(1)}%` : '—'}
           sub={runsToday.length > 0 ? `${runsToday.length - successToday} errored` : 'no runs'}
           tone={runsToday.length > 0 && successToday === runsToday.length ? 'ok' : undefined}
         />
-        <KpiCard
+        <StatCard
           label={t('scripts.kpi.active_runs', 'Active runs')}
           value={String(activeRuns)}
           sub={activeRuns > 0 ? t('scripts.kpi.in_progress', 'in progress') : t('scripts.kpi.idle', 'idle')}

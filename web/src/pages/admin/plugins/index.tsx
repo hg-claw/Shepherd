@@ -7,7 +7,7 @@ import * as icons from 'lucide-react'
 import { listPlugins, enablePlugin, disablePlugin, type PluginEntry } from '@/api/plugins'
 import { fetchSSHAuditOverview } from '@/api/sshaudit'
 import { Button } from '@/components/ui/button'
-import { KpiCard } from '@/components/KpiCard'
+import { StatCard } from '@/components/StatCard'
 import { Pill } from '@/components/Pill'
 import { cn } from '@/lib/utils'
 
@@ -84,18 +84,18 @@ export default function PluginsIndex() {
 
       {/* KPI strip */}
       <div className="grid grid-cols-3 gap-3">
-        <KpiCard
+        <StatCard
           label={t('plugins.kpi.installed', 'Installed')}
           value={String(plugins.length)}
           sub={t('plugins.kpi.installed_sub', 'local registry')}
         />
-        <KpiCard
+        <StatCard
           label={t('plugins.kpi.enabled', 'Enabled')}
           value={String(enabledCount)}
           sub={t('plugins.kpi.enabled_sub', 'actively running')}
           tone={enabledCount > 0 ? 'ok' : undefined}
         />
-        <KpiCard
+        <StatCard
           label={t('plugins.kpi.hosts', 'Hosts')}
           value={String(totalHosts)}
           sub={t('plugins.kpi.hosts_sub', 'across all plugins')}

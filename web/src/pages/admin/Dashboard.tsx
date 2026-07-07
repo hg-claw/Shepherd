@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useServers, type ServerWithLatest } from '@/api/servers'
 import { useAuditLog } from '@/api/audit'
 import { pct } from '@/lib/bytes'
-import { KpiCard } from '@/components/KpiCard'
+import { StatCard } from '@/components/StatCard'
 import { TopList } from '@/components/TopList'
 import { Pill } from '@/components/Pill'
 import { relativeTime } from '@/lib/time'
@@ -109,14 +109,14 @@ export default function Dashboard() {
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard label={t('admin.summary.total', 'Total')} value={total} />
-        <KpiCard label={t('admin.summary.online', 'Online')} value={online} tone="ok" />
-        <KpiCard
+        <StatCard label={t('admin.summary.total', 'Total')} value={total} />
+        <StatCard label={t('admin.summary.online', 'Online')} value={online} tone="ok" />
+        <StatCard
           label={t('admin.summary.offline', 'Offline')}
           value={offline}
           tone={offline > 0 ? 'err' : undefined}
         />
-        <KpiCard
+        <StatCard
           label={t('admin.summary.alerts', 'Alerting')}
           value={alerts}
           tone={alerts > 0 ? 'warn' : undefined}

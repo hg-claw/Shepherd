@@ -11,7 +11,7 @@ import { Seg } from '@/components/Seg'
 import { OnlineDot } from '@/components/OnlineDot'
 import { CountryFlag } from '@/components/CountryFlag'
 import { MetricBar } from '@/components/MetricBar'
-import { SummaryStat } from '@/components/SummaryStat'
+import { StatCard } from '@/components/StatCard'
 
 const WALL_VIEW_KEY = 'shep_wall_view'
 
@@ -83,16 +83,18 @@ export default function Wall() {
 
       {/* Summary strip */}
       <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-        <SummaryStat label={t('wall.stat.nodes', 'Nodes')} value={String(total)} icon={Server} />
-        <SummaryStat label={t('wall.online', 'Online')} value={String(onlineCount)} icon={CircleCheck} tone="ok" />
-        <SummaryStat
+        <StatCard variant="compact" label={t('wall.stat.nodes', 'Nodes')} value={String(total)} icon={Server} />
+        <StatCard variant="compact" label={t('wall.online', 'Online')} value={String(onlineCount)} icon={CircleCheck} tone="ok" />
+        <StatCard
+          variant="compact"
           label={t('wall.offline', 'Offline')}
           value={String(offlineCount)}
           icon={CircleX}
           tone={offlineCount > 0 ? 'err' : undefined}
         />
         <RealtimeStat online={onlineList} label={t('wall.stat.realtime', 'Realtime')} />
-        <SummaryStat
+        <StatCard
+          variant="compact"
           label={t('wall.stat.traffic', 'Traffic')}
           value={`↓ ${bytes(sumTrafficRx)}`}
           sub={`↑ ${bytes(sumTrafficTx)}`}
@@ -144,7 +146,7 @@ function RealtimeStat({ online, label }: { online: PublicCard[]; label: string }
   const live = useWallLiveStore((s) => s.live)
   const rx = online.reduce((a, s) => a + (live[s.id]?.rx_bps ?? s.latest?.net_rx_bps ?? 0), 0)
   const tx = online.reduce((a, s) => a + (live[s.id]?.tx_bps ?? s.latest?.net_tx_bps ?? 0), 0)
-  return <SummaryStat label={label} value={`↓ ${bps(rx)}`} sub={`↑ ${bps(tx)}`} icon={Activity} />
+  return <StatCard variant="compact" label={label} value={`↓ ${bps(rx)}`} sub={`↑ ${bps(tx)}`} icon={Activity} />
 }
 
 // ── List view ─────────────────────────────────────────────────────────────────

@@ -130,7 +130,7 @@ describe('ServerDetail — Hardware card', () => {
   it('renders — when inventory is null', () => {
     mockInventory = null
     renderPage()
-    // Multiple '—' exist (KpiCard strip + Hardware card); find the one in a
+    // Multiple '—' exist (StatCard strip + Hardware card); find the one in a
     // <span class="text-muted-foreground"> which is how the Hardware card renders it.
     const dashes = screen.getAllByText('—')
     const muted = dashes.find((el) => el.tagName === 'SPAN' && el.className.includes('text-muted-foreground'))

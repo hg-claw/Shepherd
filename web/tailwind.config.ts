@@ -83,6 +83,10 @@ const config: Config = {
           fg: 'hsl(var(--console-fg))',
           muted: 'hsl(var(--console-muted))',
         },
+        elev: 'hsl(var(--bg-elev) / <alpha-value>)',
+        sunken: 'hsl(var(--bg-sunken) / <alpha-value>)',
+        strong: 'hsl(var(--border-strong) / <alpha-value>)',
+        'fg-dim': 'hsl(var(--fg-dim) / <alpha-value>)',
       },
       borderRadius: {
         lg: 'var(--radius)',

@@ -120,11 +120,9 @@
 }
 
 @layer utilities {
-  /* Surface helpers tied to the new bg-elev / bg-sunken tokens. */
-  .bg-elev { background-color: hsl(var(--bg-elev)); }
-  .bg-sunken { background-color: hsl(var(--bg-sunken)); }
-  .border-strong { border-color: hsl(var(--border-strong)); }
-  .text-fg-dim { color: hsl(var(--fg-dim)); }
+  /* Surface helpers (bg-elev, bg-sunken, border-strong, text-fg-dim) are now
+     registered as config colors in tailwind.config.ts so variants and opacity
+     modifiers (e.g. hover:bg-sunken/60) are generated automatically. */
 
   /* Status pill pulse — animates the dot inside .pill */
   @keyframes shep-pulse {

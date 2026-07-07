@@ -7,6 +7,8 @@ import { useServers } from '@/api/servers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { OnlineDot } from '@/components/OnlineDot'
+import { PageHeader } from '@/components/PageHeader'
+import { LoadingState } from '@/components/LoadingState'
 import { cn } from '@/lib/utils'
 
 export default function ScriptRunPage() {
@@ -20,7 +22,7 @@ export default function ScriptRunPage() {
   const [args, setArgs] = useState<Record<string, string>>({})
   const [targets, setTargets] = useState<number[]>([])
 
-  if (!script) return <div className="text-muted-foreground text-[13px] p-4">{t('common.loading')}</div>
+  if (!script) return <LoadingState />
 
   const submit = async () => {
     const out = await run.mutateAsync({ id: script.id, args, target_server_ids: targets })
@@ -38,25 +40,25 @@ export default function ScriptRunPage() {
   const pickNone = () => setTargets([])
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Header */}
       <div>
-        <h1 className="text-[22px] font-semibold tracking-tight m-0 break-all">
-          {t('scripts.run', 'Run')}: <span className="font-mono">{script.name}</span>
-        </h1>
-        <p className="text-muted-foreground text-[13px] mt-1">{script.description}</p>
+        <PageHeader
+          title={<span className="break-all">{t('scripts.run', 'Run')}: <span className="font-mono">{script.name}</span></span>}
+        />
+        <p className="text-muted-foreground text-sm mt-1">{script.description}</p>
       </div>
 
       {/* Parameters */}
       <div className="border rounded-lg bg-elev overflow-hidden">
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-          <span className="text-foreground font-medium text-[12.5px]">
+          <span className="text-foreground font-medium text-sm">
             {t('scripts.params', 'Parameters')}
           </span>
         </div>
         <div className="p-4">
           {(script.params ?? []).length === 0 ? (
-            <p className="text-fg-dim font-mono text-[12px]">
+            <p className="text-fg-dim font-mono text-xs">
               {t('scripts.no_params', 'no parameters defined')}
             </p>
           ) : (
@@ -65,18 +67,18 @@ export default function ScriptRunPage() {
                 <div key={p.name} className="grid grid-cols-1 sm:grid-cols-[200px_1fr] gap-2 items-start">
                   <div>
                     <div className="flex items-center gap-1">
-                      <span className="font-mono text-[12.5px] font-medium">{p.name}</span>
-                      {p.required && <span className="text-err text-[12px]">*</span>}
+                      <span className="font-mono text-sm font-medium">{p.name}</span>
+                      {p.required && <span className="text-err text-xs">*</span>}
                     </div>
                     {p.label && (
-                      <div className="text-fg-dim text-[11px] mt-0.5">{p.label}</div>
+                      <div className="text-fg-dim text-2xs mt-0.5">{p.label}</div>
                     )}
                   </div>
                   <Input
                     value={args[p.name] ?? p.default ?? ''}
                     onChange={(e) => setArgs({ ...args, [p.name]: e.target.value })}
                     placeholder={p.default ?? ''}
-                    className="h-7 font-mono text-[12.5px]"
+                    className="h-7 font-mono text-sm"
                   />
                 </div>
               ))}
@@ -88,17 +90,17 @@ export default function ScriptRunPage() {
       {/* Target picker */}
       <div className="border rounded-lg bg-elev overflow-hidden">
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b flex-wrap">
-          <span className="text-foreground font-medium text-[12.5px]">
+          <span className="text-foreground font-medium text-sm">
             {t('scripts.targets', 'Target servers')}
           </span>
-          <span className="text-fg-dim font-mono text-[11px]">
+          <span className="text-fg-dim font-mono text-2xs">
             {targets.length}/{allServers.length} selected
           </span>
           <div className="ml-auto flex items-center gap-1">
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-[12px]" onClick={pickAll}>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={pickAll}>
               Select online
             </Button>
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-[12px]" onClick={pickNone}>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={pickNone}>
               Clear
             </Button>
           </div>
@@ -115,7 +117,7 @@ export default function ScriptRunPage() {
                 <label
                   key={s.id}
                   className={cn(
-                    'flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-[12.5px] font-mono cursor-pointer transition-colors',
+                    'flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-sm font-mono cursor-pointer transition-colors',
                     checked
                       ? 'bg-accent/20 border-accent/50 text-accent-foreground'
                       : 'bg-sunken border-border hover:border-muted-foreground/50',
@@ -144,7 +146,7 @@ export default function ScriptRunPage() {
 
       {/* Footer */}
       <div className="flex items-center gap-3 pt-1">
-        <span className="font-mono text-[12.5px] text-fg-dim">
+        <span className="font-mono text-sm text-fg-dim">
           {script.default_timeout_s ? `timeout · ${script.default_timeout_s}s per target` : ''}
         </span>
         <Button

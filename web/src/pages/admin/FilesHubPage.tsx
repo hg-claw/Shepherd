@@ -5,6 +5,8 @@ import { Search, ChevronRight } from 'lucide-react'
 import { useServers } from '@/api/servers'
 import { Input } from '@/components/ui/input'
 import { OnlineDot } from '@/components/OnlineDot'
+import { PageHeader } from '@/components/PageHeader'
+import { LoadingState } from '@/components/LoadingState'
 import { cn } from '@/lib/utils'
 
 // File browser is per-server (sandbox is configured server-wide but
@@ -16,7 +18,7 @@ export default function FilesHubPage() {
   const [filter, setFilter] = useState('')
   const { data, isLoading } = useServers({ refetchInterval: 30_000 })
 
-  if (isLoading) return <div className="text-muted-foreground text-[13px] p-4">{t('common.loading')}</div>
+  if (isLoading) return <LoadingState />
   const servers = data ?? []
 
   const filtered = servers.filter((s) => {
@@ -36,21 +38,23 @@ export default function FilesHubPage() {
   }).length
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight m-0">{t('nav.files', 'Files')}</h1>
-          <p className="text-muted-foreground text-[13px] mt-1">
-            {t(
-              'files.hub_sub',
-              'Browse the remote filesystem and transfer files. Every action is audit-logged.',
-            )}
-          </p>
-        </div>
-        <span className="font-mono text-[11.5px] text-fg-dim">
-          {onlineCount}/{servers.length} {t('files.online', 'online')}
-        </span>
+      <div>
+        <PageHeader
+          title={t('nav.files', 'Files')}
+          actions={
+            <span className="font-mono text-2xs text-fg-dim">
+              {onlineCount}/{servers.length} {t('files.online', 'online')}
+            </span>
+          }
+        />
+        <p className="text-muted-foreground text-sm mt-1">
+          {t(
+            'files.hub_sub',
+            'Browse the remote filesystem and transfer files. Every action is audit-logged.',
+          )}
+        </p>
       </div>
 
       {/* Search */}
@@ -60,13 +64,13 @@ export default function FilesHubPage() {
           placeholder={t('common.filter', 'Filter…')}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="pl-8 h-8 text-[13px]"
+          className="pl-8 h-8 text-sm"
         />
       </div>
 
       {/* Server card grid */}
       {filtered.length === 0 ? (
-        <div className="border rounded-lg bg-elev px-4 py-8 text-center text-fg-dim font-mono text-[12px]">
+        <div className="border rounded-lg bg-elev px-4 py-8 text-center text-fg-dim font-mono text-xs">
           {filter ? t('common.no_match', 'no matching hosts') : t('files.hub_empty', 'No hosts available')}
         </div>
       ) : (
@@ -88,17 +92,17 @@ export default function FilesHubPage() {
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <OnlineDot online={online} />
-                  <span className="font-mono font-medium text-[13px] truncate flex-1">{s.name}</span>
+                  <span className="font-mono font-medium text-sm truncate flex-1">{s.name}</span>
                   <ChevronRight className="h-4 w-4 text-fg-dim group-hover:text-foreground transition-colors shrink-0" />
                 </div>
                 {s.ssh_host?.String && (
-                  <div className="font-mono text-[11.5px] text-fg-dim truncate">
+                  <div className="font-mono text-2xs text-fg-dim truncate">
                     {s.ssh_host.String}
                   </div>
                 )}
                 {s.public_group?.String && (
                   <div className="flex items-center gap-1 mt-0.5">
-                    <span className="inline-flex items-center h-4 px-1.5 rounded text-[10px] font-mono bg-sunken border border-border text-fg-dim">
+                    <span className="inline-flex items-center h-4 px-1.5 rounded text-2xs font-mono bg-sunken border border-border text-fg-dim">
                       {s.public_group.String}
                     </span>
                   </div>

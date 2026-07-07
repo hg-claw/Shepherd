@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { PageHeader } from '@/components/PageHeader'
 
 export default function RecordingPlayerPage() {
   const { t } = useTranslation()
@@ -27,7 +28,7 @@ export default function RecordingPlayerPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl sm:text-2xl font-semibold">{t('recording.title')}</h1>
+      <PageHeader title={t('recording.title')} />
       <div ref={ref} className="border rounded overflow-hidden" />
     </div>
   )

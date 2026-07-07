@@ -10,6 +10,14 @@ const config: Config = {
       screens: { '2xl': '1400px' },
     },
     extend: {
+      fontSize: {
+        '2xs': ['11px', '16px'],
+        xs: ['12px', '18px'],
+        sm: ['13px', '20px'],
+        lg: ['16px', '22px'],
+        title: ['22px', '28px'],
+        display: ['26px', '32px'],
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',

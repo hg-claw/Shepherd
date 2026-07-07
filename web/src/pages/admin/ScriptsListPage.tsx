@@ -1,8 +1,10 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Plus, Search, Trash2, Play, ChevronRight, ChevronDown } from 'lucide-react'
-import { useScripts, useDeleteScript, useScriptRuns, useScriptRunDetail } from '@/api/scripts'
+import { useScripts, useDeleteScript, useScriptRuns, useScriptRunDetail, type Script } from '@/api/scripts'
+import { useTableSort } from '@/lib/useTableSort'
+import { SortableTh } from '@/components/SortableTh'
 import { useServers } from '@/api/servers'
 import { StatCard } from '@/components/StatCard'
 import { Pill } from '@/components/Pill'
@@ -13,6 +15,11 @@ import { PageHeader } from '@/components/PageHeader'
 import { LoadingState } from '@/components/LoadingState'
 import { EmptyState } from '@/components/EmptyState'
 import { cn } from '@/lib/utils'
+
+const scriptSortAccessors = {
+  name: (s: Script) => s.name,
+  description: (s: Script) => s.description,
+}
 
 function statusKind(s?: string | null): 'ok' | 'warn' | 'err' | 'neutral' {
   if (s === 'succeeded') return 'ok'
@@ -33,9 +40,23 @@ export default function ScriptsListPage() {
   const serverName = (id: number) =>
     serversData?.find((s) => s.id === id)?.name ?? `#${id}`
 
+  const scripts = data ?? []
+  const filteredLib = useMemo(
+    () =>
+      scripts.filter((s) => {
+        if (!filter) return true
+        const f = filter.toLowerCase()
+        return s.name.toLowerCase().includes(f) || s.description.toLowerCase().includes(f)
+      }),
+    [scripts, filter],
+  )
+  const { sorted: sortedLib, sort: scriptSort, toggle: scriptToggle } = useTableSort(
+    filteredLib,
+    scriptSortAccessors,
+  )
+
   if (isLoading) return <LoadingState />
 
-  const scripts = data ?? []
   const runs = runsData ?? []
 
   // KPI calculations
@@ -47,12 +68,6 @@ export default function ScriptsListPage() {
   })
   const successToday = runsToday.filter((r) => r.finished_at).length
   const activeRuns = runs.filter((r) => r.started_at && !r.finished_at).length
-
-  const filtered = scripts.filter((s) => {
-    if (!filter) return true
-    const f = filter.toLowerCase()
-    return s.name.toLowerCase().includes(f) || s.description.toLowerCase().includes(f)
-  })
 
   return (
     <div className="space-y-4">
@@ -124,7 +139,7 @@ export default function ScriptsListPage() {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {sortedLib.length === 0 ? (
           scripts.length === 0 ? (
             <EmptyState
               title={t('scripts.empty')}
@@ -152,12 +167,20 @@ export default function ScriptsListPage() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr>
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b">
-                    {t('scripts.name', 'Name')}
-                  </th>
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden md:table-cell">
-                    {t('scripts.description', 'Description')}
-                  </th>
+                  <SortableTh
+                    label={t('scripts.name', 'Name')}
+                    sortKey="name"
+                    sort={scriptSort}
+                    onToggle={scriptToggle}
+                    className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b"
+                  />
+                  <SortableTh
+                    label={t('scripts.description', 'Description')}
+                    sortKey="description"
+                    sort={scriptSort}
+                    onToggle={scriptToggle}
+                    className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden md:table-cell"
+                  />
                   <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
                     {t('scripts.params', 'Params')}
                   </th>
@@ -170,7 +193,7 @@ export default function ScriptsListPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((s) => {
+                {sortedLib.map((s) => {
                   const paramCount = s.params?.length ?? 0
                   // Find most recent run for this script
                   const lastRun = runs

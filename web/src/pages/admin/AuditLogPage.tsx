@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Download, Search } from 'lucide-react'
 import { useAuditLog, type AuditRow } from '@/api/audit'
+import { useTableSort } from '@/lib/useTableSort'
+import { SortableTh } from '@/components/SortableTh'
 import { StatCard } from '@/components/StatCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +11,12 @@ import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/PageHeader'
 import { LoadingState } from '@/components/LoadingState'
 import { EmptyState } from '@/components/EmptyState'
+
+const auditSortAccessors = {
+  ts: (r: AuditRow) => r.ts,
+  action: (r: AuditRow) => r.action,
+  result: (r: AuditRow) => r.result,
+}
 
 function rowsToCSV(rows: AuditRow[]): string {
   const headers = ['ts', 'admin_id', 'server_id', 'action', 'result', 'details']
@@ -41,6 +49,7 @@ export default function AuditLogPage() {
   })
 
   const rows = data ?? []
+  const { sorted: sortedRows, sort: auditSort, toggle: auditToggle } = useTableSort(rows, auditSortAccessors)
 
   const handleDownloadCSV = () => {
     const csv = rowsToCSV(rows)
@@ -136,21 +145,33 @@ export default function AuditLogPage() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr>
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b whitespace-nowrap">
-                    {t('audit.ts', 'Time')}
-                  </th>
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b">
-                    {t('audit.action', 'Action')}
-                  </th>
+                  <SortableTh
+                    label={t('audit.ts', 'Time')}
+                    sortKey="ts"
+                    sort={auditSort}
+                    onToggle={auditToggle}
+                    className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b whitespace-nowrap"
+                  />
+                  <SortableTh
+                    label={t('audit.action', 'Action')}
+                    sortKey="action"
+                    sort={auditSort}
+                    onToggle={auditToggle}
+                    className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b"
+                  />
                   <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
                     {t('audit.admin', 'Admin')}
                   </th>
                   <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
                     {t('audit.server', 'Server')}
                   </th>
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b">
-                    {t('audit.result', 'Result')}
-                  </th>
+                  <SortableTh
+                    label={t('audit.result', 'Result')}
+                    sortKey="result"
+                    sort={auditSort}
+                    onToggle={auditToggle}
+                    className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b"
+                  />
                   <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden md:table-cell">
                     {t('audit.details', 'Details')}
                   </th>
@@ -164,7 +185,7 @@ export default function AuditLogPage() {
                     </td>
                   </tr>
                 ) : (
-                  rows.map((r) => (
+                  sortedRows.map((r) => (
                     <tr
                       key={r.id}
                       className={cn(

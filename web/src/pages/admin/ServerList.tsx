@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Trash2, LayoutGrid, Rows3, ArrowUpCircle } from 'lucide-react'
 import { useServers, useDeleteServer, useBatchUpdateAgent, useReinstall, type ServerWithLatest } from '@/api/servers'
+import { useTableSort } from '@/lib/useTableSort'
+import { SortableTh } from '@/components/SortableTh'
 import { useUI } from '@/store/ui'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -119,6 +121,12 @@ function Bar({ value }: { value: number | null | undefined }) {
 
 const VIEW_KEY = 'shep_hosts_view'
 
+const serverSortAccessors = {
+  name: (s: ServerWithLatest) => s.name,
+  cpu: (s: ServerWithLatest) => s.latest?.cpu_pct ?? null,
+  mem: (s: ServerWithLatest) => pct(s.latest?.mem_used, s.latest?.mem_total) ?? null,
+}
+
 export default function ServerList() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
@@ -180,14 +188,19 @@ export default function ServerList() {
     return sum / online.length
   }, [all])
 
-  if (isLoading) return <LoadingState />
+  const filtered = useMemo(
+    () =>
+      all.filter((s) => {
+        if (statusFilter !== 'all' && hostStatus(s) !== statusFilter) return false
+        if (!filter) return true
+        const f = filter.toLowerCase()
+        return s.name.toLowerCase().includes(f) || (s.ssh_host?.String ?? '').toLowerCase().includes(f)
+      }),
+    [all, filter, statusFilter],
+  )
+  const { sorted: servers, sort: serverSort, toggle: serverToggle } = useTableSort(filtered, serverSortAccessors)
 
-  const servers = all.filter((s) => {
-    if (statusFilter !== 'all' && hostStatus(s) !== statusFilter) return false
-    if (!filter) return true
-    const f = filter.toLowerCase()
-    return s.name.toLowerCase().includes(f) || (s.ssh_host?.String ?? '').toLowerCase().includes(f)
-  })
+  if (isLoading) return <LoadingState />
 
   const setViewPersist = (v: 'grid' | 'table') => {
     setView(v)
@@ -415,13 +428,31 @@ export default function ServerList() {
                     className="h-3.5 w-3.5 cursor-pointer"
                   />
                 </Th>
-                <Th>{t('admin.name', 'Name')}</Th>
+                <SortableTh
+                  label={t('admin.name', 'Name')}
+                  sortKey="name"
+                  sort={serverSort}
+                  onToggle={serverToggle}
+                  className="font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0 text-left"
+                />
                 <Th className="hidden md:table-cell">{t('admin.host', 'Host')}</Th>
                 <Th className="hidden lg:table-cell">OS</Th>
                 <Th className="hidden md:table-cell">Stage</Th>
                 <Th className="hidden lg:table-cell">{t('admin.agent_last_seen', 'Last seen')}</Th>
-                <Th>CPU</Th>
-                <Th className="hidden sm:table-cell">MEM</Th>
+                <SortableTh
+                  label="CPU"
+                  sortKey="cpu"
+                  sort={serverSort}
+                  onToggle={serverToggle}
+                  className="font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0 text-left"
+                />
+                <SortableTh
+                  label="MEM"
+                  sortKey="mem"
+                  sort={serverSort}
+                  onToggle={serverToggle}
+                  className="hidden sm:table-cell font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0 text-left"
+                />
                 <Th className="text-right">{t('admin.actions', 'Actions')}</Th>
               </tr>
             </thead>

@@ -34,23 +34,25 @@
 
 | 档位 | 值 | 用途 | 替换规则 |
 |------|-----|------|---------|
-| `text-2xs` | 11px | 辅助信息、mono 数据、徽章 | `text-[11px]`、`text-[11.5px]` → `text-2xs` |
+| `text-2xs` | 11px | 辅助信息、mono 数据、徽章 | `text-[10px]`、`text-[10.5px]`、`text-[11px]`、`text-[11.5px]` → `text-2xs` |
 | `text-xs` | 12px | 表格正文、密集内容 | `text-[12px]` → `text-xs` |
 | `text-sm` | 13px | 常规正文、表单、说明 | `text-[12.5px]`、`text-[13px]` → `text-sm` |
-| `text-title` | 22px | 页面标题 | `text-[22px]` → `text-title` |
+| `text-lg` | 16px | 卡片次级数值 | `text-[16px]` → `text-lg` |
+| `text-title` | 22px | 页面标题、卡片大数值 | `text-[22px]` → `text-title` |
+| `text-display` | 26px | KPI 大数字 | `text-[26px]` → `text-display` |
 
-半像素归并规则：11.5 → 11（`2xs`），12.5 → 13（`sm`）。line-height 随档位在 config 中一并定义（2xs: 16px, xs: 18px, sm: 20px, title: 28px），替换后删除散落的 `leading-[..]` 任意值（与档位默认一致时）。
+归并规则：≤11.5px 一律归 `2xs`，12.5 → 13（`sm`）。line-height 随档位在 config 中一并定义（2xs: 16px, xs: 18px, sm: 20px, lg: 22px, title: 28px, display: 32px），替换后删除散落的 `leading-[..]` 任意值（与档位默认一致时）。
 
 ### 1.2 颜色全部走 token
 
 - **图表色**：`index.css` 新增 `--chart-1..4`（浅/深两套值），`tailwind.config.ts` 暴露为 `chart.1..4`。替换 xray/singbox `TrafficDrawer` 的 SVG hex fill/stroke、`Sparkline`/`TimeSeriesChart`/netquality 图表内的硬编码色。SVG 属性处用 `hsl(var(--chart-1))` 字符串形式。
-- **状态色**：一律 `ok/warn/err`（含 `-soft`）。替换 `text-green-600`/`text-amber-600`（singbox CertificatesTab）、`bg-yellow-100 dark:bg-yellow-900/40`（ServerDetail）、`bg-emerald-500`（InboundsTab）等。
+- **状态色**：一律 `ok/warn/err`（含 `-soft`）。替换 `text-green-600`/`text-amber-600`（singbox CertificatesTab）、`bg-yellow-100 dark:bg-yellow-900/40`（ServerDetail）、`text-yellow-500`（singbox InboundsTab）、`text-red-*`/`ring-red-400`（ui/toast.tsx destructive variant → `err` token）等。
 - **ConsoleDock**：终端内容区保留"永远深色"外观（终端惯例），但改用 `index.css` 中新增的 `--console-bg`/`--console-fg`/`--console-muted`/`--console-elev` token（两主题下取值可相同或微调）；标签栏、按钮等外壳改用标准 token（`bg-elev`、`text-foreground`、`bg-ok` 等），在线状态点从 `bg-emerald-400` 改为 `bg-ok`。
 
 ### 1.3 组件收敛
 
 - **状态徽章**：`Pill` 是唯一状态徽章组件。`MetricBadge` 保留（用途不同：数值+等级），但其 level→颜色映射改为与 Pill 共用同一模块导出的映射表。shadcn `Badge` 只用于非状态标签（tag、计数）。各页手写状态色全部换成 `Pill`。
-- **指标卡**：`KpiCard`/`MetricCard`/`SummaryStat` 合并为 `StatCard`（props: `label`、`value`、`sub?`、`icon?`、`variant?: 'kpi' | 'compact'`），旧三个组件删除、调用点迁移。
+- **指标卡**：`KpiCard`/`SummaryStat` 合并为 `StatCard`（props: `label`、`value`、`sub?`、`icon?`、`tone?`、`variant?: 'kpi' | 'compact'`），旧两个组件删除、调用点迁移。（注：`MetricCard` 是公开墙的服务器卡片，用途不同，不参与合并，仅做字号/颜色 token 化。）
 - **`EmptyState`**（新增）：`icon?` + `title` + `description?` + `action?`（按钮插槽）。两种语境：真空（无数据，配引导操作）与筛选无结果（配"清除筛选"）。
 - **`LoadingState`**（新增）：统一 `text-sm text-muted-foreground` + spinner，可选 skeleton 行模式（表格用）。
 - **`ErrorState`**（新增）：错误文案 + 重试按钮。
@@ -81,14 +83,14 @@
 - 空状态引导：Hosts 空 →"添加主机"按钮；Scripts 空 →"新建脚本"；其余页面按有无自然入口配置 action。
 - 筛选无结果统一显示"清除筛选"快捷操作。
 - 危险操作（删除主机/脚本/inbound/证书等）统一走 `ConfirmDialog`。
-- 列排序：主要表格（Hosts、Scripts 列表、Audit 日志、插件 traffic/events 表）支持点击表头排序（客户端排序即可，数据量大的表结合 Phase 4 虚拟滚动）。实现为 `useTableSort` hook + 表头组件，不引第三方表格库。
-- 分页样式统一：以现有 Audit 分页样式为基准提取共享分页组件（若无现成分页则新建简单 prev/next + 计数样式）。
+- 列排序：主要表格（Hosts、Scripts 列表、Audit 日志）支持点击表头排序（客户端排序即可，数据量大的表结合 Phase 4 虚拟滚动）。实现为 `useTableSort` hook + 表头组件，不引第三方表格库。
+- 分页：现状全站无分页、列表全量客户端渲染；不新增分页，大表交给 Phase 4 虚拟滚动解决。
 
 ## Phase 4 — 性能
 
-- 虚拟滚动：仅行数可能上千的表（审计日志、插件 traffic/events/results）引入 `@tanstack/react-virtual`；普通列表不加。
-- 路由懒加载：检查主路由与插件页是否已 `React.lazy`/动态 import，补齐缺失项。
-- 轮询排查：盘点各页面/store 的轮询定时器，合并重复数据源（如 Dashboard 与 ServerList 共用主机状态数据则共享同一 store 轮询），页面不可见时暂停（`document.visibilityState`，若已有机制则对齐）。
+- 虚拟滚动：仅行数可能上千的表（审计日志、singbox/xray 的 events 表）引入 `@tanstack/react-virtual`；普通列表不加。
+- 路由懒加载：现状已全部 `React.lazy`（App.tsx 15 个页面 + 插件 `lazyPluginPage`），无需改动，最终验收时确认无回退。
+- 轮询排查：现状全部走 react-query `refetchInterval`（`refetchIntervalInBackground` 默认 false，后台标签页已自动暂停）。剩余工作：确认 Dashboard / ServerList / AdminLayout 的 `useServers` query key 一致以复用缓存，消除同数据多 key 重复请求。
 
 ## Error handling
 

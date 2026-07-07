@@ -123,7 +123,7 @@ export default function TrafficDrawer({
               key={r}
               size="sm"
               variant={range === r ? 'default' : 'outline'}
-              className="h-7 px-3 text-[12px]"
+              className="h-7 px-3 text-xs"
               onClick={() => setRange(r)}
             >
               {r}
@@ -132,15 +132,15 @@ export default function TrafficDrawer({
         </div>
 
         {/* Cumulative stats */}
-        <div className="flex gap-6 mt-4 text-[13px]">
+        <div className="flex gap-6 mt-4 text-sm">
           <div>
-            <div className="text-muted-foreground text-[11px] uppercase tracking-wide">
+            <div className="text-muted-foreground text-2xs uppercase tracking-wide">
               Uplink
             </div>
             <div className="font-mono">{formatBytes(totalUp)}</div>
           </div>
           <div>
-            <div className="text-muted-foreground text-[11px] uppercase tracking-wide">
+            <div className="text-muted-foreground text-2xs uppercase tracking-wide">
               Downlink
             </div>
             <div className="font-mono">{formatBytes(totalDown)}</div>
@@ -150,12 +150,12 @@ export default function TrafficDrawer({
         {/* Area chart */}
         <div className="mt-6">
           {q.isLoading && (
-            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-[13px]">
+            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
               Loading...
             </div>
           )}
           {!q.isLoading && chartData.length === 0 && (
-            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-[13px]">
+            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
               No data
             </div>
           )}
@@ -187,8 +187,8 @@ export default function TrafficDrawer({
                   dataKey="bytes_up"
                   name="Uplink"
                   stackId="1"
-                  fill="#3b82f6"
-                  stroke="#3b82f6"
+                  fill="hsl(var(--chart-1))"
+                  stroke="hsl(var(--chart-1))"
                   fillOpacity={0.3}
                 />
                 <Area
@@ -196,8 +196,8 @@ export default function TrafficDrawer({
                   dataKey="bytes_down"
                   name="Downlink"
                   stackId="1"
-                  fill="#22c55e"
-                  stroke="#22c55e"
+                  fill="hsl(var(--chart-2))"
+                  stroke="hsl(var(--chart-2))"
                   fillOpacity={0.3}
                 />
               </AreaChart>

@@ -41,8 +41,8 @@ function expiryClass(expires: string | null, status: SingboxCertificate['status'
   if (status !== 'active' || !expires) return 'text-muted-foreground'
   const days = (new Date(expires).getTime() - Date.now()) / 86_400_000
   if (days < 7)  return 'text-destructive font-semibold'
-  if (days < 30) return 'text-amber-600'
-  return 'text-green-600'
+  if (days < 30) return 'text-warn'
+  return 'text-ok'
 }
 
 // ─── IssueCertDialog ──────────────────────────────────────────────────────────
@@ -264,7 +264,7 @@ export default function CertificatesTab() {
               </tr>
             )}
             {certs.map((c) => (
-              <tr key={c.id} className="border-b last:border-0 hover:bg-muted/30">
+              <tr key={c.id} className="border-b last:border-0 hover:bg-sunken/60">
                 {/* Domain */}
                 <td className="px-3 py-2 font-mono text-xs">{c.domain}</td>
 
@@ -298,7 +298,7 @@ export default function CertificatesTab() {
                         <TooltipTrigger asChild>
                           <button
                             type="button"
-                            className="inline-flex h-6 w-6 items-center justify-center rounded text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/60"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/60"
                             aria-label="Show last error"
                           >
                             ⚠

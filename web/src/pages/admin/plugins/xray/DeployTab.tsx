@@ -45,7 +45,7 @@ function VersionInline({ serverID, current, versions }: { serverID: number; curr
   })
   if (!editing) {
     return (
-      <span className="font-mono text-[12px] text-fg-dim">
+      <span className="font-mono text-xs text-fg-dim">
         {current ?? '—'}{' '}
         <button className="underline" onClick={() => { setValue(current ?? ''); setEditing(true) }}>change</button>
       </span>
@@ -56,22 +56,22 @@ function VersionInline({ serverID, current, versions }: { serverID: number; curr
   return (
     <span className="inline-flex items-center gap-1">
       <Select value={value} onValueChange={setValue}>
-        <SelectTrigger className="h-6 w-28 font-mono text-[11px]">
+        <SelectTrigger className="h-6 w-28 font-mono text-2xs">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           {versionList.map((v) => (
-            <SelectItem key={v} value={v} className="font-mono text-[11px]">{v}</SelectItem>
+            <SelectItem key={v} value={v} className="font-mono text-2xs">{v}</SelectItem>
           ))}
         </SelectContent>
       </Select>
-      <Button size="sm" className="h-6 px-2 text-[11px]" disabled={apply.isPending}
+      <Button size="sm" className="h-7 px-2 text-2xs" disabled={apply.isPending}
         onClick={() => apply.mutate()}>Apply</Button>
-      <label className="inline-flex items-center gap-1 text-fg-dim text-[11px] cursor-pointer" title="Route the binary download via gh-proxy.com (for CN hosts)">
+      <label className="inline-flex items-center gap-1 text-fg-dim text-2xs cursor-pointer" title="Route the binary download via gh-proxy.com (for CN hosts)">
         <input type="checkbox" className="h-3 w-3" checked={useMirror} onChange={(e) => setUseMirror(e.target.checked)} />
         mirror
       </label>
-      <button className="text-fg-dim text-[11px]" onClick={() => setEditing(false)}>cancel</button>
+      <button className="text-fg-dim text-2xs" onClick={() => setEditing(false)}>cancel</button>
     </span>
   )
 }
@@ -93,13 +93,13 @@ function RedeployButton({ serverID, deployedVersion }: { serverID: number; deplo
       <Button
         size="sm"
         variant="outline"
-        className="h-6 px-2 text-[11px]"
+        className="h-7 px-2 text-2xs"
         disabled={!deployedVersion || redeploy.isPending}
         onClick={() => redeploy.mutate()}
       >
         Re-deploy
       </Button>
-      <label className="inline-flex items-center gap-1 text-fg-dim text-[11px] cursor-pointer" title="Route the binary download via gh-proxy.com (for CN hosts)">
+      <label className="inline-flex items-center gap-1 text-fg-dim text-2xs cursor-pointer" title="Route the binary download via gh-proxy.com (for CN hosts)">
         <input type="checkbox" className="h-3 w-3" checked={useMirror} onChange={(e) => setUseMirror(e.target.checked)} />
         mirror
       </label>
@@ -128,7 +128,7 @@ function DeployButton({ serverID, versions }: { serverID: number; versions: stri
   return (
     <span className="inline-flex items-center gap-1">
       <Select value={version} onValueChange={setVersion} disabled={!versions.length || deploy.isPending}>
-        <SelectTrigger className="h-6 w-24 text-[11px] font-mono">
+        <SelectTrigger className="h-6 w-24 text-2xs font-mono">
           <SelectValue placeholder="version" />
         </SelectTrigger>
         <SelectContent>
@@ -138,13 +138,13 @@ function DeployButton({ serverID, versions }: { serverID: number; versions: stri
       <Button
         size="sm"
         variant="outline"
-        className="h-6 px-2 text-[11px]"
+        className="h-7 px-2 text-2xs"
         disabled={!version || deploy.isPending}
         onClick={() => deploy.mutate()}
       >
         {deploy.isPending ? 'Deploying…' : 'Deploy'}
       </Button>
-      <label className="inline-flex items-center gap-1 text-fg-dim text-[11px] cursor-pointer" title="Route the binary download via gh-proxy.com (for CN hosts)">
+      <label className="inline-flex items-center gap-1 text-fg-dim text-2xs cursor-pointer" title="Route the binary download via gh-proxy.com (for CN hosts)">
         <input type="checkbox" className="h-3 w-3" checked={useMirror} onChange={(e) => setUseMirror(e.target.checked)} />
         mirror
       </label>
@@ -165,7 +165,7 @@ function LifecycleButtons({ serverID, status }: { serverID: number; status: Xray
         <Button
           size="sm"
           variant="ghost"
-          className="h-6 w-6 p-0"
+          className="h-7 w-7 p-0"
           disabled={busy}
           title="Start"
           onClick={wrap(() => lc.start.mutateAsync())}
@@ -177,7 +177,7 @@ function LifecycleButtons({ serverID, status }: { serverID: number; status: Xray
         <Button
           size="sm"
           variant="ghost"
-          className="h-6 w-6 p-0"
+          className="h-7 w-7 p-0"
           disabled={busy}
           title="Stop"
           onClick={wrap(() => lc.stop.mutateAsync())}
@@ -188,7 +188,7 @@ function LifecycleButtons({ serverID, status }: { serverID: number; status: Xray
       <Button
         size="sm"
         variant="ghost"
-        className="h-6 w-6 p-0"
+        className="h-7 w-7 p-0"
         disabled={busy}
         title="Restart"
         onClick={wrap(() => lc.restart.mutateAsync())}
@@ -198,7 +198,7 @@ function LifecycleButtons({ serverID, status }: { serverID: number; status: Xray
       <Button
         size="sm"
         variant="ghost"
-        className="h-6 w-6 p-0"
+        className="h-7 w-7 p-0"
         disabled={busy}
         title="Refresh status"
         onClick={wrap(() => lc.refreshStatus.mutateAsync())}
@@ -241,9 +241,9 @@ export default function DeployTab() {
 
   return (
     <div className="space-y-2">
-      <table className="w-full text-[13px]">
+      <table className="w-full text-sm">
         <thead>
-          <tr className="border-b text-[11px] text-muted-foreground uppercase tracking-wide">
+          <tr className="border-b text-2xs text-muted-foreground uppercase tracking-wide">
             <th className="text-left py-2 pr-4 font-medium">Server</th>
             <th className="text-left py-2 pr-4 font-medium">Status</th>
             <th className="text-left py-2 pr-4 font-medium">Version</th>
@@ -266,14 +266,14 @@ export default function DeployTab() {
                 <td className="py-2 pr-4">
                   <div className="font-medium">{server.name}</div>
                   {sshHost && (
-                    <div className="text-[11px] text-muted-foreground font-mono">{sshHost}</div>
+                    <div className="text-2xs text-muted-foreground font-mono">{sshHost}</div>
                   )}
                 </td>
                 <td className="py-2 pr-4">
                   {host ? (
                     <Pill kind={kind}>{label}</Pill>
                   ) : (
-                    <span className="text-muted-foreground text-[12px]">not deployed</span>
+                    <span className="text-muted-foreground text-xs">not deployed</span>
                   )}
                 </td>
                 <td className="py-2 pr-4">
@@ -290,7 +290,7 @@ export default function DeployTab() {
                         <TooltipTrigger asChild>
                           <button
                             type="button"
-                            className="inline-flex h-6 w-6 items-center justify-center rounded text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/60"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/60"
                             aria-label="Show last error"
                           >
                             ⚠
@@ -305,7 +305,7 @@ export default function DeployTab() {
                     <span className="text-muted-foreground">—</span>
                   )}
                 </td>
-                <td className="py-2 pr-4 font-mono text-[11px] text-muted-foreground">
+                <td className="py-2 pr-4 font-mono text-2xs text-muted-foreground">
                   {host?.updated_at ?? '—'}
                 </td>
                 <td className="py-2">
@@ -328,7 +328,7 @@ export default function DeployTab() {
           })}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={6} className="py-6 text-center text-muted-foreground text-[13px]">
+              <td colSpan={6} className="py-6 text-center text-muted-foreground text-sm">
                 No servers found.
               </td>
             </tr>

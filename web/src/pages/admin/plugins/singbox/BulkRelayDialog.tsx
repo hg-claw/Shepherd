@@ -314,13 +314,13 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
           <DialogTitle className="font-mono">
             Add relays → {landingInbound.tag} @ {landingInbound.server_name}
           </DialogTitle>
-          <p className="text-[12px] text-muted-foreground font-mono">{proto}</p>
+          <p className="text-xs text-muted-foreground font-mono">{proto}</p>
         </DialogHeader>
 
         <div className="space-y-3">
           <div>
-            <Label className="text-[12px]">Mode</Label>
-            <div className="mt-1 flex gap-1 text-[12px]">
+            <Label className="text-xs">Mode</Label>
+            <div className="mt-1 flex gap-1 text-xs">
               <Button
                 type="button"
                 size="sm"
@@ -340,7 +340,7 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
                 Proxy (per-relay keys)
               </Button>
             </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
+            <p className="mt-1 text-2xs text-muted-foreground">
               {mode === 'forward'
                 ? 'Relay just NATs traffic to the landing. Client uses the landing’s URL with the relay’s IP:port. No per-relay keys, no double encryption — cheaper and the same URL works for every IP.'
                 : 'Relay terminates the protocol with its own keys and re-encapsulates to the landing. Each relay gets a unique share URL. Use this when you specifically want per-relay credentials for revocation.'}
@@ -348,10 +348,10 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
           </div>
 
           <div>
-            <Label className="text-[12px]">Target servers</Label>
+            <Label className="text-xs">Target servers</Label>
             <div className="mt-1 rounded-md border bg-elev max-h-64 overflow-y-auto">
               {targets.length === 0 && (
-                <p className="px-3 py-4 text-[12px] text-muted-foreground">No eligible servers.</p>
+                <p className="px-3 py-4 text-xs text-muted-foreground">No eligible servers.</p>
               )}
               {targets.map((s) => {
                 const alreadyDeployed = existingRelayServerIDs.has(s.id)
@@ -365,18 +365,18 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
                 const taken = portsByServer.get(s.id) ?? new Set<number>()
                 return (
                   <label key={s.id}
-                    className="flex items-center gap-3 px-3 py-2 border-b last:border-b-0 text-[12.5px]">
+                    className="flex items-center gap-3 px-3 py-2 border-b last:border-b-0 text-sm">
                     <input type="checkbox" checked={checked} disabled={alreadyDeployed}
                       onChange={() => toggle({ id: s.id, name: s.name })}
                       aria-label={`select ${s.name}`} />
                     <span className="font-mono w-32 truncate">{s.name}</span>
                     {alreadyDeployed && (
-                      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-ok/15 text-ok">
+                      <span className="text-2xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-ok/15 text-ok">
                         deployed
                       </span>
                     )}
                     {taken.size > 0 && (
-                      <span className="text-fg-dim text-[10.5px]" title={`used: ${Array.from(taken).join(', ')}`}>
+                      <span className="text-fg-dim text-2xs" title={`used: ${Array.from(taken).join(', ')}`}>
                         {taken.size} port(s) in use
                       </span>
                     )}
@@ -390,9 +390,9 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
                           className="h-7 w-24 font-mono" />
                         {mode === 'proxy' && needsX25519(proto) && (
                           <>
-                            <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]"
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-2xs"
                               onClick={(e) => { e.preventDefault(); void regenKeys(s.id) }}>↻ keys</Button>
-                            <span className="font-mono text-fg-dim text-[10px] truncate" title={d.publicKey}>
+                            <span className="font-mono text-fg-dim text-2xs truncate" title={d.publicKey}>
                               {d.publicKey ? d.publicKey.slice(0, 8) + '…' : 'generating…'}
                             </span>
                           </>

@@ -88,7 +88,7 @@ export default function HistoryDrawer({ open, onOpenChange, serverID, targetID, 
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[560px] max-w-full overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="text-[15px]">{label}</SheetTitle>
+          <SheetTitle className="text-lg">{label}</SheetTitle>
         </SheetHeader>
 
         <div className="mt-3 flex gap-1">
@@ -97,7 +97,7 @@ export default function HistoryDrawer({ open, onOpenChange, serverID, targetID, 
               key={r}
               size="sm"
               variant={r === range ? 'default' : 'outline'}
-              className="h-7 px-2.5 text-[11.5px]"
+              className="h-7 px-2.5 text-2xs"
               onClick={() => setRange(r)}
             >
               {r}
@@ -105,16 +105,16 @@ export default function HistoryDrawer({ open, onOpenChange, serverID, targetID, 
           ))}
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 text-[12.5px]">
+        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
           <div className="border rounded-md p-3">
-            <div className="text-muted-foreground text-[11px] uppercase tracking-wide">Avg RTT</div>
-            <div className="text-[18px] font-mono tabular-nums">
+            <div className="text-muted-foreground text-2xs uppercase tracking-wide">Avg RTT</div>
+            <div className="text-lg font-mono tabular-nums">
               {avgRTT != null ? `${avgRTT.toFixed(1)} ms` : '—'}
             </div>
           </div>
           <div className="border rounded-md p-3">
-            <div className="text-muted-foreground text-[11px] uppercase tracking-wide">Avg loss</div>
-            <div className="text-[18px] font-mono tabular-nums">
+            <div className="text-muted-foreground text-2xs uppercase tracking-wide">Avg loss</div>
+            <div className="text-lg font-mono tabular-nums">
               {avgLoss != null ? `${avgLoss.toFixed(1)}%` : '—'}
             </div>
           </div>
@@ -122,7 +122,7 @@ export default function HistoryDrawer({ open, onOpenChange, serverID, targetID, 
 
         <div className="mt-4 h-64">
           {points.length === 0 ? (
-            <div className="h-full grid place-items-center text-[12.5px] text-muted-foreground">
+            <div className="h-full grid place-items-center text-sm text-muted-foreground">
               No samples in this range yet.
             </div>
           ) : (
@@ -146,7 +146,7 @@ export default function HistoryDrawer({ open, onOpenChange, serverID, targetID, 
           )}
         </div>
 
-        <div className="mt-4 text-[11px] text-muted-foreground">
+        <div className="mt-4 text-2xs text-muted-foreground">
           Resolution: <span className="font-mono">{q.data?.resolution ?? resolution}</span>
         </div>
       </SheetContent>

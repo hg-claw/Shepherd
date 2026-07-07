@@ -105,7 +105,7 @@ export default function TrafficTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-[12.5px] text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Inbound traffic — uplink + downlink by inbound tag. Click any row for detailed chart.
         </p>
         <div className="flex items-center gap-1">
@@ -114,7 +114,7 @@ export default function TrafficTab() {
               key={r.key}
               size="sm"
               variant={r.key === rangeKey ? 'default' : 'ghost'}
-              className="h-7 px-2 text-[12px]"
+              className="h-7 px-2 text-xs"
               onClick={() => setRangeKey(r.key)}
             >
               {r.label}
@@ -128,21 +128,21 @@ export default function TrafficTab() {
         if (inbounds.length === 0) return null
         return (
           <div key={s.id} className="rounded-lg border bg-elev overflow-hidden">
-            <div className="px-3 py-2 border-b bg-background/40 text-[13px] font-mono">
+            <div className="px-3 py-2 border-b bg-background/40 text-sm font-mono">
               <span className="font-medium">{s.name}</span>
               <span className="text-fg-dim ml-2">
                 {s.ssh_host?.Valid ? s.ssh_host.String : '—'}
               </span>
             </div>
-            <table className="w-full text-[13px] border-collapse">
+            <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="text-left">
-                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Tag</th>
-                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Role</th>
-                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Last {range.label}</th>
-                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground text-right">Uplink</th>
-                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground text-right">Downlink</th>
-                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground text-right">Total</th>
+                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Tag</th>
+                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Role</th>
+                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Last {range.label}</th>
+                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground text-right">Uplink</th>
+                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground text-right">Downlink</th>
+                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground text-right">Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -156,23 +156,23 @@ export default function TrafficTab() {
                       onClick={() => setDrillFor({ serverID: s.id, tag: i.tag })}
                     >
                       <td className="px-3 py-2 font-mono">{i.tag}</td>
-                      <td className="px-3 py-2 font-mono text-[12px] text-fg-dim">
+                      <td className="px-3 py-2 font-mono text-xs text-fg-dim">
                         {i.role}
                       </td>
                       <td className="px-3 py-2">
                         {st && st.sparkline.length >= 2 ? (
                           <Sparkline values={st.sparkline} width={120} height={28} className="text-primary" />
                         ) : (
-                          <span className="font-mono text-fg-dim text-[12px]">—</span>
+                          <span className="font-mono text-fg-dim text-xs">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono text-[12.5px]">
+                      <td className="px-3 py-2 text-right font-mono text-sm">
                         {formatBytes(st?.totalUp ?? 0)}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono text-[12.5px]">
+                      <td className="px-3 py-2 text-right font-mono text-sm">
                         {formatBytes(st?.totalDown ?? 0)}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono text-[12.5px] font-medium">
+                      <td className="px-3 py-2 text-right font-mono text-sm font-medium">
                         {formatBytes(total)}
                       </td>
                     </tr>
@@ -185,7 +185,7 @@ export default function TrafficTab() {
       })}
 
       {(inboundsQ.data ?? []).length === 0 && (
-        <div className="rounded-lg border bg-elev p-6 text-center text-muted-foreground text-[13px]">
+        <div className="rounded-lg border bg-elev p-6 text-center text-muted-foreground text-sm">
           No inbounds deployed yet. Create some in the Inbounds tab.
         </div>
       )}

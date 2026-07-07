@@ -60,7 +60,7 @@ export default function TargetsTab() {
 
   return (
     <div className="space-y-4">
-      <div className="text-[12.5px] text-muted-foreground">
+      <div className="text-sm text-muted-foreground">
         Toggle which destinations are sampled. Builtin entries can be disabled (history stays
         intact) but not deleted. Custom entries are scoped to your install.
       </div>
@@ -72,12 +72,12 @@ export default function TargetsTab() {
         if (rows.length === 0) return null
         return (
           <div key={isp} className="border rounded-md overflow-hidden">
-            <div className="px-3 py-2 bg-elev border-b text-[12px] font-medium">
+            <div className="px-3 py-2 bg-elev border-b text-xs font-medium">
               {ISP_LABEL[isp]} <span className="text-muted-foreground">({rows.length})</span>
             </div>
-            <table className="w-full text-[13px]">
+            <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-[11px] text-muted-foreground uppercase tracking-wide">
+                <tr className="border-b text-2xs text-muted-foreground uppercase tracking-wide">
                   <th className="text-left py-2 pl-3 pr-4 font-medium">Region</th>
                   <th className="text-left py-2 pr-4 font-medium">Label</th>
                   <th className="text-left py-2 pr-4 font-medium font-mono">Host</th>
@@ -91,7 +91,7 @@ export default function TargetsTab() {
                   <tr key={t.id} className="border-b last:border-0">
                     <td className="py-2 pl-3 pr-4">{t.region}</td>
                     <td className="py-2 pr-4">{t.label}</td>
-                    <td className="py-2 pr-4 font-mono text-[12px] text-muted-foreground">{t.host}</td>
+                    <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">{t.host}</td>
                     <td className="py-2 pr-4">
                       <Pill kind={t.source === 'builtin' ? 'neutral' : 'ok'}>{t.source}</Pill>
                     </td>
@@ -148,31 +148,31 @@ function NewTargetForm() {
   return (
     <div className="border rounded-md bg-elev p-3 flex items-center gap-2 flex-wrap">
       <Select value={isp} onValueChange={(v) => setISP(v as NetqualityISP)}>
-        <SelectTrigger className="h-8 w-32 text-[12px]">
+        <SelectTrigger className="h-8 w-32 text-xs">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           {(Object.keys(ISP_LABEL) as NetqualityISP[]).map((k) => (
-            <SelectItem key={k} value={k} className="text-[12px]">
+            <SelectItem key={k} value={k} className="text-xs">
               {ISP_LABEL[k]}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
       <Input
-        className="h-8 w-36 text-[12px]"
+        className="h-8 w-36 text-xs"
         placeholder="Region (e.g. HK)"
         value={region}
         onChange={(e) => setRegion(e.target.value)}
       />
       <Input
-        className="h-8 w-48 text-[12px]"
+        className="h-8 w-48 text-xs"
         placeholder="Label (e.g. My VPS)"
         value={label}
         onChange={(e) => setLabel(e.target.value)}
       />
       <Input
-        className="h-8 w-48 text-[12px] font-mono"
+        className="h-8 w-48 text-xs font-mono"
         placeholder="Host or IP"
         value={host}
         onChange={(e) => setHost(e.target.value)}

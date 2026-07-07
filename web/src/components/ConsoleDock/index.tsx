@@ -43,7 +43,7 @@ export function ConsoleDock() {
                 'transition-colors',
                 t.id === active
                   ? 'bg-console-elev text-console-fg'
-                  : 'bg-console-elev text-console-muted hover:bg-console-elev hover:text-console-fg',
+                  : 'bg-console-elev/60 text-console-muted hover:bg-console-elev hover:text-console-fg',
                 t.status === 'exited' && 'opacity-60',
               )}
             >
@@ -63,7 +63,7 @@ export function ConsoleDock() {
                 aria-label="close tab"
                 className={cn(
                   'ml-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded',
-                  'opacity-0 group-hover:opacity-100 hover:bg-console-elev',
+                  'opacity-0 group-hover:opacity-100 hover:bg-console-fg/10',
                   'transition-opacity',
                 )}
                 onClick={(e) => {

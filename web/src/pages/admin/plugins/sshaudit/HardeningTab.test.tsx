@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
+import { I18nextProvider } from 'react-i18next'
+import i18n from '@/i18n'
 import { APIError } from '@/api/client'
 import HardeningTab from './HardeningTab'
 import { fetchSSHAuditFail2ban, setSSHAuditFail2ban } from '@/api/sshaudit'
@@ -23,17 +25,20 @@ const mockSet = setSSHAuditFail2ban as unknown as ReturnType<typeof vi.fn>
 function renderTab() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
-    <QueryClientProvider client={qc}>
-      <MemoryRouter>
-        <HardeningTab />
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <I18nextProvider i18n={i18n}>
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <HardeningTab />
+        </MemoryRouter>
+      </QueryClientProvider>
+    </I18nextProvider>,
   )
 }
 
 describe('sshaudit/HardeningTab', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
+    await i18n.changeLanguage('en')
   })
   afterEach(() => {
     vi.restoreAllMocks()
@@ -108,15 +113,19 @@ describe('sshaudit/HardeningTab', () => {
       find_time: 600,
       ban_time: 3600,
     })
-    // Enabling is confirmed via window.confirm.
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderTab()
 
+    // Click the enable button — a ConfirmDialog should appear.
     const enableBtn = await screen.findByText('Enable fail2ban')
     fireEvent.click(enableBtn)
 
+    // Dialog description should be visible.
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+
+    // Confirm via the primary button ("OK" in English).
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+
     await waitFor(() => expect(mockSet).toHaveBeenCalledWith(1, true))
-    expect(confirmSpy).toHaveBeenCalled()
   })
 
   it('does not call the API when the enable confirm is dismissed', async () => {
@@ -130,11 +139,16 @@ describe('sshaudit/HardeningTab', () => {
       find_time: 0,
       ban_time: 0,
     })
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
     renderTab()
 
+    // Click the enable button — a ConfirmDialog should appear.
     const enableBtn = await screen.findByText('Enable fail2ban')
     fireEvent.click(enableBtn)
+
+    await screen.findByRole('dialog')
+
+    // Dismiss via Cancel — the mutation must not fire.
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(mockSet).not.toHaveBeenCalled()
   })

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Plus, Copy as CopyIcon, Trash2 } from 'lucide-react'
 import {
@@ -22,6 +23,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { useUI } from '@/store/ui'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 const POLICIES = ['PROXY', 'DIRECT', 'REJECT'] as const
 type Policy = (typeof POLICIES)[number] | string
@@ -119,6 +121,7 @@ function textToCustomGroups(text: string): CustomGroupModel[] {
 }
 
 export default function TemplatesTab() {
+  const { t: tr } = useTranslation()
   const toast = useUI((s) => s.toast)
   const qc = useQueryClient()
 
@@ -135,6 +138,7 @@ export default function TemplatesTab() {
   // editor state: either editing an existing custom template (id set) or
   // creating a new one (id null). `seed` provides the prefill rules.
   const [editing, setEditing] = useState<{ id: number | null; name: string; rules: string } | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<SubgenTemplate | null>(null)
 
   const templates = tplQ.data ?? []
 
@@ -190,7 +194,7 @@ export default function TemplatesTab() {
                       </Button>
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
                         disabled={remove.isPending}
-                        onClick={() => { if (confirm(`Delete template "${t.name}"?`)) remove.mutate(t.id) }}
+                        onClick={() => setRemoveTarget(t)}
                         aria-label="delete">
                         <Trash2 className="h-3.5 w-3.5 text-destructive" />
                       </Button>
@@ -214,6 +218,14 @@ export default function TemplatesTab() {
           onSaved={() => { invalidate(); setEditing(null) }}
         />
       )}
+
+      <ConfirmDialog
+        open={removeTarget != null}
+        onOpenChange={(open) => { if (!open) setRemoveTarget(null) }}
+        title={tr('subgen.delete_template')}
+        description={tr('subgen.delete_template_confirm', { name: removeTarget?.name ?? '' })}
+        onConfirm={() => { if (removeTarget) remove.mutate(removeTarget.id) }}
+      />
     </div>
   )
 }

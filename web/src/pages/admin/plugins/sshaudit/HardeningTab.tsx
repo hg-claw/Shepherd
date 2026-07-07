@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Loader2, RefreshCw, ShieldCheck, ShieldOff } from 'lucide-react'
@@ -14,8 +15,10 @@ import {
   setSSHAuditFail2ban,
   type SSHFail2banStatus,
 } from '@/api/sshaudit'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 export default function HardeningTab() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const [sp, setSP] = useSearchParams()
@@ -23,6 +26,7 @@ export default function HardeningTab() {
 
   const { data: servers = [] } = useServers()
   const [serverID, setServerID] = useState<number | undefined>(initialID)
+  const [confirmEnable, setConfirmEnable] = useState(false)
 
   // Pick the first server when nothing is selected so the operator
   // doesn't see an empty page on first open.
@@ -56,9 +60,8 @@ export default function HardeningTab() {
   const onToggle = (next: boolean) => {
     if (!effectiveID) return
     if (next) {
-      if (!confirm('Enable fail2ban? This installs, configures, and starts the SSH brute-force jail on this host.')) {
-        return
-      }
+      setConfirmEnable(true)
+      return
     }
     toggle.mutate({ serverID: effectiveID, enabled: next })
   }
@@ -132,6 +135,15 @@ export default function HardeningTab() {
       ) : status ? (
         <StatusCard status={status} busy={busy} onToggle={onToggle} />
       ) : null}
+
+      <ConfirmDialog
+        open={confirmEnable}
+        onOpenChange={setConfirmEnable}
+        title={t('sshaudit.enable_fail2ban')}
+        description={t('sshaudit.enable_fail2ban_confirm')}
+        destructive={false}
+        onConfirm={() => toggle.mutate({ serverID: effectiveID!, enabled: true })}
+      />
     </div>
   )
 }

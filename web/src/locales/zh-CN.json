@@ -187,7 +187,9 @@
     "just_now": "刚刚"
   },
   "servers": {
-    "empty": "暂无主机"
+    "empty": "暂无主机",
+    "reset_traffic": "立即重置",
+    "reset_traffic_confirm": "确认立即重置流量统计？"
   },
   "scripts": {
     "title": "脚本",
@@ -231,7 +233,9 @@
     "items": "项",
     "drop_hint": "拖拽到此区域上传",
     "transfers": "传输队列",
-    "no_transfers": "暂无传输"
+    "no_transfers": "暂无传输",
+    "remove": "删除",
+    "remove_confirm": "确认删除 {{name}}？"
   },
   "plugins": {
     "subtitle": "通过日志解析、自定义指标采集、告警转发等插件扩展 Shepherd 代理。",
@@ -254,6 +258,20 @@
   "recording": {
     "title": "录制回放",
     "replay": "重放"
+  },
+  "sshaudit": {
+    "enable_fail2ban": "启用 fail2ban",
+    "enable_fail2ban_confirm": "将在此主机上安装、配置并启动 SSH 暴力破解防护（fail2ban）。"
+  },
+  "netquality": {
+    "delete_target": "删除目标",
+    "delete_target_confirm": "确认删除自定义目标 \"{{name}}\"？"
+  },
+  "subgen": {
+    "delete_subscription": "删除订阅",
+    "delete_subscription_confirm": "确认删除订阅 \"{{name}}\"？",
+    "delete_template": "删除模板",
+    "delete_template_confirm": "确认删除模板 \"{{name}}\"？"
   },
   "server": {
     "update_agent": "更新 agent",

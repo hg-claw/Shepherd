@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, Plus, RotateCw, Server, Trash2 } from 'lucide-react'
 import { useServers } from '@/api/servers'
@@ -28,6 +29,7 @@ import {
 } from '@/components/ui/dialog'
 import { useUI } from '@/store/ui'
 import { copyText } from '@/lib/clipboard'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 type Target = 'surge' | 'shadowrocket' | 'clash'
 
@@ -36,6 +38,7 @@ function subUrl(token: string, target: Target): string {
 }
 
 export default function SubscriptionsTab() {
+  const { t } = useTranslation()
   const toast = useUI((s) => s.toast)
   const qc = useQueryClient()
 
@@ -81,6 +84,7 @@ export default function SubscriptionsTab() {
 
   const [creating, setCreating] = useState(false)
   const [nodesFor, setNodesFor] = useState<SubgenSubscription | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<SubgenSubscription | null>(null)
 
   const copy = async (text: string) => {
     try {
@@ -166,7 +170,7 @@ export default function SubscriptionsTab() {
                     </Button>
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
                       disabled={remove.isPending}
-                      onClick={() => { if (confirm(`Delete subscription "${s.name}"?`)) remove.mutate(s.id) }}
+                      onClick={() => setRemoveTarget(s)}
                       aria-label="delete">
                       <Trash2 className="h-3.5 w-3.5 text-destructive" />
                     </Button>
@@ -198,6 +202,14 @@ export default function SubscriptionsTab() {
           onClose={() => setNodesFor(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={removeTarget != null}
+        onOpenChange={(open) => { if (!open) setRemoveTarget(null) }}
+        title={t('subgen.delete_subscription')}
+        description={t('subgen.delete_subscription_confirm', { name: removeTarget?.name ?? '' })}
+        onConfirm={() => { if (removeTarget) remove.mutate(removeTarget.id) }}
+      />
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -15,6 +16,7 @@ import {
   type NetqualityTarget,
 } from '@/api/netquality'
 import { useUI } from '@/store/ui'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 const ISP_LABEL: Record<NetqualityISP, string> = {
   telecom: '电信',
@@ -24,9 +26,11 @@ const ISP_LABEL: Record<NetqualityISP, string> = {
 }
 
 export default function TargetsTab() {
+  const { t: tr } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const targetsQ = useQuery({ queryKey: ['netquality', 'targets'], queryFn: listNetqualityTargets })
+  const [removeTarget, setRemoveTarget] = useState<NetqualityTarget | null>(null)
 
   const toggle = useMutation({
     mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) =>
@@ -66,6 +70,14 @@ export default function TargetsTab() {
       </div>
 
       <NewTargetForm />
+
+      <ConfirmDialog
+        open={removeTarget != null}
+        onOpenChange={(open) => { if (!open) setRemoveTarget(null) }}
+        title={tr('netquality.delete_target')}
+        description={tr('netquality.delete_target_confirm', { name: removeTarget?.label ?? '' })}
+        onConfirm={() => { if (removeTarget) remove.mutate(removeTarget.id) }}
+      />
 
       {(['telecom', 'unicom', 'mobile', 'overseas'] as NetqualityISP[]).map((isp) => {
         const rows = grouped.get(isp) ?? []
@@ -109,9 +121,7 @@ export default function TargetsTab() {
                           size="sm"
                           className="h-7 w-7 p-0"
                           disabled={remove.isPending}
-                          onClick={() => {
-                            if (confirm(`Delete custom target "${t.label}"?`)) remove.mutate(t.id)
-                          }}
+                          onClick={() => setRemoveTarget(t)}
                           title="Delete"
                         >
                           <Trash className="h-3.5 w-3.5" />

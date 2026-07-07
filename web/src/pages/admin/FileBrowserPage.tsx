@@ -31,6 +31,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { LoadingState } from '@/components/LoadingState'
 import { ErrorState } from '@/components/ErrorState'
 import { cn } from '@/lib/utils'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 function formatMode(m: number): string {
   return (m & 0o777).toString(8).padStart(3, '0')
@@ -86,6 +87,7 @@ export default function FileBrowserPage() {
 
   // PTY session for the inline terminal. Open one per host visit; close on
   // unmount via the agent-side timeout when the WS drops.
+  const [removeTarget, setRemoveTarget] = useState<FileEntry | null>(null)
   const [ptySid, setPtySid] = useState<string | null>(null)
   const [auditId, setAuditId] = useState<number | null>(null)
   useEffect(() => {
@@ -143,10 +145,8 @@ export default function FileBrowserPage() {
     })
   }
 
-  const handleRm = async (entry: FileEntry) => {
-    if (!confirm(`Remove ${entry.name}?`)) return
-    const path = cwd === '/' ? `/${entry.name}` : `${cwd}/${entry.name}`
-    await rm.mutateAsync({ server_id: sid, path, recursive: entry.is_dir })
+  const handleRm = (entry: FileEntry) => {
+    setRemoveTarget(entry)
   }
 
   const queueUpload = (files: FileList | File[]) => {
@@ -572,6 +572,17 @@ export default function FileBrowserPage() {
           </pre>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog
+        open={removeTarget != null}
+        onOpenChange={(open) => { if (!open) setRemoveTarget(null) }}
+        title={t('files.remove')}
+        description={t('files.remove_confirm', { name: removeTarget?.name ?? '' })}
+        onConfirm={() => {
+          if (!removeTarget) return
+          const path = cwd === '/' ? `/${removeTarget.name}` : `${cwd}/${removeTarget.name}`
+          rm.mutate({ server_id: sid, path, recursive: removeTarget.is_dir })
+        }}
+      />
     </div>
   )
 }

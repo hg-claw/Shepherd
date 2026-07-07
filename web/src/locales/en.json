@@ -168,7 +168,9 @@
     "just_now": "just now"
   },
   "servers": {
-    "empty": "No servers yet"
+    "empty": "No servers yet",
+    "reset_traffic": "Reset traffic",
+    "reset_traffic_confirm": "Reset traffic counters now?"
   },
   "scripts": {
     "title": "Scripts",
@@ -212,7 +214,9 @@
     "items": "items",
     "drop_hint": "drop files here to upload",
     "transfers": "Transfers",
-    "no_transfers": "no transfers yet"
+    "no_transfers": "no transfers yet",
+    "remove": "Remove",
+    "remove_confirm": "Remove {{name}}?"
   },
   "plugins": {
     "subtitle": "Extend the Shepherd agent with log parsers, extra metric collectors, and alert routers.",
@@ -235,6 +239,20 @@
   "recording": {
     "title": "Recording",
     "replay": "Replay"
+  },
+  "sshaudit": {
+    "enable_fail2ban": "Enable fail2ban",
+    "enable_fail2ban_confirm": "Install, configure, and start the SSH brute-force jail on this host."
+  },
+  "netquality": {
+    "delete_target": "Delete target",
+    "delete_target_confirm": "Delete custom target \"{{name}}\"?"
+  },
+  "subgen": {
+    "delete_subscription": "Delete subscription",
+    "delete_subscription_confirm": "Delete subscription \"{{name}}\"?",
+    "delete_template": "Delete template",
+    "delete_template_confirm": "Delete template \"{{name}}\"?"
   },
   "server": {
     "update_agent": "Update agent",

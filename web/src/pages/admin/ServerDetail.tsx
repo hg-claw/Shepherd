@@ -26,6 +26,7 @@ import type { Range } from '@/api/servers'
 import { openConsole } from '@/api/console'
 import { useConsoleTabs } from '@/store/consoleTabs'
 import { LoadingState } from '@/components/LoadingState'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 export default function AdminServerDetail() {
   const { id: idStr } = useParams<{ id: string }>()
@@ -75,6 +76,7 @@ export default function AdminServerDetail() {
   // Session-local (deliberately not persisted on the server row):
   // operators flip it per action.
   const [cnMirror, setCNMirror] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
 
   if (!s) return <LoadingState />
 
@@ -219,7 +221,7 @@ export default function AdminServerDetail() {
                   size="sm"
                   variant="outline"
                   onClick={() => {
-                    if (confirm('确认立即重置流量统计？')) resetTraffic.mutate()
+                    setConfirmReset(true)
                   }}
                 >
                   立即重置
@@ -486,6 +488,13 @@ export default function AdminServerDetail() {
           mem snapshot: {bytes(points[points.length - 1].mem_used)} / {bytes(points[points.length - 1].mem_total)}
         </p>
       )}
+      <ConfirmDialog
+        open={confirmReset}
+        onOpenChange={setConfirmReset}
+        title={t('servers.reset_traffic')}
+        description={t('servers.reset_traffic_confirm')}
+        onConfirm={() => resetTraffic.mutate()}
+      />
     </div>
   )
 }

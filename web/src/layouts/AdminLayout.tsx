@@ -38,10 +38,10 @@ type NavSection = { label: string; items: NavItem[] }
 function BrandMark() {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="grid place-items-center h-[22px] w-[22px] rounded-[5px] bg-foreground text-background font-mono font-bold text-[12px]">
+      <span className="grid place-items-center h-[22px] w-[22px] rounded-[5px] bg-foreground text-background font-mono font-bold text-xs">
         Sh
       </span>
-      <span className="font-semibold tracking-tight text-[14px]">Shepherd</span>
+      <span className="font-semibold tracking-tight text-sm">Shepherd</span>
     </div>
   )
 }
@@ -108,13 +108,13 @@ export function AdminLayout() {
     <nav className="flex flex-col gap-0.5 px-2 py-3">
       {sections.map((sec, i) => (
         <div key={sec.label} className={cn(i > 0 && 'mt-2')}>
-          <div className="px-2.5 pt-2 pb-1 text-[10.5px] uppercase tracking-[0.08em] text-fg-dim font-medium">
+          <div className="px-2.5 pt-2 pb-1 text-2xs uppercase tracking-[0.08em] text-fg-dim font-medium">
             {sec.label}
           </div>
           {sec.items.map((it) => {
             const active = isActive(it.to)
             const cls = cn(
-              'flex items-center gap-2.5 h-[30px] px-2.5 rounded-md text-[13px] transition-colors',
+              'flex items-center gap-2.5 h-[30px] px-2.5 rounded-md text-sm transition-colors',
               'text-muted-foreground hover:bg-sunken hover:text-foreground',
               active && 'bg-sunken text-foreground font-medium',
             )
@@ -123,7 +123,7 @@ export function AdminLayout() {
                 <it.icon className="h-3.5 w-3.5 shrink-0 opacity-70" />
                 <span className="truncate flex-1">{it.label}</span>
                 {it.badge != null && (
-                  <span className="text-fg-dim text-[11px] font-mono">{it.badge}</span>
+                  <span className="text-fg-dim text-2xs font-mono">{it.badge}</span>
                 )}
               </>
             )
@@ -157,11 +157,11 @@ export function AdminLayout() {
       ))}
 
       <div className="mt-2">
-        <div className="px-2.5 pt-2 pb-1 text-[10.5px] uppercase tracking-[0.08em] text-fg-dim font-medium">
+        <div className="px-2.5 pt-2 pb-1 text-2xs uppercase tracking-[0.08em] text-fg-dim font-medium">
           {t('nav.section.recent', 'Recent hosts')}
         </div>
         {recents.length === 0 ? (
-          <div className="px-2.5 py-1.5 text-fg-dim text-[11.5px] font-mono">
+          <div className="px-2.5 py-1.5 text-fg-dim text-2xs font-mono">
             {t('nav.recent_empty', 'visit a host to see it here')}
           </div>
         ) : (
@@ -174,7 +174,7 @@ export function AdminLayout() {
                 key={s.id}
                 to={`/admin/servers/${s.id}`}
                 onClick={onNavigate}
-                className="flex items-center gap-2.5 h-[28px] px-2.5 rounded-md text-[12.5px] font-mono text-muted-foreground hover:bg-sunken hover:text-foreground transition-colors"
+                className="flex items-center gap-2.5 h-[28px] px-2.5 rounded-md text-sm font-mono text-muted-foreground hover:bg-sunken hover:text-foreground transition-colors"
               >
                 <span
                   className={cn(
@@ -191,7 +191,7 @@ export function AdminLayout() {
 
       {enabledPlugins.length > 0 && (
         <div className="mt-2">
-          <div className="px-2.5 pt-2 pb-1 text-[10.5px] uppercase tracking-[0.08em] text-fg-dim font-medium">
+          <div className="px-2.5 pt-2 pb-1 text-2xs uppercase tracking-[0.08em] text-fg-dim font-medium">
             {t('nav.section.active_plugins', 'Active plugins')}
           </div>
           {enabledPlugins.map((p) => (
@@ -200,7 +200,7 @@ export function AdminLayout() {
               to={`/admin/plugins/${p.id}`}
               onClick={onNavigate}
               className={cn(
-                'flex items-center gap-2.5 h-[28px] px-2.5 rounded-md text-[12.5px] font-mono',
+                'flex items-center gap-2.5 h-[28px] px-2.5 rounded-md text-sm font-mono',
                 'text-muted-foreground hover:bg-sunken hover:text-foreground transition-colors',
               )}
             >
@@ -295,7 +295,7 @@ export function AdminLayout() {
       <header className="md:col-span-2 flex items-stretch border-b bg-elev sticky top-0 z-30 h-12">
         <div className="hidden md:flex w-[232px] shrink-0 items-center px-4 border-r">
           <BrandMark />
-          <span className="ml-auto text-fg-dim text-[10.5px] font-mono">{versionQ.data?.version ?? ''}</span>
+          <span className="ml-auto text-fg-dim text-2xs font-mono">{versionQ.data?.version ?? ''}</span>
         </div>
 
         <div className="flex flex-1 items-center gap-3 px-3 sm:px-4 min-w-0">
@@ -322,7 +322,7 @@ export function AdminLayout() {
             <BrandMark />
           </div>
 
-          <div className="hidden md:flex items-center gap-2 text-muted-foreground text-[13px] whitespace-nowrap min-w-0 flex-1">
+          <div className="hidden md:flex items-center gap-2 text-muted-foreground text-sm whitespace-nowrap min-w-0 flex-1">
             {crumbs.map((c, i) => {
               const last = i === crumbs.length - 1
               return (
@@ -355,7 +355,7 @@ export function AdminLayout() {
               asChild
               size="sm"
               variant="default"
-              className="hidden sm:inline-flex h-7 px-2.5 text-[12.5px]"
+              className="hidden sm:inline-flex h-7 px-2.5 text-sm"
             >
               <Link to="/admin/servers/new">
                 <Plus className="h-3.5 w-3.5 mr-1" />
@@ -376,7 +376,7 @@ export function AdminLayout() {
             {admin && (
               <span
                 title={admin.username}
-                className="grid place-items-center h-7 w-7 rounded-full bg-sunken border text-[11px] font-mono uppercase shrink-0"
+                className="grid place-items-center h-7 w-7 rounded-full bg-sunken border text-2xs font-mono uppercase shrink-0"
               >
                 {admin.username.slice(0, 1)}
               </span>

@@ -1,5 +1,5 @@
 .PHONY: web web-clean server server-no-web agent agents agent-amd64 agent-arm64 \
-        release docker-build test test-go test-web fmt vet tidy
+        release docker-build test test-go test-web lint-web fmt vet tidy
 
 VERSION ?= dev
 
@@ -77,6 +77,9 @@ test-go:
 
 test-web:
 	cd web && npm test
+
+lint-web:
+	./scripts/check-ui-tokens.sh
 
 fmt:
 	gofmt -w .

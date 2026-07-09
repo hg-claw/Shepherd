@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Plus, Copy as CopyIcon, Trash2 } from 'lucide-react'
 import {
@@ -22,6 +23,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { useUI } from '@/store/ui'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 const POLICIES = ['PROXY', 'DIRECT', 'REJECT'] as const
 type Policy = (typeof POLICIES)[number] | string
@@ -119,6 +121,7 @@ function textToCustomGroups(text: string): CustomGroupModel[] {
 }
 
 export default function TemplatesTab() {
+  const { t: tr } = useTranslation()
   const toast = useUI((s) => s.toast)
   const qc = useQueryClient()
 
@@ -135,6 +138,7 @@ export default function TemplatesTab() {
   // editor state: either editing an existing custom template (id set) or
   // creating a new one (id null). `seed` provides the prefill rules.
   const [editing, setEditing] = useState<{ id: number | null; name: string; rules: string } | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<SubgenTemplate | null>(null)
 
   const templates = tplQ.data ?? []
 
@@ -144,13 +148,13 @@ export default function TemplatesTab() {
     setEditing({ id: null, name: `${t.name} copy`, rules: t.rules_json })
 
   if (tplQ.isError) {
-    return <div className="text-err text-[13px]">Failed to load templates: {(tplQ.error as Error).message}</div>
+    return <div className="text-err text-sm">Failed to load templates: {(tplQ.error as Error).message}</div>
   }
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-[12.5px] text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Templates describe how nodes map to policies and which rule-sets to include. Built-in templates are read-only — clone one to customize.
         </p>
         <Button size="sm" className="h-8" onClick={openNew}>
@@ -159,12 +163,12 @@ export default function TemplatesTab() {
       </div>
 
       <div className="rounded-lg border bg-elev overflow-x-auto">
-        <table className="w-full text-[13px] border-collapse">
+        <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="text-left">
-              <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Name</th>
-              <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Type</th>
-              <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground text-right">Actions</th>
+              <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Name</th>
+              <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Type</th>
+              <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -178,19 +182,19 @@ export default function TemplatesTab() {
                 </td>
                 <td className="px-3 py-2 text-right whitespace-nowrap">
                   {t.builtin ? (
-                    <Button variant="outline" size="sm" className="h-7 px-2 text-[12px]"
+                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
                       onClick={() => openClone(t)}>
                       <CopyIcon className="h-3.5 w-3.5 mr-1" /> Clone
                     </Button>
                   ) : (
                     <>
-                      <Button variant="outline" size="sm" className="h-7 px-2 text-[12px] mr-1"
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs mr-1"
                         onClick={() => openEdit(t)}>
                         <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                       </Button>
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
                         disabled={remove.isPending}
-                        onClick={() => { if (confirm(`Delete template "${t.name}"?`)) remove.mutate(t.id) }}
+                        onClick={() => setRemoveTarget(t)}
                         aria-label="delete">
                         <Trash2 className="h-3.5 w-3.5 text-destructive" />
                       </Button>
@@ -214,6 +218,14 @@ export default function TemplatesTab() {
           onSaved={() => { invalidate(); setEditing(null) }}
         />
       )}
+
+      <ConfirmDialog
+        open={removeTarget != null}
+        onOpenChange={(open) => { if (!open) setRemoveTarget(null) }}
+        title={tr('subgen.delete_template')}
+        description={tr('subgen.delete_template_confirm', { name: removeTarget?.name ?? '' })}
+        onConfirm={() => { if (removeTarget) remove.mutate(removeTarget.id) }}
+      />
     </div>
   )
 }
@@ -346,11 +358,11 @@ export function TemplateEditor({
           {/* ── editor column ─────────────────────────────────────────────── */}
           <div className="max-h-[65vh] overflow-y-auto space-y-4 pr-1">
             <div>
-              <Label className="text-[12px]">Name</Label>
+              <Label className="text-xs">Name</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 mt-1" />
             </div>
 
-            <div className="inline-flex rounded-md border bg-sunken/30 p-0.5 text-[12px]">
+            <div className="inline-flex rounded-md border bg-sunken/30 p-0.5 text-xs">
               <button type="button"
                 onClick={() => { if (mode !== 'form') switchToForm() }}
                 className={`px-3 h-7 rounded ${mode === 'form' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}>
@@ -367,32 +379,32 @@ export function TemplateEditor({
               <>
                 <div>
                   <div className="flex items-center gap-2">
-                    <Label className="text-[12px]">Proxy groups</Label>
+                    <Label className="text-xs">Proxy groups</Label>
                     <button type="button" onClick={checkAllGroups}
-                      className="ml-auto text-[11px] text-fg-dim hover:text-fg underline">Select all</button>
+                      className="ml-auto text-2xs text-fg-dim hover:text-fg underline">Select all</button>
                     <button type="button" onClick={clearAllGroups}
-                      className="text-[11px] text-fg-dim hover:text-fg underline">Clear</button>
+                      className="text-2xs text-fg-dim hover:text-fg underline">Clear</button>
                   </div>
-                  <p className="text-fg-dim text-[11px] mt-0.5 mb-2">
+                  <p className="text-fg-dim text-2xs mt-0.5 mb-2">
                     Checked service groups (and their rules) are included in the generated config. Core groups (Proxy / Domestic / Others / Auto) are always present.
                   </p>
                   <div className="grid grid-cols-2 gap-1.5">
                     {oixGroups.map((name) => (
-                      <label key={name} className="flex items-center gap-2 text-[12.5px] rounded-md border bg-sunken/30 px-2 py-1">
+                      <label key={name} className="flex items-center gap-2 text-sm rounded-md border bg-sunken/30 px-2 py-1">
                         <input type="checkbox" checked={!disabledGroups.has(name)}
                           onChange={() => toggleGroup(name)} aria-label={`group ${name}`} />
                         <span className="font-mono">{name}</span>
                       </label>
                     ))}
                     {oixGroups.length === 0 && (
-                      <div className="text-fg-dim text-[12px]">No groups defined.</div>
+                      <div className="text-fg-dim text-xs">No groups defined.</div>
                     )}
                   </div>
                 </div>
 
                 <div>
-                  <Label className="text-[12px]">Custom rules</Label>
-                  <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                  <Label className="text-xs">Custom rules</Label>
+                  <p className="text-fg-dim text-2xs mt-0.5 mb-1">
                     One <code>TYPE,VALUE,policy</code> per line (e.g. <code>DOMAIN-SUFFIX,example.com,DIRECT</code>).
                   </p>
                   <textarea
@@ -400,14 +412,14 @@ export function TemplateEditor({
                     onChange={(e) => setCustomText(e.target.value)}
                     rows={5}
                     spellCheck={false}
-                    className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
+                    className="w-full px-2 py-1.5 rounded-md border bg-background text-xs font-mono"
                     placeholder="DOMAIN-SUFFIX,example.com,DIRECT"
                   />
                 </div>
 
                 <div>
-                  <Label className="text-[12px]">[General]</Label>
-                  <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                  <Label className="text-xs">[General]</Label>
+                  <p className="text-fg-dim text-2xs mt-0.5 mb-1">
                     Raw Surge <code>[General]</code> directives. Leave empty for the default (<code>bypass-system = true</code>).
                   </p>
                   <textarea
@@ -415,14 +427,14 @@ export function TemplateEditor({
                     onChange={(e) => setGeneral(e.target.value)}
                     rows={4}
                     spellCheck={false}
-                    className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
+                    className="w-full px-2 py-1.5 rounded-md border bg-background text-xs font-mono"
                     placeholder="dns-server = 119.29.29.29, 223.5.5.5"
                   />
                 </div>
 
                 <div>
-                  <Label className="text-[12px]">[MITM]</Label>
-                  <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                  <Label className="text-xs">[MITM]</Label>
+                  <p className="text-fg-dim text-2xs mt-0.5 mb-1">
                     Raw Surge <code>[MITM]</code> directives. Leave empty to omit the section.
                   </p>
                   <textarea
@@ -430,14 +442,14 @@ export function TemplateEditor({
                     onChange={(e) => setMitm(e.target.value)}
                     rows={3}
                     spellCheck={false}
-                    className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
+                    className="w-full px-2 py-1.5 rounded-md border bg-background text-xs font-mono"
                     placeholder="hostname = *.googlevideo.com"
                   />
                 </div>
 
                 <div>
-                  <Label className="text-[12px]">[URL Rewrite]</Label>
-                  <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                  <Label className="text-xs">[URL Rewrite]</Label>
+                  <p className="text-fg-dim text-2xs mt-0.5 mb-1">
                     Raw Surge <code>[URL Rewrite]</code> lines (Surge / ShadowRocket only; Clash ignores). Leave empty to omit.
                   </p>
                   <textarea
@@ -445,14 +457,14 @@ export function TemplateEditor({
                     onChange={(e) => setUrlRewrite(e.target.value)}
                     rows={3}
                     spellCheck={false}
-                    className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
+                    className="w-full px-2 py-1.5 rounded-md border bg-background text-xs font-mono"
                     placeholder="^https://example.com/x $1 header"
                   />
                 </div>
 
                 <div>
-                  <Label className="text-[12px]">[Clash] general</Label>
-                  <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                  <Label className="text-xs">[Clash] general</Label>
+                  <p className="text-fg-dim text-2xs mt-0.5 mb-1">
                     Raw Clash YAML top-level keys (<code>dns</code>, <code>mode</code>…); used only for the clash target. Leave empty for <code>mode: rule</code>.
                   </p>
                   <textarea
@@ -460,14 +472,14 @@ export function TemplateEditor({
                     onChange={(e) => setClashGeneral(e.target.value)}
                     rows={4}
                     spellCheck={false}
-                    className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
+                    className="w-full px-2 py-1.5 rounded-md border bg-background text-xs font-mono"
                     placeholder="mode: rule"
                   />
                 </div>
 
                 <div>
-                  <Label className="text-[12px]">Custom nodes (share links)</Label>
-                  <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                  <Label className="text-xs">Custom nodes (share links)</Label>
+                  <p className="text-fg-dim text-2xs mt-0.5 mb-1">
                     One proxy share link per line (<code>vless://</code>, <code>ss://</code>, <code>vmess://</code>, <code>trojan://</code>, <code>hysteria2://</code>, <code>tuic://</code>, <code>anytls://</code>). The name after <code>#</code> becomes the node name; parsed nodes appear in the preview.
                   </p>
                   <textarea
@@ -475,14 +487,14 @@ export function TemplateEditor({
                     onChange={(e) => setCustomNodes(e.target.value)}
                     rows={4}
                     spellCheck={false}
-                    className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
+                    className="w-full px-2 py-1.5 rounded-md border bg-background text-xs font-mono"
                     placeholder="vless://uuid@host:443?security=reality&pbk=...#🇺🇸 US"
                   />
                 </div>
 
                 <div>
-                  <Label className="text-[12px]">Custom groups</Label>
-                  <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                  <Label className="text-xs">Custom groups</Label>
+                  <p className="text-fg-dim text-2xs mt-0.5 mb-1">
                     One group per line: <code>Name = type, member1, member2</code> (type = select or url-test). Members are free text (node names, PROXY/DIRECT/REJECT, <code>DEVICE:Name</code> for Surge Ponte, or other group names). Use <code>{'{{NODES}}'}</code> as a member to include all selected proxy nodes (e.g. <code>All = select, {'{{NODES}}'}, DIRECT</code>). Target a group from a custom rule. <code>DEVICE:</code> members render only for Surge.
                   </p>
                   <textarea
@@ -490,21 +502,21 @@ export function TemplateEditor({
                     onChange={(e) => setCustomGroupsText(e.target.value)}
                     rows={3}
                     spellCheck={false}
-                    className="w-full px-2 py-1.5 rounded-md border bg-background text-[12px] font-mono"
+                    className="w-full px-2 py-1.5 rounded-md border bg-background text-xs font-mono"
                     placeholder="Home = select, DEVICE:HomeMac, DIRECT"
                   />
                 </div>
 
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                  <label className="flex items-center gap-2 text-[12.5px]">
+                  <label className="flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={includeAutoSelect}
                       onChange={(e) => setIncludeAutoSelect(e.target.checked)} />
                     Include auto-select group
                   </label>
-                  <div className="flex items-center gap-2 text-[12.5px]">
+                  <div className="flex items-center gap-2 text-sm">
                     <span>Final</span>
                     <select value={final} onChange={(e) => setFinal(e.target.value)}
-                      className="h-7 px-1.5 rounded border bg-background text-[11.5px]">
+                      className="h-7 px-1.5 rounded border bg-background text-2xs">
                       {POLICIES.map((p) => <option key={p} value={p}>{p}</option>)}
                     </select>
                   </div>
@@ -512,8 +524,8 @@ export function TemplateEditor({
               </>
             ) : (
               <div>
-                <Label className="text-[12px]">rules_json</Label>
-                <p className="text-fg-dim text-[11px] mt-0.5 mb-1">
+                <Label className="text-xs">rules_json</Label>
+                <p className="text-fg-dim text-2xs mt-0.5 mb-1">
                   Edit the raw template spec. Switching back to Form re-reads this JSON.
                 </p>
                 <textarea
@@ -521,7 +533,7 @@ export function TemplateEditor({
                   onChange={(e) => setRawJson(e.target.value)}
                   rows={20}
                   spellCheck={false}
-                  className="w-full px-2 py-1.5 rounded-md border bg-background text-[11.5px] font-mono"
+                  className="w-full px-2 py-1.5 rounded-md border bg-background text-2xs font-mono"
                 />
               </div>
             )}
@@ -530,21 +542,21 @@ export function TemplateEditor({
           {/* ── preview column ────────────────────────────────────────────── */}
           <div className="flex flex-col max-h-[65vh] min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <Label className="text-[12px]">Preview</Label>
+              <Label className="text-xs">Preview</Label>
               <select value={previewTarget} onChange={(e) => setPreviewTarget(e.target.value as PreviewTarget)}
-                className="h-7 px-1.5 rounded border bg-background text-[11.5px]">
+                className="h-7 px-1.5 rounded border bg-background text-2xs">
                 <option value="surge">surge</option>
                 <option value="shadowrocket">shadowrocket</option>
                 <option value="clash">clash</option>
               </select>
-              {previewing && <span className="text-fg-dim text-[11px]">rendering…</span>}
+              {previewing && <span className="text-fg-dim text-2xs">rendering…</span>}
             </div>
             {previewErr ? (
-              <pre className="flex-1 overflow-auto rounded-md border bg-sunken/30 p-2 text-[11px] font-mono text-err whitespace-pre-wrap break-all">{previewErr}</pre>
+              <pre className="flex-1 overflow-auto rounded-md border bg-sunken/30 p-2 text-2xs font-mono text-err whitespace-pre-wrap break-all">{previewErr}</pre>
             ) : (
-              <pre className="flex-1 overflow-auto rounded-md border bg-sunken/30 p-2 text-[10.5px] font-mono whitespace-pre">{previewText}</pre>
+              <pre className="flex-1 overflow-auto rounded-md border bg-sunken/30 p-2 text-2xs font-mono whitespace-pre">{previewText}</pre>
             )}
-            <p className="text-fg-dim text-[10.5px] mt-1">
+            <p className="text-fg-dim text-2xs mt-1">
               Preview uses two sample nodes (🇺🇸 / 🇭🇰) — your subscription's real nodes are substituted at fetch time.
             </p>
           </div>

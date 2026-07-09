@@ -159,15 +159,27 @@
     "copied": "Copied",
     "back": "Back",
     "not_found": "Not found",
+    "no_results": "No matches",
+    "clear_filter": "Clear filter",
     "minute_ago": "{{n}} min ago",
     "second_ago": "{{n}} sec ago",
     "hour_ago": "{{n}} hr ago",
     "day_ago": "{{n}} days ago",
     "just_now": "just now"
   },
+  "servers": {
+    "empty": "No servers yet",
+    "reset_traffic": "Reset traffic",
+    "reset_traffic_confirm": "Reset traffic counters now?",
+    "reset_now": "Reset now",
+    "last_reset": "Last reset"
+  },
   "scripts": {
     "title": "Scripts",
     "new": "New",
+    "empty": "No scripts yet",
+    "delete_script": "Delete script",
+    "delete_script_confirm": "Delete script \"{{name}}\"? This cannot be undone.",
     "edit": "Edit script",
     "name": "Name",
     "description": "Description",
@@ -206,7 +218,9 @@
     "items": "items",
     "drop_hint": "drop files here to upload",
     "transfers": "Transfers",
-    "no_transfers": "no transfers yet"
+    "no_transfers": "no transfers yet",
+    "remove": "Remove",
+    "remove_confirm": "Remove {{name}}?"
   },
   "plugins": {
     "subtitle": "Extend the Shepherd agent with log parsers, extra metric collectors, and alert routers.",
@@ -224,11 +238,36 @@
     "action_filter": "filter action…",
     "server_id_filter": "server id",
     "from": "from (RFC3339)",
-    "to": "to (RFC3339)"
+    "to": "to (RFC3339)",
+    "empty": "No audit entries"
   },
   "recording": {
     "title": "Recording",
     "replay": "Replay"
+  },
+  "sshaudit": {
+    "enable_fail2ban": "Enable fail2ban",
+    "enable_fail2ban_confirm": "Install, configure, and start the SSH brute-force jail on this host."
+  },
+  "singbox": {
+    "delete_inbound": "Delete inbound",
+    "delete_inbound_confirm": "Delete inbound \"{{name}}\"?",
+    "delete_certificate": "Delete certificate",
+    "delete_certificate_confirm": "Delete certificate \"{{name}}\"?"
+  },
+  "xray": {
+    "delete_inbound": "Delete inbound",
+    "delete_inbound_confirm": "Delete inbound \"{{name}}\"?"
+  },
+  "netquality": {
+    "delete_target": "Delete target",
+    "delete_target_confirm": "Delete custom target \"{{name}}\"?"
+  },
+  "subgen": {
+    "delete_subscription": "Delete subscription",
+    "delete_subscription_confirm": "Delete subscription \"{{name}}\"?",
+    "delete_template": "Delete template",
+    "delete_template_confirm": "Delete template \"{{name}}\"?"
   },
   "server": {
     "update_agent": "Update agent",

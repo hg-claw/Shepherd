@@ -1,15 +1,26 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Plus, Search, Trash2, Play, ChevronRight, ChevronDown } from 'lucide-react'
-import { useScripts, useDeleteScript, useScriptRuns, useScriptRunDetail } from '@/api/scripts'
+import { useScripts, useDeleteScript, useScriptRuns, useScriptRunDetail, type Script } from '@/api/scripts'
+import { useTableSort } from '@/lib/useTableSort'
+import { SortableTh } from '@/components/SortableTh'
 import { useServers } from '@/api/servers'
-import { KpiCard } from '@/components/KpiCard'
+import { StatCard } from '@/components/StatCard'
 import { Pill } from '@/components/Pill'
 import { RunLogDialog } from '@/components/RunLogDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PageHeader } from '@/components/PageHeader'
+import { LoadingState } from '@/components/LoadingState'
+import { EmptyState } from '@/components/EmptyState'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { cn } from '@/lib/utils'
+
+const scriptSortAccessors = {
+  name: (s: Script) => s.name,
+  description: (s: Script) => s.description,
+}
 
 function statusKind(s?: string | null): 'ok' | 'warn' | 'err' | 'neutral' {
   if (s === 'succeeded') return 'ok'
@@ -26,13 +37,28 @@ export default function ScriptsListPage() {
   const del = useDeleteScript()
   const [filter, setFilter] = useState('')
   const [expandedRunId, setExpandedRunId] = useState<number | null>(null)
+  const [pendingDeleteScript, setPendingDeleteScript] = useState<Script | null>(null)
 
   const serverName = (id: number) =>
     serversData?.find((s) => s.id === id)?.name ?? `#${id}`
 
-  if (isLoading) return <div className="text-muted-foreground text-[13px] p-4">{t('common.loading')}</div>
-
   const scripts = data ?? []
+  const filteredLib = useMemo(
+    () =>
+      scripts.filter((s) => {
+        if (!filter) return true
+        const f = filter.toLowerCase()
+        return s.name.toLowerCase().includes(f) || s.description.toLowerCase().includes(f)
+      }),
+    [scripts, filter],
+  )
+  const { sorted: sortedLib, sort: scriptSort, toggle: scriptToggle } = useTableSort(
+    filteredLib,
+    scriptSortAccessors,
+  )
+
+  if (isLoading) return <LoadingState />
+
   const runs = runsData ?? []
 
   // KPI calculations
@@ -45,54 +71,48 @@ export default function ScriptsListPage() {
   const successToday = runsToday.filter((r) => r.finished_at).length
   const activeRuns = runs.filter((r) => r.started_at && !r.finished_at).length
 
-  const filtered = scripts.filter((s) => {
-    if (!filter) return true
-    const f = filter.toLowerCase()
-    return s.name.toLowerCase().includes(f) || s.description.toLowerCase().includes(f)
-  })
-
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight m-0">
-            {t('scripts.title', 'Scripts')}
-          </h1>
-          <p className="text-muted-foreground text-[13px] mt-1 max-w-2xl">
-            {t(
-              'scripts.sub',
-              'Library of batch commands. Run on any subset of hosts — every run records per-host output and exit codes.',
-            )}
-          </p>
-        </div>
-        <Button asChild size="sm">
-          <Link to="/admin/scripts/new">
-            <Plus className="h-3.5 w-3.5 mr-1" />
-            {t('scripts.new', 'New command')}
-          </Link>
-        </Button>
+      <div>
+        <PageHeader
+          title={t('scripts.title', 'Scripts')}
+          actions={
+            <Button asChild size="sm">
+              <Link to="/admin/scripts/new">
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                {t('scripts.new', 'New command')}
+              </Link>
+            </Button>
+          }
+        />
+        <p className="text-muted-foreground text-sm mt-1 max-w-2xl">
+          {t(
+            'scripts.sub',
+            'Library of batch commands. Run on any subset of hosts — every run records per-host output and exit codes.',
+          )}
+        </p>
       </div>
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard
+        <StatCard
           label={t('scripts.kpi.commands', 'Commands')}
           value={String(scripts.length)}
           sub={t('scripts.kpi.in_library', 'in library')}
         />
-        <KpiCard
+        <StatCard
           label={t('scripts.kpi.runs_today', 'Runs today')}
           value={String(runsToday.length)}
           sub={t('scripts.kpi.last_24h', 'last 24h')}
         />
-        <KpiCard
+        <StatCard
           label={t('scripts.kpi.success_rate', 'Success rate')}
           value={runsToday.length > 0 ? `${((successToday / runsToday.length) * 100).toFixed(1)}%` : '—'}
           sub={runsToday.length > 0 ? `${runsToday.length - successToday} errored` : 'no runs'}
           tone={runsToday.length > 0 && successToday === runsToday.length ? 'ok' : undefined}
         />
-        <KpiCard
+        <StatCard
           label={t('scripts.kpi.active_runs', 'Active runs')}
           value={String(activeRuns)}
           sub={activeRuns > 0 ? t('scripts.kpi.in_progress', 'in progress') : t('scripts.kpi.idle', 'idle')}
@@ -104,10 +124,10 @@ export default function ScriptsListPage() {
       <div className="border rounded-lg bg-elev overflow-hidden">
         {/* Card head */}
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-          <span className="text-foreground font-medium text-[12.5px]">
+          <span className="text-foreground font-medium text-sm">
             {t('scripts.library', 'Library')}
           </span>
-          <span className="text-muted-foreground font-mono text-[11px] ml-auto">
+          <span className="text-muted-foreground font-mono text-2xs ml-auto">
             {scripts.length} {t('scripts.commands', 'commands')}
           </span>
           <div className="relative">
@@ -116,39 +136,66 @@ export default function ScriptsListPage() {
               placeholder={t('common.filter', 'filter…')}
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="pl-6 h-7 w-48 text-[12px] font-mono"
+              className="pl-6 h-7 w-48 text-xs font-mono"
             />
           </div>
         </div>
 
-        {filtered.length === 0 ? (
-          <div className="px-4 py-8 text-center text-fg-dim font-mono text-[12px]">
-            {filter ? t('scripts.no_match', 'no matching commands') : t('scripts.empty', 'no scripts yet')}
-          </div>
+        {sortedLib.length === 0 ? (
+          scripts.length === 0 ? (
+            <EmptyState
+              title={t('scripts.empty')}
+              action={
+                <Button asChild className="h-8">
+                  <Link to="/admin/scripts/new">
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    {t('scripts.new')}
+                  </Link>
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              title={t('common.no_results')}
+              action={
+                <Button variant="outline" className="h-7" onClick={() => setFilter('')}>
+                  {t('common.clear_filter')}
+                </Button>
+              }
+            />
+          )
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-[12.5px] border-collapse">
+            <table className="w-full text-sm border-collapse">
               <thead>
                 <tr>
-                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b">
-                    {t('scripts.name', 'Name')}
-                  </th>
-                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b hidden md:table-cell">
-                    {t('scripts.description', 'Description')}
-                  </th>
-                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
+                  <SortableTh
+                    label={t('scripts.name', 'Name')}
+                    sortKey="name"
+                    sort={scriptSort}
+                    onToggle={scriptToggle}
+                    className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b"
+                  />
+                  <SortableTh
+                    label={t('scripts.description', 'Description')}
+                    sortKey="description"
+                    sort={scriptSort}
+                    onToggle={scriptToggle}
+                    className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden md:table-cell"
+                  />
+                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
                     {t('scripts.params', 'Params')}
                   </th>
-                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b hidden lg:table-cell">
+                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden lg:table-cell">
                     {t('scripts.last_run', 'Last run')}
                   </th>
-                  <th className="text-right font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b">
+                  <th className="text-right font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b">
                     {t('admin.actions', 'Actions')}
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((s) => {
+                {sortedLib.map((s) => {
                   const paramCount = s.params?.length ?? 0
                   // Find most recent run for this script
                   const lastRun = runs
@@ -164,30 +211,30 @@ export default function ScriptsListPage() {
                       : 'running'
                     : null
                   return (
-                    <tr key={s.id} className="border-t hover:bg-sunken/70 transition-colors">
+                    <tr key={s.id} className="border-t hover:bg-sunken/60 transition-colors">
                       <td className="px-4 py-2.5">
                         <Link
                           to={`/admin/scripts/${s.id}`}
-                          className="font-mono font-medium text-foreground hover:underline text-[13px]"
+                          className="font-mono font-medium text-foreground hover:underline text-sm"
                         >
                           {s.name}
                         </Link>
                       </td>
                       <td className="px-4 py-2.5 hidden md:table-cell">
-                        <span className="text-muted-foreground text-[12px] truncate max-w-xs block">
+                        <span className="text-muted-foreground text-xs truncate max-w-xs block">
                           {s.description}
                         </span>
                       </td>
                       <td className="px-4 py-2.5 hidden sm:table-cell">
                         <div className="flex items-center gap-1 flex-wrap">
                           {paramCount === 0 ? (
-                            <span className="text-fg-dim font-mono text-[11px]">none</span>
+                            <span className="text-fg-dim font-mono text-2xs">none</span>
                           ) : (
                             s.params?.map((p) => (
                               <span
                                 key={p.name}
                                 className={cn(
-                                  'inline-flex items-center h-5 px-1.5 rounded text-[10.5px] font-mono border',
+                                  'inline-flex items-center h-5 px-1.5 rounded text-2xs font-mono border',
                                   p.required
                                     ? 'bg-accent/20 border-accent/40 text-accent-foreground'
                                     : 'bg-sunken border-border text-fg-dim',
@@ -195,7 +242,7 @@ export default function ScriptsListPage() {
                               >
                                 {p.name}
                                 {p.required && (
-                                  <span className="text-err ml-0.5 text-[10px]">*</span>
+                                  <span className="text-err ml-0.5 text-2xs">*</span>
                                 )}
                               </span>
                             ))
@@ -206,11 +253,11 @@ export default function ScriptsListPage() {
                         {lastStatus ? (
                           <Pill kind={statusKind(lastStatus)}>{lastStatus}</Pill>
                         ) : (
-                          <span className="text-fg-dim font-mono text-[11px]">never</span>
+                          <span className="text-fg-dim font-mono text-2xs">never</span>
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                        <Button variant="ghost" size="sm" asChild className="h-7 px-2 text-[12px]">
+                        <Button variant="ghost" size="sm" asChild className="h-7 px-2 text-xs">
                           <Link to={`/admin/scripts/${s.id}/run`}>
                             <Play className="h-3 w-3 mr-1" />
                             {t('scripts.run', 'Run')}
@@ -219,7 +266,7 @@ export default function ScriptsListPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => del.mutate(s.id)}
+                          onClick={() => setPendingDeleteScript(s)}
                           disabled={del.isPending}
                           className="h-7 w-7 p-0"
                           aria-label="delete"
@@ -236,40 +283,46 @@ export default function ScriptsListPage() {
         )}
       </div>
 
+      <ConfirmDialog
+        open={pendingDeleteScript != null}
+        onOpenChange={(open) => { if (!open) setPendingDeleteScript(null) }}
+        title={t('scripts.delete_script')}
+        description={t('scripts.delete_script_confirm', { name: pendingDeleteScript?.name ?? '' })}
+        onConfirm={() => { if (pendingDeleteScript) del.mutate(pendingDeleteScript.id) }}
+      />
+
       {/* Recent runs */}
       <div className="border rounded-lg bg-elev overflow-hidden">
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-          <span className="text-foreground font-medium text-[12.5px]">
+          <span className="text-foreground font-medium text-sm">
             {t('scripts.recent_runs', 'Recent runs')}
           </span>
-          <span className="text-fg-dim font-mono text-[11px]">· last 30 days</span>
-          <Button asChild size="sm" variant="ghost" className="ml-auto h-6 px-2 text-[12px]">
+          <span className="text-fg-dim font-mono text-2xs">· last 30 days</span>
+          <Button asChild size="sm" variant="ghost" className="ml-auto h-7 px-2 text-xs">
             <Link to="/admin/script-runs">{t('scripts.view_all', 'View all')}</Link>
           </Button>
         </div>
         {runs.length === 0 ? (
-          <div className="px-4 py-6 text-center text-fg-dim font-mono text-[12px]">
-            {t('scripts.no_runs', 'no runs yet')}
-          </div>
+          <EmptyState title={t('scripts.no_runs', 'no runs yet')} />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-[12.5px] border-collapse">
+            <table className="w-full text-sm border-collapse">
               <thead>
                 <tr>
-                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b w-8" />
-                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b">
+                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b w-8" />
+                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b">
                     {t('scripts.run_id', 'Run #')}
                   </th>
-                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
+                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
                     {t('scripts.script_id', 'Script')}
                   </th>
-                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b">
+                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b">
                     {t('scripts.status', 'Status')}
                   </th>
-                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b">
+                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b">
                     {t('scripts.started_at', 'Started')}
                   </th>
-                  <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-4 py-2 border-b hidden md:table-cell">
+                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden md:table-cell">
                     {t('scripts.finished_at', 'Finished')}
                   </th>
                 </tr>
@@ -298,16 +351,16 @@ export default function ScriptsListPage() {
                             #{r.id}
                           </Link>
                         </td>
-                        <td className="px-4 py-2 hidden sm:table-cell font-mono text-fg-dim text-[12px]">
+                        <td className="px-4 py-2 hidden sm:table-cell font-mono text-fg-dim text-xs">
                           {r.script_id}
                         </td>
                         <td className="px-4 py-2">
                           <Pill kind={statusKind(runStatus)}>{runStatus}</Pill>
                         </td>
-                        <td className="px-4 py-2 font-mono text-fg-dim text-[11.5px] whitespace-nowrap">
+                        <td className="px-4 py-2 font-mono text-fg-dim text-2xs whitespace-nowrap">
                           {r.started_at}
                         </td>
-                        <td className="px-4 py-2 hidden md:table-cell font-mono text-fg-dim text-[11.5px] whitespace-nowrap">
+                        <td className="px-4 py-2 hidden md:table-cell font-mono text-fg-dim text-2xs whitespace-nowrap">
                           {r.finished_at ?? '—'}
                         </td>
                       </tr>
@@ -348,15 +401,15 @@ function ExpandedRunTargets({
   const targets = data ?? []
 
   if (isLoading) {
-    return <div className="text-fg-dim text-[12px] py-1">{t('common.loading', 'Loading…')}</div>
+    return <div className="text-fg-dim text-xs py-1">{t('common.loading', 'Loading…')}</div>
   }
   if (targets.length === 0) {
-    return <div className="text-fg-dim text-[12px] py-1">{t('scripts.no_targets', 'No targets recorded for this run.')}</div>
+    return <div className="text-fg-dim text-xs py-1">{t('scripts.no_targets', 'No targets recorded for this run.')}</div>
   }
   return (
     <div className="space-y-1">
       {targets.map((tgt) => (
-        <div key={tgt.id} className="flex items-center gap-3 text-[12px]">
+        <div key={tgt.id} className="flex items-center gap-3 text-xs">
           <Pill kind={statusKind(tgt.status)}>{tgt.status}</Pill>
           <span className="font-mono text-foreground">{serverName(tgt.server_id)}</span>
           <span className="font-mono text-fg-dim tabular-nums">
@@ -367,7 +420,7 @@ function ExpandedRunTargets({
               ptySessionId={tgt.pty_session_id}
               running={tgt.status === 'running'}
               triggerClassName={cn(
-                'text-[12px] hover:underline',
+                'text-xs hover:underline',
                 tgt.status === 'failed' ? 'text-err' : 'text-muted-foreground',
               )}
               title={`${t('scripts.execution_log', 'Execution log')} · ${serverName(tgt.server_id)}`}
@@ -377,7 +430,7 @@ function ExpandedRunTargets({
       ))}
       <Link
         to={`/admin/script-runs/${runId}`}
-        className="inline-block text-[12px] text-muted-foreground hover:underline pt-1"
+        className="inline-block text-xs text-muted-foreground hover:underline pt-1"
         onClick={(e) => e.stopPropagation()}
       >
         {t('scripts.view_run_detail', 'Open full run detail →')}

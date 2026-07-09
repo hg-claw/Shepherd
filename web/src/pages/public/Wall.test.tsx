@@ -122,7 +122,7 @@ describe('Wall — public probe dashboard', () => {
 
   it('summary strip shows correct Nodes (2) and Online (1) counts', () => {
     renderPage()
-    // SummaryStat renders: outer div > [icon span, inner div > [label div, value div]]
+    // StatCard compact renders: outer div > [icon span, inner div > [label div, value div]]
     // Walk up two levels from the label div to reach the outer card div.
 
     // Nodes card: label is exactly "Nodes" (unique on the page).
@@ -136,7 +136,7 @@ describe('Wall — public probe dashboard', () => {
     // Online/Offline summary stats: the summary strip is the second div child
     // of the page root. Find an element whose full textContent is exactly the
     // online label (no slashes / digits) so we avoid hitting the group header.
-    // The SummaryStat label div is a leaf with only the label text.
+    // The StatCard label div is a leaf with only the label text.
     const onlineStatLabel = screen.getAllByText((content, element) => {
       if (!element) return false
       // Must be a leaf-ish element (no children with text) whose own text
@@ -162,7 +162,7 @@ describe('Wall — public probe dashboard', () => {
     renderPage()
     const liveRx = bps(999_000)
     // The live map overrides net_rx_bps=1_000_000 with rx_bps=999_000.
-    // The value appears in both the SummaryStat strip (Realtime) and the table row.
+    // The value appears in both the StatCard strip (Realtime) and the table row.
     const matches = screen.getAllByText((content) => content.includes(liveRx))
     expect(matches.length).toBeGreaterThan(0)
   })

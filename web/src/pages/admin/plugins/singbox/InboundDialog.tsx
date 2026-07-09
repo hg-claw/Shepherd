@@ -229,9 +229,9 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
 
   // ─────────────────────────────────────────────────────────────────────────
 
-  const inputCls = 'h-8 font-mono text-[12.5px] mt-0.5'
-  const labelCls = 'text-[11.5px] text-muted-foreground mb-0.5 block'
-  const selectCls = 'h-8 px-2 rounded-md border bg-background text-[12.5px] font-mono w-full disabled:opacity-60'
+  const inputCls = 'h-8 font-mono text-sm mt-0.5'
+  const labelCls = 'text-2xs text-muted-foreground mb-0.5 block'
+  const selectCls = 'h-8 px-2 rounded-md border bg-background text-sm font-mono w-full disabled:opacity-60'
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
@@ -240,7 +240,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
           <DialogTitle className="font-mono">
             {isEdit ? `Edit — ${initial!.tag}` : 'New inbound'}
             {isRelayEdit && (
-              <span className="ml-2 text-[10px] uppercase tracking-wider text-warn font-sans align-middle">
+              <span className="ml-2 text-2xs uppercase tracking-wider text-warn font-sans align-middle">
                 relay · limited
               </span>
             )}
@@ -249,7 +249,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
 
         <div className="space-y-3 py-1">
           {isRelayEdit && (
-            <div className="rounded border border-warn/50 bg-warn/10 px-2.5 py-1.5 text-[11.5px] text-warn">
+            <div className="rounded border border-warn/50 bg-warn/10 px-2.5 py-1.5 text-2xs text-warn">
               Editing a relay. Handshake server / port are inherited from the upstream landing
               and not editable here — change them on the landing inbound to propagate.
             </div>
@@ -317,7 +317,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                 <Input id="ib-sni-reality" aria-label="sni" className={inputCls}
                   value={sni} onChange={(e) => setSNI(e.target.value)}
                   placeholder="www.icloud.com" />
-                <p className="text-[10.5px] text-muted-foreground mt-0.5">
+                <p className="text-2xs text-muted-foreground mt-0.5">
                   Must be a single-tenant TLS endpoint — not a multi-tenant CDN.
                 </p>
               </div>
@@ -327,13 +327,13 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                 <Label className={labelCls}>REALITY keypair (Curve25519)</Label>
                 <div className="flex gap-2">
                   <Input aria-label="private key" placeholder="private key" readOnly
-                    className={inputCls + ' flex-1 text-[11px]'} value={privKey} />
+                    className={inputCls + ' flex-1 text-2xs'} value={privKey} />
                   <Input aria-label="public key" placeholder="public key" readOnly
-                    className={inputCls + ' flex-1 text-[11px]'} value={pubKey} />
+                    className={inputCls + ' flex-1 text-2xs'} value={pubKey} />
                   <Button type="button" variant="outline" size="sm" className="h-8"
                     onClick={genKeypair}>Generate</Button>
                 </div>
-                <p className="text-[10.5px] text-muted-foreground mt-0.5">
+                <p className="text-2xs text-muted-foreground mt-0.5">
                   Uses the same Curve25519 endpoint as Xray (shared crypto).
                 </p>
               </div>
@@ -383,7 +383,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
               <div>
                 <Label className={labelCls} htmlFor="ib-cert">Certificate</Label>
                 {validCerts.length === 0 ? (
-                  <p className="text-[11.5px] text-muted-foreground">
+                  <p className="text-2xs text-muted-foreground">
                     No valid certificates. Issue one in the Certificates tab first.
                   </p>
                 ) : (
@@ -446,7 +446,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
             </>
           )}
 
-          {error && <p className="text-[12px] text-destructive">{error}</p>}
+          {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
 
         <DialogFooter>

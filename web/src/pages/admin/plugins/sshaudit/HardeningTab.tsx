@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Loader2, RefreshCw, ShieldCheck, ShieldOff } from 'lucide-react'
@@ -14,8 +15,10 @@ import {
   setSSHAuditFail2ban,
   type SSHFail2banStatus,
 } from '@/api/sshaudit'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 export default function HardeningTab() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const [sp, setSP] = useSearchParams()
@@ -23,6 +26,7 @@ export default function HardeningTab() {
 
   const { data: servers = [] } = useServers()
   const [serverID, setServerID] = useState<number | undefined>(initialID)
+  const [confirmEnable, setConfirmEnable] = useState(false)
 
   // Pick the first server when nothing is selected so the operator
   // doesn't see an empty page on first open.
@@ -56,23 +60,22 @@ export default function HardeningTab() {
   const onToggle = (next: boolean) => {
     if (!effectiveID) return
     if (next) {
-      if (!confirm('Enable fail2ban? This installs, configures, and starts the SSH brute-force jail on this host.')) {
-        return
-      }
+      setConfirmEnable(true)
+      return
     }
     toggle.mutate({ serverID: effectiveID, enabled: next })
   }
 
   return (
     <div className="space-y-4">
-      <div className="text-[12.5px] text-muted-foreground">
+      <div className="text-sm text-muted-foreground">
         fail2ban watches the SSH auth log and temporarily bans source IPs after repeated failed
         logins — defensive hardening for your managed hosts. Enable it to install, configure, and
         start the jail; disable to stop it.
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-[12.5px] text-muted-foreground">Server</span>
+        <span className="text-sm text-muted-foreground">Server</span>
         <Select
           value={effectiveID ? String(effectiveID) : ''}
           onValueChange={(v) => {
@@ -82,12 +85,12 @@ export default function HardeningTab() {
             setSP(sp, { replace: true })
           }}
         >
-          <SelectTrigger className="h-8 w-72 text-[12.5px]">
+          <SelectTrigger className="h-8 w-72 text-sm">
             <SelectValue placeholder="Pick a server" />
           </SelectTrigger>
           <SelectContent>
             {servers.map((s: ServerRecord) => (
-              <SelectItem key={s.id} value={String(s.id)} className="text-[12.5px]">
+              <SelectItem key={s.id} value={String(s.id)} className="text-sm">
                 {s.name}
               </SelectItem>
             ))}
@@ -96,7 +99,7 @@ export default function HardeningTab() {
         <Button
           variant="outline"
           size="sm"
-          className="h-8 text-[12px]"
+          className="h-8 text-xs"
           disabled={!effectiveID || statusQ.isFetching || busy}
           onClick={() => statusQ.refetch()}
         >
@@ -107,31 +110,40 @@ export default function HardeningTab() {
 
       {busy ? (
         <div className="border rounded-md p-6 text-center bg-elev">
-          <div className="inline-flex items-center gap-2 text-[13px] font-medium">
+          <div className="inline-flex items-center gap-2 text-sm font-medium">
             <Loader2 className="h-4 w-4 animate-spin" />
             {toggle.variables?.enabled ? 'Installing fail2ban…' : 'Stopping fail2ban…'}
           </div>
-          <div className="text-[12px] text-muted-foreground mt-1">
+          <div className="text-xs text-muted-foreground mt-1">
             This can take a moment while the agent runs on the host.
           </div>
         </div>
       ) : offline ? (
         <div className="border rounded-md p-6 text-center bg-elev">
-          <div className="text-[13px] font-medium">Host offline / no agent</div>
-          <div className="text-[12px] text-muted-foreground mt-1">
+          <div className="text-sm font-medium">Host offline / no agent</div>
+          <div className="text-xs text-muted-foreground mt-1">
             Couldn't reach the agent to read fail2ban status. Make sure the server is online and try
             again.
           </div>
         </div>
       ) : err ? (
-        <p className="text-[12.5px] text-err">{err.message}</p>
+        <p className="text-sm text-err">{err.message}</p>
       ) : statusQ.isLoading ? (
-        <div className="border rounded-md p-6 text-center text-muted-foreground text-[13px]">
+        <div className="border rounded-md p-6 text-center text-muted-foreground text-sm">
           Loading…
         </div>
       ) : status ? (
         <StatusCard status={status} busy={busy} onToggle={onToggle} />
       ) : null}
+
+      <ConfirmDialog
+        open={confirmEnable}
+        onOpenChange={setConfirmEnable}
+        title={t('sshaudit.enable_fail2ban')}
+        description={t('sshaudit.enable_fail2ban_confirm')}
+        destructive={false}
+        onConfirm={() => toggle.mutate({ serverID: effectiveID!, enabled: true })}
+      />
     </div>
   )
 }
@@ -150,14 +162,14 @@ function StatusCard({
   if (!status.installed) {
     return (
       <div className="border rounded-md p-6 text-center bg-elev space-y-3">
-        <div className="inline-flex items-center gap-2 text-[13px] font-medium">
+        <div className="inline-flex items-center gap-2 text-sm font-medium">
           <ShieldOff className="h-4 w-4 text-muted-foreground" />
           fail2ban is not installed
         </div>
-        <div className="text-[12px] text-muted-foreground">
+        <div className="text-xs text-muted-foreground">
           Enable to install, configure, and start the SSH brute-force jail on this host.
         </div>
-        <Button size="sm" className="h-8 text-[12px]" disabled={busy} onClick={() => onToggle(true)}>
+        <Button size="sm" className="h-8 text-xs" disabled={busy} onClick={() => onToggle(true)}>
           Enable fail2ban
         </Button>
       </div>
@@ -173,11 +185,11 @@ function StatusCard({
           ) : (
             <ShieldOff className="h-4 w-4 text-muted-foreground" />
           )}
-          <span className="text-[13px] font-medium">fail2ban</span>
+          <span className="text-sm font-medium">fail2ban</span>
           <Pill kind={status.active ? 'ok' : 'neutral'}>{status.active ? 'active' : 'stopped'}</Pill>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[12px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {status.active ? 'Enabled' : 'Disabled'}
           </span>
           <Switch
@@ -188,7 +200,7 @@ function StatusCard({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-[12.5px]">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
         <StatCard label="Currently banned" value={status.currently_banned} tone="warn" />
         <StatCard label="Total banned" value={status.total_banned} />
         <StatCard label="Banned IPs" value={status.banned_ips.length} />
@@ -196,10 +208,10 @@ function StatusCard({
 
       {status.max_retry > 0 && status.find_time > 0 && status.ban_time > 0 ? (
         <div className="border rounded-md p-3">
-          <div className="text-muted-foreground text-[11px] uppercase tracking-wide mb-1">
+          <div className="text-muted-foreground text-2xs uppercase tracking-wide mb-1">
             Ban policy
           </div>
-          <div className="text-[12.5px]">
+          <div className="text-sm">
             <span className="font-mono tabular-nums">{status.max_retry}</span> failed attempts within{' '}
             <span className="font-mono tabular-nums">{humanSeconds(status.find_time)}</span> → ban for{' '}
             <span className="font-mono tabular-nums">{humanSeconds(status.ban_time)}</span>
@@ -208,11 +220,11 @@ function StatusCard({
       ) : null}
 
       <div className="border rounded-md p-3">
-        <div className="text-muted-foreground text-[11px] uppercase tracking-wide mb-2">
+        <div className="text-muted-foreground text-2xs uppercase tracking-wide mb-2">
           Banned IPs
         </div>
         {status.banned_ips.length === 0 ? (
-          <div className="text-[12px] text-muted-foreground">No IPs are currently banned.</div>
+          <div className="text-xs text-muted-foreground">No IPs are currently banned.</div>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {status.banned_ips.map((ip) => (
@@ -240,8 +252,8 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone?:
   const toneClass = tone === 'warn' && value > 0 ? 'text-warn' : ''
   return (
     <div className="border rounded-md p-3">
-      <div className="text-muted-foreground text-[11px] uppercase tracking-wide">{label}</div>
-      <div className={`text-[20px] font-mono tabular-nums ${toneClass}`}>{value}</div>
+      <div className="text-muted-foreground text-2xs uppercase tracking-wide">{label}</div>
+      <div className={`text-title font-mono tabular-nums ${toneClass}`}>{value}</div>
     </div>
   )
 }

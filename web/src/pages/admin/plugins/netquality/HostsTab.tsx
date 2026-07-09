@@ -52,13 +52,13 @@ export default function HostsTab() {
 
   return (
     <div className="space-y-2">
-      <div className="text-[12.5px] text-muted-foreground mb-3">
+      <div className="text-sm text-muted-foreground mb-3">
         Enable the netquality probe on a server, then pick how often the agent should run the ping
         burst. Builtin targets are used; manage the catalog under the <em>Targets</em> tab.
       </div>
-      <table className="w-full text-[13px]">
+      <table className="w-full text-sm">
         <thead>
-          <tr className="border-b text-[11px] text-muted-foreground uppercase tracking-wide">
+          <tr className="border-b text-2xs text-muted-foreground uppercase tracking-wide">
             <th className="text-left py-2 pr-4 font-medium">Server</th>
             <th className="text-left py-2 pr-4 font-medium">Enabled</th>
             <th className="text-left py-2 pr-4 font-medium">Interval</th>
@@ -79,7 +79,7 @@ export default function HostsTab() {
           ))}
           {servers.length === 0 && (
             <tr>
-              <td colSpan={5} className="py-6 text-center text-muted-foreground text-[13px]">
+              <td colSpan={5} className="py-6 text-center text-muted-foreground text-sm">
                 No servers registered yet.
               </td>
             </tr>
@@ -134,7 +134,7 @@ function HostRow({
     <tr className="border-b last:border-0">
       <td className="py-2 pr-4">
         <div className="font-medium">{server.name}</div>
-        {sshHost && <div className="text-[11px] text-muted-foreground font-mono">{sshHost}</div>}
+        {sshHost && <div className="text-2xs text-muted-foreground font-mono">{sshHost}</div>}
       </td>
       <td className="py-2 pr-4">
         <Switch
@@ -156,7 +156,7 @@ function HostRow({
             onApply(enabled, n)
           }}
         >
-          <SelectTrigger className="h-7 w-24 text-[11.5px]">
+          <SelectTrigger className="h-7 w-24 text-2xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -172,10 +172,10 @@ function HostRow({
         {lastErr ? (
           <Pill kind="err">{lastErr.slice(0, 60)}</Pill>
         ) : (
-          <span className="text-muted-foreground text-[12px]">—</span>
+          <span className="text-muted-foreground text-xs">—</span>
         )}
       </td>
-      <td className="py-2 pr-4 font-mono text-[11px] text-muted-foreground">
+      <td className="py-2 pr-4 font-mono text-2xs text-muted-foreground">
         {host?.updated_at ? new Date(host.updated_at).toLocaleString() : '—'}
       </td>
       <td className="py-2 text-right">
@@ -184,7 +184,7 @@ function HostRow({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-[11.5px]"
+              className="h-7 px-2 text-2xs"
               onClick={onPickTargets}
               title="Pick which targets this host samples"
             >
@@ -192,7 +192,7 @@ function HostRow({
               Targets
             </Button>
           )}
-          <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-[11.5px]">
+          <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-2xs">
             <a href={`/admin/plugins/netquality/results?server_id=${server.id}`}>Results →</a>
           </Button>
         </span>

@@ -27,7 +27,11 @@ import { XtermPane } from '@/components/ConsoleDock/XtermPane'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
+import { PageHeader } from '@/components/PageHeader'
+import { LoadingState } from '@/components/LoadingState'
+import { ErrorState } from '@/components/ErrorState'
 import { cn } from '@/lib/utils'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 function formatMode(m: number): string {
   return (m & 0o777).toString(8).padStart(3, '0')
@@ -83,6 +87,7 @@ export default function FileBrowserPage() {
 
   // PTY session for the inline terminal. Open one per host visit; close on
   // unmount via the agent-side timeout when the WS drops.
+  const [removeTarget, setRemoveTarget] = useState<FileEntry | null>(null)
   const [ptySid, setPtySid] = useState<string | null>(null)
   const [auditId, setAuditId] = useState<number | null>(null)
   useEffect(() => {
@@ -140,10 +145,8 @@ export default function FileBrowserPage() {
     })
   }
 
-  const handleRm = async (entry: FileEntry) => {
-    if (!confirm(`Remove ${entry.name}?`)) return
-    const path = cwd === '/' ? `/${entry.name}` : `${cwd}/${entry.name}`
-    await rm.mutateAsync({ server_id: sid, path, recursive: entry.is_dir })
+  const handleRm = (entry: FileEntry) => {
+    setRemoveTarget(entry)
   }
 
   const queueUpload = (files: FileList | File[]) => {
@@ -228,30 +231,30 @@ export default function FileBrowserPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight m-0">
-            {t('files.title', 'Files')} &amp; shell
-          </h1>
-          <p className="text-muted-foreground text-[13px] mt-1">
-            {t(
-              'files.page_sub',
-              'Browse the remote filesystem and run a PTY through the Shepherd agent. Every action is audit-logged.',
-            )}
-          </p>
-        </div>
-        <select
-          value={sid}
-          onChange={(e) => navigate(`/admin/files/${e.target.value}`)}
-          className="h-8 px-2.5 rounded-md border bg-background text-[13px] font-mono w-full sm:w-[280px]"
-        >
-          {(serversQuery.data ?? []).map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-              {s.ssh_host?.String ? ` · ${s.ssh_host.String}` : ''}
-            </option>
-          ))}
-        </select>
+      <div>
+        <PageHeader
+          title={<>{t('files.title', 'Files')} &amp; shell</>}
+          actions={
+            <select
+              value={sid}
+              onChange={(e) => navigate(`/admin/files/${e.target.value}`)}
+              className="h-8 px-2.5 rounded-md border bg-background text-sm font-mono w-full sm:w-[280px]"
+            >
+              {(serversQuery.data ?? []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                  {s.ssh_host?.String ? ` · ${s.ssh_host.String}` : ''}
+                </option>
+              ))}
+            </select>
+          }
+        />
+        <p className="text-muted-foreground text-sm mt-1">
+          {t(
+            'files.page_sub',
+            'Browse the remote filesystem and run a PTY through the Shepherd agent. Every action is audit-logged.',
+          )}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -268,7 +271,7 @@ export default function FileBrowserPage() {
             >
               <ArrowUp className="h-3.5 w-3.5" />
             </Button>
-            <div className="flex items-center gap-1 text-[12px] font-mono min-w-0 flex-1 overflow-hidden">
+            <div className="flex items-center gap-1 text-xs font-mono min-w-0 flex-1 overflow-hidden">
               <button
                 onClick={() => setCwd('/')}
                 className="text-muted-foreground hover:text-foreground"
@@ -300,7 +303,7 @@ export default function FileBrowserPage() {
             <Button
               variant="outline"
               size="sm"
-              className="h-7 px-2 text-[12px]"
+              className="h-7 px-2 text-xs"
               onClick={() => fileInputRef.current?.click()}
             >
               <UploadIcon className="h-3.5 w-3.5 mr-1" />
@@ -309,7 +312,7 @@ export default function FileBrowserPage() {
             <Button
               variant="outline"
               size="sm"
-              className="h-7 px-2 text-[12px]"
+              className="h-7 px-2 text-xs"
               onClick={handleMkdir}
             >
               <Plus className="h-3.5 w-3.5" />
@@ -322,14 +325,14 @@ export default function FileBrowserPage() {
               onChange={(e) => setPathInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submitPath()}
               placeholder="/tmp"
-              className="font-mono text-[12px] flex-1 min-w-[120px] h-7 px-2 border rounded bg-background"
+              className="font-mono text-xs flex-1 min-w-[120px] h-7 px-2 border rounded bg-background"
             />
             {QUICK_PATHS.map((p) => (
               <button
                 key={p}
                 onClick={() => setCwd(p)}
                 className={cn(
-                  'px-2 h-6 text-[11px] rounded border font-mono transition-colors',
+                  'px-2 h-7 text-2xs rounded border font-mono transition-colors',
                   cwd === p ? 'bg-sunken' : 'hover:bg-sunken',
                 )}
               >
@@ -355,23 +358,23 @@ export default function FileBrowserPage() {
             }}
           >
             {isLoading ? (
-              <div className="p-4 text-muted-foreground text-[13px]">{t('common.loading')}</div>
+              <LoadingState />
             ) : error ? (
-              <div className="p-4 text-destructive text-[13px]">{(error as Error).message}</div>
+              <ErrorState message={(error as Error).message} onRetry={refetch} />
             ) : (
-              <table className="w-full text-[12.5px] border-collapse">
+              <table className="w-full text-sm border-collapse">
                 <thead className="sticky top-0 bg-elev">
                   <tr>
-                    <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-3 py-1.5">
+                    <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3 py-1.5">
                       {t('files.name', 'Name')}
                     </th>
-                    <th className="text-right font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-3 py-1.5">
+                    <th className="text-right font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3 py-1.5">
                       {t('files.size', 'Size')}
                     </th>
-                    <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-3 py-1.5 hidden md:table-cell">
+                    <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3 py-1.5 hidden md:table-cell">
                       {t('files.mode', 'Perms')}
                     </th>
-                    <th className="text-left font-medium text-muted-foreground text-[10.5px] uppercase tracking-[0.05em] px-3 py-1.5 hidden lg:table-cell">
+                    <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3 py-1.5 hidden lg:table-cell">
                       {t('files.mtime', 'Modified')}
                     </th>
                     <th />
@@ -382,7 +385,7 @@ export default function FileBrowserPage() {
                     <tr
                       key={entry.name}
                       className={cn(
-                        'border-t cursor-pointer hover:bg-sunken/70',
+                        'border-t cursor-pointer hover:bg-sunken/60',
                         selected === entry.name && 'bg-sunken',
                       )}
                       onClick={() => setSelected(entry.name)}
@@ -409,13 +412,13 @@ export default function FileBrowserPage() {
                           </button>
                         </div>
                       </td>
-                      <td className="px-3 py-1.5 text-right font-mono text-fg-dim text-[11.5px] tabular-nums whitespace-nowrap">
+                      <td className="px-3 py-1.5 text-right font-mono text-fg-dim text-2xs tabular-nums whitespace-nowrap">
                         {entry.is_dir ? '—' : formatSize(entry.size)}
                       </td>
-                      <td className="px-3 py-1.5 font-mono text-fg-dim text-[11.5px] hidden md:table-cell">
+                      <td className="px-3 py-1.5 font-mono text-fg-dim text-2xs hidden md:table-cell">
                         {formatMode(entry.mode)}
                       </td>
-                      <td className="px-3 py-1.5 font-mono text-fg-dim text-[11.5px] whitespace-nowrap hidden lg:table-cell">
+                      <td className="px-3 py-1.5 font-mono text-fg-dim text-2xs whitespace-nowrap hidden lg:table-cell">
                         {new Date(entry.mtime * 1000).toLocaleString()}
                       </td>
                       <td className="px-3 py-1.5 text-right whitespace-nowrap">
@@ -423,7 +426,7 @@ export default function FileBrowserPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-6 w-6 p-0"
+                            className="h-7 w-7 p-0"
                             aria-label="download"
                             onClick={(e) => {
                               e.stopPropagation()
@@ -436,7 +439,7 @@ export default function FileBrowserPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-6 w-6 p-0"
+                          className="h-7 w-7 p-0"
                           aria-label="delete"
                           onClick={(e) => {
                             e.stopPropagation()
@@ -453,7 +456,7 @@ export default function FileBrowserPage() {
             )}
           </div>
 
-          <div className="border-t px-3 py-1.5 flex items-center justify-between text-[11.5px] text-fg-dim font-mono">
+          <div className="border-t px-3 py-1.5 flex items-center justify-between text-2xs text-fg-dim font-mono">
             <span>
               {data?.length ?? 0} {t('files.items', 'items')}
             </span>
@@ -464,19 +467,19 @@ export default function FileBrowserPage() {
         {/* Terminal */}
         <div className="border rounded-lg bg-elev flex flex-col h-[460px] overflow-hidden">
           <div className="flex items-center gap-2 px-3 py-2 border-b">
-            <span className="font-mono text-[12.5px] truncate">
+            <span className="font-mono text-sm truncate">
               {host?.name ?? `#${sid}`}:{cwd}
             </span>
             <Pill kind={ptySid ? 'ok' : 'neutral'}>pty</Pill>
-            <span className="ml-auto text-fg-dim text-[11px] font-mono">
+            <span className="ml-auto text-fg-dim text-2xs font-mono">
               {auditId ? `audit_id=ses_${auditId}` : 'opening…'}
             </span>
           </div>
-          <div className="flex-1 bg-[#0a0a0b]">
+          <div className="flex-1 bg-console">
             {ptySid ? (
               <XtermPane tabId={`files-${ptySid}`} sid={ptySid} />
             ) : (
-              <div className="text-[12px] text-zinc-500 font-mono p-3">opening PTY…</div>
+              <div className="text-xs text-console-muted font-mono p-3">opening PTY…</div>
             )}
           </div>
         </div>
@@ -485,27 +488,27 @@ export default function FileBrowserPage() {
       {/* Transfers */}
       <div className="border rounded-lg bg-elev overflow-hidden">
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-          <span className="text-foreground font-medium text-[12.5px]">
+          <span className="text-foreground font-medium text-sm">
             {t('files.transfers', 'Transfers')}
           </span>
           {transfersActive > 0 && (
-            <span className="inline-flex items-center gap-1 h-4 px-1.5 rounded-full bg-warn-soft text-warn text-[10px] font-mono">
+            <span className="inline-flex items-center gap-1 h-4 px-1.5 rounded-full bg-warn-soft text-warn text-2xs font-mono">
               {transfersActive} active
             </span>
           )}
-          <span className="ml-auto text-fg-dim text-[11px] font-mono">
+          <span className="ml-auto text-fg-dim text-2xs font-mono">
             {transfers.length} {t('files.items', 'items')}
           </span>
         </div>
         {transfers.length === 0 ? (
-          <div className="px-3.5 py-6 text-center text-fg-dim text-[12px] font-mono">
+          <div className="px-3.5 py-6 text-center text-fg-dim text-xs font-mono">
             {t('files.no_transfers', 'no transfers yet')}
           </div>
         ) : (
           transfers.map((tr) => (
             <div
               key={tr.id}
-              className="flex items-center gap-3 px-3.5 py-2.5 border-b last:border-b-0 text-[12px]"
+              className="flex items-center gap-3 px-3.5 py-2.5 border-b last:border-b-0 text-xs"
             >
               <span
                 className={cn(
@@ -516,10 +519,10 @@ export default function FileBrowserPage() {
                 {tr.dir === 'down' ? '↓' : '↑'}
               </span>
               <span className="font-mono truncate flex-1 min-w-0">{tr.name}</span>
-              <span className="font-mono text-fg-dim text-[11px] hidden sm:inline truncate w-[120px]">
+              <span className="font-mono text-fg-dim text-2xs hidden sm:inline truncate w-[120px]">
                 {tr.host}
               </span>
-              <span className="font-mono text-fg-dim text-[11px] w-[64px] text-right tabular-nums">
+              <span className="font-mono text-fg-dim text-2xs w-[64px] text-right tabular-nums">
                 {formatSize(tr.size)}
               </span>
               <div className="hidden sm:block w-[140px] h-1.5 bg-sunken rounded overflow-hidden">
@@ -537,7 +540,7 @@ export default function FileBrowserPage() {
                   style={{ width: `${tr.progress}%` }}
                 />
               </div>
-              <span className="font-mono w-12 text-right tabular-nums text-[11.5px]">
+              <span className="font-mono w-12 text-right tabular-nums text-2xs">
                 {tr.status === 'error'
                   ? 'err'
                   : tr.status === 'cancelled'
@@ -548,7 +551,7 @@ export default function FileBrowserPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 px-2 text-[11px]"
+                  className="h-7 px-2 text-2xs"
                   onClick={() => tr.cancel?.()}
                 >
                   {t('common.cancel', 'cancel')}
@@ -569,6 +572,17 @@ export default function FileBrowserPage() {
           </pre>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog
+        open={removeTarget != null}
+        onOpenChange={(open) => { if (!open) setRemoveTarget(null) }}
+        title={t('files.remove')}
+        description={t('files.remove_confirm', { name: removeTarget?.name ?? '' })}
+        onConfirm={() => {
+          if (!removeTarget) return
+          const path = cwd === '/' ? `/${removeTarget.name}` : `${cwd}/${removeTarget.name}`
+          rm.mutate({ server_id: sid, path, recursive: removeTarget.is_dir })
+        }}
+      />
     </div>
   )
 }

@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/Pill'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { useUI } from '@/store/ui'
 import { copyText } from '@/lib/clipboard'
 import { buildShareURL } from './templates'
@@ -16,6 +18,7 @@ import {
 import { useServers } from '@/api/servers'
 
 export default function InboundsTab() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const serversQ = useServers({ refetchInterval: 30_000 })
@@ -120,10 +123,12 @@ export default function InboundsTab() {
     null
   >(null)
 
+  const [pendingDelete, setPendingDelete] = useState<XrayInbound | null>(null)
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-[12.5px] text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Each row is one xray inbound. A single server can host multiple inbounds.
         </p>
         <Button size="sm" className="h-8" onClick={() => setDialog({ kind: 'new' })}>
@@ -132,7 +137,7 @@ export default function InboundsTab() {
       </div>
 
       {inboundsQ.isLoading && (
-        <p className="text-[12.5px] text-muted-foreground px-1">Loading…</p>
+        <p className="text-sm text-muted-foreground px-1">Loading…</p>
       )}
 
       {!inboundsQ.isLoading && (serversQ.data ?? []).map((s) => {
@@ -141,7 +146,7 @@ export default function InboundsTab() {
         return (
           <div key={s.id} className="rounded-lg border bg-elev overflow-hidden">
             <div className="flex items-center justify-between px-3 py-2 border-b bg-background/40">
-              <div className="text-[13px] font-mono">
+              <div className="text-sm font-mono">
                 <span className="font-medium">{s.name}</span>
                 <span className="text-fg-dim ml-2">
                   {s.ssh_host?.Valid ? s.ssh_host.String : '—'}
@@ -153,25 +158,25 @@ export default function InboundsTab() {
                   <span className="ml-3"><Pill kind={host.status === 'running' ? 'ok' : 'neutral'}>{host.status}</Pill></span>
                 )}
               </div>
-              <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
+              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
                 onClick={() => setDialog({ kind: 'new', serverID: s.id })}>
                 + Add inbound
               </Button>
             </div>
-            <table className="w-full text-[13px] border-collapse">
+            <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="text-left">
-                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Tag</th>
-                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Role</th>
-                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Protocol</th>
-                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Port</th>
-                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground">Alias</th>
-                  <th className="px-3 py-2 text-[11px] uppercase tracking-[0.05em] text-muted-foreground text-right">Actions</th>
+                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Tag</th>
+                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Role</th>
+                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Protocol</th>
+                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Port</th>
+                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Alias</th>
+                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {inbounds.length === 0 && (
-                  <tr><td colSpan={6} className="px-3 py-4 text-center text-muted-foreground text-[12.5px]">
+                  <tr><td colSpan={6} className="px-3 py-4 text-center text-muted-foreground text-sm">
                     No inbounds on this server.
                   </td></tr>
                 )}
@@ -194,7 +199,7 @@ export default function InboundsTab() {
                           return (
                             <span
                               className={`inline-block w-1.5 h-1.5 rounded-full mr-2 align-middle ${
-                                isActive ? 'bg-emerald-500' : 'bg-fg-dim/40'
+                                isActive ? 'bg-ok' : 'bg-fg-dim/40'
                               }`}
                               title={isActive ? 'active (traffic in last 2 min)' : 'idle (no recent traffic)'}
                             />
@@ -212,11 +217,11 @@ export default function InboundsTab() {
                             </span>
                           )}
                       </td>
-                      <td className="px-3 py-2 font-mono text-[12.5px]">{i.protocol}</td>
-                      <td className="px-3 py-2 font-mono text-[12.5px]">{i.port}</td>
-                      <td className="px-3 py-2 font-mono text-[12.5px] text-muted-foreground">{i.alias || '—'}</td>
+                      <td className="px-3 py-2 font-mono text-sm">{i.protocol}</td>
+                      <td className="px-3 py-2 font-mono text-sm">{i.port}</td>
+                      <td className="px-3 py-2 font-mono text-sm text-muted-foreground">{i.alias || '—'}</td>
                       <td className="px-3 py-2 text-right whitespace-nowrap">
-                        <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
                           disabled={!shareURL}
                           title={shareURL ? 'Copy share URL' : 'cannot build URL'}
                           onClick={async () => {
@@ -227,19 +232,19 @@ export default function InboundsTab() {
                           Copy URL
                         </Button>
                         {isLanding && (
-                          <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
+                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
                             onClick={() => setDialog({ kind: 'bulk', landing: i })}>
                             + Bulk Relay
                           </Button>
                         )}
-                        <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px]"
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
                           onClick={() => setDialog({ kind: 'edit', inbound: i })}>
                           Edit
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-7 px-2 text-[12px] text-destructive"
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-destructive"
                           disabled={del.isPending || dep > 0}
                           title={dep > 0 ? `${dep} relay(s) depend on this landing; delete them first` : undefined}
-                          onClick={() => del.mutate(i.id)}>
+                          onClick={() => setPendingDelete(i)}>
                           Delete
                         </Button>
                       </td>
@@ -251,6 +256,14 @@ export default function InboundsTab() {
           </div>
         )
       })}
+
+      <ConfirmDialog
+        open={pendingDelete != null}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null) }}
+        title={t('xray.delete_inbound')}
+        description={t('xray.delete_inbound_confirm', { name: pendingDelete?.alias || (pendingDelete?.tag ?? '') })}
+        onConfirm={() => { if (pendingDelete) del.mutate(pendingDelete.id) }}
+      />
 
       {dialog?.kind === 'new' && (
         <InboundDialog
@@ -310,10 +323,10 @@ function VersionInline({ serverID, current }: { serverID: number; current: strin
   return (
     <span className="inline-flex items-center gap-1">
       <Input value={value} onChange={(e) => setValue(e.target.value)}
-        className="h-6 w-20 font-mono text-[11px]" />
-      <Button size="sm" className="h-6 px-2 text-[11px]" disabled={apply.isPending}
+        className="h-7 w-20 font-mono text-2xs" />
+      <Button size="sm" className="h-7 px-2 text-2xs" disabled={apply.isPending}
         onClick={() => apply.mutate()}>Apply</Button>
-      <button className="text-fg-dim text-[11px]" onClick={() => setEditing(false)}>cancel</button>
+      <button className="text-fg-dim text-2xs" onClick={() => setEditing(false)}>cancel</button>
     </span>
   )
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -8,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { useUI } from '@/store/ui'
 import {
   listSingboxCerts,
@@ -41,8 +43,8 @@ function expiryClass(expires: string | null, status: SingboxCertificate['status'
   if (status !== 'active' || !expires) return 'text-muted-foreground'
   const days = (new Date(expires).getTime() - Date.now()) / 86_400_000
   if (days < 7)  return 'text-destructive font-semibold'
-  if (days < 30) return 'text-amber-600'
-  return 'text-green-600'
+  if (days < 30) return 'text-warn'
+  return 'text-ok'
 }
 
 // ─── IssueCertDialog ──────────────────────────────────────────────────────────
@@ -177,9 +179,11 @@ export function IssueCertDialog({ open, onOpenChange }: IssueCertDialogProps) {
 // ─── CertificatesTab ──────────────────────────────────────────────────────────
 
 export default function CertificatesTab() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const [showIssue, setShowIssue] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<SingboxCertificate | null>(null)
 
   // Poll fast (2s) whenever any cert is mid-issuance — ACME completes
   // in seconds-to-minutes and the user wants the status pill to flip
@@ -264,7 +268,7 @@ export default function CertificatesTab() {
               </tr>
             )}
             {certs.map((c) => (
-              <tr key={c.id} className="border-b last:border-0 hover:bg-muted/30">
+              <tr key={c.id} className="border-b last:border-0 hover:bg-sunken/60">
                 {/* Domain */}
                 <td className="px-3 py-2 font-mono text-xs">{c.domain}</td>
 
@@ -298,7 +302,7 @@ export default function CertificatesTab() {
                         <TooltipTrigger asChild>
                           <button
                             type="button"
-                            className="inline-flex h-6 w-6 items-center justify-center rounded text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/60"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/60"
                             aria-label="Show last error"
                           >
                             ⚠
@@ -334,7 +338,7 @@ export default function CertificatesTab() {
                           ? 'cert is in use by inbound(s); remove them first'
                           : undefined
                       }
-                      onClick={() => del.mutate(c.id)}
+                      onClick={() => setPendingDelete(c)}
                     >
                       Delete
                     </Button>
@@ -348,6 +352,14 @@ export default function CertificatesTab() {
 
       {/* Issue cert dialog */}
       <IssueCertDialog open={showIssue} onOpenChange={setShowIssue} />
+
+      <ConfirmDialog
+        open={pendingDelete != null}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null) }}
+        title={t('singbox.delete_certificate')}
+        description={t('singbox.delete_certificate_confirm', { name: pendingDelete?.domain ?? '' })}
+        onConfirm={() => { if (pendingDelete) del.mutate(pendingDelete.id) }}
+      />
     </div>
   )
 }

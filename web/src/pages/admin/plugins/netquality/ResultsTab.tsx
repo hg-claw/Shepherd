@@ -70,7 +70,7 @@ export default function ResultsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <span className="text-[12.5px] text-muted-foreground">Server</span>
+        <span className="text-sm text-muted-foreground">Server</span>
         <Select
           value={effectiveID ? String(effectiveID) : ''}
           onValueChange={(v) => {
@@ -80,22 +80,22 @@ export default function ResultsTab() {
             setSP(sp, { replace: true })
           }}
         >
-          <SelectTrigger className="h-8 w-72 text-[12.5px]">
+          <SelectTrigger className="h-8 w-72 text-sm">
             <SelectValue placeholder="Pick a server" />
           </SelectTrigger>
           <SelectContent>
             {servers.map((s: ServerRecord) => (
-              <SelectItem key={s.id} value={String(s.id)} className="text-[12.5px]">
+              <SelectItem key={s.id} value={String(s.id)} className="text-sm">
                 {s.name}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        {latestQ.isLoading && <span className="text-[12px] text-muted-foreground">loading…</span>}
+        {latestQ.isLoading && <span className="text-xs text-muted-foreground">loading…</span>}
       </div>
 
       {(latestQ.data ?? []).length === 0 && !latestQ.isLoading && (
-        <p className="text-[12.5px] text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           No samples yet. Enable the plugin on this server under <em>Hosts</em>, then wait one
           sample interval.
         </p>
@@ -106,12 +106,12 @@ export default function ResultsTab() {
         if (rows.length === 0) return null
         return (
           <div key={isp} className="border rounded-md overflow-hidden">
-            <div className="px-3 py-2 bg-elev border-b text-[12px] font-medium">
+            <div className="px-3 py-2 bg-elev border-b text-xs font-medium">
               {ISP_LABEL[isp]}
             </div>
-            <table className="w-full text-[13px]">
+            <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-[11px] text-muted-foreground uppercase tracking-wide">
+                <tr className="border-b text-2xs text-muted-foreground uppercase tracking-wide">
                   <th className="text-left py-2 pl-3 pr-4 font-medium">Region</th>
                   <th className="text-left py-2 pr-4 font-medium">Target</th>
                   <th className="text-left py-2 pr-4 font-medium">RTT</th>
@@ -123,7 +123,7 @@ export default function ResultsTab() {
                 {rows.map((r) => (
                   <tr
                     key={r.target_id}
-                    className="border-b last:border-0 hover:bg-elev cursor-pointer"
+                    className="border-b last:border-0 hover:bg-sunken/60 cursor-pointer"
                     onClick={() => setDrillFor({ targetID: r.target_id, label: r.label })}
                   >
                     <td className="py-2 pl-3 pr-4">{r.region}</td>
@@ -132,7 +132,7 @@ export default function ResultsTab() {
                       <Pill kind={rttKind(r.rtt_avg_ms, r.loss_pct)}>{fmtRTT(r.rtt_avg_ms)}</Pill>
                     </td>
                     <td className="py-2 pr-4">{fmtLoss(r.loss_pct)}</td>
-                    <td className="py-2 pr-3 font-mono text-[11px] text-muted-foreground">
+                    <td className="py-2 pr-3 font-mono text-2xs text-muted-foreground">
                       {r.ts ? new Date(r.ts).toLocaleTimeString() : '—'}
                     </td>
                   </tr>

@@ -11,11 +11,11 @@ export function PublicLayout() {
       <header className="sticky top-0 z-30 h-12 border-b bg-elev">
         <div className="container flex h-full items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2.5">
-            <span className="grid place-items-center h-[22px] w-[22px] rounded-[5px] bg-foreground text-background font-mono font-bold text-[12px]">
+            <span className="grid place-items-center h-[22px] w-[22px] rounded-[5px] bg-foreground text-background font-mono font-bold text-xs">
               Sh
             </span>
-            <span className="font-semibold tracking-tight text-[14px]">{t('app.name')}</span>
-            <span className="text-fg-dim font-mono text-[11.5px] ml-1">/ status</span>
+            <span className="font-semibold tracking-tight text-sm">{t('app.name')}</span>
+            <span className="text-fg-dim font-mono text-2xs ml-1">/ status</span>
           </Link>
           <div className="flex items-center gap-1 sm:gap-1.5">
             <ThemeToggle />

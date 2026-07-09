@@ -19,12 +19,14 @@ import {
 } from '@/components/ui/dialog'
 import { TimeSeriesChart } from '@/components/TimeSeriesChart'
 import { InstallProgress } from '@/components/InstallProgress'
-import { KpiCard } from '@/components/KpiCard'
+import { StatCard } from '@/components/StatCard'
 import { useUI } from '@/store/ui'
 import { bps, bytes, pct } from '@/lib/bytes'
 import type { Range } from '@/api/servers'
 import { openConsole } from '@/api/console'
 import { useConsoleTabs } from '@/store/consoleTabs'
+import { LoadingState } from '@/components/LoadingState'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 export default function AdminServerDetail() {
   const { id: idStr } = useParams<{ id: string }>()
@@ -74,8 +76,9 @@ export default function AdminServerDetail() {
   // Session-local (deliberately not persisted on the server row):
   // operators flip it per action.
   const [cnMirror, setCNMirror] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
 
-  if (!s) return <div>{t('common.loading')}</div>
+  if (!s) return <LoadingState />
 
   const points = tele.data ?? []
   const cpu = points.map((p) => ({ ts: p.ts, v: p.cpu_pct ?? 0 }))
@@ -123,19 +126,19 @@ export default function AdminServerDetail() {
 
       {/* Hero metric strip — 4-up KPI cards showing current live values */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard
+        <StatCard
           label={t('metric.cpu', 'CPU')}
           value={isOnline && points.length > 0 ? `${(points[points.length - 1].cpu_pct ?? 0).toFixed(0)}%` : '—'}
         />
-        <KpiCard
+        <StatCard
           label={t('metric.mem', 'MEM')}
           value={isOnline && points.length > 0 ? `${(pct(points[points.length - 1].mem_used, points[points.length - 1].mem_total) ?? 0).toFixed(0)}%` : '—'}
         />
-        <KpiCard
+        <StatCard
           label={t('metric.load1', 'LOAD-1')}
           value={isOnline && points.length > 0 ? (points[points.length - 1].load_1 ?? 0).toFixed(2) : '—'}
         />
-        <KpiCard
+        <StatCard
           label={t('metric.tcp_conn', 'TCP conn')}
           value={isOnline && points.length > 0 ? (points[points.length - 1].tcp_conn ?? 0).toString() : '—'}
         />
@@ -151,7 +154,7 @@ export default function AdminServerDetail() {
             <span className="font-mono text-xs flex items-center gap-2">
               {s.agent_version?.String ?? '-'}
               {targetVersion && s.agent_version?.String !== targetVersion && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300 px-2 py-0.5 text-[11px] font-medium">
+                <span className="inline-flex items-center gap-1 rounded-full bg-warn-soft text-warn px-2 py-0.5 text-2xs font-medium">
                   {t('server.updating_to', 'Updating to v{{v}}…', { v: targetVersion.replace(/^v/, '') })}
                 </span>
               )}
@@ -212,16 +215,16 @@ export default function AdminServerDetail() {
                   }}
                 />
               </div>
-              <KV k="上次重置" v={traffic.data.last_reset_at ? new Date(traffic.data.last_reset_at).toLocaleString() : '—'} />
+              <KV k={t('servers.last_reset', 'Last reset')} v={traffic.data.last_reset_at ? new Date(traffic.data.last_reset_at).toLocaleString() : '—'} />
               <div className="sm:col-span-2">
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => {
-                    if (confirm('确认立即重置流量统计？')) resetTraffic.mutate()
+                    setConfirmReset(true)
                   }}
                 >
-                  立即重置
+                  {t('servers.reset_now', 'Reset now')}
                 </Button>
               </div>
             </>
@@ -320,7 +323,7 @@ export default function AdminServerDetail() {
         {/* CN mirror toggle — applies to both Install command and
             Update agent on this page. Routes script + asset downloads
             through gh-proxy.com for hosts that can't reach github.com. */}
-        <label className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground ml-1 cursor-pointer select-none">
+        <label className="inline-flex items-center gap-1.5 text-xs text-muted-foreground ml-1 cursor-pointer select-none">
           <input type="checkbox" checked={cnMirror} onChange={(e) => setCNMirror(e.target.checked)} />
           CN mirror
         </label>
@@ -464,10 +467,10 @@ export default function AdminServerDetail() {
         <CardHeader><CardTitle>实时网速</CardTitle></CardHeader>
         <CardContent className="min-w-0">
           {live.rx === null ? (
-            <p className="text-muted-foreground text-[12px]">{live.connected ? '等待数据…' : '未连接'}</p>
+            <p className="text-muted-foreground text-xs">{live.connected ? '等待数据…' : '未连接'}</p>
           ) : (
             <>
-              <div className="text-[13px] mb-2">↑ {bps(live.tx ?? 0)}　↓ {bps(live.rx ?? 0)}</div>
+              <div className="text-sm mb-2">↑ {bps(live.tx ?? 0)}　↓ {bps(live.rx ?? 0)}</div>
               <TimeSeriesChart
                 series={[
                   { name: 'rx', values: live.rxSeries },
@@ -485,6 +488,13 @@ export default function AdminServerDetail() {
           mem snapshot: {bytes(points[points.length - 1].mem_used)} / {bytes(points[points.length - 1].mem_total)}
         </p>
       )}
+      <ConfirmDialog
+        open={confirmReset}
+        onOpenChange={setConfirmReset}
+        title={t('servers.reset_traffic')}
+        description={t('servers.reset_traffic_confirm')}
+        onConfirm={() => resetTraffic.mutate()}
+      />
     </div>
   )
 }

@@ -6,6 +6,17 @@ import { I18nextProvider } from 'react-i18next'
 import i18n from '@/i18n'
 import EventsTab from './EventsTab'
 
+// useVirtualRows returns zero items in jsdom (no scroll container height).
+// Mock it to pass all rows through so the DOM test can find rendered text.
+vi.mock('@/lib/useVirtualRows', () => ({
+  useVirtualRows: (rows: unknown[]) => ({
+    parentRef: { current: null },
+    items: rows.map((_, index) => ({ index, start: index * 36, end: (index + 1) * 36, size: 36, key: index, lane: 0 })),
+    padTop: 0,
+    padBottom: 0,
+  }),
+}))
+
 vi.mock('@/api/plugins', () => ({
   listPluginEvents: () => Promise.resolve([
     { ts: '2026-05-16T08:14:01Z', admin_id: 1, server_id: 7,

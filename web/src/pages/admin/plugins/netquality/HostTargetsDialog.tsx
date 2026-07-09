@@ -91,16 +91,16 @@ export default function HostTargetsDialog({ open, onOpenChange, serverID, server
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-[14px]">
+          <DialogTitle className="text-sm">
             Targets for <span className="font-mono">{serverName}</span>
           </DialogTitle>
         </DialogHeader>
 
-        {q.isLoading && <div className="py-6 text-[12.5px] text-muted-foreground">Loading…</div>}
+        {q.isLoading && <div className="py-6 text-sm text-muted-foreground">Loading…</div>}
 
         {!q.isLoading && (
           <div className="space-y-3">
-            <div className="text-[12px] text-muted-foreground">
+            <div className="text-xs text-muted-foreground">
               Pick which targets this server should ping. Disabling a target here just opts THIS
               host out — the catalog stays unchanged.
             </div>
@@ -112,14 +112,14 @@ export default function HostTargetsDialog({ open, onOpenChange, serverID, server
               return (
                 <div key={isp} className="border rounded-md overflow-hidden">
                   <div
-                    className="flex items-center justify-between px-3 py-1.5 bg-elev border-b cursor-pointer text-[12px] font-medium"
+                    className="flex items-center justify-between px-3 py-1.5 bg-elev border-b cursor-pointer text-xs font-medium"
                     onClick={() => toggleGroup(isp)}
                   >
                     <span>
                       {ISP_LABEL[isp]}{' '}
                       <span className="text-muted-foreground">({rows.filter((r) => selected.has(r.target_id)).length}/{rows.length})</span>
                     </span>
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-2xs text-muted-foreground">
                       {allSelected ? 'click to clear group' : someSelected ? 'partial — click to select all' : 'click to select all'}
                     </span>
                   </div>
@@ -129,12 +129,12 @@ export default function HostTargetsDialog({ open, onOpenChange, serverID, server
                       return (
                         <label
                           key={r.target_id}
-                          className="flex items-center gap-3 px-3 py-1.5 text-[12.5px] cursor-pointer hover:bg-sunken"
+                          className="flex items-center gap-3 px-3 py-1.5 text-sm cursor-pointer hover:bg-sunken"
                         >
                           <Switch checked={checked} onCheckedChange={() => toggle(r.target_id)} />
                           <span className="w-24 text-muted-foreground">{r.region}</span>
                           <span className="flex-1">{r.label}</span>
-                          <span className="font-mono text-[11px] text-fg-dim">{r.host}</span>
+                          <span className="font-mono text-2xs text-fg-dim">{r.host}</span>
                         </label>
                       )
                     })}
@@ -144,7 +144,7 @@ export default function HostTargetsDialog({ open, onOpenChange, serverID, server
             })}
 
             <div className="flex items-center justify-between pt-2 border-t">
-              <span className="text-[12px] text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 {selected.size} selected
               </span>
               <div className="flex gap-2">

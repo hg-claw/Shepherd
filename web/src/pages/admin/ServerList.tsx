@@ -3,11 +3,13 @@ import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Trash2, LayoutGrid, Rows3, ArrowUpCircle } from 'lucide-react'
 import { useServers, useDeleteServer, useBatchUpdateAgent, useReinstall, type ServerWithLatest } from '@/api/servers'
+import { useTableSort } from '@/lib/useTableSort'
+import { SortableTh } from '@/components/SortableTh'
 import { useUI } from '@/store/ui'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Pill, type PillKind } from '@/components/Pill'
-import { KpiCard } from '@/components/KpiCard'
+import { StatCard } from '@/components/StatCard'
 import { OnlineDot } from '@/components/OnlineDot'
 import { CountryFlag } from '@/components/CountryFlag'
 import { Seg } from '@/components/Seg'
@@ -18,6 +20,9 @@ import { pct } from '@/lib/bytes'
 import { relativeTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { Search } from 'lucide-react'
+import { PageHeader } from '@/components/PageHeader'
+import { LoadingState } from '@/components/LoadingState'
+import { EmptyState } from '@/components/EmptyState'
 
 type HostStatus = 'ok' | 'warn' | 'err' | 'offline'
 
@@ -109,12 +114,18 @@ function Bar({ value }: { value: number | null | undefined }) {
           style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
         />
       </div>
-      <span className="font-mono tabular-nums text-[12.5px]">{value.toFixed(0)}%</span>
+      <span className="font-mono tabular-nums text-sm">{value.toFixed(0)}%</span>
     </div>
   )
 }
 
 const VIEW_KEY = 'shep_hosts_view'
+
+const serverSortAccessors = {
+  name: (s: ServerWithLatest) => s.name,
+  cpu: (s: ServerWithLatest) => s.latest?.cpu_pct ?? null,
+  mem: (s: ServerWithLatest) => pct(s.latest?.mem_used, s.latest?.mem_total) ?? null,
+}
 
 export default function ServerList() {
   const { t, i18n } = useTranslation()
@@ -177,14 +188,19 @@ export default function ServerList() {
     return sum / online.length
   }, [all])
 
-  if (isLoading) return <div className="text-muted-foreground">{t('common.loading')}</div>
+  const filtered = useMemo(
+    () =>
+      all.filter((s) => {
+        if (statusFilter !== 'all' && hostStatus(s) !== statusFilter) return false
+        if (!filter) return true
+        const f = filter.toLowerCase()
+        return s.name.toLowerCase().includes(f) || (s.ssh_host?.String ?? '').toLowerCase().includes(f)
+      }),
+    [all, filter, statusFilter],
+  )
+  const { sorted: servers, sort: serverSort, toggle: serverToggle } = useTableSort(filtered, serverSortAccessors)
 
-  const servers = all.filter((s) => {
-    if (statusFilter !== 'all' && hostStatus(s) !== statusFilter) return false
-    if (!filter) return true
-    const f = filter.toLowerCase()
-    return s.name.toLowerCase().includes(f) || (s.ssh_host?.String ?? '').toLowerCase().includes(f)
-  })
+  if (isLoading) return <LoadingState />
 
   const setViewPersist = (v: 'grid' | 'table') => {
     setView(v)
@@ -252,52 +268,52 @@ export default function ServerList() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight m-0">
-            {t('nav.hosts', 'Hosts')}
-          </h1>
-          <p className="text-muted-foreground text-[13px] mt-1">
-            {servers.length} {t('hosts.of', 'of')} {all.length}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Seg
-            value={view}
-            onChange={setViewPersist}
-            size="sm"
-            options={[
-              { value: 'grid' as const, icon: LayoutGrid, label: t('view.grid', 'Grid') },
-              { value: 'table' as const, icon: Rows3, label: t('view.table', 'Table') },
-            ]}
-          />
-          <Button asChild size="sm" className="h-8">
-            <Link to="/admin/servers/new">
-              <Plus className="mr-1 h-3.5 w-3.5" />
-              {t('admin.add_server', 'Add server')}
-            </Link>
-          </Button>
-        </div>
+      <div>
+        <PageHeader
+          title={t('nav.hosts', 'Hosts')}
+          actions={
+            <>
+              <Seg
+                value={view}
+                onChange={setViewPersist}
+                size="sm"
+                options={[
+                  { value: 'grid' as const, icon: LayoutGrid, label: t('view.grid', 'Grid') },
+                  { value: 'table' as const, icon: Rows3, label: t('view.table', 'Table') },
+                ]}
+              />
+              <Button asChild size="sm" className="h-8">
+                <Link to="/admin/servers/new">
+                  <Plus className="mr-1 h-3.5 w-3.5" />
+                  {t('admin.add_server', 'Add server')}
+                </Link>
+              </Button>
+            </>
+          }
+        />
+        <p className="text-muted-foreground text-sm mt-1">
+          {servers.length} {t('hosts.of', 'of')} {all.length}
+        </p>
       </div>
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard
+        <StatCard
           label={t('hosts.kpi.online', 'Online')}
           value={`${onlineCount}/${all.length}`}
           sub={`${counts.offline} ${t('wall.offline', 'offline')}`}
         />
-        <KpiCard
+        <StatCard
           label={t('hosts.kpi.cpu', 'Avg CPU')}
           value={`${avgCpu.toFixed(1)}%`}
           sub={t('range.24h', '24h')}
         />
-        <KpiCard
+        <StatCard
           label={t('hosts.kpi.mem', 'Avg memory')}
           value={`${avgMem.toFixed(1)}%`}
           sub={t('range.24h', '24h')}
         />
-        <KpiCard
+        <StatCard
           label={t('hosts.kpi.alerts', 'Alerts')}
           value={String(counts.err + counts.warn)}
           sub={`${counts.err} ${t('filter.err', 'critical')}`}
@@ -313,7 +329,7 @@ export default function ServerList() {
             placeholder={t('common.filter', 'Filter…')}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="pl-7 max-w-full sm:max-w-[240px] h-7 text-[13px]"
+            className="pl-7 max-w-full sm:max-w-[240px] h-7 text-sm"
           />
         </div>
         {chipDefs.map((c) => (
@@ -322,14 +338,14 @@ export default function ServerList() {
             type="button"
             onClick={() => setStatusFilter(c.key)}
             className={cn(
-              'h-[26px] px-2.5 rounded-full text-[12px] inline-flex items-center gap-1.5 border transition-colors',
+              'h-7 px-2.5 rounded-full text-xs inline-flex items-center gap-1.5 border transition-colors',
               statusFilter === c.key
                 ? 'bg-accent text-accent-foreground border-transparent'
                 : 'bg-sunken text-muted-foreground border-transparent hover:text-foreground',
             )}
           >
             {c.label}
-            <span className="font-mono text-[11px] opacity-70">{c.count}</span>
+            <span className="font-mono text-2xs opacity-70">{c.count}</span>
           </button>
         ))}
       </div>
@@ -345,14 +361,14 @@ export default function ServerList() {
             variant="outline"
             disabled={batchUpdate.isPending}
             onClick={handleBatchUpdate}
-            className="h-7 text-[12.5px]"
+            className="h-7 text-sm"
           >
             <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
             {batchUpdate.isPending
               ? t('server.updating', 'Updating…')
               : t('server.batch_update_agents', 'Update {{n}} agents', { n: selected.size })}
           </Button>
-          <label className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground cursor-pointer select-none">
+          <label className="inline-flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
             <input type="checkbox" checked={batchCN} onChange={(e) => setBatchCN(e.target.checked)} />
             {t('server.cn_mirror', 'CN mirror')}
           </label>
@@ -367,7 +383,27 @@ export default function ServerList() {
       )}
 
       {/* Views */}
-      {view === 'grid' ? (
+      {servers.length === 0 ? (
+        all.length === 0 ? (
+          <EmptyState
+            title={t('servers.empty')}
+            action={
+              <Button asChild className="h-8">
+                <Link to="/admin/servers/new">{t('admin.add_server')}</Link>
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            title={t('common.no_results')}
+            action={
+              <Button variant="outline" className="h-7" onClick={() => { setFilter(''); setStatusFilter('all') }}>
+                {t('common.clear_filter')}
+              </Button>
+            }
+          />
+        )
+      ) : view === 'grid' ? (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
           {servers.map((s) => (
             <HostCard
@@ -380,7 +416,7 @@ export default function ServerList() {
         </div>
       ) : (
         <div className="rounded-lg border bg-elev overflow-x-auto">
-          <table className="w-full border-collapse text-[13px]">
+          <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="text-left">
                 <Th className="w-8">
@@ -392,13 +428,31 @@ export default function ServerList() {
                     className="h-3.5 w-3.5 cursor-pointer"
                   />
                 </Th>
-                <Th>{t('admin.name', 'Name')}</Th>
+                <SortableTh
+                  label={t('admin.name', 'Name')}
+                  sortKey="name"
+                  sort={serverSort}
+                  onToggle={serverToggle}
+                  className="font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0 text-left"
+                />
                 <Th className="hidden md:table-cell">{t('admin.host', 'Host')}</Th>
                 <Th className="hidden lg:table-cell">OS</Th>
                 <Th className="hidden md:table-cell">Stage</Th>
                 <Th className="hidden lg:table-cell">{t('admin.agent_last_seen', 'Last seen')}</Th>
-                <Th>CPU</Th>
-                <Th className="hidden sm:table-cell">MEM</Th>
+                <SortableTh
+                  label="CPU"
+                  sortKey="cpu"
+                  sort={serverSort}
+                  onToggle={serverToggle}
+                  className="font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0 text-left"
+                />
+                <SortableTh
+                  label="MEM"
+                  sortKey="mem"
+                  sort={serverSort}
+                  onToggle={serverToggle}
+                  className="hidden sm:table-cell font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0 text-left"
+                />
                 <Th className="text-right">{t('admin.actions', 'Actions')}</Th>
               </tr>
             </thead>
@@ -439,10 +493,10 @@ export default function ServerList() {
                         )}
                       </div>
                     </Td>
-                    <Td className="hidden md:table-cell font-mono text-[12px] text-muted-foreground">
+                    <Td className="hidden md:table-cell font-mono text-xs text-muted-foreground">
                       {s.ssh_host?.String ?? '—'}
                     </Td>
-                    <Td className="hidden lg:table-cell font-mono text-[12px] text-fg-dim">
+                    <Td className="hidden lg:table-cell font-mono text-xs text-fg-dim">
                       {[s.agent_os?.String, s.agent_arch?.String].filter(Boolean).join('/') || '—'}
                     </Td>
                     <Td className="hidden md:table-cell">
@@ -455,7 +509,7 @@ export default function ServerList() {
                         )
                       })()}
                     </Td>
-                    <Td className="hidden lg:table-cell text-[12px] text-muted-foreground font-mono tabular-nums">
+                    <Td className="hidden lg:table-cell text-xs text-muted-foreground font-mono tabular-nums">
                       {lastSeen ? t(lastSeen.key, { n: lastSeen.n, lng: i18n.language }) : '—'}
                     </Td>
                     <Td><Bar value={s.latest?.cpu_pct} /></Td>
@@ -464,7 +518,7 @@ export default function ServerList() {
                       {(stage === 'install-failed' || stage === 'not-installed') && (
                         <ReinstallButton server={s} t={t} />
                       )}
-                      <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-[12.5px]">
+                      <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-sm">
                         <Link to={`/admin/servers/${s.id}`}>{t('admin.details', 'Details')}</Link>
                       </Button>
                       <DeleteButton server={s} onDelete={() => handleDelete(s)} t={t} />
@@ -524,7 +578,7 @@ function ReinstallButton({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-[12.5px]">
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-sm">
           {t('server.reinstall', 'Reinstall')}
         </Button>
       </DialogTrigger>
@@ -540,15 +594,15 @@ function ReinstallButton({
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <label className="text-[12px] text-fg-dim">ssh_user</label>
-            <Input value={user} onChange={(e) => setUser(e.target.value)} placeholder="root" className="mt-1 h-8 text-[12.5px]" />
+            <label className="text-xs text-fg-dim">ssh_user</label>
+            <Input value={user} onChange={(e) => setUser(e.target.value)} placeholder="root" className="mt-1 h-8 text-sm" />
           </div>
           <div>
-            <label className="text-[12px] text-fg-dim">ssh_password</label>
-            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 h-8 text-[12.5px]" />
+            <label className="text-xs text-fg-dim">ssh_password</label>
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 h-8 text-sm" />
           </div>
           <div>
-            <label className="text-[12px] text-fg-dim">ssh_key (PEM)</label>
+            <label className="text-xs text-fg-dim">ssh_key (PEM)</label>
             <textarea
               rows={4}
               value={key}
@@ -556,12 +610,12 @@ function ReinstallButton({
               placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
               className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-vertical"
             />
-            <p className="text-fg-dim text-[11px] mt-1">
+            <p className="text-fg-dim text-2xs mt-1">
               {t('server.reinstall_cred_hint', 'Provide either password or key. Passphrase-protected keys are not supported.')}
             </p>
           </div>
           <div>
-            <label className="text-[12px] text-fg-dim">arch</label>
+            <label className="text-xs text-fg-dim">arch</label>
             <div className="mt-1">
               <Seg
                 value={arch}
@@ -648,11 +702,11 @@ function HostCard({
         <div className="flex-1 min-w-0">
           <Link
             to={`/admin/servers/${server.id}`}
-            className="font-mono font-medium text-[13.5px] hover:underline truncate block"
+            className="font-mono font-medium text-sm hover:underline truncate block"
           >
             {server.name}
           </Link>
-          <div className="font-mono text-[11.5px] text-muted-foreground mt-0.5 truncate">
+          <div className="font-mono text-2xs text-muted-foreground mt-0.5 truncate">
             {(server.agent_os?.String ?? '—')} · {server.public_group?.String ?? '—'}
           </div>
         </div>
@@ -665,7 +719,7 @@ function HostCard({
         <Stat label="TCP" v={online ? tcp.toLocaleString() : '—'} />
       </div>
       <div className="flex items-center gap-1 mt-3 pt-2.5 border-t border-dashed">
-        <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-[12px]">
+        <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-xs">
           <Link to={`/admin/servers/${server.id}`}>{t('admin.details', 'Details')}</Link>
         </Button>
         <div className="ml-auto" onClick={(e) => e.stopPropagation()}>
@@ -698,8 +752,8 @@ function HostCard({
 function Stat({ label, v }: { label: string; v: string }) {
   return (
     <div>
-      <div className="text-[10.5px] text-fg-dim uppercase tracking-[0.05em]">{label}</div>
-      <div className="font-mono font-medium text-[14px] tabular-nums mt-0.5">{v}</div>
+      <div className="text-2xs text-fg-dim uppercase tracking-[0.05em]">{label}</div>
+      <div className="font-mono font-medium text-sm tabular-nums mt-0.5">{v}</div>
     </div>
   )
 }
@@ -708,7 +762,7 @@ function Th({ children, className }: { children: React.ReactNode; className?: st
   return (
     <th
       className={cn(
-        'font-medium text-muted-foreground text-[11px] uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0 text-left',
+        'font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0 text-left',
         className,
       )}
     >

@@ -200,15 +200,15 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
           <DialogTitle className="font-mono">
             Add relays → {landingInbound.tag} @ {landingInbound.server_name}
           </DialogTitle>
-          <p className="text-[12px] text-muted-foreground font-mono">{proto}</p>
+          <p className="text-xs text-muted-foreground font-mono">{proto}</p>
         </DialogHeader>
 
         <div className="space-y-3">
           <div>
-            <Label className="text-[12px]">Target servers</Label>
+            <Label className="text-xs">Target servers</Label>
             <div className="mt-1 rounded-md border bg-elev max-h-64 overflow-y-auto">
               {targets.length === 0 && (
-                <p className="px-3 py-4 text-[12px] text-muted-foreground">No eligible servers.</p>
+                <p className="px-3 py-4 text-xs text-muted-foreground">No eligible servers.</p>
               )}
               {targets.map((s) => {
                 const checked = selected.has(s.id)
@@ -216,12 +216,12 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
                 const taken = portsByServer.get(s.id) ?? new Set<number>()
                 return (
                   <label key={s.id}
-                    className="flex items-center gap-3 px-3 py-2 border-b last:border-b-0 text-[12.5px]">
+                    className="flex items-center gap-3 px-3 py-2 border-b last:border-b-0 text-sm">
                     <input type="checkbox" checked={checked} onChange={() => toggle({ id: s.id, name: s.name })}
                       aria-label={`select ${s.name}`} />
                     <span className="font-mono w-32 truncate">{s.name}</span>
                     {taken.size > 0 && (
-                      <span className="text-fg-dim text-[10.5px]" title={`used: ${Array.from(taken).join(', ')}`}>
+                      <span className="text-fg-dim text-2xs" title={`used: ${Array.from(taken).join(', ')}`}>
                         {taken.size} port(s) in use
                       </span>
                     )}
@@ -235,9 +235,9 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
                           className="h-7 w-24 font-mono" />
                         {needsX25519(proto) && (
                           <>
-                            <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]"
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-2xs"
                               onClick={(e) => { e.preventDefault(); void regenKeys(s.id) }}>↻ keys</Button>
-                            <span className="font-mono text-fg-dim text-[10px] truncate" title={d.publicKey}>
+                            <span className="font-mono text-fg-dim text-2xs truncate" title={d.publicKey}>
                               {d.publicKey ? d.publicKey.slice(0, 8) + '…' : 'generating…'}
                             </span>
                           </>
@@ -250,7 +250,7 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
             </div>
           </div>
 
-          {version && <p className="text-fg-dim text-[11px]">Uses xray v{version} (taken from the landing's deployed version).</p>}
+          {version && <p className="text-fg-dim text-2xs">Uses xray v{version} (taken from the landing's deployed version).</p>}
         </div>
 
         <DialogFooter>

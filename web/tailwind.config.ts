@@ -10,6 +10,14 @@ const config: Config = {
       screens: { '2xl': '1400px' },
     },
     extend: {
+      fontSize: {
+        '2xs': ['11px', '16px'],
+        xs: ['12px', '18px'],
+        sm: ['13px', '20px'],
+        lg: ['16px', '22px'],
+        title: ['22px', '28px'],
+        display: ['26px', '32px'],
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -62,6 +70,23 @@ const config: Config = {
           DEFAULT: 'hsl(var(--err))',
           soft: 'hsl(var(--err-soft))',
         },
+        chart: {
+          1: 'hsl(var(--chart-1))',
+          2: 'hsl(var(--chart-2))',
+          3: 'hsl(var(--chart-3))',
+          4: 'hsl(var(--chart-4))',
+        },
+        console: {
+          DEFAULT: 'hsl(var(--console-bg) / <alpha-value>)',
+          elev: 'hsl(var(--console-elev) / <alpha-value>)',
+          border: 'hsl(var(--console-border) / <alpha-value>)',
+          fg: 'hsl(var(--console-fg) / <alpha-value>)',
+          muted: 'hsl(var(--console-muted) / <alpha-value>)',
+        },
+        elev: 'hsl(var(--bg-elev) / <alpha-value>)',
+        sunken: 'hsl(var(--bg-sunken) / <alpha-value>)',
+        strong: 'hsl(var(--border-strong) / <alpha-value>)',
+        'fg-dim': 'hsl(var(--fg-dim) / <alpha-value>)',
       },
       borderRadius: {
         lg: 'var(--radius)',

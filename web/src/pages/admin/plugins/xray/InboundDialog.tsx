@@ -126,13 +126,13 @@ export default function InboundDialog(props: Props) {
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-[12px]" htmlFor="ind-server">Server</Label>
+              <Label className="text-xs" htmlFor="ind-server">Server</Label>
               <select id="ind-server"
                 aria-label="server"
                 value={serverID}
                 onChange={(e) => setServerID(Number(e.target.value) || '')}
                 disabled={isEdit}
-                className="mt-1 h-8 px-2 rounded-md border bg-background text-[13px] font-mono w-full disabled:opacity-60">
+                className="mt-1 h-8 px-2 rounded-md border bg-background text-sm font-mono w-full disabled:opacity-60">
                 <option value="">— select —</option>
                 {(serversQ.data ?? []).map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
@@ -140,13 +140,13 @@ export default function InboundDialog(props: Props) {
               </select>
             </div>
             <div>
-              <Label className="text-[12px]" htmlFor="ind-role">Role</Label>
+              <Label className="text-xs" htmlFor="ind-role">Role</Label>
               <select id="ind-role"
                 aria-label="role"
                 value={role}
                 onChange={(e) => setRole(e.target.value as Role)}
                 disabled={isEdit}
-                className="mt-1 h-8 px-2 rounded-md border bg-background text-[13px] font-mono w-full disabled:opacity-60">
+                className="mt-1 h-8 px-2 rounded-md border bg-background text-sm font-mono w-full disabled:opacity-60">
                 <option value="landing">Landing</option>
                 <option value="relay">Relay</option>
               </select>
@@ -155,13 +155,13 @@ export default function InboundDialog(props: Props) {
 
           {role === 'relay' && (
             <div>
-              <Label className="text-[12px]" htmlFor="ind-upstream">Upstream landing-inbound</Label>
+              <Label className="text-xs" htmlFor="ind-upstream">Upstream landing-inbound</Label>
               <select id="ind-upstream"
                 aria-label="upstream landing-inbound"
                 value={upstreamID}
                 onChange={(e) => setUpstreamID(Number(e.target.value) || '')}
                 disabled={isEdit}
-                className="mt-1 h-8 px-2 rounded-md border bg-background text-[13px] font-mono w-full disabled:opacity-60">
+                className="mt-1 h-8 px-2 rounded-md border bg-background text-sm font-mono w-full disabled:opacity-60">
                 <option value="">— select —</option>
                 {landings.map((l) => (
                   <option key={l.id} value={l.id}>
@@ -174,18 +174,18 @@ export default function InboundDialog(props: Props) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-[12px]">Protocol</Label>
+              <Label className="text-xs">Protocol</Label>
               <select value={protocol}
                 onChange={(e) => setProtocol(e.target.value as Protocol)}
                 disabled={isEdit}
-                className="mt-1 h-8 px-2 rounded-md border bg-background text-[13px] font-mono w-full disabled:opacity-60">
+                className="mt-1 h-8 px-2 rounded-md border bg-background text-sm font-mono w-full disabled:opacity-60">
                 <option value="vless-reality">VLESS + REALITY</option>
                 <option value="vmess-ws">VMess + WS</option>
                 <option value="shadowsocks">Shadowsocks</option>
               </select>
             </div>
             <div>
-              <Label className="text-[12px]">Port</Label>
+              <Label className="text-xs">Port</Label>
               <Input type="number" value={port} onChange={(e) => setPort(Number(e.target.value))}
                 className="h-8 font-mono mt-1" />
             </div>
@@ -193,10 +193,10 @@ export default function InboundDialog(props: Props) {
 
           {protocol !== 'shadowsocks' && (
             <div>
-              <Label className="text-[12px]">UUID</Label>
+              <Label className="text-xs">UUID</Label>
               <div className="flex gap-2 mt-1">
                 <Input value={uuid} onChange={(e) => setUUID(e.target.value)}
-                  className="h-8 font-mono text-[12px]" />
+                  className="h-8 font-mono text-xs" />
                 <Button type="button" variant="outline" size="sm" className="h-8"
                   onClick={() => setUUID(randomUUID())}>new</Button>
               </div>
@@ -204,7 +204,7 @@ export default function InboundDialog(props: Props) {
           )}
 
           <div>
-            <Label className="text-[12px]" htmlFor="ind-alias">Alias</Label>
+            <Label className="text-xs" htmlFor="ind-alias">Alias</Label>
             <Input id="ind-alias" value={alias} onChange={(e) => setAlias(e.target.value)}
               placeholder="可选：节点别名，留空用默认命名"
               className="h-8 font-mono mt-1" />
@@ -213,20 +213,20 @@ export default function InboundDialog(props: Props) {
           {protocol === 'vless-reality' && (
             <>
               <div>
-                <Label className="text-[12px]">REALITY SNI (target domain)</Label>
+                <Label className="text-xs">REALITY SNI (target domain)</Label>
                 <Input value={sni} onChange={(e) => setSNI(e.target.value)}
                   className="h-8 font-mono mt-1" />
-                <p className="text-fg-dim text-[11px] mt-1">
+                <p className="text-fg-dim text-2xs mt-1">
                   Must be a single-tenant TLS endpoint. Do NOT use multi-tenant CDNs.
                 </p>
               </div>
               <div>
-                <Label className="text-[12px]">REALITY keypair</Label>
+                <Label className="text-xs">REALITY keypair</Label>
                 <div className="flex gap-2 mt-1">
                   <Input value={privateKey} placeholder="private" readOnly
-                    className="h-8 font-mono text-[11px]" />
+                    className="h-8 font-mono text-2xs" />
                   <Input value={publicKey} placeholder="public" readOnly
-                    className="h-8 font-mono text-[11px]" />
+                    className="h-8 font-mono text-2xs" />
                   <Button type="button" variant="outline" size="sm" className="h-8"
                     onClick={async () => {
                       const kp = await generateX25519()
@@ -235,7 +235,7 @@ export default function InboundDialog(props: Props) {
                 </div>
               </div>
               <div>
-                <Label className="text-[12px]">Short ID</Label>
+                <Label className="text-xs">Short ID</Label>
                 <div className="flex gap-2 mt-1">
                   <Input value={shortID} onChange={(e) => setShortID(e.target.value)}
                     className="h-8 font-mono" />
@@ -251,7 +251,7 @@ export default function InboundDialog(props: Props) {
 
           {protocol === 'vmess-ws' && (
             <div>
-              <Label className="text-[12px]">WebSocket path</Label>
+              <Label className="text-xs">WebSocket path</Label>
               <Input value={wsPath} onChange={(e) => setWSPath(e.target.value)}
                 className="h-8 font-mono mt-1" />
             </div>
@@ -260,23 +260,23 @@ export default function InboundDialog(props: Props) {
           {protocol === 'shadowsocks' && (
             <>
               <div>
-                <Label className="text-[12px]" htmlFor="ind-ss-method">Method</Label>
+                <Label className="text-xs" htmlFor="ind-ss-method">Method</Label>
                 <select id="ind-ss-method"
                   aria-label="method"
                   value={ssMethod}
                   onChange={(e) => setSSMethod(e.target.value)}
-                  className="mt-1 h-8 px-2 rounded-md border bg-background text-[13px] font-mono w-full disabled:opacity-60">
+                  className="mt-1 h-8 px-2 rounded-md border bg-background text-sm font-mono w-full disabled:opacity-60">
                   {XRAY_SS_METHODS.map((m) => (
                     <option key={m} value={m}>{m}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <Label className="text-[12px]">Password</Label>
+                <Label className="text-xs">Password</Label>
                 <div className="flex gap-2 mt-1">
                   <Input aria-label="ss password" value={ssPassword}
                     onChange={(e) => setSSPassword(e.target.value)}
-                    className="h-8 font-mono text-[12px]" />
+                    className="h-8 font-mono text-xs" />
                   <Button type="button" variant="outline" size="sm" className="h-8"
                     onClick={() => setSSPassword(randomSSKey(ssMethod))}>new</Button>
                 </div>
@@ -284,7 +284,7 @@ export default function InboundDialog(props: Props) {
             </>
           )}
 
-          {error && <p className="text-err text-[12px]">{error}</p>}
+          {error && <p className="text-err text-xs">{error}</p>}
         </div>
 
         <DialogFooter>

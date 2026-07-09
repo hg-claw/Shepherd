@@ -49,18 +49,18 @@ export function MetricCard({ card, mode: _mode }: Props) {
       >
         <div className="flex items-center gap-2">
           <CountryFlag code={card.country_code} />
-          <span className="font-mono text-[11.5px] text-muted-foreground truncate">{card.alias}</span>
+          <span className="font-mono text-2xs text-muted-foreground truncate">{card.alias}</span>
         </div>
         <div
           className={cn(
-            'font-mono text-[22px] mt-0.5 tracking-tight tabular-nums leading-none',
+            'font-mono text-title mt-0.5 tracking-tight tabular-nums leading-none',
             status === 'warn' && 'text-warn',
             status === 'err' && 'text-err',
           )}
         >
           {headline}
         </div>
-        <div className="flex gap-2 mt-1.5 font-mono text-[10.5px] text-fg-dim">
+        <div className="flex gap-2 mt-1.5 font-mono text-2xs text-fg-dim">
           <span>MEM {mem != null ? `${mem.toFixed(0)}%` : '—'}</span>
           {disk != null && <span>DSK {disk.toFixed(0)}%</span>}
         </div>
@@ -71,7 +71,7 @@ export function MetricCard({ card, mode: _mode }: Props) {
           <NetqualityPills items={card.netquality} />
         )}
         {status === 'offline' && (
-          <div className="mt-1.5 text-[10.5px] text-fg-dim font-mono">{lastSeenLabel}</div>
+          <div className="mt-1.5 text-2xs text-fg-dim font-mono">{lastSeenLabel}</div>
         )}
       </div>
     </Link>
@@ -106,7 +106,7 @@ function NetqualityPills({ items }: { items: NetqualityISPSummary[] }) {
           <span
             key={it.isp}
             className={cn(
-              'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono tabular-nums',
+              'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-mono tabular-nums',
               tone === 'ok' && 'bg-[hsl(var(--ok)/0.12)] text-[hsl(var(--ok))]',
               tone === 'warn' && 'bg-[hsl(var(--warn)/0.15)] text-[hsl(var(--warn))]',
               tone === 'err' && 'bg-[hsl(var(--err)/0.15)] text-[hsl(var(--err))]',

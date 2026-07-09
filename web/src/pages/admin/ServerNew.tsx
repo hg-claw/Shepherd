@@ -14,6 +14,7 @@ import { useInstall, useScriptInstall } from '@/api/servers'
 import { useUI } from '@/store/ui'
 import { InstallCommandPanel } from '@/components/admin/InstallCommandPanel'
 import { cn } from '@/lib/utils'
+import { PageHeader } from '@/components/PageHeader'
 
 const schema = z.object({
   name: z.string().min(1),
@@ -50,7 +51,7 @@ function TabBar({ active, onChange }: { active: TabKey; onChange: (v: TabKey) =>
           type="button"
           onClick={() => onChange(tab.key)}
           className={cn(
-            'px-3 py-2 text-[13px] -mb-px border-b-2 transition-colors',
+            'px-3 py-2 text-sm -mb-px border-b-2 transition-colors',
             active === tab.key
               ? 'border-foreground text-foreground font-medium'
               : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -81,12 +82,12 @@ function Field({
 }) {
   return (
     <div className={cn('flex flex-col gap-1', className)}>
-      <Label htmlFor={id} className="text-[12.5px] font-medium">
+      <Label htmlFor={id} className="text-sm font-medium">
         {label}
       </Label>
       {children}
       {hint && !error && (
-        <span className="font-mono text-[11.5px] text-fg-dim">{hint}</span>
+        <span className="font-mono text-2xs text-fg-dim">{hint}</span>
       )}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
@@ -110,7 +111,7 @@ function InputField({
 } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <Field id={id} label={label} hint={hint} error={error} className={className}>
-      <Input id={id} className="h-8 text-[13px]" {...rest} />
+      <Input id={id} className="h-8 text-sm" {...rest} />
     </Field>
   )
 }
@@ -151,8 +152,8 @@ function SshInstallForm() {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-[14px]">SSH</CardTitle>
-        <CardDescription className="text-[12.5px]">
+        <CardTitle className="text-sm">SSH</CardTitle>
+        <CardDescription className="text-sm">
           {t('servernew.ssh_desc', 'Credentials are used once and discarded after install.')}
         </CardDescription>
       </CardHeader>
@@ -231,7 +232,7 @@ function SshInstallForm() {
               onCheckedChange={(v) => setValue('show_on_public', v)}
               id="show_on_public"
             />
-            <Label htmlFor="show_on_public" className="text-[12.5px]">
+            <Label htmlFor="show_on_public" className="text-sm">
               {t('servernew.show_on_public', 'Show on public wall')}
             </Label>
           </div>
@@ -285,10 +286,10 @@ function ScriptInstallForm() {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-[14px]">
+        <CardTitle className="text-sm">
           {t('servernew.script_title', 'Add via install script')}
         </CardTitle>
-        <CardDescription className="text-[12.5px]">
+        <CardDescription className="text-sm">
           {t('servernew.script_desc', 'Generate a one-time install command to run on the target host.')}
         </CardDescription>
       </CardHeader>
@@ -299,7 +300,7 @@ function ScriptInstallForm() {
               id="script-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-8 text-[13px]"
+              className="h-8 text-sm"
             />
           </Field>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -308,7 +309,7 @@ function ScriptInstallForm() {
                 id="script-alias"
                 value={publicAlias}
                 onChange={(e) => setPublicAlias(e.target.value)}
-                className="h-8 text-[13px]"
+                className="h-8 text-sm"
               />
             </Field>
             <Field id="script-group" label={t('servernew.public_group', 'Public group')}>
@@ -316,7 +317,7 @@ function ScriptInstallForm() {
                 id="script-group"
                 value={publicGroup}
                 onChange={(e) => setPublicGroup(e.target.value)}
-                className="h-8 text-[13px]"
+                className="h-8 text-sm"
               />
             </Field>
             <Field id="script-cc" label={t('servernew.country_code', 'Country code (ISO-2)')}>
@@ -325,7 +326,7 @@ function ScriptInstallForm() {
                 value={countryCode}
                 onChange={(e) => setCountryCode(e.target.value.toUpperCase())}
                 maxLength={2}
-                className="h-8 text-[13px]"
+                className="h-8 text-sm"
               />
             </Field>
           </div>
@@ -335,7 +336,7 @@ function ScriptInstallForm() {
               onCheckedChange={setShowOnPublic}
               id="script-public"
             />
-            <Label htmlFor="script-public" className="text-[12.5px]">
+            <Label htmlFor="script-public" className="text-sm">
               {t('servernew.show_on_public', 'Show on public wall')}
             </Label>
           </div>
@@ -345,7 +346,7 @@ function ScriptInstallForm() {
               onCheckedChange={setCNMirror}
               id="script-cn"
             />
-            <Label htmlFor="script-cn" className="text-[12.5px]">
+            <Label htmlFor="script-cn" className="text-sm">
               {t('servernew.cn_mirror', 'CN mirror (gh-proxy.com — for mainland-China hosts)')}
             </Label>
           </div>
@@ -373,21 +374,21 @@ export default function ServerNew() {
   return (
     <div className="space-y-4 max-w-2xl">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight m-0">
-            {t('admin.add_server', 'Add server')}
-          </h1>
-          <p className="text-muted-foreground text-[13px] mt-1">
-            {t(
-              'servernew.subtitle',
-              'Onboard a new host via SSH (creds discarded after use) or by generating an install command.',
-            )}
-          </p>
-        </div>
-        <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
-          <Link to="/admin/servers">{t('common.cancel', 'Cancel')}</Link>
-        </Button>
+      <div>
+        <PageHeader
+          title={t('admin.add_server', 'Add server')}
+          actions={
+            <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
+              <Link to="/admin/servers">{t('common.cancel', 'Cancel')}</Link>
+            </Button>
+          }
+        />
+        <p className="text-muted-foreground text-sm mt-1">
+          {t(
+            'servernew.subtitle',
+            'Onboard a new host via SSH (creds discarded after use) or by generating an install command.',
+          )}
+        </p>
       </div>
 
       {/* Tab selector */}

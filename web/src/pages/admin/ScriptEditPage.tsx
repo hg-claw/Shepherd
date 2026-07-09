@@ -6,6 +6,7 @@ import { useScript, useCreateScript, useUpdateScript, type Param } from '@/api/s
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PageHeader } from '@/components/PageHeader'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -54,49 +55,47 @@ export default function ScriptEditPage({ mode }: Props) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Header */}
-      <div>
-        <h1 className="text-[22px] font-semibold tracking-tight m-0">
-          {mode === 'create' ? t('scripts.new', 'New script') : t('scripts.edit', 'Edit script')}
-        </h1>
-      </div>
+      <PageHeader
+        title={mode === 'create' ? t('scripts.new', 'New script') : t('scripts.edit', 'Edit script')}
+      />
 
       {/* Basic fields */}
       <div className="border rounded-lg bg-elev overflow-hidden">
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-          <span className="text-foreground font-medium text-[12.5px]">
+          <span className="text-foreground font-medium text-sm">
             {t('scripts.details', 'Details')}
           </span>
         </div>
         <div className="p-4 space-y-3">
           <div>
-            <Label className="text-[12px]">{t('scripts.name', 'Name')}</Label>
+            <Label className="text-xs">{t('scripts.name', 'Name')}</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-1 font-mono text-[12.5px]"
+              className="mt-1 font-mono text-sm"
               placeholder="my-script"
             />
           </div>
           <div>
-            <Label className="text-[12px]">{t('scripts.description', 'Description')}</Label>
+            <Label className="text-xs">{t('scripts.description', 'Description')}</Label>
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="mt-1 text-[12.5px]"
+              className="mt-1 text-sm"
               placeholder="One-line description"
             />
           </div>
           <div>
-            <Label className="text-[12px]">
+            <Label className="text-xs">
               {t('scripts.default_timeout', 'Default timeout (s)')}
             </Label>
             <Input
               type="number"
               value={defaultTimeout}
               onChange={(e) => setDefaultTimeout(e.target.value)}
-              className="mt-1 w-32 font-mono text-[12.5px]"
+              className="mt-1 w-32 font-mono text-sm"
               placeholder="300"
             />
           </div>
@@ -106,7 +105,7 @@ export default function ScriptEditPage({ mode }: Props) {
       {/* Script content */}
       <div className="border rounded-lg bg-elev overflow-hidden">
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-          <span className="text-foreground font-medium text-[12.5px]">
+          <span className="text-foreground font-medium text-sm">
             {t('scripts.content', 'Script content')}
           </span>
         </div>
@@ -114,10 +113,10 @@ export default function ScriptEditPage({ mode }: Props) {
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            className="w-full font-mono text-[12px] rounded-md border border-input bg-[#09090b] text-zinc-200 p-3 min-h-[200px] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y leading-relaxed"
+            className="w-full font-mono text-xs rounded-md border border-input bg-console text-console-fg p-3 min-h-[200px] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y leading-relaxed"
             placeholder="#!/usr/bin/env bash&#10;set -euo pipefail&#10;"
           />
-          <p className="text-fg-dim font-mono text-[11px] mt-1.5">
+          <p className="text-fg-dim font-mono text-2xs mt-1.5">
             hint · bash/sh shebang line is required · env vars injected as UPPERCASE param names
           </p>
         </div>
@@ -126,14 +125,14 @@ export default function ScriptEditPage({ mode }: Props) {
       {/* Parameters */}
       <div className="border rounded-lg bg-elev overflow-hidden">
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
-          <span className="text-foreground font-medium text-[12.5px]">
+          <span className="text-foreground font-medium text-sm">
             {t('scripts.params', 'Params')}
           </span>
-          <span className="text-fg-dim font-mono text-[11px]">{params.length} defined</span>
+          <span className="text-fg-dim font-mono text-2xs">{params.length} defined</span>
           <Button
             size="sm"
             variant="outline"
-            className="ml-auto h-7 px-2 text-[12px] gap-1"
+            className="ml-auto h-7 px-2 text-xs gap-1"
             onClick={() => setParams([...params, { name: '', required: false, default: '' }])}
           >
             <Plus className="h-3 w-3" />
@@ -142,7 +141,7 @@ export default function ScriptEditPage({ mode }: Props) {
         </div>
 
         {params.length === 0 ? (
-          <div className="px-4 py-6 text-center text-fg-dim font-mono text-[12px]">
+          <div className="px-4 py-6 text-center text-fg-dim font-mono text-xs">
             no parameters defined
           </div>
         ) : (
@@ -153,7 +152,7 @@ export default function ScriptEditPage({ mode }: Props) {
                 className="flex items-start gap-2 px-4 py-3 flex-wrap sm:flex-nowrap"
               >
                 <div className="min-w-0 flex-1">
-                  <Label className="text-[10.5px] uppercase tracking-wide text-muted-foreground">name</Label>
+                  <Label className="text-2xs uppercase tracking-wide text-muted-foreground">name</Label>
                   <Input
                     value={p.name}
                     onChange={(e) => {
@@ -161,12 +160,12 @@ export default function ScriptEditPage({ mode }: Props) {
                       next[i] = { ...next[i], name: e.target.value }
                       setParams(next)
                     }}
-                    className="mt-1 h-7 font-mono text-[12px]"
+                    className="mt-1 h-7 font-mono text-xs"
                     placeholder="param_name"
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <Label className="text-[10.5px] uppercase tracking-wide text-muted-foreground">label</Label>
+                  <Label className="text-2xs uppercase tracking-wide text-muted-foreground">label</Label>
                   <Input
                     value={p.label ?? ''}
                     onChange={(e) => {
@@ -174,12 +173,12 @@ export default function ScriptEditPage({ mode }: Props) {
                       next[i] = { ...next[i], label: e.target.value }
                       setParams(next)
                     }}
-                    className="mt-1 h-7 text-[12px]"
+                    className="mt-1 h-7 text-xs"
                     placeholder="Human-readable label"
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <Label className="text-[10.5px] uppercase tracking-wide text-muted-foreground">default</Label>
+                  <Label className="text-2xs uppercase tracking-wide text-muted-foreground">default</Label>
                   <Input
                     value={p.default ?? ''}
                     onChange={(e) => {
@@ -187,12 +186,12 @@ export default function ScriptEditPage({ mode }: Props) {
                       next[i] = { ...next[i], default: e.target.value }
                       setParams(next)
                     }}
-                    className="mt-1 h-7 font-mono text-[12px]"
+                    className="mt-1 h-7 font-mono text-xs"
                     placeholder="default value"
                   />
                 </div>
                 <div className="flex items-center gap-2 mt-auto pb-[1px]">
-                  <label className={cn('flex items-center gap-1.5 text-[12px] cursor-pointer whitespace-nowrap mt-5')}>
+                  <label className={cn('flex items-center gap-1.5 text-xs cursor-pointer whitespace-nowrap mt-5')}>
                     <input
                       type="checkbox"
                       checked={!!p.required}
@@ -203,7 +202,7 @@ export default function ScriptEditPage({ mode }: Props) {
                       }}
                       className="h-3.5 w-3.5 accent-primary"
                     />
-                    <span className="text-[12px]">required</span>
+                    <span className="text-xs">required</span>
                   </label>
                   <Button
                     size="icon"

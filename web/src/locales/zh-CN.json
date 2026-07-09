@@ -178,15 +178,27 @@
     "copied": "已复制",
     "back": "返回",
     "not_found": "未找到",
+    "no_results": "无匹配结果",
+    "clear_filter": "清除筛选",
     "minute_ago": "{{n}} 分钟前",
     "second_ago": "{{n}} 秒前",
     "hour_ago": "{{n}} 小时前",
     "day_ago": "{{n}} 天前",
     "just_now": "刚刚"
   },
+  "servers": {
+    "empty": "暂无主机",
+    "reset_traffic": "立即重置",
+    "reset_traffic_confirm": "确认立即重置流量统计？",
+    "reset_now": "立即重置",
+    "last_reset": "上次重置"
+  },
   "scripts": {
     "title": "脚本",
     "new": "新建",
+    "empty": "暂无脚本",
+    "delete_script": "删除脚本",
+    "delete_script_confirm": "确认删除脚本 \"{{name}}\"？此操作不可撤销。",
     "edit": "编辑脚本",
     "name": "名称",
     "description": "描述",
@@ -225,7 +237,9 @@
     "items": "项",
     "drop_hint": "拖拽到此区域上传",
     "transfers": "传输队列",
-    "no_transfers": "暂无传输"
+    "no_transfers": "暂无传输",
+    "remove": "删除",
+    "remove_confirm": "确认删除 {{name}}？"
   },
   "plugins": {
     "subtitle": "通过日志解析、自定义指标采集、告警转发等插件扩展 Shepherd 代理。",
@@ -243,11 +257,36 @@
     "action_filter": "筛选动作…",
     "server_id_filter": "服务器 ID",
     "from": "起始（RFC3339）",
-    "to": "终止（RFC3339）"
+    "to": "终止（RFC3339）",
+    "empty": "暂无审计记录"
   },
   "recording": {
     "title": "录制回放",
     "replay": "重放"
+  },
+  "sshaudit": {
+    "enable_fail2ban": "启用 fail2ban",
+    "enable_fail2ban_confirm": "将在此主机上安装、配置并启动 SSH 暴力破解防护（fail2ban）。"
+  },
+  "singbox": {
+    "delete_inbound": "删除入站",
+    "delete_inbound_confirm": "确认删除入站 \"{{name}}\"？",
+    "delete_certificate": "删除证书",
+    "delete_certificate_confirm": "确认删除证书 \"{{name}}\"？"
+  },
+  "xray": {
+    "delete_inbound": "删除入站",
+    "delete_inbound_confirm": "确认删除入站 \"{{name}}\"？"
+  },
+  "netquality": {
+    "delete_target": "删除目标",
+    "delete_target_confirm": "确认删除自定义目标 \"{{name}}\"？"
+  },
+  "subgen": {
+    "delete_subscription": "删除订阅",
+    "delete_subscription_confirm": "确认删除订阅 \"{{name}}\"？",
+    "delete_template": "删除模板",
+    "delete_template_confirm": "确认删除模板 \"{{name}}\"？"
   },
   "server": {
     "update_agent": "更新 agent",

@@ -253,7 +253,12 @@
     "delete_inbound": "Delete inbound",
     "delete_inbound_confirm": "Delete inbound \"{{name}}\"?",
     "delete_certificate": "Delete certificate",
-    "delete_certificate_confirm": "Delete certificate \"{{name}}\"?"
+    "delete_certificate_confirm": "Delete certificate \"{{name}}\"?",
+    "snell": {
+      "psk": "PSK",
+      "obfs_mode": "Obfuscation",
+      "mode": "Traffic mode"
+    }
   },
   "xray": {
     "delete_inbound": "Delete inbound",

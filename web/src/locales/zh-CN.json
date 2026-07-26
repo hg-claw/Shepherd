@@ -272,7 +272,12 @@
     "delete_inbound": "删除入站",
     "delete_inbound_confirm": "确认删除入站 \"{{name}}\"？",
     "delete_certificate": "删除证书",
-    "delete_certificate_confirm": "确认删除证书 \"{{name}}\"？"
+    "delete_certificate_confirm": "确认删除证书 \"{{name}}\"？",
+    "snell": {
+      "psk": "PSK",
+      "obfs_mode": "混淆",
+      "mode": "流量模式"
+    }
   },
   "xray": {
     "delete_inbound": "删除入站",

@@ -1,6 +1,8 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { I18nextProvider } from 'react-i18next'
+import i18n from '@/i18n'
 import InboundDialog from './InboundDialog'
 import * as pluginsAPI from '@/api/plugins'
 
@@ -32,8 +34,16 @@ vi.mock('@/store/ui', () => ({
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  return (
+    <I18nextProvider i18n={i18n}>
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    </I18nextProvider>
+  )
 }
+
+beforeEach(async () => {
+  await i18n.changeLanguage('en')
+})
 
 describe('singbox/InboundDialog', () => {
   it('shows port field for all protocols', () => {
@@ -155,6 +165,76 @@ describe('singbox/InboundDialog', () => {
     fireEvent.click(newBtn)
 
     expect(pwInput.value).not.toBe('')
+  })
+
+  it('shows PSK and obfs field for snell-v5, hides sni/uuid', async () => {
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    const select = screen.getByRole('combobox', { name: /protocol/i })
+    fireEvent.change(select, { target: { value: 'snell-v5' } })
+
+    await waitFor(() => expect(screen.getByLabelText(/psk/i)).toBeTruthy())
+    expect(screen.getByLabelText(/obfs/i)).toBeTruthy()
+    expect(screen.queryByLabelText(/sni/i)).toBeNull()
+    expect(screen.queryByLabelText(/uuid/i)).toBeNull()
+  })
+
+  it('shows mode field instead of obfs for snell-v6', async () => {
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    const select = screen.getByRole('combobox', { name: /protocol/i })
+    fireEvent.change(select, { target: { value: 'snell-v6' } })
+
+    await waitFor(() => expect(screen.getByLabelText(/mode/i)).toBeTruthy())
+    expect(screen.queryByLabelText(/obfs/i)).toBeNull()
+  })
+
+  it('submits extra: JSON.stringify({ obfs_mode }) for snell-v5', async () => {
+    const spy = vi.spyOn(pluginsAPI, 'createSingboxInbound')
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    const select = screen.getByRole('combobox', { name: /protocol/i })
+    fireEvent.change(select, { target: { value: 'snell-v5' } })
+
+    await waitFor(() => expect(screen.getByLabelText(/obfs/i)).toBeTruthy())
+    fireEvent.change(screen.getByLabelText(/obfs/i), { target: { value: 'http' } })
+
+    const createBtn = screen.getByRole('button', { name: /create/i })
+    fireEvent.click(createBtn)
+
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({ extra: JSON.stringify({ obfs_mode: 'http' }) }),
+      )
+    )
+  })
+
+  it('submits extra: JSON.stringify({ mode }) for snell-v6', async () => {
+    const spy = vi.spyOn(pluginsAPI, 'createSingboxInbound')
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    const select = screen.getByRole('combobox', { name: /protocol/i })
+    fireEvent.change(select, { target: { value: 'snell-v6' } })
+
+    await waitFor(() => expect(screen.getByLabelText(/mode/i)).toBeTruthy())
+    fireEvent.change(screen.getByLabelText(/mode/i), { target: { value: 'unsafe-raw' } })
+
+    const createBtn = screen.getByRole('button', { name: /create/i })
+    fireEvent.click(createBtn)
+
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({ extra: JSON.stringify({ mode: 'unsafe-raw' }) }),
+      )
+    )
   })
 
   it('SS new button fills ss password with a base64 key of correct length for aes-128-gcm', async () => {

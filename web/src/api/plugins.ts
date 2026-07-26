@@ -274,6 +274,7 @@ export type SingboxProtocol =
   | 'vmess-ws-tls' | 'vmess-h2-tls' | 'vmess-httpupgrade-tls'
   | 'trojan-tls'   | 'trojan-ws-tls' | 'trojan-h2-tls' | 'trojan-httpupgrade-tls'
   | 'hysteria2' | 'tuic-v5' | 'anytls' | 'shadowsocks-2022'
+  | 'snell-v5' | 'snell-v6'
 
 export interface SingboxInbound {
   id: number

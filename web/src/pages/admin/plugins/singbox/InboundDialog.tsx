@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,6 +36,8 @@ const PROTOCOLS: { value: SingboxProtocol; label: string }[] = [
   { value: 'tuic-v5',               label: 'TUIC v5' },
   { value: 'anytls',                label: 'AnyTLS' },
   { value: 'shadowsocks-2022',       label: 'Shadowsocks 2022' },
+  { value: 'snell-v5',               label: 'Snell v5' },
+  { value: 'snell-v6',               label: 'Snell v6' },
 ]
 
 const SS_METHODS = [
@@ -43,13 +46,23 @@ const SS_METHODS = [
   '2022-blake3-chacha20-poly1305',
 ]
 
+// obfs_mode ∈ none|http (v5), mode ∈ default|unshaped|unsafe-raw (v6) — must
+// match the backend enums exactly (internal/plugins/singbox validation).
+const SNELL_OBFS_MODES = ['none', 'http']
+const SNELL_MODES = ['default', 'unshaped', 'unsafe-raw']
+
 // ─── Per-protocol field predicates ───────────────────────────────────────────
 
+function isSnell(p: SingboxProtocol): boolean {
+  return p === 'snell-v5' || p === 'snell-v6'
+}
 function needsUUID(p: SingboxProtocol): boolean {
   return p.startsWith('vless-') || p.startsWith('vmess-') || p === 'tuic-v5'
 }
 function needsPassword(p: SingboxProtocol): boolean {
-  return p.startsWith('trojan-') || p === 'hysteria2' || p === 'tuic-v5' || p === 'anytls'
+  // Snell's psk rides in the same `password` field/column as the other
+  // protocols — no separate psk column on the backend.
+  return p.startsWith('trojan-') || p === 'hysteria2' || p === 'tuic-v5' || p === 'anytls' || isSnell(p)
 }
 function needsSS(p: SingboxProtocol): boolean {
   return p === 'shadowsocks-2022'
@@ -91,9 +104,17 @@ interface Props {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function InboundDialog({ serverID, initial, open, onClose, onSaved }: Props) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const isEdit = !!initial
+  // Snell's obfs_mode (v5) / mode (v6) ride in the generic `extra` JSON
+  // field — parse whatever the backend returned so editing an existing
+  // snell inbound pre-fills the right dropdown option.
+  const initialExtra: Record<string, unknown> = (() => {
+    try { return initial?.extra_json ? JSON.parse(initial.extra_json) : {} }
+    catch { return {} }
+  })()
   // Relays have a different shape from landings: they're created by
   // BulkRelayDialog and store the relay-side keys, NOT the landing-side
   // handshake server / private key (those are landing-only concepts in
@@ -141,6 +162,14 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
   const [ssMethod,   setSSMethod]   = useState<string>(initial?.ss_method ?? SS_METHODS[0])
   const [ssPassword, setSSPassword] = useState<string>(initial?.ss_password ?? '')
 
+  // Snell (psk shares the `password` state above)
+  const [snellObfs, setSnellObfs] = useState<string>(
+    typeof initialExtra.obfs_mode === 'string' ? initialExtra.obfs_mode : SNELL_OBFS_MODES[0],
+  )
+  const [snellMode, setSnellMode] = useState<string>(
+    typeof initialExtra.mode === 'string' ? initialExtra.mode : SNELL_MODES[0],
+  )
+
   const [error, setError] = useState<string | null>(null)
 
   // Reset cert when switching protocols (cert may no longer apply)
@@ -185,6 +214,10 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
         body.ss_method   = ssMethod
         body.ss_password = ssPassword
       }
+      // obfs_mode (v5) / mode (v6) travel in the generic `extra` JSON field
+      // — the same channel hysteria2's up_mbps uses server-side.
+      if (protocol === 'snell-v5') body.extra = JSON.stringify({ obfs_mode: snellObfs })
+      if (protocol === 'snell-v6') body.extra = JSON.stringify({ mode: snellMode })
 
       if (isEdit) {
         // Only send patchable fields
@@ -296,16 +329,46 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
             </div>
           )}
 
-          {/* ── Password (trojan / hysteria2 / tuic / anytls) ── */}
+          {/* ── Password (trojan / hysteria2 / tuic / anytls / snell psk) ── */}
           {needsPassword(protocol) && (
             <div>
-              <Label className={labelCls} htmlFor="ib-pw">Password</Label>
+              <Label className={labelCls} htmlFor="ib-pw">
+                {isSnell(protocol) ? t('singbox.snell.psk') : 'Password'}
+              </Label>
               <div className="flex gap-2">
-                <Input id="ib-pw" aria-label="password" className={inputCls + ' flex-1'}
+                <Input id="ib-pw" aria-label={isSnell(protocol) ? 'psk' : 'password'} className={inputCls + ' flex-1'}
                   value={password} onChange={(e) => setPassword(e.target.value)} />
                 <Button type="button" variant="outline" size="sm" className="h-8"
                   onClick={() => setPassword(randomPassword())}>new</Button>
               </div>
+            </div>
+          )}
+
+          {/* ── Snell obfs_mode (v5) / mode (v6) ── */}
+          {protocol === 'snell-v5' && (
+            <div>
+              <Label className={labelCls} htmlFor="ib-snell-obfs">{t('singbox.snell.obfs_mode')}</Label>
+              <select id="ib-snell-obfs" aria-label="obfs mode"
+                className={selectCls}
+                value={snellObfs}
+                onChange={(e) => setSnellObfs(e.target.value)}>
+                {SNELL_OBFS_MODES.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {protocol === 'snell-v6' && (
+            <div>
+              <Label className={labelCls} htmlFor="ib-snell-mode">{t('singbox.snell.mode')}</Label>
+              <select id="ib-snell-mode" aria-label="mode"
+                className={selectCls}
+                value={snellMode}
+                onChange={(e) => setSnellMode(e.target.value)}>
+                {SNELL_MODES.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
             </div>
           )}
 

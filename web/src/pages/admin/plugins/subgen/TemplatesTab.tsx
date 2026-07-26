@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Pill } from '@/components/Pill'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
@@ -148,67 +149,71 @@ export default function TemplatesTab() {
     setEditing({ id: null, name: `${t.name} copy`, rules: t.rules_json })
 
   if (tplQ.isError) {
-    return <div className="text-err text-sm">Failed to load templates: {(tplQ.error as Error).message}</div>
+    return (
+      <div className="text-err text-sm">
+        {tr('subgen.templates.load_error', 'Failed to load templates: {{message}}', {
+          message: (tplQ.error as Error).message,
+        })}
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Templates describe how nodes map to policies and which rule-sets to include. Built-in templates are read-only — clone one to customize.
+          {tr('subgen.templates.description', 'Templates describe how nodes map to policies and which rule-sets to include. Built-in templates are read-only — clone one to customize.')}
         </p>
         <Button size="sm" onClick={openNew}>
-          <Plus className="h-3.5 w-3.5 mr-1" /> New template
+          <Plus className="h-3.5 w-3.5 mr-1" /> {tr('subgen.templates.new', 'New template')}
         </Button>
       </div>
 
-      <div className="rounded-lg border bg-elev overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
-          <thead>
-            <tr className="text-left">
-              <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Name</th>
-              <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Type</th>
-              <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {templates.map((t) => (
-              <tr key={t.id} className="border-t">
-                <td className="px-3 py-2 font-mono">{t.name}</td>
-                <td className="px-3 py-2">
-                  {t.builtin
-                    ? <Pill kind="neutral">built-in</Pill>
-                    : <Pill kind="neutral">custom</Pill>}
-                </td>
-                <td className="px-3 py-2 text-right whitespace-nowrap">
-                  {t.builtin ? (
-                    <Button variant="outline" size="xs"
-                      onClick={() => openClone(t)}>
-                      <CopyIcon className="h-3.5 w-3.5 mr-1" /> Clone
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead>{tr('subgen.templates.name', 'Name')}</TableHead>
+            <TableHead>{tr('subgen.templates.type', 'Type')}</TableHead>
+            <TableHead className="text-right">{tr('admin.actions', 'Actions')}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {templates.map((t) => (
+            <TableRow key={t.id}>
+              <TableCell className="font-mono">{t.name}</TableCell>
+              <TableCell>
+                {t.builtin
+                  ? <Pill kind="neutral">{tr('subgen.templates.builtin_pill', 'built-in')}</Pill>
+                  : <Pill kind="neutral">{tr('subgen.templates.custom_pill', 'custom')}</Pill>}
+              </TableCell>
+              <TableCell className="text-right whitespace-nowrap">
+                {t.builtin ? (
+                  <Button variant="outline" size="xs"
+                    onClick={() => openClone(t)}>
+                    <CopyIcon className="h-3.5 w-3.5 mr-1" /> {tr('subgen.templates.clone', 'Clone')}
+                  </Button>
+                ) : (
+                  <>
+                    <Button variant="outline" size="xs" className="mr-1"
+                      onClick={() => openEdit(t)}>
+                      <Pencil className="h-3.5 w-3.5 mr-1" /> {tr('subgen.templates.edit_action', 'Edit')}
                     </Button>
-                  ) : (
-                    <>
-                      <Button variant="outline" size="xs" className="mr-1"
-                        onClick={() => openEdit(t)}>
-                        <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                      </Button>
-                      <Button variant="ghost" size="xs" className="w-7 p-0"
-                        disabled={remove.isPending}
-                        onClick={() => setRemoveTarget(t)}
-                        aria-label="delete">
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {templates.length === 0 && (
-              <tr><td colSpan={3} className="px-3 py-6 text-center text-muted-foreground">No templates.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                    <Button variant="ghost" size="xs" className="w-7 p-0"
+                      disabled={remove.isPending}
+                      onClick={() => setRemoveTarget(t)}
+                      aria-label={tr('subgen.templates.delete_aria', 'delete')}>
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+          {templates.length === 0 && (
+            <TableEmpty colSpan={3}>{tr('subgen.empty.templates', 'No templates yet.')}</TableEmpty>
+          )}
+        </TableBody>
+      </Table>
 
       {editing && (
         <TemplateEditor
@@ -241,6 +246,7 @@ export function TemplateEditor({
   onClose: () => void
   onSaved: () => void
 }) {
+  const { t } = useTranslation()
   const toast = useUI((s) => s.toast)
 
   const initial = parseRules(editing.rules)
@@ -343,7 +349,7 @@ export function TemplateEditor({
       editing.id == null
         ? createSubgenTemplate(name.trim(), rules)
         : updateSubgenTemplate(editing.id, name.trim(), rules),
-    onSuccess: () => { toast('success', 'Template saved'); onSaved() },
+    onSuccess: () => { toast('success', t('subgen.templates.saved_toast', 'Template saved')); onSaved() },
     onError: (e: any) => toast('error', String(e?.message ?? e)),
   })
 
@@ -351,14 +357,14 @@ export function TemplateEditor({
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{editing.id == null ? 'New template' : 'Edit template'}</DialogTitle>
+          <DialogTitle>{editing.id == null ? t('subgen.templates.new', 'New template') : t('subgen.templates.edit', 'Edit template')}</DialogTitle>
         </DialogHeader>
 
         <div className="grid gap-4 md:grid-cols-2">
           {/* ── editor column ─────────────────────────────────────────────── */}
           <div className="max-h-[80vh] overflow-y-auto space-y-4 pr-1">
             <div>
-              <Label className="text-xs">Name</Label>
+              <Label className="text-xs">{t('subgen.templates.name', 'Name')}</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 mt-1" />
             </div>
 
@@ -366,12 +372,12 @@ export function TemplateEditor({
               <button type="button"
                 onClick={() => { if (mode !== 'form') switchToForm() }}
                 className={`px-3 h-7 rounded ${mode === 'form' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}>
-                Form
+                {t('subgen.templates.mode_form', 'Form')}
               </button>
               <button type="button"
                 onClick={() => { if (mode !== 'raw') switchToRaw() }}
                 className={`px-3 h-7 rounded ${mode === 'raw' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}>
-                Raw JSON
+                {t('subgen.templates.mode_raw', 'Raw JSON')}
               </button>
             </div>
 
@@ -379,14 +385,14 @@ export function TemplateEditor({
               <>
                 <div>
                   <div className="flex items-center gap-2">
-                    <Label className="text-xs">Proxy groups</Label>
+                    <Label className="text-xs">{t('subgen.templates.proxy_groups', 'Proxy groups')}</Label>
                     <button type="button" onClick={checkAllGroups}
-                      className="ml-auto text-2xs text-fg-dim hover:text-fg underline">Select all</button>
+                      className="ml-auto text-2xs text-fg-dim hover:text-fg underline">{t('subgen.templates.select_all_groups', 'Select all')}</button>
                     <button type="button" onClick={clearAllGroups}
-                      className="text-2xs text-fg-dim hover:text-fg underline">Clear</button>
+                      className="text-2xs text-fg-dim hover:text-fg underline">{t('subgen.templates.clear_groups', 'Clear')}</button>
                   </div>
                   <p className="text-fg-dim text-2xs mt-0.5 mb-2">
-                    Checked service groups (and their rules) are included in the generated config. Core groups (Proxy / Domestic / Others / Auto) are always present.
+                    {t('subgen.templates.groups_description', 'Checked service groups (and their rules) are included in the generated config. Core groups (Proxy / Domestic / Others / Auto) are always present.')}
                   </p>
                   <div className="grid grid-cols-2 gap-1.5">
                     {oixGroups.map((name) => (
@@ -397,15 +403,16 @@ export function TemplateEditor({
                       </label>
                     ))}
                     {oixGroups.length === 0 && (
-                      <div className="text-fg-dim text-xs">No groups defined.</div>
+                      <div className="text-fg-dim text-xs">{t('subgen.templates.no_groups', 'No groups defined.')}</div>
                     )}
                   </div>
                 </div>
 
                 <div>
-                  <Label className="text-xs">Custom rules</Label>
+                  <Label className="text-xs">{t('subgen.templates.custom_rules_label', 'Custom rules')}</Label>
                   <p className="text-fg-dim text-2xs mt-0.5 mb-1">
-                    One <code>TYPE,VALUE,policy</code> per line (e.g. <code>DOMAIN-SUFFIX,example.com,DIRECT</code>).
+                    {t('subgen.templates.custom_rules_desc_pre', 'One')} <code>TYPE,VALUE,policy</code>{' '}
+                    {t('subgen.templates.custom_rules_desc_post', 'per line (e.g.')} <code>DOMAIN-SUFFIX,example.com,DIRECT</code>).
                   </p>
                   <textarea
                     value={customText}
@@ -420,7 +427,8 @@ export function TemplateEditor({
                 <div>
                   <Label className="text-xs">[General]</Label>
                   <p className="text-fg-dim text-2xs mt-0.5 mb-1">
-                    Raw Surge <code>[General]</code> directives. Leave empty for the default (<code>bypass-system = true</code>).
+                    {t('subgen.templates.raw_surge_prefix', 'Raw Surge')} <code>[General]</code>{' '}
+                    {t('subgen.templates.general_desc_mid', 'directives. Leave empty for the default (')}<code>bypass-system = true</code>).
                   </p>
                   <textarea
                     value={general}
@@ -435,7 +443,8 @@ export function TemplateEditor({
                 <div>
                   <Label className="text-xs">[MITM]</Label>
                   <p className="text-fg-dim text-2xs mt-0.5 mb-1">
-                    Raw Surge <code>[MITM]</code> directives. Leave empty to omit the section.
+                    {t('subgen.templates.raw_surge_prefix', 'Raw Surge')} <code>[MITM]</code>{' '}
+                    {t('subgen.templates.mitm_desc_post', 'directives. Leave empty to omit the section.')}
                   </p>
                   <textarea
                     value={mitm}
@@ -450,7 +459,8 @@ export function TemplateEditor({
                 <div>
                   <Label className="text-xs">[URL Rewrite]</Label>
                   <p className="text-fg-dim text-2xs mt-0.5 mb-1">
-                    Raw Surge <code>[URL Rewrite]</code> lines (Surge / ShadowRocket only; Clash ignores). Leave empty to omit.
+                    {t('subgen.templates.raw_surge_prefix', 'Raw Surge')} <code>[URL Rewrite]</code>{' '}
+                    {t('subgen.templates.url_rewrite_desc_post', 'lines (Surge / ShadowRocket only; Clash ignores). Leave empty to omit.')}
                   </p>
                   <textarea
                     value={urlRewrite}
@@ -465,7 +475,8 @@ export function TemplateEditor({
                 <div>
                   <Label className="text-xs">[Clash] general</Label>
                   <p className="text-fg-dim text-2xs mt-0.5 mb-1">
-                    Raw Clash YAML top-level keys (<code>dns</code>, <code>mode</code>…); used only for the clash target. Leave empty for <code>mode: rule</code>.
+                    {t('subgen.templates.clash_general_desc_pre', 'Raw Clash YAML top-level keys (')}<code>dns</code>, <code>mode</code>
+                    {t('subgen.templates.clash_general_desc_mid', '…); used only for the clash target. Leave empty for')} <code>mode: rule</code>.
                   </p>
                   <textarea
                     value={clashGeneral}
@@ -478,9 +489,11 @@ export function TemplateEditor({
                 </div>
 
                 <div>
-                  <Label className="text-xs">Custom nodes (share links)</Label>
+                  <Label className="text-xs">{t('subgen.templates.custom_nodes_label', 'Custom nodes (share links)')}</Label>
                   <p className="text-fg-dim text-2xs mt-0.5 mb-1">
-                    One proxy share link per line (<code>vless://</code>, <code>ss://</code>, <code>vmess://</code>, <code>trojan://</code>, <code>hysteria2://</code>, <code>tuic://</code>, <code>anytls://</code>). The name after <code>#</code> becomes the node name; parsed nodes appear in the preview.
+                    {t('subgen.templates.custom_nodes_desc_pre', 'One proxy share link per line (')}<code>vless://</code>, <code>ss://</code>, <code>vmess://</code>, <code>trojan://</code>, <code>hysteria2://</code>, <code>tuic://</code>, <code>anytls://</code>
+                    {t('subgen.templates.custom_nodes_desc_mid', '). The name after')} <code>#</code>{' '}
+                    {t('subgen.templates.custom_nodes_desc_post', 'becomes the node name; parsed nodes appear in the preview.')}
                   </p>
                   <textarea
                     value={customNodes}
@@ -493,9 +506,14 @@ export function TemplateEditor({
                 </div>
 
                 <div>
-                  <Label className="text-xs">Custom groups</Label>
+                  <Label className="text-xs">{t('subgen.templates.custom_groups_label', 'Custom groups')}</Label>
                   <p className="text-fg-dim text-2xs mt-0.5 mb-1">
-                    One group per line: <code>Name = type, member1, member2</code> (type = select or url-test). Members are free text (node names, PROXY/DIRECT/REJECT, <code>DEVICE:Name</code> for Surge Ponte, or other group names). Use <code>{'{{NODES}}'}</code> as a member to include all selected proxy nodes (e.g. <code>All = select, {'{{NODES}}'}, DIRECT</code>). Target a group from a custom rule. <code>DEVICE:</code> members render only for Surge.
+                    {t('subgen.templates.custom_groups_desc_1', 'One group per line:')} <code>Name = type, member1, member2</code>{' '}
+                    {t('subgen.templates.custom_groups_desc_2', '(type = select or url-test). Members are free text (node names, PROXY/DIRECT/REJECT,')} <code>DEVICE:Name</code>{' '}
+                    {t('subgen.templates.custom_groups_desc_3', 'for Surge Ponte, or other group names). Use')} <code>{'{{NODES}}'}</code>{' '}
+                    {t('subgen.templates.custom_groups_desc_4', 'as a member to include all selected proxy nodes (e.g.')} <code>All = select, {'{{NODES}}'}, DIRECT</code>
+                    {t('subgen.templates.custom_groups_desc_5', '). Target a group from a custom rule.')} <code>DEVICE:</code>{' '}
+                    {t('subgen.templates.custom_groups_desc_6', 'members render only for Surge.')}
                   </p>
                   <textarea
                     value={customGroupsText}
@@ -511,10 +529,10 @@ export function TemplateEditor({
                   <label className="flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={includeAutoSelect}
                       onChange={(e) => setIncludeAutoSelect(e.target.checked)} />
-                    Include auto-select group
+                    {t('subgen.templates.include_auto_select', 'Include auto-select group')}
                   </label>
                   <div className="flex items-center gap-2 text-sm">
-                    <span>Final</span>
+                    <span>{t('subgen.templates.final_label', 'Final')}</span>
                     <select value={final} onChange={(e) => setFinal(e.target.value)}
                       className="h-7 px-1.5 rounded border bg-background text-2xs">
                       {POLICIES.map((p) => <option key={p} value={p}>{p}</option>)}
@@ -526,7 +544,7 @@ export function TemplateEditor({
               <div>
                 <Label className="text-xs">rules_json</Label>
                 <p className="text-fg-dim text-2xs mt-0.5 mb-1">
-                  Edit the raw template spec. Switching back to Form re-reads this JSON.
+                  {t('subgen.templates.rules_json_desc', 'Edit the raw template spec. Switching back to Form re-reads this JSON.')}
                 </p>
                 <textarea
                   value={rawJson}
@@ -542,14 +560,14 @@ export function TemplateEditor({
           {/* ── preview column ────────────────────────────────────────────── */}
           <div className="flex flex-col max-h-[80vh] min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <Label className="text-xs">Preview</Label>
+              <Label className="text-xs">{t('subgen.templates.preview_label', 'Preview')}</Label>
               <select value={previewTarget} onChange={(e) => setPreviewTarget(e.target.value as PreviewTarget)}
                 className="h-7 px-1.5 rounded border bg-background text-2xs">
                 <option value="surge">surge</option>
                 <option value="shadowrocket">shadowrocket</option>
                 <option value="clash">clash</option>
               </select>
-              {previewing && <span className="text-fg-dim text-2xs">rendering…</span>}
+              {previewing && <span className="text-fg-dim text-2xs">{t('subgen.templates.rendering', 'rendering…')}</span>}
             </div>
             {previewErr ? (
               <pre className="flex-1 overflow-auto rounded-md border bg-sunken/30 p-2 text-2xs font-mono text-err whitespace-pre-wrap break-all">{previewErr}</pre>
@@ -557,15 +575,15 @@ export function TemplateEditor({
               <pre className="flex-1 overflow-auto rounded-md border bg-sunken/30 p-2 text-2xs font-mono whitespace-pre">{previewText}</pre>
             )}
             <p className="text-fg-dim text-2xs mt-1">
-              Preview uses two sample nodes (🇺🇸 / 🇭🇰) — your subscription's real nodes are substituted at fetch time.
+              {t('subgen.templates.preview_hint', "Preview uses two sample nodes (🇺🇸 / 🇭🇰) — your subscription's real nodes are substituted at fetch time.")}
             </p>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" size="sm" onClick={onClose}>{t('common.cancel')}</Button>
           <Button size="sm" disabled={!name.trim() || save.isPending}
-            onClick={() => save.mutate()}>Save</Button>
+            onClick={() => save.mutate()}>{t('admin.save', 'Save')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

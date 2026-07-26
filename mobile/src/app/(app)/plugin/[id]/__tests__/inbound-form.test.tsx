@@ -2,6 +2,7 @@ import React from 'react'
 import { render as rtlRender, fireEvent, waitFor } from '@testing-library/react-native'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import InboundFormScreen from '../inbound-form'
+import { SINGBOX_URL_PROTOCOLS } from '@/api/inbounds'
 
 // The form calls useQueryClient() (invalidate after save), so renders must sit
 // inside a QueryClientProvider.
@@ -170,6 +171,61 @@ test('invalid port is rejected before any network call', async () => {
   fireEvent.press(getByTestId('save'))
   expect(await waitFor(() => getByText(/port must be 1–65535/))).toBeTruthy()
   expect(mockCreate).not.toHaveBeenCalled()
+})
+
+// ── sing-box snell ──
+
+test('snell-v5 shows a PSK field and obfs mode picker, but no UUID/REALITY/SNI', () => {
+  const { getByTestId, getByText, queryByTestId, queryByText } = render(<InboundFormScreen />)
+  fireEvent.press(getByTestId('protocol-snell-v5'))
+  expect(getByText('PSK')).toBeTruthy()
+  expect(getByTestId('password')).toBeTruthy()
+  expect(getByTestId('snellobfs')).toBeTruthy()
+  expect(queryByTestId('uuid')).toBeNull()
+  expect(queryByTestId('pubkey')).toBeNull()
+  expect(queryByTestId('sni')).toBeNull()
+  expect(queryByText(/SNI/i)).toBeNull()
+})
+
+test('snell-v6 shows the mode picker (not obfs mode)', () => {
+  const { getByTestId, queryByTestId } = render(<InboundFormScreen />)
+  fireEvent.press(getByTestId('protocol-snell-v6'))
+  expect(getByTestId('snellmode')).toBeTruthy()
+  expect(queryByTestId('snellobfs')).toBeNull()
+})
+
+test('snell-v5 create sends the PSK as password and obfs_mode inside extra (not extra_json)', async () => {
+  const { getByTestId } = render(<InboundFormScreen />)
+  fireEvent.press(getByTestId('protocol-snell-v5'))
+  fireEvent.changeText(getByTestId('port'), '8388')
+  fireEvent.changeText(getByTestId('password'), 'secret-psk')
+  fireEvent.press(getByTestId('snellobfs-http'))
+  fireEvent.press(getByTestId('save'))
+  await waitFor(() => expect(mockCreate).toHaveBeenCalled())
+  const [plugin, body] = mockCreate.mock.calls[0]
+  expect(plugin).toBe('singbox')
+  expect(body.protocol).toBe('snell-v5')
+  expect(body.password).toBe('secret-psk')
+  expect(body.extra).toBe(JSON.stringify({ obfs_mode: 'http' }))
+  expect(body).not.toHaveProperty('extra_json')
+  expect(body).not.toHaveProperty('uuid')
+})
+
+test('snell-v6 create sends mode inside extra', async () => {
+  const { getByTestId } = render(<InboundFormScreen />)
+  fireEvent.press(getByTestId('protocol-snell-v6'))
+  fireEvent.changeText(getByTestId('port'), '8389')
+  fireEvent.press(getByTestId('snellmode-unshaped'))
+  fireEvent.press(getByTestId('save'))
+  await waitFor(() => expect(mockCreate).toHaveBeenCalled())
+  const body = mockCreate.mock.calls[0][1]
+  expect(body.protocol).toBe('snell-v6')
+  expect(body.extra).toBe(JSON.stringify({ mode: 'unshaped' }))
+})
+
+test('snell is not in SINGBOX_URL_PROTOCOLS (no de-facto snell:// share-link standard)', () => {
+  expect(SINGBOX_URL_PROTOCOLS.has('snell-v5')).toBe(false)
+  expect(SINGBOX_URL_PROTOCOLS.has('snell-v6')).toBe(false)
 })
 
 // ── sing-box edit ──

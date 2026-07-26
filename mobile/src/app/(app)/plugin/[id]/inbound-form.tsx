@@ -5,9 +5,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import {
   useInbounds, createInbound, patchInbound, invalidateInbounds,
   generateX25519, generateShortID, randomUUID, randomPort, randomPassword, randomSSKey,
-  needsUUID, needsPassword, needsSS, needsReality, needsCertAndSNI, needsTransport,
+  needsUUID, needsPassword, needsSS, needsReality, needsCertAndSNI, needsTransport, isSnell,
   certDaysLeft, certUrgency, certExpiryLabel,
-  SINGBOX_PROTOCOLS, SINGBOX_SS_METHODS, XRAY_PROTOCOLS, XRAY_SS_METHODS,
+  SINGBOX_PROTOCOLS, SINGBOX_SS_METHODS, SINGBOX_SNELL_OBFS_MODES, SINGBOX_SNELL_MODES,
+  XRAY_PROTOCOLS, XRAY_SS_METHODS,
   type ProxyPluginID, type ProxyInboundFull,
 } from '@/api/inbounds'
 import { useSingboxCerts, type SingboxCertificate } from '@/api/plugins'
@@ -149,6 +150,14 @@ function SingboxForm({ mode, serverIdParam, editing }: {
   const isEdit = mode === 'edit'
   const isRelayEdit = isEdit && editing?.role === 'relay'
 
+  // Snell's obfs_mode (v5) / mode (v6) ride in the generic `extra` JSON field on
+  // the wire — parse whatever GET echoed back as extra_json so editing an
+  // existing snell inbound pre-fills the right picker. Ported from web.
+  const initialExtra: Record<string, unknown> = (() => {
+    try { return editing?.extra_json ? JSON.parse(editing.extra_json) : {} }
+    catch { return {} }
+  })()
+
   // Seed once via lazy useState (mount-only) — never from an effect.
   const [protocol, setProtocol] = useState<string>(editing?.protocol ?? 'vless-reality')
   const [port, setPort] = useState<string>(String(editing?.port ?? randomPort()))
@@ -167,6 +176,13 @@ function SingboxForm({ mode, serverIdParam, editing }: {
   const [hsPort, setHSPort] = useState<string>(String(editing?.reality_handshake_port ?? '443'))
   const [ssMethod, setSSMethod] = useState<string>(editing?.ss_method ?? SINGBOX_SS_METHODS[0])
   const [ssPassword, setSSPassword] = useState<string>('')
+  // Snell (psk shares the `password` state above)
+  const [snellObfs, setSnellObfs] = useState<string>(
+    typeof initialExtra.obfs_mode === 'string' ? initialExtra.obfs_mode : SINGBOX_SNELL_OBFS_MODES[0],
+  )
+  const [snellMode, setSnellMode] = useState<string>(
+    typeof initialExtra.mode === 'string' ? initialExtra.mode : SINGBOX_SNELL_MODES[0],
+  )
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -231,6 +247,11 @@ function SingboxForm({ mode, serverIdParam, editing }: {
       }
     }
     if (groups.ss) { body.ss_method = ssMethod; body.ss_password = ssPassword }
+    // obfs_mode (v5) / mode (v6) travel in the generic `extra` JSON field — the
+    // wire key is `extra` (Go tag json:"extra"), NOT extra_json (that's the
+    // GET-only echo). Matches web InboundDialog exactly.
+    if (protocol === 'snell-v5') body.extra = JSON.stringify({ obfs_mode: snellObfs })
+    if (protocol === 'snell-v6') body.extra = JSON.stringify({ mode: snellMode })
 
     try {
       if (isEdit) {
@@ -286,9 +307,31 @@ function SingboxForm({ mode, serverIdParam, editing }: {
       ) : null}
 
       {groups.password ? (
-        <Field label="Password">
+        <Field label={isSnell(protocol) ? 'PSK' : 'Password'}>
           <Input testID="password" mono value={password} onChangeText={setPassword} autoCapitalize="none" autoCorrect={false} />
           <Button variant="ghost" icon="rotate-cw" onPress={() => setPassword(randomPassword())}>New password</Button>
+        </Field>
+      ) : null}
+
+      {protocol === 'snell-v5' ? (
+        <Field label="Obfuscation">
+          <OptionList
+            testID="snellobfs"
+            value={snellObfs}
+            options={SINGBOX_SNELL_OBFS_MODES.map((m) => ({ value: m, label: m }))}
+            onChange={setSnellObfs}
+          />
+        </Field>
+      ) : null}
+
+      {protocol === 'snell-v6' ? (
+        <Field label="Traffic mode">
+          <OptionList
+            testID="snellmode"
+            value={snellMode}
+            options={SINGBOX_SNELL_MODES.map((m) => ({ value: m, label: m }))}
+            onChange={setSnellMode}
+          />
         </Field>
       ) : null}
 

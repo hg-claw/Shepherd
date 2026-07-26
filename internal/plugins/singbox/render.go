@@ -426,7 +426,10 @@ func snellObfsMode(extra map[string]any) (string, error) {
 	if !ok {
 		return "none", nil
 	}
-	s, _ := v.(string)
+	s, ok2 := v.(string)
+	if !ok2 {
+		return "", fmt.Errorf("obfs_mode: expected string, got %T", v)
+	}
 	switch s {
 	case "":
 		return "none", nil
@@ -443,7 +446,10 @@ func snellMode(extra map[string]any) (string, error) {
 	if !ok {
 		return "default", nil
 	}
-	s, _ := v.(string)
+	s, ok2 := v.(string)
+	if !ok2 {
+		return "", fmt.Errorf("mode: expected string, got %T", v)
+	}
 	switch s {
 	case "":
 		return "default", nil

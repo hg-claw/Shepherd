@@ -702,23 +702,44 @@ func TestRender_SnellV6(t *testing.T) {
 	if _, ok := got["obfs_mode"]; ok {
 		t.Error("v6 must not carry obfs_mode")
 	}
+	if _, ok := got["tls"]; ok {
+		t.Error("v6 must not carry tls block")
+	}
+	if _, ok := got["users"]; ok {
+		t.Error("v6 must not carry users array")
+	}
 }
 
 func TestRender_SnellRejectsBadEnum(t *testing.T) {
 	psk := "psk-abc"
-	badObfs := `{"obfs_mode":"tls"}`
-	in := InboundView{Inbound: Inbound{
-		ServerID: 1, Tag: "t", Port: 8443, Role: "landing",
-		Protocol: "snell-v5", Password: &psk, ExtraJSON: &badObfs,
-	}}
-	if _, err := renderInbound(in, nil); err == nil {
-		t.Error("expected error for obfs_mode=tls (only none/http allowed)")
+	tests := []struct {
+		name     string
+		protocol string
+		extra    string
+		wantErr  bool
+	}{
+		{"obfs_mode bad string", "snell-v5", `{"obfs_mode":"tls"}`, true},
+		{"obfs_mode int", "snell-v5", `{"obfs_mode":42}`, true},
+		{"obfs_mode bool", "snell-v5", `{"obfs_mode":true}`, true},
+		{"obfs_mode object", "snell-v5", `{"obfs_mode":{}}`, true},
+		{"obfs_mode null", "snell-v5", `{"obfs_mode":null}`, true},
+		{"mode bad string", "snell-v6", `{"mode":"turbo"}`, true},
+		{"mode int", "snell-v6", `{"mode":42}`, true},
+		{"mode bool", "snell-v6", `{"mode":true}`, true},
+		{"mode object", "snell-v6", `{"mode":{}}`, true},
+		{"mode null", "snell-v6", `{"mode":null}`, true},
 	}
-	badMode := `{"mode":"turbo"}`
-	in.Protocol = "snell-v6"
-	in.ExtraJSON = &badMode
-	if _, err := renderInbound(in, nil); err == nil {
-		t.Error("expected error for mode=turbo")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			in := InboundView{Inbound: Inbound{
+				ServerID: 1, Tag: "t", Port: 8443, Role: "landing",
+				Protocol: tt.protocol, Password: &psk, ExtraJSON: &tt.extra,
+			}}
+			_, err := renderInbound(in, nil)
+			if (err == nil) != !tt.wantErr {
+				t.Errorf("got err=%v, wantErr=%v", err, tt.wantErr)
+			}
+		})
 	}
 }
 

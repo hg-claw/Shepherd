@@ -561,11 +561,11 @@ export default function FileBrowserPage() {
       </div>
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-4xl w-[calc(100vw-2rem)]">
+        <DialogContent className="max-w-2xl w-[calc(100vw-2rem)]">
           <DialogHeader>
             <DialogTitle className="break-all font-mono">{previewName}</DialogTitle>
           </DialogHeader>
-          <pre className="font-mono text-xs whitespace-pre-wrap overflow-auto max-h-[60vh] bg-sunken p-3 rounded">
+          <pre className="font-mono text-xs whitespace-pre-wrap overflow-auto max-h-[80vh] bg-sunken p-3 rounded">
             {previewText}
           </pre>
         </DialogContent>

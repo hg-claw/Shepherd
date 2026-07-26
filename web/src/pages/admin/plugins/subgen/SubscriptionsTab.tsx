@@ -345,7 +345,7 @@ function NodePickerDialog({
         <DialogHeader>
           <DialogTitle>Nodes for "{subscription.name}"</DialogTitle>
         </DialogHeader>
-        <div className="max-h-[60vh] overflow-y-auto space-y-4">
+        <div className="max-h-[80vh] overflow-y-auto space-y-4">
           {loading && <div className="text-sm text-muted-foreground">Loading inbounds…</div>}
           {!loading && servers.map((srv) => {
             const xib = xrayByServer.get(srv.id) ?? []

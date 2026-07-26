@@ -32,7 +32,7 @@ export function RunLogDialog({
           {triggerLabel ?? t('scripts.view_log', 'View log')}
         </button>
       </DialogTrigger>
-      <DialogContent className="max-w-3xl" onClick={(e) => e.stopPropagation()}>
+      <DialogContent className="max-w-2xl" onClick={(e) => e.stopPropagation()}>
         <DialogHeader>
           <DialogTitle>{title ?? t('scripts.execution_log', 'Execution log')}</DialogTitle>
         </DialogHeader>
@@ -56,7 +56,7 @@ function LogBody({ ptySessionId, running }: { ptySessionId: number; running: boo
     return <div className="text-fg-dim text-xs py-2">{t('scripts.empty_log', 'No output was captured.')}</div>
   }
   return (
-    <pre className="max-h-[60vh] overflow-auto rounded-md border bg-sunken px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words">
+    <pre className="max-h-[80vh] overflow-auto rounded-md border bg-sunken px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words">
       {text}
     </pre>
   )

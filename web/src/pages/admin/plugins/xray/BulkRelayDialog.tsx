@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -96,6 +97,7 @@ function buildRelayBody(d: RelayDraft, landing: XrayInbound): CreateXrayInboundB
 }
 
 export default function BulkRelayDialog({ open, onOpenChange, landingInbound, allInbounds }: Props) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const serversQ = useServers()
@@ -173,10 +175,10 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
         try {
           await createXrayInbound(buildRelayBody(refresh, landingInbound))
           ok++
-          toast('success', `Deployed relay on ${d.serverName}`)
+          toast('success', t('xray.bulk_relay_dialog.deployed_toast', 'Deployed relay on {{server}}', { server: d.serverName }))
         } catch (e: any) {
           fail++
-          toast('error', `${d.serverName}: ${String(e?.message ?? e)}`)
+          toast('error', t('xray.bulk_relay_dialog.error_toast', '{{server}}: {{message}}', { server: d.serverName, message: String(e?.message ?? e) }))
         }
       }
       return { ok, fail }
@@ -186,7 +188,7 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
       qc.invalidateQueries({ queryKey: ['plugin-hosts', 'xray'] })
     },
     onSuccess: ({ ok, fail }) => {
-      toast(fail === 0 ? 'success' : 'info', `Bulk relay: ${ok} ok, ${fail} failed`)
+      toast(fail === 0 ? 'success' : 'info', t('xray.bulk_relay_dialog.summary_toast', 'Bulk relay: {{ok}} ok, {{fail}} failed', { ok, fail }))
       if (fail === 0) onOpenChange(false)
     },
   })
@@ -198,17 +200,17 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="font-mono">
-            Add relays → {landingInbound.tag} @ {landingInbound.server_name}
+            {t('xray.bulk_relay_dialog.title', 'Add relays → {{tag}} @ {{server}}', { tag: landingInbound.tag, server: landingInbound.server_name })}
           </DialogTitle>
           <p className="text-xs text-muted-foreground font-mono">{proto}</p>
         </DialogHeader>
 
         <div className="space-y-3">
           <div>
-            <Label className="text-xs">Target servers</Label>
+            <Label className="text-xs">{t('xray.bulk_relay_dialog.targets_label', 'Target servers')}</Label>
             <div className="mt-1 rounded-md border bg-elev max-h-64 overflow-y-auto">
               {targets.length === 0 && (
-                <p className="px-3 py-4 text-xs text-muted-foreground">No eligible servers.</p>
+                <p className="px-3 py-4 text-xs text-muted-foreground">{t('xray.bulk_relay_dialog.no_eligible_servers', 'No eligible servers.')}</p>
               )}
               {targets.map((s) => {
                 const checked = selected.has(s.id)
@@ -221,13 +223,13 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
                       aria-label={`select ${s.name}`} />
                     <span className="font-mono w-32 truncate">{s.name}</span>
                     {taken.size > 0 && (
-                      <span className="text-fg-dim text-2xs" title={`used: ${Array.from(taken).join(', ')}`}>
-                        {taken.size} port(s) in use
+                      <span className="text-fg-dim text-2xs" title={t('xray.bulk_relay_dialog.ports_in_use_title', 'used: {{ports}}', { ports: Array.from(taken).join(', ') })}>
+                        {t('xray.bulk_relay_dialog.ports_in_use', '{{n}} port(s) in use', { n: taken.size })}
                       </span>
                     )}
                     {checked && d && (
                       <>
-                        <span className="font-mono text-fg-dim">port</span>
+                        <span className="font-mono text-fg-dim">{t('xray.bulk_relay_dialog.port_label', 'port')}</span>
                         <Input type="number" value={d.port}
                           onChange={(e) => setDrafts((prev) => {
                             const m = new Map(prev); m.set(s.id, { ...d, port: Number(e.target.value) }); return m
@@ -236,9 +238,9 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
                         {needsX25519(proto) && (
                           <>
                             <Button size="xs" variant="ghost" className="text-2xs"
-                              onClick={(e) => { e.preventDefault(); void regenKeys(s.id) }}>↻ keys</Button>
+                              onClick={(e) => { e.preventDefault(); void regenKeys(s.id) }}>{t('xray.bulk_relay_dialog.regen_keys', '↻ keys')}</Button>
                             <span className="font-mono text-fg-dim text-2xs truncate" title={d.publicKey}>
-                              {d.publicKey ? d.publicKey.slice(0, 8) + '…' : 'generating…'}
+                              {d.publicKey ? d.publicKey.slice(0, 8) + '…' : t('xray.bulk_relay_dialog.generating_key', 'generating…')}
                             </span>
                           </>
                         )}
@@ -250,14 +252,14 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
             </div>
           </div>
 
-          {version && <p className="text-fg-dim text-2xs">Uses xray v{version} (taken from the landing's deployed version).</p>}
+          {version && <p className="text-fg-dim text-2xs">{t('xray.bulk_relay_dialog.version_note', "Uses xray v{{version}} (taken from the landing's deployed version).", { version })}</p>}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
           <Button disabled={deploy.isPending || selected.size === 0}
             onClick={() => deploy.mutate()}>
-            {deploy.isPending ? 'Deploying…' : `Deploy all (${selected.size})`}
+            {deploy.isPending ? t('xray.bulk_relay_dialog.deploying', 'Deploying…') : t('xray.bulk_relay_dialog.deploy_all', 'Deploy all ({{n}})', { n: selected.size })}
           </Button>
         </DialogFooter>
       </DialogContent>

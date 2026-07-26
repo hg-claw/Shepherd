@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import {
   AreaChart,
@@ -89,6 +90,7 @@ export default function TrafficDrawer({
   tag,
   kind,
 }: Props) {
+  const { t } = useTranslation()
   const [range, setRange] = useState<TimeRange>('1h')
   const params = rangeToParams(range)
 
@@ -111,11 +113,14 @@ export default function TrafficDrawer({
     bytes_down: p.bytes_down,
   }))
 
+  const uplinkLabel = t('xray.traffic_drawer.uplink', 'Uplink')
+  const downlinkLabel = t('xray.traffic_drawer.downlink', 'Downlink')
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[520px] max-w-full overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="font-mono text-sm">{tag} 流量</SheetTitle>
+          <SheetTitle className="font-mono text-sm">{tag} {t('xray.traffic_drawer.title_suffix', 'Traffic')}</SheetTitle>
         </SheetHeader>
 
         {/* Time range selector */}
@@ -136,14 +141,14 @@ export default function TrafficDrawer({
         {/* Cumulative stats */}
         <div className="flex gap-6 mt-4 text-sm">
           <div>
-            <div className="text-muted-foreground text-2xs uppercase tracking-wide">
-              上行
+            <div className="text-muted-foreground text-2xs uppercase tracking-[0.05em]">
+              {uplinkLabel}
             </div>
             <div className="font-mono">{formatBytes(totalUp)}</div>
           </div>
           <div>
-            <div className="text-muted-foreground text-2xs uppercase tracking-wide">
-              下行
+            <div className="text-muted-foreground text-2xs uppercase tracking-[0.05em]">
+              {downlinkLabel}
             </div>
             <div className="font-mono">{formatBytes(totalDown)}</div>
           </div>
@@ -153,12 +158,12 @@ export default function TrafficDrawer({
         <div className="mt-6">
           {q.isLoading && (
             <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
-              加载中…
+              {t('common.loading', 'Loading…')}
             </div>
           )}
           {!q.isLoading && chartData.length === 0 && (
             <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
-              暂无数据
+              {t('xray.traffic_drawer.no_data', 'No data')}
             </div>
           )}
           {!q.isLoading && chartData.length > 0 && (
@@ -187,7 +192,7 @@ export default function TrafficDrawer({
                 <Area
                   type="monotone"
                   dataKey="bytes_up"
-                  name="上行"
+                  name={uplinkLabel}
                   stackId="1"
                   fill="hsl(var(--chart-1))"
                   stroke="hsl(var(--chart-1))"
@@ -196,7 +201,7 @@ export default function TrafficDrawer({
                 <Area
                   type="monotone"
                   dataKey="bytes_down"
-                  name="下行"
+                  name={downlinkLabel}
                   stackId="1"
                   fill="hsl(var(--chart-2))"
                   stroke="hsl(var(--chart-2))"

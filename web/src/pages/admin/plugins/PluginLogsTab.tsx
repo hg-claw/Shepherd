@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { listPluginHosts, pluginLogsWSURL } from '@/api/plugins'
 
 interface LogLine { ts: string; level: string; line: string }
@@ -9,6 +11,7 @@ interface LogLine { ts: string; level: string; line: string }
 // display gate (a ref read inside onmessage), NOT an effect dependency — so
 // pausing neither reconnects the socket nor clears the buffer.
 export function PluginLogsTab({ plugin }: { plugin: 'xray' | 'singbox' }) {
+  const { t } = useTranslation()
   const hostsQ = useQuery({ queryKey: ['plugin-hosts', plugin], queryFn: () => listPluginHosts(plugin) })
   const [serverID, setServerID] = useState<number | null>(null)
   useEffect(() => {
@@ -40,20 +43,24 @@ export function PluginLogsTab({ plugin }: { plugin: 'xray' | 'singbox' }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
-        <select
-          value={serverID ?? ''}
-          onChange={(e) => setServerID(Number(e.target.value))}
-          className="h-8 px-2 rounded-md border bg-background text-sm font-mono"
+        <Select
+          value={serverID != null ? String(serverID) : undefined}
+          onValueChange={(v) => setServerID(Number(v))}
         >
-          {(hostsQ.data ?? []).map((h) => (
-            <option key={h.id} value={h.server_id}>#{h.server_id}</option>
-          ))}
-        </select>
+          <SelectTrigger className="h-8 w-32 font-mono text-sm" aria-label={t('plugins.logs.select_server_aria', 'select server')}>
+            <SelectValue placeholder={t('plugins.logs.select_server_placeholder', 'select server')} />
+          </SelectTrigger>
+          <SelectContent>
+            {(hostsQ.data ?? []).map((h) => (
+              <SelectItem key={h.id} value={String(h.server_id)}>#{h.server_id}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button size="sm" variant="outline" onClick={() => setPaused((v) => !v)}>
-          {paused ? 'Resume' : 'Pause'}
+          {paused ? t('plugins.logs.resume', 'Resume') : t('plugins.logs.pause', 'Pause')}
         </Button>
         <Button size="sm" variant="outline" onClick={() => setLines([])}>
-          Clear
+          {t('plugins.logs.clear', 'Clear')}
         </Button>
       </div>
       <div className="h-[440px] bg-console text-console-fg rounded-lg overflow-auto p-3 font-mono text-xs leading-relaxed">
@@ -63,7 +70,7 @@ export function PluginLogsTab({ plugin }: { plugin: 'xray' | 'singbox' }) {
             <span>{l.line}</span>
           </div>
         ))}
-        {lines.length === 0 && <div className="text-console-muted">waiting for log lines…</div>}
+        {lines.length === 0 && <div className="text-console-muted">{t('plugins.logs.waiting', 'waiting for log lines…')}</div>}
       </div>
     </div>
   )

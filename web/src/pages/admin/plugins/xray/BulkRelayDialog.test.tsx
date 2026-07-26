@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { I18nextProvider } from 'react-i18next'
+import i18n from '@/i18n'
 import BulkRelayDialog from './BulkRelayDialog'
 import * as pluginsAPI from '@/api/plugins'
 
@@ -56,7 +58,11 @@ const landingShadowsocks: pluginsAPI.XrayInbound = {
 
 function wrap(node: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(<QueryClientProvider client={qc}>{node}</QueryClientProvider>)
+  return render(
+    <I18nextProvider i18n={i18n}>
+      <QueryClientProvider client={qc}>{node}</QueryClientProvider>
+    </I18nextProvider>
+  )
 }
 
 describe('BulkRelayDialog (inbound-level)', () => {

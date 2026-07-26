@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Sparkline } from '@/components/Sparkline'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import {
   listXrayInbounds, fetchXrayTrafficBatch,
   type XrayInbound,
@@ -33,6 +35,7 @@ interface Stat {
 }
 
 export default function TrafficTab() {
+  const { t } = useTranslation()
   const serversQ = useServers({ refetchInterval: 30_000 })
   const inboundsQ = useQuery({
     queryKey: ['xray-inbounds'],
@@ -106,7 +109,7 @@ export default function TrafficTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Inbound 流量 — uplink + downlink，按 inbound tag 切分。点击任一行 drill-down 看时序图。
+          {t('xray.traffic.description', 'Inbound traffic — uplink + downlink by inbound tag. Click any row for detailed chart.')}
         </p>
         <div className="flex items-center gap-1">
           {RANGES.map((r) => (
@@ -133,62 +136,62 @@ export default function TrafficTab() {
                 {s.ssh_host?.Valid ? s.ssh_host.String : '—'}
               </span>
             </div>
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="text-left">
-                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Tag</th>
-                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Role</th>
-                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Last {range.label}</th>
-                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground text-right">Uplink</th>
-                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground text-right">Downlink</th>
-                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table wrapperClassName="border-0 rounded-none bg-transparent">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>{t('xray.traffic.tag', 'Tag')}</TableHead>
+                  <TableHead>{t('xray.traffic.role', 'Role')}</TableHead>
+                  <TableHead>{t('xray.traffic.last_range', 'Last {{range}}', { range: range.label })}</TableHead>
+                  <TableHead className="text-right">{t('xray.traffic.uplink', 'Uplink')}</TableHead>
+                  <TableHead className="text-right">{t('xray.traffic.downlink', 'Downlink')}</TableHead>
+                  <TableHead className="text-right">{t('xray.traffic.total', 'Total')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {inbounds.map((i) => {
                   const st = stats.get(i.tag)
                   const total = (st?.totalUp ?? 0) + (st?.totalDown ?? 0)
                   return (
-                    <tr
+                    <TableRow
                       key={i.id}
-                      className="border-t hover:bg-background/40 cursor-pointer"
+                      className="cursor-pointer"
                       onClick={() => setDrillFor({ serverID: s.id, tag: i.tag })}
                     >
-                      <td className="px-3 py-2 font-mono">{i.tag}</td>
-                      <td className="px-3 py-2 font-mono text-xs text-fg-dim">
+                      <TableCell className="font-mono">{i.tag}</TableCell>
+                      <TableCell className="font-mono text-xs text-fg-dim">
                         {i.role}
                         {i.role === 'relay' && i.upstream_tag && (
                           <span className="ml-1">→ {i.upstream_tag}</span>
                         )}
-                      </td>
-                      <td className="px-3 py-2">
+                      </TableCell>
+                      <TableCell>
                         {st && st.sparkline.length >= 2 ? (
                           <Sparkline values={st.sparkline} width={120} height={28} className="text-primary" />
                         ) : (
                           <span className="font-mono text-fg-dim text-xs">—</span>
                         )}
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono text-sm">
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
                         {formatBytes(st?.totalUp ?? 0)}
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono text-sm">
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
                         {formatBytes(st?.totalDown ?? 0)}
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono text-sm font-medium">
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm font-medium">
                         {formatBytes(total)}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )
       })}
 
       {(inboundsQ.data ?? []).length === 0 && (
         <div className="rounded-lg border bg-elev p-6 text-center text-muted-foreground text-sm">
-          No inbounds deployed yet. Create some in the Inbounds tab.
+          {t('xray.empty.traffic', 'No inbounds deployed yet. Create some in the Inbounds tab.')}
         </div>
       )}
 

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/Pill'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/table'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { useUI } from '@/store/ui'
 import { copyText } from '@/lib/clipboard'
@@ -129,15 +130,15 @@ export default function InboundsTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Each row is one xray inbound. A single server can host multiple inbounds.
+          {t('xray.inbounds.description', 'Each row is one xray inbound. A single server can host multiple inbounds.')}
         </p>
         <Button size="sm" onClick={() => setDialog({ kind: 'new' })}>
-          + New inbound
+          + {t('xray.inbounds.new_inbound', 'New inbound')}
         </Button>
       </div>
 
       {inboundsQ.isLoading && (
-        <p className="text-sm text-muted-foreground px-1">Loading…</p>
+        <p className="text-sm text-muted-foreground px-1">{t('common.loading', 'Loading…')}</p>
       )}
 
       {!inboundsQ.isLoading && (serversQ.data ?? []).map((s) => {
@@ -160,25 +161,23 @@ export default function InboundsTab() {
               </div>
               <Button size="xs" variant="ghost"
                 onClick={() => setDialog({ kind: 'new', serverID: s.id })}>
-                + Add inbound
+                + {t('xray.inbounds.add_inbound', 'Add inbound')}
               </Button>
             </div>
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="text-left">
-                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Tag</th>
-                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Role</th>
-                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Protocol</th>
-                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Port</th>
-                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Alias</th>
-                  <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table wrapperClassName="border-0 rounded-none bg-transparent">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>{t('xray.inbounds.tag', 'Tag')}</TableHead>
+                  <TableHead>{t('xray.inbounds.role', 'Role')}</TableHead>
+                  <TableHead>{t('xray.inbounds.protocol', 'Protocol')}</TableHead>
+                  <TableHead>{t('xray.inbounds.port', 'Port')}</TableHead>
+                  <TableHead>{t('xray.inbounds.alias', 'Alias')}</TableHead>
+                  <TableHead className="text-right">{t('admin.actions', 'Actions')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {inbounds.length === 0 && (
-                  <tr><td colSpan={6} className="px-3 py-4 text-center text-muted-foreground text-sm">
-                    No inbounds on this server.
-                  </td></tr>
+                  <TableEmpty colSpan={6}>{t('xray.empty.inbounds', 'No inbounds on this server.')}</TableEmpty>
                 )}
                 {inbounds.map((i) => {
                   const dep = dependentsByLandingID.get(i.id) ?? 0
@@ -191,23 +190,19 @@ export default function InboundsTab() {
                         publicKey: i.public_key, shortID: i.short_id,
                       }, hostname, `${s.name}/${i.tag}`)
                     : null
+                  const isActive = activeMap.get(i.tag) === true
                   return (
-                    <tr key={i.id} className="border-t">
-                      <td className="px-3 py-2 font-mono">
-                        {(() => {
-                          const isActive = activeMap.get(i.tag) === true
-                          return (
-                            <span
-                              className={`inline-block w-1.5 h-1.5 rounded-full mr-2 align-middle ${
-                                isActive ? 'bg-ok' : 'bg-fg-dim/40'
-                              }`}
-                              title={isActive ? 'active (traffic in last 2 min)' : 'idle (no recent traffic)'}
-                            />
-                          )
-                        })()}
+                    <TableRow key={i.id}>
+                      <TableCell className="font-mono">
+                        <span
+                          className={`inline-block w-1.5 h-1.5 rounded-full mr-2 align-middle ${
+                            isActive ? 'bg-ok' : 'bg-fg-dim/40'
+                          }`}
+                          title={isActive ? t('xray.inbounds.active_title', 'active (traffic in last 2 min)') : t('xray.inbounds.idle_title', 'idle (no recent traffic)')}
+                        />
                         {i.tag}
-                      </td>
-                      <td className="px-3 py-2">
+                      </TableCell>
+                      <TableCell>
                         {isLanding
                           ? <Pill kind="neutral">landing</Pill>
                           : (
@@ -216,43 +211,43 @@ export default function InboundsTab() {
                               <span className="text-fg-dim ml-1">→ {i.upstream_tag} @ {i.upstream_server_name}</span>
                             </span>
                           )}
-                      </td>
-                      <td className="px-3 py-2 font-mono text-sm">{i.protocol}</td>
-                      <td className="px-3 py-2 font-mono text-sm">{i.port}</td>
-                      <td className="px-3 py-2 font-mono text-sm text-muted-foreground">{i.alias || '—'}</td>
-                      <td className="px-3 py-2 text-right whitespace-nowrap">
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{i.protocol}</TableCell>
+                      <TableCell className="font-mono text-sm">{i.port}</TableCell>
+                      <TableCell className="font-mono text-sm text-muted-foreground">{i.alias || '—'}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
                         <Button size="xs" variant="ghost"
                           disabled={!shareURL}
-                          title={shareURL ? 'Copy share URL' : 'cannot build URL'}
+                          title={shareURL ? t('xray.inbounds.copy_url_title', 'Copy share URL') : t('xray.inbounds.copy_url_disabled_title', 'cannot build URL')}
                           onClick={async () => {
                             if (!shareURL) return
-                            try { await copyText(shareURL); toast('success', 'Share URL copied') }
+                            try { await copyText(shareURL); toast('success', t('xray.inbounds.copy_url_copied_toast', 'Share URL copied')) }
                             catch (e) { toast('error', String((e as Error)?.message ?? e)) }
                           }}>
-                          Copy URL
+                          {t('xray.inbounds.copy_url_button', 'Copy URL')}
                         </Button>
                         {isLanding && (
                           <Button size="xs" variant="ghost"
                             onClick={() => setDialog({ kind: 'bulk', landing: i })}>
-                            + Bulk Relay
+                            + {t('xray.inbounds.bulk_relay_button', 'Bulk Relay')}
                           </Button>
                         )}
                         <Button size="xs" variant="ghost"
                           onClick={() => setDialog({ kind: 'edit', inbound: i })}>
-                          Edit
+                          {t('xray.inbounds.edit_button', 'Edit')}
                         </Button>
                         <Button size="xs" variant="ghost" className="text-destructive"
                           disabled={del.isPending || dep > 0}
-                          title={dep > 0 ? `${dep} relay(s) depend on this landing; delete them first` : undefined}
+                          title={dep > 0 ? t('xray.inbounds.delete_disabled_title', '{{n}} relay(s) depend on this landing; delete them first', { n: dep }) : undefined}
                           onClick={() => setPendingDelete(i)}>
-                          Delete
+                          {t('admin.delete', 'Delete')}
                         </Button>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )
       })}
@@ -299,6 +294,7 @@ export default function InboundsTab() {
 }
 
 function VersionInline({ serverID, current }: { serverID: number; current: string | null }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const [editing, setEditing] = useState(false)
@@ -306,7 +302,7 @@ function VersionInline({ serverID, current }: { serverID: number; current: strin
   const apply = useMutation({
     mutationFn: () => patchXrayServerVersion(serverID, value),
     onSuccess: () => {
-      toast('success', `Upgrading to v${value}`)
+      toast('success', t('xray.deploy.upgrading_toast', 'Upgrading to v{{version}}', { version: value }))
       qc.invalidateQueries({ queryKey: ['plugin-hosts', 'xray'] })
       setEditing(false)
     },
@@ -316,7 +312,7 @@ function VersionInline({ serverID, current }: { serverID: number; current: strin
     return (
       <span className="text-fg-dim">
         xray v{current ?? '—'}{' '}
-        <button className="text-fg-dim underline" onClick={() => setEditing(true)}>change</button>
+        <button className="text-fg-dim underline" onClick={() => setEditing(true)}>{t('xray.deploy.change', 'change')}</button>
       </span>
     )
   }
@@ -325,8 +321,8 @@ function VersionInline({ serverID, current }: { serverID: number; current: strin
       <Input value={value} onChange={(e) => setValue(e.target.value)}
         className="h-7 w-20 font-mono text-2xs" />
       <Button size="xs" className="text-2xs" disabled={apply.isPending}
-        onClick={() => apply.mutate()}>Apply</Button>
-      <button className="text-fg-dim text-2xs" onClick={() => setEditing(false)}>cancel</button>
+        onClick={() => apply.mutate()}>{t('xray.deploy.apply', 'Apply')}</Button>
+      <button className="text-fg-dim text-2xs" onClick={() => setEditing(false)}>{t('xray.deploy.cancel', 'cancel')}</button>
     </span>
   )
 }

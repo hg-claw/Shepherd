@@ -231,7 +231,15 @@
   "plugins": {
     "subtitle": "Extend the Shepherd agent with log parsers, extra metric collectors, and alert routers.",
     "placeholder_title": "Plugin runtime not enabled",
-    "placeholder_body": "This release ships without a plugin host. The plugin sandbox, signed distribution, and per-host enablement are tracked separately."
+    "placeholder_body": "This release ships without a plugin host. The plugin sandbox, signed distribution, and per-host enablement are tracked separately.",
+    "logs": {
+      "select_server_placeholder": "select server",
+      "select_server_aria": "select server",
+      "pause": "Pause",
+      "resume": "Resume",
+      "clear": "Clear",
+      "waiting": "waiting for log lines…"
+    }
   },
   "audit": {
     "title": "Audit log",
@@ -564,7 +572,125 @@
   },
   "xray": {
     "delete_inbound": "Delete inbound",
-    "delete_inbound_confirm": "Delete inbound \"{{name}}\"?"
+    "delete_inbound_confirm": "Delete inbound \"{{name}}\"?",
+    "empty": {
+      "inbounds": "No inbounds on this server.",
+      "deploy": "No servers found.",
+      "events": "No events yet.",
+      "traffic": "No inbounds deployed yet. Create some in the Inbounds tab."
+    },
+    "inbounds": {
+      "description": "Each row is one xray inbound. A single server can host multiple inbounds.",
+      "new_inbound": "New inbound",
+      "add_inbound": "Add inbound",
+      "tag": "Tag",
+      "role": "Role",
+      "protocol": "Protocol",
+      "port": "Port",
+      "alias": "Alias",
+      "active_title": "active (traffic in last 2 min)",
+      "idle_title": "idle (no recent traffic)",
+      "copy_url_title": "Copy share URL",
+      "copy_url_disabled_title": "cannot build URL",
+      "copy_url_copied_toast": "Share URL copied",
+      "copy_url_button": "Copy URL",
+      "bulk_relay_button": "Bulk Relay",
+      "edit_button": "Edit",
+      "delete_disabled_title": "{{n}} relay(s) depend on this landing; delete them first"
+    },
+    "deploy": {
+      "server": "Server",
+      "status": "Status",
+      "version": "Version",
+      "last_error": "Last Error",
+      "last_update": "Last Update",
+      "not_deployed": "not deployed",
+      "change": "change",
+      "apply": "Apply",
+      "cancel": "cancel",
+      "mirror": "mirror",
+      "mirror_title": "Route the binary download via gh-proxy.com (for CN hosts)",
+      "redeploy": "Re-deploy",
+      "redeploy_toast": "Re-deploy triggered",
+      "deploy": "Deploy",
+      "deploying": "Deploying…",
+      "deploying_toast": "Deploying v{{version}}",
+      "version_placeholder": "version",
+      "start_title": "Start",
+      "stop_title": "Stop",
+      "restart_title": "Restart",
+      "refresh_title": "Refresh status",
+      "show_last_error_aria": "Show last error",
+      "upgrading_toast": "Upgrading to v{{version}}"
+    },
+    "events": {
+      "time": "Time",
+      "action": "Action",
+      "host": "Host",
+      "result": "Result"
+    },
+    "traffic": {
+      "description": "Inbound traffic — uplink + downlink by inbound tag. Click any row for detailed chart.",
+      "tag": "Tag",
+      "role": "Role",
+      "last_range": "Last {{range}}",
+      "uplink": "Uplink",
+      "downlink": "Downlink",
+      "total": "Total"
+    },
+    "traffic_drawer": {
+      "title_suffix": "Traffic",
+      "uplink": "Uplink",
+      "downlink": "Downlink",
+      "no_data": "No data"
+    },
+    "inbound_dialog": {
+      "edit_title": "Edit inbound {{tag}}",
+      "new_title": "New inbound",
+      "server_label": "Server",
+      "select_placeholder": "— select —",
+      "role_label": "Role",
+      "role_landing": "Landing",
+      "role_relay": "Relay",
+      "upstream_label": "Upstream landing-inbound",
+      "protocol_label": "Protocol",
+      "port_label": "Port",
+      "uuid_label": "UUID",
+      "new_button": "new",
+      "alias_label": "Alias",
+      "alias_placeholder": "Optional — node alias, defaults to an auto-generated name if left blank",
+      "reality_sni_label": "REALITY SNI (target domain)",
+      "reality_sni_hint": "Must be a single-tenant TLS endpoint. Do NOT use multi-tenant CDNs.",
+      "reality_keypair_label": "REALITY keypair",
+      "reality_private_key_placeholder": "private",
+      "reality_public_key_placeholder": "public",
+      "generate_button": "Generate",
+      "short_id_label": "Short ID",
+      "ws_path_label": "WebSocket path",
+      "method_label": "Method",
+      "password_label": "Password (base64)",
+      "save_button": "Save",
+      "saving": "Saving…",
+      "creating": "Creating…",
+      "created_toast": "Inbound created",
+      "updated_toast": "Inbound updated"
+    },
+    "bulk_relay_dialog": {
+      "title": "Add relays → {{tag}} @ {{server}}",
+      "targets_label": "Target servers",
+      "no_eligible_servers": "No eligible servers.",
+      "port_label": "port",
+      "ports_in_use": "{{n}} port(s) in use",
+      "ports_in_use_title": "used: {{ports}}",
+      "regen_keys": "↻ keys",
+      "generating_key": "generating…",
+      "version_note": "Uses xray v{{version}} (taken from the landing's deployed version).",
+      "deploy_all": "Deploy all ({{n}})",
+      "deploying": "Deploying…",
+      "deployed_toast": "Deployed relay on {{server}}",
+      "error_toast": "{{server}}: {{message}}",
+      "summary_toast": "Bulk relay: {{ok}} ok, {{fail}} failed"
+    }
   },
   "netquality": {
     "delete_target": "Delete target",

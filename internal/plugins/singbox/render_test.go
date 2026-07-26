@@ -1008,6 +1008,57 @@ func TestRender_SS2022Relay(t *testing.T) {
 	}
 }
 
+func TestRenderRelayOutbound_SnellV5MapsToVersion4(t *testing.T) {
+	in := InboundView{}
+	in.Tag = "relay-x"
+	in.Role = "relay"
+	in.RelayMode = "proxy"
+	in.UpstreamTag = sql.NullString{String: "landing-snell", Valid: true}
+	in.UpstreamAddress = sql.NullString{String: "1.2.3.4", Valid: true}
+	in.UpstreamPort = sql.NullInt64{Int64: 8443, Valid: true}
+	in.UpstreamProtocol = sql.NullString{String: "snell-v5", Valid: true}
+	in.UpstreamPassword = sql.NullString{String: "psk-abc", Valid: true}
+
+	ob, err := renderRelayOutbound(in)
+	if err != nil {
+		t.Fatalf("renderRelayOutbound: %v", err)
+	}
+	if ob["type"] != "snell" {
+		t.Errorf("type = %v, want snell", ob["type"])
+	}
+	// sing-box snell OUTBOUND only accepts version 4 or 6 — passing 5
+	// makes the config fail to parse.
+	if ob["version"] != 4 {
+		t.Errorf("version = %v, want 4 (v5 landing must dial as v4)", ob["version"])
+	}
+	if ob["psk"] != "psk-abc" {
+		t.Errorf("psk = %v, want psk-abc", ob["psk"])
+	}
+}
+
+func TestRenderRelayOutbound_SnellV6StaysVersion6(t *testing.T) {
+	in := InboundView{}
+	in.Tag = "relay-x"
+	in.Role = "relay"
+	in.RelayMode = "proxy"
+	in.UpstreamTag = sql.NullString{String: "landing-snell6", Valid: true}
+	in.UpstreamAddress = sql.NullString{String: "1.2.3.4", Valid: true}
+	in.UpstreamPort = sql.NullInt64{Int64: 8443, Valid: true}
+	in.UpstreamProtocol = sql.NullString{String: "snell-v6", Valid: true}
+	in.UpstreamPassword = sql.NullString{String: "psk-abc", Valid: true}
+
+	ob, err := renderRelayOutbound(in)
+	if err != nil {
+		t.Fatalf("renderRelayOutbound: %v", err)
+	}
+	if ob["version"] != 6 {
+		t.Errorf("version = %v, want 6", ob["version"])
+	}
+	if _, ok := ob["obfs_mode"]; ok {
+		t.Error("v6 outbound must not carry obfs_mode")
+	}
+}
+
 func TestBuildTransport(t *testing.T) {
 	ws := buildTransport("ws", "/p", "h.com", true)
 	if ws["path"] != "/p" {

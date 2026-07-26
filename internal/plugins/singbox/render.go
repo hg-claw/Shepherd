@@ -590,6 +590,30 @@ func renderRelayOutbound(in InboundView) (map[string]any, error) {
 		ob["type"] = "shadowsocks"
 		ob["method"] = in.UpstreamSSMethod.String
 		ob["password"] = in.UpstreamPassword.String
+	case "snell-v5", "snell-v6":
+		ob["type"] = "snell"
+		ob["psk"] = in.UpstreamPassword.String
+		// sing-box snell outbound accepts version 4 or 6 only. The v5
+		// wire protocol is identical to v4, so a v5 landing is dialed
+		// as v4; sending 5 fails config parsing outright.
+		if in.UpstreamProtocol.String == "snell-v6" {
+			ob["version"] = 6
+		} else {
+			ob["version"] = 4
+			var extra map[string]any
+			if in.UpstreamExtraJSON.Valid && in.UpstreamExtraJSON.String != "" {
+				if err := json.Unmarshal([]byte(in.UpstreamExtraJSON.String), &extra); err != nil {
+					return nil, fmt.Errorf("relay %s: bad upstream extra_json: %w", in.Tag, err)
+				}
+			}
+			m, err := snellObfsMode(extra)
+			if err != nil {
+				return nil, fmt.Errorf("relay %s: %w", in.Tag, err)
+			}
+			if m != "none" {
+				ob["obfs_mode"] = m
+			}
+		}
 	default:
 		return nil, fmt.Errorf("unsupported upstream protocol: %s", in.UpstreamProtocol.String)
 	}

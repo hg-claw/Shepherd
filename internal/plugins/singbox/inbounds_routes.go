@@ -28,6 +28,7 @@ func isValidProtocol(p string) bool {
 		"vmess-tcp", "vmess-http", "vmess-quic", "vmess-ws-tls", "vmess-h2-tls", "vmess-httpupgrade-tls",
 		"trojan-tls", "trojan-ws-tls", "trojan-h2-tls", "trojan-httpupgrade-tls",
 		"hysteria2", "tuic-v5", "anytls", "shadowsocks-2022",
+		"snell-v5", "snell-v6",
 	} {
 		if p == v {
 			return true
@@ -88,6 +89,11 @@ func validatePostInbound(ctx context.Context, store *InboundStore, body postInbo
 	}
 	if !isValidProtocol(body.Protocol) {
 		return fmt.Errorf("unknown protocol %q", body.Protocol)
+	}
+	if body.Protocol == "snell-v5" || body.Protocol == "snell-v6" {
+		if body.Password == nil || *body.Password == "" {
+			return errors.New("password (snell psk) required for snell inbounds")
+		}
 	}
 	existing, _ := store.ListByServer(ctx, body.ServerID)
 	for _, e := range existing {

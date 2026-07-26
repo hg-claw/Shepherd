@@ -2,6 +2,7 @@ package singbox
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -243,5 +244,30 @@ func TestRoutes_InboundAlias(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("list: inbound id=%d not found in response", id)
+	}
+}
+
+func TestIsValidProtocol_Snell(t *testing.T) {
+	for _, p := range []string{"snell-v5", "snell-v6"} {
+		if !isValidProtocol(p) {
+			t.Errorf("isValidProtocol(%q) = false, want true", p)
+		}
+	}
+	if isValidProtocol("snell") {
+		t.Error(`isValidProtocol("snell") = true, want false (version must be in the name)`)
+	}
+}
+
+func TestValidatePostInbound_SnellRequiresPassword(t *testing.T) {
+	deps := newRouteDeps(t)
+	store := &InboundStore{DB: deps.DB}
+	body := postInboundBody{ServerID: 1, Port: 8443, Role: "landing", Protocol: "snell-v5"}
+	if err := validatePostInbound(context.Background(), store, body); err == nil {
+		t.Fatal("expected error when snell psk (password) is empty")
+	}
+	psk := "test-psk-value"
+	body.Password = &psk
+	if err := validatePostInbound(context.Background(), store, body); err != nil {
+		t.Fatalf("unexpected error with psk set: %v", err)
 	}
 }

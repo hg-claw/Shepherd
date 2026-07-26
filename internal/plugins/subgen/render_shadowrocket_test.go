@@ -45,6 +45,56 @@ func TestShadowRocket_RendersAndReportsTarget(t *testing.T) {
 	}
 }
 
+func TestShadowrocket_SnellV5DowngradesToV4(t *testing.T) {
+	n := Node{
+		Name: "hk1", Protocol: "snell", Server: "1.2.3.4", Port: 8443,
+		Password: "psk-abc",
+		Extra:    map[string]any{"snell_version": 5},
+	}
+	line := (&ShadowRocketRenderer{}).proxyLine(n, "shadowrocket")
+	if !strings.Contains(line, "version=4") {
+		t.Errorf("shadowrocket must dial a v5 landing as v4, got %q", line)
+	}
+}
+
+func TestShadowrocket_SnellV6Skipped(t *testing.T) {
+	n := Node{
+		Name: "hk1", Protocol: "snell", Server: "1.2.3.4", Port: 8443,
+		Password: "psk-abc",
+		Extra:    map[string]any{"snell_version": 6},
+	}
+	if line := (&ShadowRocketRenderer{}).proxyLine(n, "shadowrocket"); line != "" {
+		t.Errorf("shadowrocket must skip snell v6 (client rejects it), got %q", line)
+	}
+}
+
+// TestShadowrocket_SkippedSnellNodeLeavesNoTrace guards the render loop itself:
+// a node whose proxyLine comes back empty must vanish completely — no blank
+// [Proxy] line, no dangling name in any group's member list. The strongest
+// check for "no trace" is that including the doomed node changes nothing at
+// all versus never having sent it.
+func TestShadowrocket_SkippedSnellNodeLeavesNoTrace(t *testing.T) {
+	withV6 := Intermediate{
+		Nodes: []Node{
+			{Name: "hk-v5", Protocol: "snell", Server: "5.6.7.8", Port: 8443, Password: "psk-def", Extra: map[string]any{"snell_version": 5}},
+			{Name: "hk-v6", Protocol: "snell", Server: "1.2.3.4", Port: 8443, Password: "psk-abc", Extra: map[string]any{"snell_version": 6}},
+		},
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"{{NODES}}"}}},
+		Rules:  []Rule{{Final: true, Target: "PROXY"}},
+	}
+	withoutV6 := withV6
+	withoutV6.Nodes = []Node{withV6.Nodes[0]}
+
+	outWith := (&ShadowRocketRenderer{}).Render(withV6, "https://x", DefaultRulesetBase)
+	outWithout := (&ShadowRocketRenderer{}).Render(withoutV6, "https://x", DefaultRulesetBase)
+	if outWith != outWithout {
+		t.Fatalf("a fully-skipped snell v6 node must leave rendering byte-identical to it never existing.\nwith v6:\n%s\n\nwithout v6:\n%s", outWith, outWithout)
+	}
+	if strings.Contains(outWith, "hk-v6") {
+		t.Fatalf("skipped node name leaked into output:\n%s", outWith)
+	}
+}
+
 func TestShadowRocket_FiltersDevice(t *testing.T) {
 	im := Intermediate{
 		Groups: []Group{{Name: "Home", Type: "select", Members: []string{"DEVICE:HomeMac", "DIRECT"}, Verbatim: true}},

@@ -13,13 +13,13 @@ func (*SurgeRenderer) Target() string { return "surge" }
 
 func (*SurgeRenderer) Supports(p string) bool {
 	switch p {
-	case "shadowsocks", "vmess", "trojan", "vless", "hysteria2", "tuic", "anytls", "wireguard":
+	case "shadowsocks", "vmess", "trojan", "vless", "hysteria2", "tuic", "anytls", "wireguard", "snell":
 		return true
 	}
 	return false
 }
 
-func (r *SurgeRenderer) proxyLine(n Node) string {
+func (r *SurgeRenderer) proxyLine(n Node, target string) string {
 	var b strings.Builder
 	switch n.Protocol {
 	case "shadowsocks":
@@ -93,8 +93,49 @@ func (r *SurgeRenderer) proxyLine(n Node) string {
 		if n.Insecure {
 			b.WriteString(", skip-cert-verify=true")
 		}
+	case "snell":
+		ver := snellVersionFor(n, target)
+		if ver == 0 {
+			return ""
+		}
+		fmt.Fprintf(&b, "%s = snell, %s, %d, psk=%s, version=%d", n.Name, n.Server, n.Port, n.Password, ver)
+		// obfs belongs to the v4/v5 generation; v6 replaces it with
+		// server-side traffic shaping and takes no client-side param.
+		if ver != 6 {
+			if m, _ := n.Extra["obfs_mode"].(string); m == "http" {
+				b.WriteString(", obfs=http")
+				if h, _ := n.Extra["obfs_host"].(string); h != "" {
+					b.WriteString(", obfs-host=" + h)
+				}
+			}
+		}
 	}
 	return b.String()
+}
+
+// snellVersionFor picks the snell version to write for a target client.
+// Surge speaks 4/5/6 natively. Every other Surge-syntax client caps out
+// at v4 — a v5 landing is dialed as v4 (the v5 wire protocol is
+// backward-compatible), and v6 has no v4 fallback at all, so it is
+// skipped. Returns 0 to mean "skip this node".
+func snellVersionFor(n Node, target string) int {
+	v, _ := n.Extra["snell_version"].(int)
+	if v == 0 {
+		// Tolerate float64 from a JSON round-trip.
+		if f, ok := n.Extra["snell_version"].(float64); ok {
+			v = int(f)
+		}
+	}
+	if target == "surge" {
+		return v
+	}
+	switch v {
+	case 5:
+		return 4
+	case 6:
+		return 0
+	}
+	return v
 }
 
 func (r *SurgeRenderer) Render(im Intermediate, subURL, rulesetBase string) string {
@@ -116,8 +157,8 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 		if !r.Supports(n.Protocol) {
 			continue
 		}
-		names = append(names, n.Name)
 		if n.Protocol == "wireguard" {
+			names = append(names, n.Name)
 			if wgInline {
 				proxies.WriteString(shadowrocketWGLine(n) + "\n")
 			} else {
@@ -128,7 +169,16 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 			}
 			continue
 		}
-		proxies.WriteString(r.proxyLine(n) + "\n")
+		line := r.proxyLine(n, target)
+		if line == "" {
+			// The client can't represent this node at all (e.g. a snell v6
+			// landing on a Surge-syntax client without v6 support) — drop
+			// it entirely so it leaves no [Proxy] line and no dangling
+			// name in any group/policy list below.
+			continue
+		}
+		names = append(names, n.Name)
+		proxies.WriteString(line + "\n")
 	}
 	nodeList := strings.Join(names, ", ")
 

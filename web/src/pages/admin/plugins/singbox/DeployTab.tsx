@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Play, Square, RotateCw, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Pill, type PillKind } from '@/components/Pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/table'
 import {
   listPluginHosts,
   fetchSingboxVersions,
@@ -29,6 +31,7 @@ function statusPill(status: SingboxStatus): { kind: PillKind; label: string } {
 }
 
 function VersionInline({ serverID, current, versions }: { serverID: number; current: string | null; versions: string[] }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const [editing, setEditing] = useState(false)
@@ -37,7 +40,7 @@ function VersionInline({ serverID, current, versions }: { serverID: number; curr
   const apply = useMutation({
     mutationFn: () => patchSingboxServerVersion(serverID, value, useMirror),
     onSuccess: () => {
-      toast('success', `Upgrading to v${value}`)
+      toast('success', t('singbox.deploy.upgrading_toast', 'Upgrading to v{{version}}', { version: value }))
       qc.invalidateQueries({ queryKey: ['plugin-hosts', 'singbox'] })
       setEditing(false)
     },
@@ -47,7 +50,7 @@ function VersionInline({ serverID, current, versions }: { serverID: number; curr
     return (
       <span className="font-mono text-xs text-fg-dim">
         {current ?? '—'}{' '}
-        <button className="underline" onClick={() => { setValue(current ?? ''); setEditing(true) }}>change</button>
+        <button className="underline" onClick={() => { setValue(current ?? ''); setEditing(true) }}>{t('singbox.deploy.change', 'change')}</button>
       </span>
     )
   }
@@ -66,24 +69,25 @@ function VersionInline({ serverID, current, versions }: { serverID: number; curr
         </SelectContent>
       </Select>
       <Button size="xs" className="text-2xs" disabled={apply.isPending}
-        onClick={() => apply.mutate()}>Apply</Button>
-      <label className="inline-flex items-center gap-1 text-fg-dim text-2xs cursor-pointer" title="Route the binary download via gh-proxy.com (for CN hosts that can't reach github.com)">
+        onClick={() => apply.mutate()}>{t('singbox.deploy.apply', 'Apply')}</Button>
+      <label className="inline-flex items-center gap-1 text-fg-dim text-2xs cursor-pointer" title={t('singbox.deploy.mirror_title_long', "Route the binary download via gh-proxy.com (for CN hosts that can't reach github.com)")}>
         <input type="checkbox" className="h-3 w-3" checked={useMirror} onChange={(e) => setUseMirror(e.target.checked)} />
-        mirror
+        {t('singbox.deploy.mirror', 'mirror')}
       </label>
-      <button className="text-fg-dim text-2xs" onClick={() => setEditing(false)}>cancel</button>
+      <button className="text-fg-dim text-2xs" onClick={() => setEditing(false)}>{t('singbox.deploy.cancel', 'cancel')}</button>
     </span>
   )
 }
 
 function RedeployButton({ serverID, deployedVersion }: { serverID: number; deployedVersion: string | null }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const [useMirror, setUseMirror] = useState(false)
   const redeploy = useMutation({
     mutationFn: () => patchSingboxServerVersion(serverID, deployedVersion ?? '', useMirror),
     onSuccess: () => {
-      toast('success', 'Re-deploy triggered')
+      toast('success', t('singbox.deploy.redeploy_toast', 'Re-deploy triggered'))
       qc.invalidateQueries({ queryKey: ['plugin-hosts', 'singbox'] })
     },
     onError: (e: any) => toast('error', String(e?.message ?? e)),
@@ -97,17 +101,18 @@ function RedeployButton({ serverID, deployedVersion }: { serverID: number; deplo
         disabled={!deployedVersion || redeploy.isPending}
         onClick={() => redeploy.mutate()}
       >
-        Re-deploy
+        {t('singbox.deploy.redeploy', 'Re-deploy')}
       </Button>
-      <label className="inline-flex items-center gap-1 text-fg-dim text-2xs cursor-pointer" title="Route the binary download via gh-proxy.com (for CN hosts)">
+      <label className="inline-flex items-center gap-1 text-fg-dim text-2xs cursor-pointer" title={t('singbox.deploy.mirror_title', 'Route the binary download via gh-proxy.com (for CN hosts)')}>
         <input type="checkbox" className="h-3 w-3" checked={useMirror} onChange={(e) => setUseMirror(e.target.checked)} />
-        mirror
+        {t('singbox.deploy.mirror', 'mirror')}
       </label>
     </span>
   )
 }
 
 function DeployButton({ serverID, versions }: { serverID: number; versions: string[] }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   // useState initializer fires once at mount. When the parent renders us
@@ -127,7 +132,7 @@ function DeployButton({ serverID, versions }: { serverID: number; versions: stri
   const deploy = useMutation({
     mutationFn: () => patchSingboxServerVersion(serverID, version, useMirror),
     onSuccess: () => {
-      toast('success', `Deploying v${version}`)
+      toast('success', t('singbox.deploy.deploying_toast', 'Deploying v{{version}}', { version }))
       qc.invalidateQueries({ queryKey: ['plugin-hosts', 'singbox'] })
     },
     onError: (e: any) => toast('error', String(e?.message ?? e)),
@@ -136,7 +141,7 @@ function DeployButton({ serverID, versions }: { serverID: number; versions: stri
     <span className="inline-flex items-center gap-1">
       <Select value={version} onValueChange={setVersion} disabled={!versions.length || deploy.isPending}>
         <SelectTrigger className="h-6 w-24 text-2xs font-mono">
-          <SelectValue placeholder="version" />
+          <SelectValue placeholder={t('singbox.deploy.version_placeholder', 'version')} />
         </SelectTrigger>
         <SelectContent>
           {versions.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
@@ -149,17 +154,18 @@ function DeployButton({ serverID, versions }: { serverID: number; versions: stri
         disabled={!version || deploy.isPending}
         onClick={() => deploy.mutate()}
       >
-        {deploy.isPending ? 'Deploying…' : 'Deploy'}
+        {deploy.isPending ? t('singbox.deploy.deploying', 'Deploying…') : t('singbox.deploy.deploy', 'Deploy')}
       </Button>
-      <label className="inline-flex items-center gap-1 text-fg-dim text-2xs cursor-pointer" title="Route the binary download via gh-proxy.com (for CN hosts)">
+      <label className="inline-flex items-center gap-1 text-fg-dim text-2xs cursor-pointer" title={t('singbox.deploy.mirror_title', 'Route the binary download via gh-proxy.com (for CN hosts)')}>
         <input type="checkbox" className="h-3 w-3" checked={useMirror} onChange={(e) => setUseMirror(e.target.checked)} />
-        mirror
+        {t('singbox.deploy.mirror', 'mirror')}
       </label>
     </span>
   )
 }
 
 function LifecycleButtons({ serverID, status }: { serverID: number; status: SingboxStatus }) {
+  const { t } = useTranslation()
   const toast = useUI((s) => s.toast)
   const lc = useHostLifecycle('singbox', serverID)
   const busy = lc.start.isPending || lc.stop.isPending || lc.restart.isPending || lc.refreshStatus.isPending
@@ -174,7 +180,7 @@ function LifecycleButtons({ serverID, status }: { serverID: number; status: Sing
           variant="ghost"
           className="w-7 p-0"
           disabled={busy}
-          title="Start"
+          title={t('singbox.deploy.start_title', 'Start')}
           onClick={wrap(() => lc.start.mutateAsync())}
         >
           <Play className="h-3 w-3" />
@@ -186,7 +192,7 @@ function LifecycleButtons({ serverID, status }: { serverID: number; status: Sing
           variant="ghost"
           className="w-7 p-0"
           disabled={busy}
-          title="Stop"
+          title={t('singbox.deploy.stop_title', 'Stop')}
           onClick={wrap(() => lc.stop.mutateAsync())}
         >
           <Square className="h-3 w-3" />
@@ -197,7 +203,7 @@ function LifecycleButtons({ serverID, status }: { serverID: number; status: Sing
         variant="ghost"
         className="w-7 p-0"
         disabled={busy}
-        title="Restart"
+        title={t('singbox.deploy.restart_title', 'Restart')}
         onClick={wrap(() => lc.restart.mutateAsync())}
       >
         <RotateCw className="h-3 w-3" />
@@ -207,7 +213,7 @@ function LifecycleButtons({ serverID, status }: { serverID: number; status: Sing
         variant="ghost"
         className="w-7 p-0"
         disabled={busy}
-        title="Refresh status"
+        title={t('singbox.deploy.refresh_title', 'Refresh status')}
         onClick={wrap(() => lc.refreshStatus.mutateAsync())}
       >
         <RefreshCw className="h-3 w-3" />
@@ -217,6 +223,7 @@ function LifecycleButtons({ serverID, status }: { serverID: number; status: Sing
 }
 
 export default function DeployTab() {
+  const { t } = useTranslation()
   const { data: servers = [] } = useServers()
   const hostsQ = useQuery({
     queryKey: ['plugin-hosts', 'singbox'],
@@ -247,19 +254,19 @@ export default function DeployTab() {
     servers.map((s) => ({ server: s, host: hostByServerID.get(s.id) }))
 
   return (
-    <div className="space-y-2">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b text-2xs text-muted-foreground uppercase tracking-wide">
-            <th className="text-left py-2 pr-4 font-medium">Server</th>
-            <th className="text-left py-2 pr-4 font-medium">Status</th>
-            <th className="text-left py-2 pr-4 font-medium">Version</th>
-            <th className="text-left py-2 pr-4 font-medium">Last Error</th>
-            <th className="text-left py-2 pr-4 font-medium">Last Update</th>
-            <th className="text-left py-2 font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
+    <div className="space-y-4">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead>{t('singbox.deploy.server', 'Server')}</TableHead>
+            <TableHead>{t('singbox.deploy.status', 'Status')}</TableHead>
+            <TableHead>{t('singbox.deploy.version', 'Version')}</TableHead>
+            <TableHead>{t('singbox.deploy.last_error', 'Last Error')}</TableHead>
+            <TableHead>{t('singbox.deploy.last_update', 'Last Update')}</TableHead>
+            <TableHead>{t('admin.actions', 'Actions')}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {rows.map(({ server, host }) => {
             const sshHost = server.ssh_host?.Valid ? server.ssh_host.String : null
             const { kind, label } = host
@@ -269,28 +276,28 @@ export default function DeployTab() {
               ? host.last_error.slice(0, 200)
               : null
             return (
-              <tr key={server.id} className="border-b last:border-0">
-                <td className="py-2 pr-4">
+              <TableRow key={server.id}>
+                <TableCell>
                   <div className="font-medium">{server.name}</div>
                   {sshHost && (
                     <div className="text-2xs text-muted-foreground font-mono">{sshHost}</div>
                   )}
-                </td>
-                <td className="py-2 pr-4">
+                </TableCell>
+                <TableCell>
                   {host ? (
                     <Pill kind={kind}>{label}</Pill>
                   ) : (
-                    <span className="text-muted-foreground text-xs">not deployed</span>
+                    <span className="text-muted-foreground text-xs">{t('singbox.deploy.not_deployed', 'not deployed')}</span>
                   )}
-                </td>
-                <td className="py-2 pr-4">
+                </TableCell>
+                <TableCell>
                   {host ? (
                     <VersionInline serverID={server.id} current={host.deployed_version} versions={allVersions} />
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
-                </td>
-                <td className="py-2 pr-4">
+                </TableCell>
+                <TableCell>
                   {errTrunc ? (
                     <TooltipProvider delayDuration={150}>
                       <Tooltip>
@@ -298,7 +305,7 @@ export default function DeployTab() {
                           <button
                             type="button"
                             className="inline-flex h-7 w-7 items-center justify-center rounded text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/60"
-                            aria-label="Show last error"
+                            aria-label={t('singbox.deploy.show_last_error_aria', 'Show last error')}
                           >
                             ⚠
                           </button>
@@ -311,11 +318,11 @@ export default function DeployTab() {
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
-                </td>
-                <td className="py-2 pr-4 font-mono text-2xs text-muted-foreground">
+                </TableCell>
+                <TableCell className="font-mono text-2xs text-muted-foreground">
                   {host?.updated_at ?? '—'}
-                </td>
-                <td className="py-2">
+                </TableCell>
+                <TableCell>
                   <span className="inline-flex items-center gap-1">
                     {host ? (
                       <>
@@ -329,19 +336,15 @@ export default function DeployTab() {
                       <DeployButton serverID={server.id} versions={allVersions} />
                     )}
                   </span>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             )
           })}
           {rows.length === 0 && (
-            <tr>
-              <td colSpan={6} className="py-6 text-center text-muted-foreground text-sm">
-                No servers found.
-              </td>
-            </tr>
+            <TableEmpty colSpan={6}>{t('singbox.empty.deploy', 'No servers found.')}</TableEmpty>
           )}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   )
 }

@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/table'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { useUI } from '@/store/ui'
 import {
@@ -55,6 +56,7 @@ interface IssueCertDialogProps {
 }
 
 export function IssueCertDialog({ open, onOpenChange }: IssueCertDialogProps) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
 
@@ -66,10 +68,10 @@ export function IssueCertDialog({ open, onOpenChange }: IssueCertDialogProps) {
   function validate(): boolean {
     const e: Record<string, string> = {}
     if (!domain.match(/^[a-zA-Z0-9*][a-zA-Z0-9.*-]*\.[a-zA-Z]{2,}$/)) {
-      e.domain = 'Enter a valid hostname (e.g. proxy.example.com)'
+      e.domain = t('singbox.certificates.issue_dialog.domain_error', 'Enter a valid hostname (e.g. proxy.example.com)')
     }
     if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      e.email = 'Enter a valid email address'
+      e.email = t('singbox.certificates.issue_dialog.email_error', 'Enter a valid email address')
     }
     setErrors(e)
     return Object.keys(e).length === 0
@@ -78,7 +80,7 @@ export function IssueCertDialog({ open, onOpenChange }: IssueCertDialogProps) {
   const issue = useMutation({
     mutationFn: () => issueSingboxCert({ domain, email, challenge_type: challengeType }),
     onSuccess: () => {
-      toast('success', `Certificate issuance started for ${domain}`)
+      toast('success', t('singbox.certificates.issue_dialog.success_toast', 'Certificate issuance started for {{domain}}', { domain }))
       qc.invalidateQueries({ queryKey: ['singbox-certs'] })
       onOpenChange(false)
       setDomain('')
@@ -99,13 +101,13 @@ export function IssueCertDialog({ open, onOpenChange }: IssueCertDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Issue Certificate</DialogTitle>
+          <DialogTitle>{t('singbox.certificates.issue_dialog.title', 'Issue Certificate')}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           {/* Domain */}
           <div className="space-y-1">
-            <Label htmlFor="ic-domain">Domain</Label>
+            <Label htmlFor="ic-domain">{t('singbox.certificates.issue_dialog.domain_label', 'Domain')}</Label>
             <Input
               id="ic-domain"
               value={domain}
@@ -119,7 +121,7 @@ export function IssueCertDialog({ open, onOpenChange }: IssueCertDialogProps) {
 
           {/* Email */}
           <div className="space-y-1">
-            <Label htmlFor="ic-email">Email</Label>
+            <Label htmlFor="ic-email">{t('singbox.certificates.issue_dialog.email_label', 'Email')}</Label>
             <Input
               id="ic-email"
               type="email"
@@ -134,7 +136,7 @@ export function IssueCertDialog({ open, onOpenChange }: IssueCertDialogProps) {
 
           {/* Challenge type */}
           <fieldset className="space-y-2">
-            <legend className="text-sm font-medium leading-none">Challenge type</legend>
+            <legend className="text-sm font-medium leading-none">{t('singbox.certificates.issue_dialog.challenge_type_label', 'Challenge type')}</legend>
             <div className="space-y-1.5 pt-1">
               <label className="flex items-center gap-2 cursor-pointer text-sm">
                 <input
@@ -144,7 +146,7 @@ export function IssueCertDialog({ open, onOpenChange }: IssueCertDialogProps) {
                   checked={challengeType === 'dns-01-cf'}
                   onChange={() => setChallengeType('dns-01-cf')}
                 />
-                DNS-01 (Cloudflare)
+                {t('singbox.certificates.issue_dialog.challenge_dns_cf', 'DNS-01 (Cloudflare)')}
               </label>
               <label className="flex items-center gap-2 cursor-pointer text-sm">
                 <input
@@ -154,7 +156,7 @@ export function IssueCertDialog({ open, onOpenChange }: IssueCertDialogProps) {
                   checked={challengeType === 'http-01'}
                   onChange={() => setChallengeType('http-01')}
                 />
-                HTTP-01
+                {t('singbox.certificates.issue_dialog.challenge_http', 'HTTP-01')}
               </label>
             </div>
           </fieldset>
@@ -162,13 +164,13 @@ export function IssueCertDialog({ open, onOpenChange }: IssueCertDialogProps) {
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel', 'Cancel')}
           </Button>
           <Button
             disabled={issue.isPending}
             onClick={handleSubmit}
           >
-            {issue.isPending ? 'Issuing…' : 'Issue'}
+            {issue.isPending ? t('singbox.certificates.issue_dialog.issuing', 'Issuing…') : t('singbox.certificates.issue_dialog.issue', 'Issue')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -213,7 +215,7 @@ export default function CertificatesTab() {
   const renew = useMutation({
     mutationFn: (id: number) => renewSingboxCert(id),
     onSuccess: (_, id) => {
-      toast('success', `Renewal queued for cert #${id}`)
+      toast('success', t('singbox.certificates.renew_toast', 'Renewal queued for cert #{{id}}', { id }))
       qc.invalidateQueries({ queryKey: ['singbox-certs'] })
     },
     onError: (e: unknown) => toast('error', String((e as Error)?.message ?? e)),
@@ -228,7 +230,7 @@ export default function CertificatesTab() {
       const err = e as APIError
       if (err.status === 409) {
         // Message from server: "cert is in use by N inbound(s); remove them first"
-        toast('error', err.message || 'cert is in use; remove inbounds first')
+        toast('error', err.message || t('singbox.certificates.delete_conflict_fallback', 'cert is in use; remove inbounds first'))
       } else {
         toast('error', String(err.message ?? e))
       }
@@ -236,119 +238,115 @@ export default function CertificatesTab() {
   })
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">TLS Certificates</h2>
+        <h2 className="text-lg font-semibold">{t('singbox.certificates.title', 'TLS Certificates')}</h2>
         <Button size="sm" onClick={() => setShowIssue(true)}>
-          + Issue cert
+          + {t('singbox.certificates.issue_button', 'Issue cert')}
         </Button>
       </div>
 
       {/* Table */}
-      <div className="rounded-md border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b text-xs text-muted-foreground">
-              <th className="px-3 py-2 text-left font-medium">Domain</th>
-              <th className="px-3 py-2 text-left font-medium">Status</th>
-              <th className="px-3 py-2 text-left font-medium">Issuer</th>
-              <th className="px-3 py-2 text-left font-medium">Expires</th>
-              <th className="px-3 py-2 text-left font-medium">Challenge</th>
-              <th className="px-3 py-2 text-left font-medium">Last error</th>
-              <th className="px-3 py-2 text-left font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {certs.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-sm text-muted-foreground">
-                  No certificates yet. Click "+ Issue cert" to get started.
-                </td>
-              </tr>
-            )}
-            {certs.map((c) => (
-              <tr key={c.id} className="border-b last:border-0 hover:bg-sunken/60">
-                {/* Domain */}
-                <td className="px-3 py-2 font-mono text-xs">{c.domain}</td>
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead>{t('singbox.certificates.domain', 'Domain')}</TableHead>
+            <TableHead>{t('singbox.certificates.status', 'Status')}</TableHead>
+            <TableHead>{t('singbox.certificates.issuer', 'Issuer')}</TableHead>
+            <TableHead>{t('singbox.certificates.expires', 'Expires')}</TableHead>
+            <TableHead>{t('singbox.certificates.challenge', 'Challenge')}</TableHead>
+            <TableHead>{t('singbox.certificates.last_error', 'Last error')}</TableHead>
+            <TableHead>{t('admin.actions', 'Actions')}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {certs.length === 0 && (
+            <TableEmpty colSpan={7}>
+              {t('singbox.empty.certificates', 'No certificates yet. Click "+ Issue cert" to get started.')}
+            </TableEmpty>
+          )}
+          {certs.map((c) => (
+            <TableRow key={c.id}>
+              {/* Domain */}
+              <TableCell className="font-mono text-xs">{c.domain}</TableCell>
 
-                {/* Status pill */}
-                <td className="px-3 py-2">
-                  <Pill kind={statusKind(c.status)}>{c.status}</Pill>
-                </td>
+              {/* Status pill */}
+              <TableCell>
+                <Pill kind={statusKind(c.status)}>{c.status}</Pill>
+              </TableCell>
 
-                {/* Issuer */}
-                <td className="px-3 py-2 text-xs">{c.issuer ?? '—'}</td>
+              {/* Issuer */}
+              <TableCell className="text-xs">{c.issuer ?? '—'}</TableCell>
 
-                {/* Expires */}
-                <td className={`px-3 py-2 text-xs ${expiryClass(c.expires_at, c.status)}`}>
-                  {c.expires_at
-                    ? new Date(c.expires_at).toLocaleDateString()
-                    : '—'}
-                </td>
+              {/* Expires */}
+              <TableCell className={`text-xs ${expiryClass(c.expires_at, c.status)}`}>
+                {c.expires_at
+                  ? new Date(c.expires_at).toLocaleDateString()
+                  : '—'}
+              </TableCell>
 
-                {/* Challenge */}
-                <td className="px-3 py-2 text-xs">{c.challenge_type}</td>
+              {/* Challenge */}
+              <TableCell className="text-xs">{c.challenge_type}</TableCell>
 
-                {/* Last error — icon + tooltip. shadcn Tooltip replaces
-                    the native `title` attribute which (a) was too slow
-                    to surface on hover and (b) had a hit area limited
-                    to the 1ch ⚠ glyph. The trigger is now button-sized
-                    + opens on focus too. */}
-                <td className="px-3 py-2">
-                  {c.last_error ? (
-                    <TooltipProvider delayDuration={150}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            className="inline-flex h-7 w-7 items-center justify-center rounded text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/60"
-                            aria-label="Show last error"
-                          >
-                            ⚠
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="max-w-md break-words text-xs">
-                          {c.last_error}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
+              {/* Last error — icon + tooltip. shadcn Tooltip replaces
+                  the native `title` attribute which (a) was too slow
+                  to surface on hover and (b) had a hit area limited
+                  to the 1ch ⚠ glyph. The trigger is now button-sized
+                  + opens on focus too. */}
+              <TableCell>
+                {c.last_error ? (
+                  <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/60"
+                          aria-label={t('singbox.certificates.show_last_error_aria', 'Show last error')}
+                        >
+                          ⚠
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-md break-words text-xs">
+                        {c.last_error}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </TableCell>
 
-                {/* Actions */}
-                <td className="px-3 py-2">
-                  <div className="flex gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={renew.isPending}
-                      onClick={() => renew.mutate(c.id)}
-                    >
-                      Renew
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={usedCertIDs.has(c.id) || del.isPending}
-                      title={
-                        usedCertIDs.has(c.id)
-                          ? 'cert is in use by inbound(s); remove them first'
-                          : undefined
-                      }
-                      onClick={() => setPendingDelete(c)}
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+              {/* Actions */}
+              <TableCell>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={renew.isPending}
+                    onClick={() => renew.mutate(c.id)}
+                  >
+                    {t('singbox.certificates.renew', 'Renew')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={usedCertIDs.has(c.id) || del.isPending}
+                    title={
+                      usedCertIDs.has(c.id)
+                        ? t('singbox.certificates.delete_disabled_title', 'cert is in use by inbound(s); remove them first')
+                        : undefined
+                    }
+                    onClick={() => setPendingDelete(c)}
+                  >
+                    {t('admin.delete', 'Delete')}
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
 
       {/* Issue cert dialog */}
       <IssueCertDialog open={showIssue} onOpenChange={setShowIssue} />

@@ -1,4 +1,5 @@
 {
+  "toast": { "error": "错误", "success": "成功", "info": "提示" },
   "app": {
     "name": "Shepherd",
     "tagline": "服务器舰队管理"

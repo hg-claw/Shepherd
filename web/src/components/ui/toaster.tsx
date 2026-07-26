@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Toast,
   ToastClose,
@@ -12,14 +13,16 @@ import { useUI, type Toast as UIToast } from '@/store/ui'
 const AUTO_DISMISS_MS = 5000
 
 function ToastItem({ t, onDismiss }: { t: UIToast; onDismiss: (id: number) => void }) {
+  const { t: tr } = useTranslation()
   useEffect(() => {
     const h = setTimeout(() => onDismiss(t.id), AUTO_DISMISS_MS)
     return () => clearTimeout(h)
   }, [t.id, onDismiss])
+  const variant = t.kind === 'error' ? 'destructive' : t.kind === 'success' ? 'success' : 'info'
   return (
-    <Toast variant={t.kind === 'error' ? 'destructive' : 'default'} onOpenChange={(open) => { if (!open) onDismiss(t.id) }}>
+    <Toast variant={variant} onOpenChange={(open) => { if (!open) onDismiss(t.id) }}>
       <div className="grid gap-1">
-        <ToastTitle>{t.kind === 'error' ? 'Error' : t.kind === 'success' ? 'Success' : 'Info'}</ToastTitle>
+        <ToastTitle>{tr(`toast.${t.kind}`)}</ToastTitle>
         <ToastDescription>{t.message}</ToastDescription>
       </div>
       <ToastClose />

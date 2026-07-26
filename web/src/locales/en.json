@@ -1,4 +1,5 @@
 {
+  "toast": { "error": "Error", "success": "Success", "info": "Info" },
   "app": { "name": "Shepherd", "tagline": "Server fleet manager" },
   "auth": {
     "login": "Login",

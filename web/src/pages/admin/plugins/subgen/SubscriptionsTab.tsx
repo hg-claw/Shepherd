@@ -20,6 +20,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
@@ -58,7 +59,7 @@ export default function SubscriptionsTab() {
   const create = useMutation({
     mutationFn: ({ name, template_id }: { name: string; template_id: number }) =>
       createSubgenSubscription(name, template_id),
-    onSuccess: () => { invalidate(); toast('success', 'Subscription created') },
+    onSuccess: () => { invalidate(); toast('success', t('subgen.subscriptions.created_toast', 'Subscription created')) },
     onError: (e: any) => toast('error', String(e?.message ?? e)),
   })
   const update = useMutation({
@@ -74,7 +75,7 @@ export default function SubscriptionsTab() {
   })
   const rotate = useMutation({
     mutationFn: rotateSubgenToken,
-    onSuccess: () => { invalidate(); toast('success', 'Token rotated') },
+    onSuccess: () => { invalidate(); toast('success', t('subgen.subscriptions.rotated_toast', 'Token rotated')) },
     onError: (e: any) => toast('error', String(e?.message ?? e)),
   })
 
@@ -89,101 +90,105 @@ export default function SubscriptionsTab() {
   const copy = async (text: string) => {
     try {
       await copyText(text)
-      toast('success', 'Copied to clipboard')
+      toast('success', t('common.copied'))
     } catch {
-      toast('error', 'Copy failed')
+      toast('error', t('subgen.subscriptions.copy_failed_toast', 'Copy failed'))
     }
   }
 
   const subs = subsQ.data ?? []
 
   if (subsQ.isError) {
-    return <div className="text-err text-sm">Failed to load subscriptions: {(subsQ.error as Error).message}</div>
+    return (
+      <div className="text-err text-sm">
+        {t('subgen.subscriptions.load_error', 'Failed to load subscriptions: {{message}}', {
+          message: (subsQ.error as Error).message,
+        })}
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Each subscription exposes a public URL clients import. Pick its template and the inbound nodes it bundles.
+          {t('subgen.subscriptions.description', 'Each subscription exposes a public URL clients import. Pick its template and the inbound nodes it bundles.')}
         </p>
-        <Button size="sm" className="h-8" onClick={() => setCreating(true)} disabled={templates.length === 0}>
-          <Plus className="h-3.5 w-3.5 mr-1" /> New subscription
+        <Button size="sm" onClick={() => setCreating(true)} disabled={templates.length === 0}>
+          <Plus className="h-3.5 w-3.5 mr-1" /> {t('subgen.subscriptions.new', 'New subscription')}
         </Button>
       </div>
 
-      <div className="rounded-lg border bg-elev overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
-          <thead>
-            <tr className="text-left">
-              <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Name</th>
-              <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Template</th>
-              <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Enabled</th>
-              <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Subscription URL</th>
-              <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {subs.map((s) => {
-              const target = targetOf(s.id)
-              const url = subUrl(s.token, target)
-              return (
-                <tr key={s.id} className="border-t align-top">
-                  <td className="px-3 py-2 font-mono">{s.name}</td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">{tplName(s.template_id)}</td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={s.enabled}
-                      disabled={update.isPending}
-                      onChange={(e) => update.mutate({ id: s.id, body: { enabled: e.target.checked } })}
-                      aria-label="enabled"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={target}
-                        onChange={(e) => setTargets((t) => ({ ...t, [s.id]: e.target.value as Target }))}
-                        className="h-7 px-1.5 rounded border bg-background text-2xs"
-                      >
-                        <option value="surge">surge</option>
-                        <option value="shadowrocket">shadowrocket</option>
-                        <option value="clash">clash</option>
-                      </select>
-                      <code className="font-mono text-2xs text-fg-dim truncate max-w-[22rem]">{url}</code>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
-                        onClick={() => copy(url)} aria-label="copy url">
-                        <Copy className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">
-                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs mr-1"
-                      onClick={() => setNodesFor(s)}>
-                      <Server className="h-3.5 w-3.5 mr-1" /> Edit nodes
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead>{t('subgen.subscriptions.name', 'Name')}</TableHead>
+            <TableHead>{t('subgen.subscriptions.template', 'Template')}</TableHead>
+            <TableHead>{t('subgen.subscriptions.enabled', 'Enabled')}</TableHead>
+            <TableHead>{t('subgen.subscriptions.url', 'Subscription URL')}</TableHead>
+            <TableHead className="text-right">{t('admin.actions', 'Actions')}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {subs.map((s) => {
+            const target = targetOf(s.id)
+            const url = subUrl(s.token, target)
+            return (
+              <TableRow key={s.id} className="align-top">
+                <TableCell className="font-mono">{s.name}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{tplName(s.template_id)}</TableCell>
+                <TableCell>
+                  <input
+                    type="checkbox"
+                    checked={s.enabled}
+                    disabled={update.isPending}
+                    onChange={(e) => update.mutate({ id: s.id, body: { enabled: e.target.checked } })}
+                    aria-label={t('subgen.subscriptions.enabled_aria', 'enabled')}
+                  />
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={target}
+                      onChange={(e) => setTargets((t) => ({ ...t, [s.id]: e.target.value as Target }))}
+                      className="h-7 px-1.5 rounded border bg-background text-2xs"
+                    >
+                      <option value="surge">surge</option>
+                      <option value="shadowrocket">shadowrocket</option>
+                      <option value="clash">clash</option>
+                    </select>
+                    <code className="font-mono text-2xs text-fg-dim truncate max-w-[22rem]">{url}</code>
+                    <Button variant="ghost" size="xs" className="w-7 p-0"
+                      onClick={() => copy(url)} aria-label={t('subgen.subscriptions.copy_url_aria', 'copy url')}>
+                      <Copy className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs mr-1"
-                      disabled={rotate.isPending}
-                      onClick={() => rotate.mutate(s.id)}>
-                      <RotateCw className="h-3.5 w-3.5 mr-1" /> Rotate token
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
-                      disabled={remove.isPending}
-                      onClick={() => setRemoveTarget(s)}
-                      aria-label="delete">
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
-                  </td>
-                </tr>
-              )
-            })}
-            {subs.length === 0 && (
-              <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">No subscriptions yet.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right whitespace-nowrap">
+                  <Button variant="outline" size="xs" className="mr-1"
+                    onClick={() => setNodesFor(s)}>
+                    <Server className="h-3.5 w-3.5 mr-1" /> {t('subgen.subscriptions.edit_nodes', 'Edit nodes')}
+                  </Button>
+                  <Button variant="outline" size="xs" className="mr-1"
+                    disabled={rotate.isPending}
+                    onClick={() => rotate.mutate(s.id)}>
+                    <RotateCw className="h-3.5 w-3.5 mr-1" /> {t('subgen.subscriptions.rotate_token', 'Rotate token')}
+                  </Button>
+                  <Button variant="ghost" size="xs" className="w-7 p-0"
+                    disabled={remove.isPending}
+                    onClick={() => setRemoveTarget(s)}
+                    aria-label={t('subgen.subscriptions.delete_aria', 'delete')}>
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            )
+          })}
+          {subs.length === 0 && (
+            <TableEmpty colSpan={5}>{t('subgen.empty.subscriptions', 'No subscriptions yet.')}</TableEmpty>
+          )}
+        </TableBody>
+      </Table>
 
       {creating && (
         <NewSubscriptionDialog
@@ -224,6 +229,7 @@ function NewSubscriptionDialog({
   onClose: () => void
   onCreate: (name: string, template_id: number) => void
 }) {
+  const { t } = useTranslation()
   const [name, setName] = useState('')
   const [tpl, setTpl] = useState<number>(templates[0]?.id ?? 0)
 
@@ -231,28 +237,30 @@ function NewSubscriptionDialog({
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New subscription</DialogTitle>
+          <DialogTitle>{t('subgen.subscriptions.new', 'New subscription')}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label className="text-xs">Name</Label>
+            <Label className="text-xs">{t('subgen.subscriptions.name', 'Name')}</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)}
-              placeholder="my-phone" className="h-8 mt-1" />
+              placeholder={t('subgen.subscriptions.name_placeholder', 'my-phone')} className="h-8 mt-1" />
           </div>
           <div>
-            <Label className="text-xs">Template</Label>
+            <Label className="text-xs">{t('subgen.subscriptions.template', 'Template')}</Label>
             <select value={tpl} onChange={(e) => setTpl(Number(e.target.value))}
               className="mt-1 h-8 px-2 rounded-md border bg-background text-sm w-full">
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}{t.builtin ? ' (built-in)' : ''}</option>
+              {templates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}{template.builtin ? ` ${t('subgen.subscriptions.builtin_suffix', '(built-in)')}` : ''}
+                </option>
               ))}
             </select>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" size="sm" className="h-8" onClick={onClose}>Cancel</Button>
-          <Button size="sm" className="h-8" disabled={!name.trim() || !tpl || pending}
-            onClick={() => onCreate(name.trim(), tpl)}>Create</Button>
+          <Button variant="outline" size="sm" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button size="sm" disabled={!name.trim() || !tpl || pending}
+            onClick={() => onCreate(name.trim(), tpl)}>{t('common.create')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -271,6 +279,7 @@ function NodePickerDialog({
   subscription: SubgenSubscription
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const toast = useUI((s) => s.toast)
   const qc = useQueryClient()
   const serversQ = useServers()
@@ -315,7 +324,7 @@ function NodePickerDialog({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['subgen-inbounds', subscription.id] })
-      toast('success', 'Nodes saved')
+      toast('success', t('subgen.subscriptions.save_nodes_toast', 'Nodes saved'))
       onClose()
     },
     onError: (e: any) => toast('error', String(e?.message ?? e)),
@@ -341,12 +350,12 @@ function NodePickerDialog({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nodes for "{subscription.name}"</DialogTitle>
+          <DialogTitle>{t('subgen.subscriptions.nodes_title', 'Nodes for "{{name}}"', { name: subscription.name })}</DialogTitle>
         </DialogHeader>
-        <div className="max-h-[60vh] overflow-y-auto space-y-4">
-          {loading && <div className="text-sm text-muted-foreground">Loading inbounds…</div>}
+        <div className="min-h-0 overflow-y-auto space-y-4">
+          {loading && <div className="text-sm text-muted-foreground">{t('subgen.subscriptions.loading_inbounds', 'Loading inbounds…')}</div>}
           {!loading && servers.map((srv) => {
             const xib = xrayByServer.get(srv.id) ?? []
             const sib = singboxByServer.get(srv.id) ?? []
@@ -387,14 +396,14 @@ function NodePickerDialog({
           })}
           {!loading && (xrayQ.data ?? []).length === 0 && (singboxQ.data ?? []).length === 0 && (
             <div className="text-sm text-muted-foreground">
-              No xray or sing-box inbounds exist yet. Create some on those plugins first.
+              {t('subgen.subscriptions.no_inbounds', 'No xray or sing-box inbounds exist yet. Create some on those plugins first.')}
             </div>
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" size="sm" className="h-8" onClick={onClose}>Cancel</Button>
-          <Button size="sm" className="h-8" disabled={save.isPending || loading}
-            onClick={() => save.mutate()}>Save</Button>
+          <Button variant="outline" size="sm" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button size="sm" disabled={save.isPending || loading}
+            onClick={() => save.mutate()}>{t('admin.save', 'Save')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

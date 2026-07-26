@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Pill } from '@/components/Pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/table'
 import { useServers, type ServerRecord } from '@/api/servers'
 import { listSSHAuditHosts, putSSHAuditHost, collectSSHAuditHost, type SSHAuditHost } from '@/api/sshaudit'
 import { relativeTime } from '@/lib/time'
@@ -15,13 +16,14 @@ import { useUI } from '@/store/ui'
 // selector only matters when enabled is true. Server-side clamps to >= 60s,
 // so we never offer anything below 1 min. Default new hosts to 300s (5 min).
 const INTERVAL_OPTIONS = [
-  { value: 60,   label: '1 min' },
-  { value: 300,  label: '5 min' },
-  { value: 900,  label: '15 min' },
-  { value: 1800, label: '30 min' },
+  { value: 60,   key: 'm1',  fallback: '1 min' },
+  { value: 300,  key: 'm5',  fallback: '5 min' },
+  { value: 900,  key: 'm15', fallback: '15 min' },
+  { value: 1800, key: 'm30', fallback: '30 min' },
 ]
 
 export default function HostsTab() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
 
@@ -39,7 +41,7 @@ export default function HostsTab() {
     mutationFn: ({ serverID, enabled, interval }: { serverID: number; enabled: boolean; interval: number }) =>
       putSSHAuditHost(serverID, { enabled, poll_interval_seconds: interval }),
     onSuccess: () => {
-      toast('success', 'Updated')
+      toast('success', t('sshaudit.hosts.updated_toast', 'Updated'))
       qc.invalidateQueries({ queryKey: ['sshaudit', 'hosts'] })
     },
     onError: (e: unknown) => toast('error', String((e as Error)?.message ?? e)),
@@ -48,32 +50,36 @@ export default function HostsTab() {
   const collect = useMutation({
     mutationFn: (serverID: number) => collectSSHAuditHost(serverID),
     onSuccess: (res) => {
-      toast('success', `Collected (${res.inserted} new)`)
+      toast('success', t('sshaudit.hosts.collected_toast', 'Collected ({{n}} new)', { n: res.inserted }))
       qc.invalidateQueries({ queryKey: ['sshaudit', 'hosts'] })
     },
     onError: (e: unknown) => toast('error', String((e as Error)?.message ?? e)),
   })
 
   return (
-    <div className="space-y-2">
-      <div className="text-sm text-muted-foreground mb-3">
-        Enable SSH auditing on a server, then pick how often the agent should collect login history
-        (the minimum is 1 min). Use <em>Collect now</em> to force an immediate pull. Live sessions and
-        the login history live under the <em>Sessions</em> and <em>Login History</em> tabs.
-      </div>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b text-2xs text-muted-foreground uppercase tracking-wide">
-            <th className="text-left py-2 pr-4 font-medium">Server</th>
-            <th className="text-left py-2 pr-4 font-medium">Enabled</th>
-            <th className="text-left py-2 pr-4 font-medium">Interval</th>
-            <th className="text-left py-2 pr-4 font-medium">Last collect</th>
-            <th className="text-left py-2 pr-4 font-medium">24h logins</th>
-            <th className="text-left py-2 pr-4 font-medium">Last error</th>
-            <th className="py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        {t('sshaudit.hosts.description_pre', 'Enable SSH auditing on a server, then pick how often the agent should collect login history (the minimum is 1 min). Use')}{' '}
+        <em>{t('sshaudit.hosts.collect_now', 'Collect now')}</em>{' '}
+        {t('sshaudit.hosts.description_mid', 'to force an immediate pull. Live sessions and the login history live under the')}{' '}
+        <em>{t('sshaudit.hosts.sessions_tab_name', 'Sessions')}</em>{' '}
+        {t('sshaudit.hosts.description_and', 'and')}{' '}
+        <em>{t('sshaudit.hosts.history_tab_name', 'Login History')}</em>{' '}
+        {t('sshaudit.hosts.description_post', 'tabs.')}
+      </p>
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead>{t('sshaudit.hosts.server', 'Server')}</TableHead>
+            <TableHead>{t('sshaudit.hosts.enabled', 'Enabled')}</TableHead>
+            <TableHead>{t('sshaudit.hosts.interval', 'Interval')}</TableHead>
+            <TableHead>{t('sshaudit.hosts.last_collect', 'Last collect')}</TableHead>
+            <TableHead>{t('sshaudit.hosts.logins_24h', '24h logins')}</TableHead>
+            <TableHead>{t('sshaudit.hosts.last_error', 'Last error')}</TableHead>
+            <TableHead />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {servers.map((s: ServerRecord) => (
             <HostRow
               key={s.id}
@@ -86,14 +92,10 @@ export default function HostsTab() {
             />
           ))}
           {servers.length === 0 && (
-            <tr>
-              <td colSpan={7} className="py-6 text-center text-muted-foreground text-sm">
-                No servers registered yet.
-              </td>
-            </tr>
+            <TableEmpty colSpan={7}>{t('sshaudit.empty.hosts', 'No servers registered yet.')}</TableEmpty>
           )}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   )
 }
@@ -132,12 +134,12 @@ function HostRow({
   const lastErr = host?.last_error
   const rel = relativeTime(host?.last_collect_at ?? null)
   return (
-    <tr className="border-b last:border-0">
-      <td className="py-2 pr-4">
+    <TableRow>
+      <TableCell>
         <div className="font-medium">{server.name}</div>
         {sshHost && <div className="text-2xs text-muted-foreground font-mono">{sshHost}</div>}
-      </td>
-      <td className="py-2 pr-4">
+      </TableCell>
+      <TableCell>
         <Switch
           checked={enabled}
           disabled={busy}
@@ -146,8 +148,8 @@ function HostRow({
             onApply(v, interval)
           }}
         />
-      </td>
-      <td className="py-2 pr-4">
+      </TableCell>
+      <TableCell>
         <Select
           value={String(interval)}
           disabled={busy || !enabled}
@@ -163,16 +165,16 @@ function HostRow({
           <SelectContent>
             {INTERVAL_OPTIONS.map((o) => (
               <SelectItem key={o.value} value={String(o.value)}>
-                {o.label}
+                {t(`sshaudit.hosts.interval_options.${o.key}`, o.fallback)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-      </td>
-      <td className="py-2 pr-4 text-xs text-muted-foreground">
+      </TableCell>
+      <TableCell className="text-xs text-muted-foreground">
         {rel ? t(rel.key, { n: rel.n }) : '—'}
-      </td>
-      <td className="py-2 pr-4 text-xs">
+      </TableCell>
+      <TableCell className="text-xs">
         {host ? (
           <span className="inline-flex items-center gap-2 font-mono tabular-nums">
             <span className="text-ok">✓ {host.accepted_24h}</span>
@@ -181,37 +183,41 @@ function HostRow({
         ) : (
           <span className="text-muted-foreground">—</span>
         )}
-      </td>
-      <td className="py-2 pr-4">
+      </TableCell>
+      <TableCell>
         {lastErr ? (
           <Pill kind="err">{lastErr.slice(0, 60)}</Pill>
         ) : (
           <span className="text-muted-foreground text-xs">—</span>
         )}
-      </td>
-      <td className="py-2 text-right">
+      </TableCell>
+      <TableCell className="text-right">
         <span className="inline-flex items-center gap-1">
           {enabled && (
             <Button
               variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-2xs"
+              size="xs"
+              className="text-2xs"
               disabled={collecting}
               onClick={onCollect}
-              title="Force an immediate collection"
+              title={t('sshaudit.hosts.collect_now_title', 'Force an immediate collection')}
             >
               <RefreshCw className={`h-3.5 w-3.5 mr-1 ${collecting ? 'animate-spin' : ''}`} />
-              Collect now
+              {t('sshaudit.hosts.collect_now', 'Collect now')}
             </Button>
           )}
-          <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-2xs">
-            <a href={`/admin/plugins/sshaudit/sessions?server_id=${server.id}`}>Sessions →</a>
+          <Button asChild variant="ghost" size="xs" className="text-2xs">
+            <a href={`/admin/plugins/sshaudit/sessions?server_id=${server.id}`}>
+              {t('sshaudit.hosts.sessions_link', 'Sessions →')}
+            </a>
           </Button>
-          <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-2xs">
-            <a href={`/admin/plugins/sshaudit/history?server_id=${server.id}`}>History →</a>
+          <Button asChild variant="ghost" size="xs" className="text-2xs">
+            <a href={`/admin/plugins/sshaudit/history?server_id=${server.id}`}>
+              {t('sshaudit.hosts.history_link', 'History →')}
+            </a>
           </Button>
         </span>
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   )
 }

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/Pill'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import {
   listNetqualityTargets,
   patchNetqualityTarget,
@@ -18,15 +19,15 @@ import {
 import { useUI } from '@/store/ui'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 
-const ISP_LABEL: Record<NetqualityISP, string> = {
-  telecom: '电信',
-  unicom: '联通',
-  mobile: '移动',
-  overseas: '海外',
+const ISP_LABEL_FALLBACK: Record<NetqualityISP, string> = {
+  telecom: 'Telecom',
+  unicom: 'Unicom',
+  mobile: 'Mobile',
+  overseas: 'Overseas',
 }
 
 export default function TargetsTab() {
-  const { t: tr } = useTranslation()
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const targetsQ = useQuery({ queryKey: ['netquality', 'targets'], queryFn: listNetqualityTargets })
@@ -41,7 +42,7 @@ export default function TargetsTab() {
   const remove = useMutation({
     mutationFn: deleteNetqualityTarget,
     onSuccess: () => {
-      toast('success', 'Removed')
+      toast('success', t('netquality.targets.removed_toast', 'Removed'))
       qc.invalidateQueries({ queryKey: ['netquality', 'targets'] })
     },
     onError: (e: unknown) => toast('error', String((e as Error)?.message ?? e)),
@@ -50,10 +51,10 @@ export default function TargetsTab() {
   // Group by ISP for the rendered table. Builtins land first within
   // each group; custom rows appear at the bottom for visibility.
   const grouped = new Map<NetqualityISP, NetqualityTarget[]>()
-  for (const t of targetsQ.data ?? []) {
-    const arr = grouped.get(t.isp) ?? []
-    arr.push(t)
-    grouped.set(t.isp, arr)
+  for (const tg of targetsQ.data ?? []) {
+    const arr = grouped.get(tg.isp) ?? []
+    arr.push(tg)
+    grouped.set(tg.isp, arr)
   }
   for (const arr of grouped.values()) {
     arr.sort((a, b) => {
@@ -64,20 +65,25 @@ export default function TargetsTab() {
 
   return (
     <div className="space-y-4">
-      <div className="text-sm text-muted-foreground">
-        Toggle which destinations are sampled. Builtin entries can be disabled (history stays
-        intact) but not deleted. Custom entries are scoped to your install.
-      </div>
+      <p className="text-sm text-muted-foreground">
+        {t('netquality.targets.description', 'Toggle which destinations are sampled. Builtin entries can be disabled (history stays intact) but not deleted. Custom entries are scoped to your install.')}
+      </p>
 
       <NewTargetForm />
 
       <ConfirmDialog
         open={removeTarget != null}
         onOpenChange={(open) => { if (!open) setRemoveTarget(null) }}
-        title={tr('netquality.delete_target')}
-        description={tr('netquality.delete_target_confirm', { name: removeTarget?.label ?? '' })}
+        title={t('netquality.delete_target')}
+        description={t('netquality.delete_target_confirm', { name: removeTarget?.label ?? '' })}
         onConfirm={() => { if (removeTarget) remove.mutate(removeTarget.id) }}
       />
+
+      {(targetsQ.data ?? []).length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          {t('netquality.empty.targets', 'No targets configured yet.')}
+        </p>
+      )}
 
       {(['telecom', 'unicom', 'mobile', 'overseas'] as NetqualityISP[]).map((isp) => {
         const rows = grouped.get(isp) ?? []
@@ -85,53 +91,54 @@ export default function TargetsTab() {
         return (
           <div key={isp} className="border rounded-md overflow-hidden">
             <div className="px-3 py-2 bg-elev border-b text-xs font-medium">
-              {ISP_LABEL[isp]} <span className="text-muted-foreground">({rows.length})</span>
+              {t(`netquality.isp.${isp}`, ISP_LABEL_FALLBACK[isp])}{' '}
+              <span className="text-muted-foreground">({rows.length})</span>
             </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-2xs text-muted-foreground uppercase tracking-wide">
-                  <th className="text-left py-2 pl-3 pr-4 font-medium">Region</th>
-                  <th className="text-left py-2 pr-4 font-medium">Label</th>
-                  <th className="text-left py-2 pr-4 font-medium font-mono">Host</th>
-                  <th className="text-left py-2 pr-4 font-medium">Source</th>
-                  <th className="text-left py-2 pr-4 font-medium">Enabled</th>
-                  <th className="py-2 pr-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((t) => (
-                  <tr key={t.id} className="border-b last:border-0">
-                    <td className="py-2 pl-3 pr-4">{t.region}</td>
-                    <td className="py-2 pr-4">{t.label}</td>
-                    <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">{t.host}</td>
-                    <td className="py-2 pr-4">
-                      <Pill kind={t.source === 'builtin' ? 'neutral' : 'ok'}>{t.source}</Pill>
-                    </td>
-                    <td className="py-2 pr-4">
+            <Table wrapperClassName="border-0 rounded-none bg-transparent">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>{t('netquality.targets.region', 'Region')}</TableHead>
+                  <TableHead>{t('netquality.targets.label', 'Label')}</TableHead>
+                  <TableHead className="font-mono">{t('netquality.targets.host', 'Host')}</TableHead>
+                  <TableHead>{t('netquality.targets.source', 'Source')}</TableHead>
+                  <TableHead>{t('netquality.targets.enabled', 'Enabled')}</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((target) => (
+                  <TableRow key={target.id}>
+                    <TableCell>{target.region}</TableCell>
+                    <TableCell>{target.label}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{target.host}</TableCell>
+                    <TableCell>
+                      <Pill kind={target.source === 'builtin' ? 'neutral' : 'ok'}>{target.source}</Pill>
+                    </TableCell>
+                    <TableCell>
                       <Switch
-                        checked={t.enabled}
+                        checked={target.enabled}
                         disabled={toggle.isPending}
-                        onCheckedChange={(v) => toggle.mutate({ id: t.id, enabled: v })}
+                        onCheckedChange={(v) => toggle.mutate({ id: target.id, enabled: v })}
                       />
-                    </td>
-                    <td className="py-2 pr-3 text-right">
-                      {t.source === 'custom' && (
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {target.source === 'custom' && (
                         <Button
                           variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
+                          size="xs"
+                          className="w-7 p-0"
                           disabled={remove.isPending}
-                          onClick={() => setRemoveTarget(t)}
-                          title="Delete"
+                          onClick={() => setRemoveTarget(target)}
+                          title={t('admin.delete', 'Delete')}
                         >
                           <Trash className="h-3.5 w-3.5" />
                         </Button>
                       )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )
       })}
@@ -140,6 +147,7 @@ export default function TargetsTab() {
 }
 
 function NewTargetForm() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const [isp, setISP] = useState<NetqualityISP>('overseas')
@@ -149,7 +157,7 @@ function NewTargetForm() {
   const create = useMutation({
     mutationFn: createNetqualityTarget,
     onSuccess: () => {
-      toast('success', 'Added')
+      toast('success', t('netquality.targets.add_toast', 'Added'))
       setRegion(''); setLabel(''); setHost('')
       qc.invalidateQueries({ queryKey: ['netquality', 'targets'] })
     },
@@ -162,39 +170,38 @@ function NewTargetForm() {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {(Object.keys(ISP_LABEL) as NetqualityISP[]).map((k) => (
+          {(Object.keys(ISP_LABEL_FALLBACK) as NetqualityISP[]).map((k) => (
             <SelectItem key={k} value={k} className="text-xs">
-              {ISP_LABEL[k]}
+              {t(`netquality.isp.${k}`, ISP_LABEL_FALLBACK[k])}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
       <Input
         className="h-8 w-36 text-xs"
-        placeholder="Region (e.g. HK)"
+        placeholder={t('netquality.targets.region_placeholder', 'Region (e.g. HK)')}
         value={region}
         onChange={(e) => setRegion(e.target.value)}
       />
       <Input
         className="h-8 w-48 text-xs"
-        placeholder="Label (e.g. My VPS)"
+        placeholder={t('netquality.targets.label_placeholder', 'Label (e.g. My VPS)')}
         value={label}
         onChange={(e) => setLabel(e.target.value)}
       />
       <Input
         className="h-8 w-48 text-xs font-mono"
-        placeholder="Host or IP"
+        placeholder={t('netquality.targets.host_placeholder', 'Host or IP')}
         value={host}
         onChange={(e) => setHost(e.target.value)}
       />
       <Button
         size="sm"
-        className="h-8"
         disabled={create.isPending || !host || !label}
         onClick={() => create.mutate({ isp, region, label, host })}
       >
         <Plus className="h-3.5 w-3.5 mr-1" />
-        Add custom
+        {t('netquality.targets.add_custom', 'Add custom')}
       </Button>
     </div>
   )

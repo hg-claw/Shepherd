@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,6 +40,7 @@ interface EditProps {
 type Props = CreateProps | EditProps
 
 export default function InboundDialog(props: Props) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const serversQ = useServers()
@@ -67,8 +69,8 @@ export default function InboundDialog(props: Props) {
 
   const create = useMutation({
     mutationFn: () => {
-      if (!serverID) throw new Error('select a server')
-      if (role === 'relay' && !upstreamID) throw new Error('relay requires upstream landing')
+      if (!serverID) throw new Error(t('xray.inbound_dialog.err_select_server', 'select a server'))
+      if (role === 'relay' && !upstreamID) throw new Error(t('xray.inbound_dialog.err_relay_upstream', 'relay requires upstream landing'))
       return createXrayInbound({
         server_id: Number(serverID), port, alias: alias || undefined, role, protocol,
         uuid, sni, public_key: publicKey, private_key: privateKey, short_id: shortID,
@@ -81,7 +83,7 @@ export default function InboundDialog(props: Props) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['xray-inbounds'] })
       qc.invalidateQueries({ queryKey: ['plugin-hosts', 'xray'] })
-      toast('success', 'Inbound created')
+      toast('success', t('xray.inbound_dialog.created_toast', 'Inbound created'))
       props.onOpenChange(false)
     },
     onError: (e: any) => setError(String(e?.message ?? e)),
@@ -105,7 +107,7 @@ export default function InboundDialog(props: Props) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['xray-inbounds'] })
       qc.invalidateQueries({ queryKey: ['plugin-hosts', 'xray'] })
-      toast('success', 'Inbound updated')
+      toast('success', t('xray.inbound_dialog.updated_toast', 'Inbound updated'))
       props.onOpenChange(false)
     },
     onError: (e: any) => setError(String(e?.message ?? e)),
@@ -116,53 +118,50 @@ export default function InboundDialog(props: Props) {
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-mono">
-            {isEdit ? `Edit inbound ${editing!.tag}` : 'New inbound'}
+            {isEdit ? t('xray.inbound_dialog.edit_title', 'Edit inbound {{tag}}', { tag: editing!.tag }) : t('xray.inbound_dialog.new_title', 'New inbound')}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs" htmlFor="ind-server">Server</Label>
+              <Label className="text-xs" htmlFor="ind-server">{t('xray.inbound_dialog.server_label', 'Server')}</Label>
               <select id="ind-server"
-                aria-label="server"
                 value={serverID}
                 onChange={(e) => setServerID(Number(e.target.value) || '')}
                 disabled={isEdit}
                 className="mt-1 h-8 px-2 rounded-md border bg-background text-sm font-mono w-full disabled:opacity-60">
-                <option value="">— select —</option>
+                <option value="">{t('xray.inbound_dialog.select_placeholder', '— select —')}</option>
                 {(serversQ.data ?? []).map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <Label className="text-xs" htmlFor="ind-role">Role</Label>
+              <Label className="text-xs" htmlFor="ind-role">{t('xray.inbound_dialog.role_label', 'Role')}</Label>
               <select id="ind-role"
-                aria-label="role"
                 value={role}
                 onChange={(e) => setRole(e.target.value as Role)}
                 disabled={isEdit}
                 className="mt-1 h-8 px-2 rounded-md border bg-background text-sm font-mono w-full disabled:opacity-60">
-                <option value="landing">Landing</option>
-                <option value="relay">Relay</option>
+                <option value="landing">{t('xray.inbound_dialog.role_landing', 'Landing')}</option>
+                <option value="relay">{t('xray.inbound_dialog.role_relay', 'Relay')}</option>
               </select>
             </div>
           </div>
 
           {role === 'relay' && (
             <div>
-              <Label className="text-xs" htmlFor="ind-upstream">Upstream landing-inbound</Label>
+              <Label className="text-xs" htmlFor="ind-upstream">{t('xray.inbound_dialog.upstream_label', 'Upstream landing-inbound')}</Label>
               <select id="ind-upstream"
-                aria-label="upstream landing-inbound"
                 value={upstreamID}
                 onChange={(e) => setUpstreamID(Number(e.target.value) || '')}
                 disabled={isEdit}
                 className="mt-1 h-8 px-2 rounded-md border bg-background text-sm font-mono w-full disabled:opacity-60">
-                <option value="">— select —</option>
+                <option value="">{t('xray.inbound_dialog.select_placeholder', '— select —')}</option>
                 {landings.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.server_name} / {l.tag} (:{l.port})
@@ -174,7 +173,7 @@ export default function InboundDialog(props: Props) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">Protocol</Label>
+              <Label className="text-xs">{t('xray.inbound_dialog.protocol_label', 'Protocol')}</Label>
               <select value={protocol}
                 onChange={(e) => setProtocol(e.target.value as Protocol)}
                 disabled={isEdit}
@@ -185,7 +184,7 @@ export default function InboundDialog(props: Props) {
               </select>
             </div>
             <div>
-              <Label className="text-xs">Port</Label>
+              <Label className="text-xs">{t('xray.inbound_dialog.port_label', 'Port')}</Label>
               <Input type="number" value={port} onChange={(e) => setPort(Number(e.target.value))}
                 className="h-8 font-mono mt-1" />
             </div>
@@ -193,57 +192,57 @@ export default function InboundDialog(props: Props) {
 
           {protocol !== 'shadowsocks' && (
             <div>
-              <Label className="text-xs">UUID</Label>
+              <Label className="text-xs">{t('xray.inbound_dialog.uuid_label', 'UUID')}</Label>
               <div className="flex gap-2 mt-1">
                 <Input value={uuid} onChange={(e) => setUUID(e.target.value)}
                   className="h-8 font-mono text-xs" />
-                <Button type="button" variant="outline" size="sm" className="h-8"
-                  onClick={() => setUUID(randomUUID())}>new</Button>
+                <Button type="button" variant="outline" size="sm"
+                  onClick={() => setUUID(randomUUID())}>{t('xray.inbound_dialog.new_button', 'new')}</Button>
               </div>
             </div>
           )}
 
           <div>
-            <Label className="text-xs" htmlFor="ind-alias">Alias</Label>
+            <Label className="text-xs" htmlFor="ind-alias">{t('xray.inbound_dialog.alias_label', 'Alias')}</Label>
             <Input id="ind-alias" value={alias} onChange={(e) => setAlias(e.target.value)}
-              placeholder="可选：节点别名，留空用默认命名"
+              placeholder={t('xray.inbound_dialog.alias_placeholder', 'Optional — node alias, defaults to an auto-generated name if left blank')}
               className="h-8 font-mono mt-1" />
           </div>
 
           {protocol === 'vless-reality' && (
             <>
               <div>
-                <Label className="text-xs">REALITY SNI (target domain)</Label>
+                <Label className="text-xs">{t('xray.inbound_dialog.reality_sni_label', 'REALITY SNI (target domain)')}</Label>
                 <Input value={sni} onChange={(e) => setSNI(e.target.value)}
                   className="h-8 font-mono mt-1" />
                 <p className="text-fg-dim text-2xs mt-1">
-                  Must be a single-tenant TLS endpoint. Do NOT use multi-tenant CDNs.
+                  {t('xray.inbound_dialog.reality_sni_hint', 'Must be a single-tenant TLS endpoint. Do NOT use multi-tenant CDNs.')}
                 </p>
               </div>
               <div>
-                <Label className="text-xs">REALITY keypair</Label>
+                <Label className="text-xs">{t('xray.inbound_dialog.reality_keypair_label', 'REALITY keypair')}</Label>
                 <div className="flex gap-2 mt-1">
-                  <Input value={privateKey} placeholder="private" readOnly
+                  <Input value={privateKey} placeholder={t('xray.inbound_dialog.reality_private_key_placeholder', 'private')} readOnly
                     className="h-8 font-mono text-2xs" />
-                  <Input value={publicKey} placeholder="public" readOnly
+                  <Input value={publicKey} placeholder={t('xray.inbound_dialog.reality_public_key_placeholder', 'public')} readOnly
                     className="h-8 font-mono text-2xs" />
-                  <Button type="button" variant="outline" size="sm" className="h-8"
+                  <Button type="button" variant="outline" size="sm"
                     onClick={async () => {
                       const kp = await generateX25519()
                       setPrivateKey(kp.private_key); setPublicKey(kp.public_key)
-                    }}>Generate</Button>
+                    }}>{t('xray.inbound_dialog.generate_button', 'Generate')}</Button>
                 </div>
               </div>
               <div>
-                <Label className="text-xs">Short ID</Label>
+                <Label className="text-xs">{t('xray.inbound_dialog.short_id_label', 'Short ID')}</Label>
                 <div className="flex gap-2 mt-1">
                   <Input value={shortID} onChange={(e) => setShortID(e.target.value)}
                     className="h-8 font-mono" />
-                  <Button type="button" variant="outline" size="sm" className="h-8"
+                  <Button type="button" variant="outline" size="sm"
                     onClick={async () => {
                       const r = await generateShortID()
                       setShortID(r.short_id)
-                    }}>Generate</Button>
+                    }}>{t('xray.inbound_dialog.generate_button', 'Generate')}</Button>
                 </div>
               </div>
             </>
@@ -251,7 +250,7 @@ export default function InboundDialog(props: Props) {
 
           {protocol === 'vmess-ws' && (
             <div>
-              <Label className="text-xs">WebSocket path</Label>
+              <Label className="text-xs">{t('xray.inbound_dialog.ws_path_label', 'WebSocket path')}</Label>
               <Input value={wsPath} onChange={(e) => setWSPath(e.target.value)}
                 className="h-8 font-mono mt-1" />
             </div>
@@ -260,9 +259,8 @@ export default function InboundDialog(props: Props) {
           {protocol === 'shadowsocks' && (
             <>
               <div>
-                <Label className="text-xs" htmlFor="ind-ss-method">Method</Label>
+                <Label className="text-xs" htmlFor="ind-ss-method">{t('xray.inbound_dialog.method_label', 'Method')}</Label>
                 <select id="ind-ss-method"
-                  aria-label="method"
                   value={ssMethod}
                   onChange={(e) => setSSMethod(e.target.value)}
                   className="mt-1 h-8 px-2 rounded-md border bg-background text-sm font-mono w-full disabled:opacity-60">
@@ -272,13 +270,13 @@ export default function InboundDialog(props: Props) {
                 </select>
               </div>
               <div>
-                <Label className="text-xs">Password</Label>
+                <Label className="text-xs" htmlFor="ind-ss-password">{t('xray.inbound_dialog.password_label', 'Password (base64)')}</Label>
                 <div className="flex gap-2 mt-1">
-                  <Input aria-label="ss password" value={ssPassword}
+                  <Input id="ind-ss-password" value={ssPassword}
                     onChange={(e) => setSSPassword(e.target.value)}
                     className="h-8 font-mono text-xs" />
-                  <Button type="button" variant="outline" size="sm" className="h-8"
-                    onClick={() => setSSPassword(randomSSKey(ssMethod))}>new</Button>
+                  <Button type="button" variant="outline" size="sm"
+                    onClick={() => setSSPassword(randomSSKey(ssMethod))}>{t('xray.inbound_dialog.new_button', 'new')}</Button>
                 </div>
               </div>
             </>
@@ -288,9 +286,11 @@ export default function InboundDialog(props: Props) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => props.onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => props.onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
           <Button disabled={create.isPending || patch.isPending} onClick={submit}>
-            {isEdit ? (patch.isPending ? 'Saving…' : 'Save') : (create.isPending ? 'Creating…' : 'Create')}
+            {isEdit
+              ? (patch.isPending ? t('xray.inbound_dialog.saving', 'Saving…') : t('xray.inbound_dialog.save_button', 'Save'))
+              : (create.isPending ? t('xray.inbound_dialog.creating', 'Creating…') : t('common.create', 'Create'))}
           </Button>
         </DialogFooter>
       </DialogContent>

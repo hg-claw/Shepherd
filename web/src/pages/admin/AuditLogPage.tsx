@@ -145,27 +145,26 @@ export default function AuditLogPage() {
             <span className="text-fg-dim font-mono text-2xs ml-auto">{rows.length} rows</span>
           </div>
           <div ref={parentRef} className="max-h-[70vh] overflow-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead>
+            <table className="w-full caption-bottom text-sm">
+              <thead className="[&_tr]:border-b">
                 <tr>
                   <SortableTh
                     label={t('audit.ts', 'Time')}
                     sortKey="ts"
                     sort={auditSort}
                     onToggle={auditToggle}
-                    className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b whitespace-nowrap"
+                    className="whitespace-nowrap"
                   />
                   <SortableTh
                     label={t('audit.action', 'Action')}
                     sortKey="action"
                     sort={auditSort}
                     onToggle={auditToggle}
-                    className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b"
                   />
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
+                  <th className="px-3 py-2 text-left align-middle font-medium text-2xs uppercase tracking-[0.05em] text-muted-foreground hidden sm:table-cell">
                     {t('audit.admin', 'Admin')}
                   </th>
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
+                  <th className="px-3 py-2 text-left align-middle font-medium text-2xs uppercase tracking-[0.05em] text-muted-foreground hidden sm:table-cell">
                     {t('audit.server', 'Server')}
                   </th>
                   <SortableTh
@@ -173,9 +172,8 @@ export default function AuditLogPage() {
                     sortKey="result"
                     sort={auditSort}
                     onToggle={auditToggle}
-                    className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b"
                   />
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden md:table-cell">
+                  <th className="px-3 py-2 text-left align-middle font-medium text-2xs uppercase tracking-[0.05em] text-muted-foreground hidden md:table-cell">
                     {t('audit.details', 'Details')}
                   </th>
                 </tr>
@@ -203,17 +201,17 @@ export default function AuditLogPage() {
                               : 'hover:bg-sunken/60',
                           )}
                         >
-                          <td className="px-4 py-2 font-mono text-2xs text-fg-dim whitespace-nowrap">
+                          <td className="px-3 py-2 align-middle font-mono text-2xs text-fg-dim whitespace-nowrap">
                             {r.ts}
                           </td>
-                          <td className="px-4 py-2 font-mono text-xs">{r.action}</td>
-                          <td className="px-4 py-2 hidden sm:table-cell font-mono text-xs text-fg-dim">
+                          <td className="px-3 py-2 align-middle font-mono text-xs">{r.action}</td>
+                          <td className="px-3 py-2 align-middle hidden sm:table-cell font-mono text-xs text-fg-dim">
                             {r.admin_id ?? '—'}
                           </td>
-                          <td className="px-4 py-2 hidden sm:table-cell font-mono text-xs text-fg-dim">
+                          <td className="px-3 py-2 align-middle hidden sm:table-cell font-mono text-xs text-fg-dim">
                             {r.server_id ?? '—'}
                           </td>
-                          <td className="px-4 py-2">
+                          <td className="px-3 py-2 align-middle">
                             <span
                               className={cn(
                                 'font-mono text-xs',
@@ -223,7 +221,7 @@ export default function AuditLogPage() {
                               {r.result}
                             </span>
                           </td>
-                          <td className="px-4 py-2 hidden md:table-cell font-mono text-2xs text-fg-dim max-w-md">
+                          <td className="px-3 py-2 align-middle hidden md:table-cell font-mono text-2xs text-fg-dim max-w-md">
                             <span className="truncate block">{r.details}</span>
                           </td>
                         </tr>

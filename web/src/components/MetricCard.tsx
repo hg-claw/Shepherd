@@ -41,9 +41,9 @@ export function MetricCard({ card, mode: _mode }: Props) {
       <div
         className={cn(
           'relative bg-elev border rounded-lg px-3 py-2.5 transition-colors hover:border-primary',
-          status === 'ok' && 'border-[hsl(var(--ok)/0.3)]',
-          status === 'warn' && 'border-[hsl(var(--warn)/0.5)]',
-          status === 'err' && 'border-[hsl(var(--err)/0.5)]',
+          status === 'ok' && 'border-ok/30',
+          status === 'warn' && 'border-warn/50',
+          status === 'err' && 'border-err/50',
           status === 'offline' && 'opacity-60',
         )}
       >
@@ -107,9 +107,9 @@ function NetqualityPills({ items }: { items: NetqualityISPSummary[] }) {
             key={it.isp}
             className={cn(
               'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-mono tabular-nums',
-              tone === 'ok' && 'bg-[hsl(var(--ok)/0.12)] text-[hsl(var(--ok))]',
-              tone === 'warn' && 'bg-[hsl(var(--warn)/0.15)] text-[hsl(var(--warn))]',
-              tone === 'err' && 'bg-[hsl(var(--err)/0.15)] text-[hsl(var(--err))]',
+              tone === 'ok' && 'bg-ok/10 text-ok',
+              tone === 'warn' && 'bg-warn/15 text-warn',
+              tone === 'err' && 'bg-err/15 text-err',
             )}
             title={`${it.isp}: ${it.rtt_avg_ms.toFixed(0)}ms / ${it.loss_pct.toFixed(0)}% loss`}
           >

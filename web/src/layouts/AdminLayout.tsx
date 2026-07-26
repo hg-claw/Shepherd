@@ -353,9 +353,9 @@ export function AdminLayout() {
           <div className="ml-auto flex items-center gap-1.5">
             <Button
               asChild
-              size="sm"
+              size="xs"
               variant="default"
-              className="hidden sm:inline-flex h-7 px-2.5 text-sm"
+              className="hidden sm:inline-flex px-2.5 text-sm"
             >
               <Link to="/admin/servers/new">
                 <Plus className="h-3.5 w-3.5 mr-1" />

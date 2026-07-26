@@ -12,6 +12,7 @@ import { OnlineDot } from '@/components/OnlineDot'
 import { CountryFlag } from '@/components/CountryFlag'
 import { MetricBar } from '@/components/MetricBar'
 import { StatCard } from '@/components/StatCard'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 
 const WALL_VIEW_KEY = 'shep_wall_view'
 
@@ -164,113 +165,109 @@ function ServerListTable({
     return a.alias.localeCompare(b.alias)
   })
   return (
-    <div className="bg-elev border rounded-lg overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm" style={{ minWidth: 900 }}>
-          <thead>
-            <tr className="text-left">
-              <Th>{t('wall.col.node', 'Node')}</Th>
-              <Th>{t('wall.col.platform', 'Platform')}</Th>
-              <Th style={{ minWidth: 120 }}>CPU</Th>
-              <Th style={{ minWidth: 120 }}>{t('wall.col.memory', 'Memory')}</Th>
-              <Th style={{ minWidth: 120 }}>{t('wall.col.disk', 'Disk')}</Th>
-              <Th>{t('wall.col.network', 'Network ↓↑')}</Th>
-              <Th>{t('wall.col.traffic', 'Traffic ↓↑')}</Th>
-              <Th className="text-right">{t('wall.col.load', 'Load')}</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((s) => (
-              <tr
-                key={s.id}
-                className="border-t hover:bg-sunken/60 cursor-pointer"
-                role="button"
-                tabIndex={0}
-                onClick={() => navigate(`/public/servers/${s.id}`)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    navigate(`/public/servers/${s.id}`)
-                  }
-                }}
-              >
-                {/* Node */}
-                <Td>
-                  <span className="flex items-center gap-2 min-w-0">
-                    <OnlineDot online={s.online} />
-                    <CountryFlag code={s.country_code} />
-                    <span className="font-mono font-medium truncate">{s.alias}</span>
-                  </span>
-                </Td>
-                {/* Platform */}
-                <Td>
-                  {s.online ? (
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {s.platform ?? ''}
-                      {s.arch ? <span className="text-fg-dim"> · {s.arch}</span> : null}
-                    </span>
-                  ) : (
-                    <span className="text-fg-dim">—</span>
-                  )}
-                </Td>
-                {/* CPU */}
-                <Td>
-                  {s.online && s.latest != null ? (
-                    <MetricBar label="" value={s.latest.cpu_pct} />
-                  ) : (
-                    <span className="text-fg-dim">—</span>
-                  )}
-                </Td>
-                {/* Memory */}
-                <Td>
-                  {s.online && s.latest != null ? (
-                    <MetricBar label="" value={s.latest.mem_pct} />
-                  ) : (
-                    <span className="text-fg-dim">—</span>
-                  )}
-                </Td>
-                {/* Disk */}
-                <Td>
-                  {s.online && s.latest != null ? (
-                    <MetricBar label="" value={s.latest.disks_pct?.[0] ?? 0} />
-                  ) : (
-                    <span className="text-fg-dim">—</span>
-                  )}
-                </Td>
-                {/* Network ↓↑ */}
-                <Td>
-                  {s.online ? (
-                    <div className="flex flex-col gap-[1px] font-mono tabular-nums text-2xs whitespace-nowrap">
-                      <LiveNetCell id={s.id} fallbackRx={s.latest?.net_rx_bps ?? 0} fallbackTx={s.latest?.net_tx_bps ?? 0}>
-                        {(rx, tx) => (
-                          <>
-                            <span>↓ {bps(rx)}</span>
-                            <span>↑ {bps(tx)}</span>
-                          </>
-                        )}
-                      </LiveNetCell>
-                    </div>
-                  ) : (
-                    <span className="text-fg-dim">—</span>
-                  )}
-                </Td>
-                {/* Traffic ↓↑ */}
-                <Td>
-                  <div className="flex flex-col gap-[1px] font-mono tabular-nums text-2xs text-muted-foreground whitespace-nowrap">
-                    <span>↓ {bytes(s.traffic_rx_bytes ?? 0)}</span>
-                    <span>↑ {bytes(s.traffic_tx_bytes ?? 0)}</span>
-                  </div>
-                </Td>
-                {/* Load */}
-                <Td className="text-right font-mono tabular-nums text-sm">
-                  {s.online && s.latest != null ? s.latest.load_1.toFixed(2) : <span className="text-fg-dim">—</span>}
-                </Td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <Table style={{ minWidth: 900 }}>
+      <TableHeader className="[&_th]:bg-elev [&_th]:px-3.5 [&_th]:py-2">
+        <TableRow className="hover:bg-transparent">
+          <TableHead>{t('wall.col.node', 'Node')}</TableHead>
+          <TableHead>{t('wall.col.platform', 'Platform')}</TableHead>
+          <TableHead style={{ minWidth: 120 }}>CPU</TableHead>
+          <TableHead style={{ minWidth: 120 }}>{t('wall.col.memory', 'Memory')}</TableHead>
+          <TableHead style={{ minWidth: 120 }}>{t('wall.col.disk', 'Disk')}</TableHead>
+          <TableHead>{t('wall.col.network', 'Network ↓↑')}</TableHead>
+          <TableHead>{t('wall.col.traffic', 'Traffic ↓↑')}</TableHead>
+          <TableHead className="text-right">{t('wall.col.load', 'Load')}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody className="[&_td]:px-3.5 [&_td]:py-2.5">
+        {sorted.map((s) => (
+          <TableRow
+            key={s.id}
+            className="cursor-pointer"
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate(`/public/servers/${s.id}`)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                navigate(`/public/servers/${s.id}`)
+              }
+            }}
+          >
+            {/* Node */}
+            <TableCell>
+              <span className="flex items-center gap-2 min-w-0">
+                <OnlineDot online={s.online} />
+                <CountryFlag code={s.country_code} />
+                <span className="font-mono font-medium truncate">{s.alias}</span>
+              </span>
+            </TableCell>
+            {/* Platform */}
+            <TableCell>
+              {s.online ? (
+                <span className="font-mono text-xs text-muted-foreground">
+                  {s.platform ?? ''}
+                  {s.arch ? <span className="text-fg-dim"> · {s.arch}</span> : null}
+                </span>
+              ) : (
+                <span className="text-fg-dim">—</span>
+              )}
+            </TableCell>
+            {/* CPU */}
+            <TableCell>
+              {s.online && s.latest != null ? (
+                <MetricBar label="" value={s.latest.cpu_pct} />
+              ) : (
+                <span className="text-fg-dim">—</span>
+              )}
+            </TableCell>
+            {/* Memory */}
+            <TableCell>
+              {s.online && s.latest != null ? (
+                <MetricBar label="" value={s.latest.mem_pct} />
+              ) : (
+                <span className="text-fg-dim">—</span>
+              )}
+            </TableCell>
+            {/* Disk */}
+            <TableCell>
+              {s.online && s.latest != null ? (
+                <MetricBar label="" value={s.latest.disks_pct?.[0] ?? 0} />
+              ) : (
+                <span className="text-fg-dim">—</span>
+              )}
+            </TableCell>
+            {/* Network ↓↑ */}
+            <TableCell>
+              {s.online ? (
+                <div className="flex flex-col gap-[1px] font-mono tabular-nums text-2xs whitespace-nowrap">
+                  <LiveNetCell id={s.id} fallbackRx={s.latest?.net_rx_bps ?? 0} fallbackTx={s.latest?.net_tx_bps ?? 0}>
+                    {(rx, tx) => (
+                      <>
+                        <span>↓ {bps(rx)}</span>
+                        <span>↑ {bps(tx)}</span>
+                      </>
+                    )}
+                  </LiveNetCell>
+                </div>
+              ) : (
+                <span className="text-fg-dim">—</span>
+              )}
+            </TableCell>
+            {/* Traffic ↓↑ */}
+            <TableCell>
+              <div className="flex flex-col gap-[1px] font-mono tabular-nums text-2xs text-muted-foreground whitespace-nowrap">
+                <span>↓ {bytes(s.traffic_rx_bytes ?? 0)}</span>
+                <span>↑ {bytes(s.traffic_tx_bytes ?? 0)}</span>
+              </div>
+            </TableCell>
+            {/* Load */}
+            <TableCell className="text-right font-mono tabular-nums text-sm">
+              {s.online && s.latest != null ? s.latest.load_1.toFixed(2) : <span className="text-fg-dim">—</span>}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   )
 }
 
@@ -350,36 +347,3 @@ function WallServerCard({
   )
 }
 
-// ── Table helpers ─────────────────────────────────────────────────────────────
-
-function Th({
-  children,
-  className,
-  style,
-}: {
-  children?: React.ReactNode
-  className?: string
-  style?: React.CSSProperties
-}) {
-  return (
-    <th
-      className={cn(
-        'font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3.5 py-2 bg-elev text-left',
-        className,
-      )}
-      style={style}
-    >
-      {children}
-    </th>
-  )
-}
-
-function Td({
-  children,
-  className,
-}: {
-  children: React.ReactNode
-  className?: string
-}) {
-  return <td className={cn('px-3.5 py-2.5 align-middle', className)}>{children}</td>
-}

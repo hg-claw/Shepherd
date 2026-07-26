@@ -234,7 +234,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['singbox', 'inbounds'] })
       qc.invalidateQueries({ queryKey: ['plugin-hosts', 'singbox'] })
-      toast('success', isEdit ? 'Inbound updated' : 'Inbound created')
+      toast('success', isEdit ? t('singbox.inbound_dialog.updated_toast', 'Inbound updated') : t('singbox.inbound_dialog.created_toast', 'Inbound created'))
       onSaved()
     },
     onError: (e: unknown) => {
@@ -274,10 +274,10 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
       <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-mono">
-            {isEdit ? `Edit — ${initial!.tag}` : 'New inbound'}
+            {isEdit ? t('singbox.inbound_dialog.edit_title', 'Edit — {{tag}}', { tag: initial!.tag }) : t('singbox.inbound_dialog.new_title', 'New inbound')}
             {isRelayEdit && (
-              <span className="ml-2 text-2xs uppercase tracking-wider text-warn font-sans align-middle">
-                relay · limited
+              <span className="ml-2 text-2xs uppercase tracking-[0.05em] text-warn font-sans align-middle">
+                {t('singbox.inbound_dialog.relay_limited_badge', 'relay · limited')}
               </span>
             )}
           </DialogTitle>
@@ -286,20 +286,19 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
         <div className="space-y-3 py-1">
           {isRelayEdit && (
             <div className="rounded border border-warn/50 bg-warn/10 px-2.5 py-1.5 text-2xs text-warn">
-              Editing a relay. Handshake server / port are inherited from the upstream landing
-              and not editable here — change them on the landing inbound to propagate.
+              {t('singbox.inbound_dialog.relay_edit_notice', 'Editing a relay. Handshake server / port are inherited from the upstream landing and not editable here — change them on the landing inbound to propagate.')}
             </div>
           )}
           {/* ── Port + Protocol ── */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className={labelCls} htmlFor="ib-port">Port</Label>
+              <Label className={labelCls} htmlFor="ib-port">{t('singbox.inbound_dialog.port_label', 'Port')}</Label>
               <Input id="ib-port" className={inputCls} value={port}
                 onChange={(e) => setPort(e.target.value)} placeholder="443" />
             </div>
             <div>
-              <Label className={labelCls} htmlFor="ib-proto">Protocol</Label>
-              <select id="ib-proto" aria-label="protocol"
+              <Label className={labelCls} htmlFor="ib-proto">{t('singbox.inbound_dialog.protocol_label', 'Protocol')}</Label>
+              <select id="ib-proto"
                 className={selectCls}
                 value={protocol}
                 disabled={isEdit}
@@ -313,21 +312,21 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
 
           {/* ── Alias (optional) ── */}
           <div>
-            <Label className={labelCls} htmlFor="ib-alias">Alias (optional)</Label>
+            <Label className={labelCls} htmlFor="ib-alias">{t('singbox.inbound_dialog.alias_label', 'Alias (optional)')}</Label>
             <Input id="ib-alias" className={inputCls}
               value={alias} onChange={(e) => setAlias(e.target.value)}
-              placeholder="可选：节点别名，留空用默认命名" />
+              placeholder={t('singbox.inbound_dialog.alias_placeholder', 'Optional — node alias, defaults to an auto-generated name if left blank')} />
           </div>
 
           {/* ── UUID (vless / vmess / tuic) ── */}
           {needsUUID(protocol) && (
             <div>
-              <Label className={labelCls} htmlFor="ib-uuid">UUID</Label>
+              <Label className={labelCls} htmlFor="ib-uuid">{t('singbox.inbound_dialog.uuid_label', 'UUID')}</Label>
               <div className="flex gap-2">
-                <Input id="ib-uuid" aria-label="uuid" className={inputCls + ' flex-1'}
+                <Input id="ib-uuid" className={inputCls + ' flex-1'}
                   value={uuid} onChange={(e) => setUUID(e.target.value)} />
-                <Button type="button" variant="outline" size="sm" className="h-8"
-                  onClick={() => setUUID(randomUUID())}>new</Button>
+                <Button type="button" variant="outline" size="sm"
+                  onClick={() => setUUID(randomUUID())}>{t('singbox.inbound_dialog.new_button', 'new')}</Button>
               </div>
             </div>
           )}
@@ -336,13 +335,15 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
           {needsPassword(protocol) && (
             <div>
               <Label className={labelCls} htmlFor="ib-pw">
-                {isSnell(protocol) ? t('singbox.snell.psk') : 'Password'}
+                {isSnell(protocol)
+                  ? t('singbox.snell.psk', 'PSK')
+                  : t('singbox.inbound_dialog.password_label', 'Password')}
               </Label>
               <div className="flex gap-2">
-                <Input id="ib-pw" aria-label={isSnell(protocol) ? 'psk' : 'password'} className={inputCls + ' flex-1'}
+                <Input id="ib-pw" className={inputCls + ' flex-1'}
                   value={password} onChange={(e) => setPassword(e.target.value)} />
-                <Button type="button" variant="outline" size="sm" className="h-8"
-                  onClick={() => setPassword(randomPassword())}>new</Button>
+                <Button type="button" variant="outline" size="sm"
+                  onClick={() => setPassword(randomPassword())}>{t('singbox.inbound_dialog.new_button', 'new')}</Button>
               </div>
             </div>
           )}
@@ -350,8 +351,8 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
           {/* ── Snell obfs_mode (v5) / mode (v6) ── */}
           {protocol === 'snell-v5' && (
             <div>
-              <Label className={labelCls} htmlFor="ib-snell-obfs">{t('singbox.snell.obfs_mode')}</Label>
-              <select id="ib-snell-obfs" aria-label="obfs mode"
+              <Label className={labelCls} htmlFor="ib-snell-obfs">{t('singbox.snell.obfs_mode', 'Obfuscation')}</Label>
+              <select id="ib-snell-obfs"
                 className={selectCls}
                 value={snellObfs}
                 onChange={(e) => setSnellObfs(e.target.value)}>
@@ -363,8 +364,8 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
           )}
           {protocol === 'snell-v6' && (
             <div>
-              <Label className={labelCls} htmlFor="ib-snell-mode">{t('singbox.snell.mode')}</Label>
-              <select id="ib-snell-mode" aria-label="mode"
+              <Label className={labelCls} htmlFor="ib-snell-mode">{t('singbox.snell.mode', 'Traffic mode')}</Label>
+              <select id="ib-snell-mode"
                 className={selectCls}
                 value={snellMode}
                 onChange={(e) => setSnellMode(e.target.value)}>
@@ -379,28 +380,34 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
           {needsReality(protocol) && (
             <>
               <div>
-                <Label className={labelCls} htmlFor="ib-sni-reality">SNI (REALITY target domain)</Label>
-                <Input id="ib-sni-reality" aria-label="sni" className={inputCls}
+                <Label className={labelCls} htmlFor="ib-sni-reality">{t('singbox.inbound_dialog.reality_sni_label', 'SNI (REALITY target domain)')}</Label>
+                <Input id="ib-sni-reality" className={inputCls}
                   value={sni} onChange={(e) => setSNI(e.target.value)}
                   placeholder="www.icloud.com" />
                 <p className="text-2xs text-muted-foreground mt-0.5">
-                  Must be a single-tenant TLS endpoint — not a multi-tenant CDN.
+                  {t('singbox.inbound_dialog.reality_sni_hint', 'Must be a single-tenant TLS endpoint — not a multi-tenant CDN.')}
                 </p>
               </div>
 
               {/* Keypair */}
               <div>
-                <Label className={labelCls}>REALITY keypair (Curve25519)</Label>
+                <Label className={labelCls}>{t('singbox.inbound_dialog.reality_keypair_label', 'REALITY keypair (Curve25519)')}</Label>
                 <div className="flex gap-2">
-                  <Input aria-label="private key" placeholder="private key" readOnly
-                    className={inputCls + ' flex-1 text-2xs'} value={privKey} />
-                  <Input aria-label="public key" placeholder="public key" readOnly
-                    className={inputCls + ' flex-1 text-2xs'} value={pubKey} />
-                  <Button type="button" variant="outline" size="sm" className="h-8"
-                    onClick={genKeypair}>Generate</Button>
+                  <div className="flex-1">
+                    <Label htmlFor="ib-privkey" className="sr-only">{t('singbox.inbound_dialog.reality_private_key_placeholder', 'private key')}</Label>
+                    <Input id="ib-privkey" placeholder={t('singbox.inbound_dialog.reality_private_key_placeholder', 'private key')} readOnly
+                      className={inputCls + ' w-full text-2xs'} value={privKey} />
+                  </div>
+                  <div className="flex-1">
+                    <Label htmlFor="ib-pubkey" className="sr-only">{t('singbox.inbound_dialog.reality_public_key_placeholder', 'public key')}</Label>
+                    <Input id="ib-pubkey" placeholder={t('singbox.inbound_dialog.reality_public_key_placeholder', 'public key')} readOnly
+                      className={inputCls + ' w-full text-2xs'} value={pubKey} />
+                  </div>
+                  <Button type="button" variant="outline" size="sm"
+                    onClick={genKeypair}>{t('singbox.inbound_dialog.generate_button', 'Generate')}</Button>
                 </div>
                 <p className="text-2xs text-muted-foreground mt-0.5">
-                  Uses the same Curve25519 endpoint as Xray (shared crypto).
+                  {t('singbox.inbound_dialog.reality_keypair_hint', 'Uses the same Curve25519 endpoint as Xray (shared crypto).')}
                 </p>
               </div>
 
@@ -408,17 +415,17 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                   not part of their schema). */}
               <div className={isRelayEdit ? '' : 'grid grid-cols-2 gap-3'}>
                 <div>
-                  <Label className={labelCls} htmlFor="ib-sid">Short ID</Label>
+                  <Label className={labelCls} htmlFor="ib-sid">{t('singbox.inbound_dialog.short_id_label', 'Short ID')}</Label>
                   <div className="flex gap-2">
-                    <Input id="ib-sid" aria-label="short id" className={inputCls + ' flex-1 font-mono'}
+                    <Input id="ib-sid" className={inputCls + ' flex-1 font-mono'}
                       value={shortID} onChange={(e) => setShortID(e.target.value)} />
-                    <Button type="button" variant="outline" size="sm" className="h-8"
-                      onClick={genShortID}>Gen</Button>
+                    <Button type="button" variant="outline" size="sm"
+                      onClick={genShortID}>{t('singbox.inbound_dialog.gen_button', 'Gen')}</Button>
                   </div>
                 </div>
                 {!isRelayEdit && (
                   <div>
-                    <Label className={labelCls} htmlFor="ib-hs">Handshake host</Label>
+                    <Label className={labelCls} htmlFor="ib-hs">{t('singbox.inbound_dialog.handshake_host_label', 'Handshake host')}</Label>
                     <Input id="ib-hs" className={inputCls}
                       value={hsServer} onChange={(e) => setHSServer(e.target.value)}
                       placeholder="www.apple.com" />
@@ -428,7 +435,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
 
               {!isRelayEdit && (
                 <div>
-                  <Label className={labelCls} htmlFor="ib-hp">Handshake port</Label>
+                  <Label className={labelCls} htmlFor="ib-hp">{t('singbox.inbound_dialog.handshake_port_label', 'Handshake port')}</Label>
                   <Input id="ib-hp" className={inputCls + ' w-28'}
                     value={hsPort} onChange={(e) => setHSPort(e.target.value)}
                     placeholder="443" />
@@ -441,23 +448,23 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
           {needsCertAndSNI(protocol) && (
             <>
               <div>
-                <Label className={labelCls} htmlFor="ib-sni-tls">SNI / Domain</Label>
-                <Input id="ib-sni-tls" aria-label="sni" className={inputCls}
+                <Label className={labelCls} htmlFor="ib-sni-tls">{t('singbox.inbound_dialog.tls_sni_label', 'SNI / Domain')}</Label>
+                <Input id="ib-sni-tls" className={inputCls}
                   value={sni} onChange={(e) => setSNI(e.target.value)}
                   placeholder="proxy.example.com" />
               </div>
               <div>
-                <Label className={labelCls} htmlFor="ib-cert">Certificate</Label>
+                <Label className={labelCls} htmlFor="ib-cert">{t('singbox.inbound_dialog.cert_label', 'Certificate')}</Label>
                 {validCerts.length === 0 ? (
                   <p className="text-2xs text-muted-foreground">
-                    No valid certificates. Issue one in the Certificates tab first.
+                    {t('singbox.inbound_dialog.cert_none', 'No valid certificates. Issue one in the Certificates tab first.')}
                   </p>
                 ) : (
-                  <select id="ib-cert" aria-label="certificate"
+                  <select id="ib-cert"
                     className={selectCls}
                     value={certID}
                     onChange={(e) => setCertID(e.target.value)}>
-                    <option value="">— select certificate —</option>
+                    <option value="">{t('singbox.inbound_dialog.cert_select_placeholder', '— select certificate —')}</option>
                     {validCerts.map((c) => (
                       <option key={c.id} value={String(c.id)}>
                         {c.domain}
@@ -473,13 +480,13 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
           {needsTransport(protocol) && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className={labelCls} htmlFor="ib-path">Path</Label>
+                <Label className={labelCls} htmlFor="ib-path">{t('singbox.inbound_dialog.path_label', 'Path')}</Label>
                 <Input id="ib-path" className={inputCls}
                   value={transportPath} onChange={(e) => setTransportPath(e.target.value)}
                   placeholder="/proxy" />
               </div>
               <div>
-                <Label className={labelCls} htmlFor="ib-host">Host header</Label>
+                <Label className={labelCls} htmlFor="ib-host">{t('singbox.inbound_dialog.host_header_label', 'Host header')}</Label>
                 <Input id="ib-host" className={inputCls}
                   value={transportHost} onChange={(e) => setTransportHost(e.target.value)} />
               </div>
@@ -490,8 +497,8 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
           {needsSS(protocol) && (
             <>
               <div>
-                <Label className={labelCls} htmlFor="ib-ssm">Method</Label>
-                <select id="ib-ssm" aria-label="method"
+                <Label className={labelCls} htmlFor="ib-ssm">{t('singbox.inbound_dialog.method_label', 'Method')}</Label>
+                <select id="ib-ssm"
                   className={selectCls}
                   value={ssMethod}
                   onChange={(e) => setSSMethod(e.target.value)}>
@@ -501,12 +508,12 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                 </select>
               </div>
               <div>
-                <Label className={labelCls} htmlFor="ib-sspw">Password (base64)</Label>
+                <Label className={labelCls} htmlFor="ib-sspw">{t('singbox.inbound_dialog.ss_password_label', 'Password (base64)')}</Label>
                 <div className="flex gap-2">
-                  <Input id="ib-sspw" aria-label="ss password" className={inputCls + ' flex-1'}
+                  <Input id="ib-sspw" className={inputCls + ' flex-1'}
                     value={ssPassword} onChange={(e) => setSSPassword(e.target.value)} />
-                  <Button type="button" variant="outline" size="sm" className="h-8"
-                    onClick={() => setSSPassword(randomSSKey(ssMethod))}>new</Button>
+                  <Button type="button" variant="outline" size="sm"
+                    onClick={() => setSSPassword(randomSSKey(ssMethod))}>{t('singbox.inbound_dialog.new_button', 'new')}</Button>
                 </div>
               </div>
             </>
@@ -516,11 +523,11 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>{t('common.cancel', 'Cancel')}</Button>
           <Button disabled={save.isPending} onClick={() => save.mutate()}>
             {save.isPending
-              ? (isEdit ? 'Saving…' : 'Creating…')
-              : (isEdit ? 'Save' : 'Create')}
+              ? (isEdit ? t('singbox.inbound_dialog.saving', 'Saving…') : t('singbox.inbound_dialog.creating', 'Creating…'))
+              : (isEdit ? t('singbox.inbound_dialog.save_button', 'Save') : t('common.create', 'Create'))}
           </Button>
         </DialogFooter>
       </DialogContent>

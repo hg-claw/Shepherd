@@ -158,9 +158,9 @@ describe('singbox/InboundDialog', () => {
     const select = screen.getByRole('combobox', { name: /protocol/i })
     fireEvent.change(select, { target: { value: 'trojan-tls' } })
 
-    await waitFor(() => expect(screen.getByLabelText('password')).toBeTruthy())
+    await waitFor(() => expect(screen.getByLabelText('Password')).toBeTruthy())
 
-    const pwInput = screen.getByLabelText('password') as HTMLInputElement
+    const pwInput = screen.getByLabelText('Password') as HTMLInputElement
     const newBtn  = screen.getByRole('button', { name: /^new$/i })
     fireEvent.click(newBtn)
 
@@ -176,7 +176,7 @@ describe('singbox/InboundDialog', () => {
     fireEvent.change(select, { target: { value: 'snell-v5' } })
 
     await waitFor(() => expect(screen.getByLabelText(/psk/i)).toBeTruthy())
-    expect(screen.getByLabelText(/obfs/i)).toBeTruthy()
+    expect(screen.getByLabelText(/obfuscation/i)).toBeTruthy()
     expect(screen.queryByLabelText(/sni/i)).toBeNull()
     expect(screen.queryByLabelText(/uuid/i)).toBeNull()
   })
@@ -190,7 +190,7 @@ describe('singbox/InboundDialog', () => {
     fireEvent.change(select, { target: { value: 'snell-v6' } })
 
     await waitFor(() => expect(screen.getByLabelText(/mode/i)).toBeTruthy())
-    expect(screen.queryByLabelText(/obfs/i)).toBeNull()
+    expect(screen.queryByLabelText(/obfuscation/i)).toBeNull()
   })
 
   it('submits extra: JSON.stringify({ obfs_mode }) for snell-v5', async () => {
@@ -202,8 +202,8 @@ describe('singbox/InboundDialog', () => {
     const select = screen.getByRole('combobox', { name: /protocol/i })
     fireEvent.change(select, { target: { value: 'snell-v5' } })
 
-    await waitFor(() => expect(screen.getByLabelText(/obfs/i)).toBeTruthy())
-    fireEvent.change(screen.getByLabelText(/obfs/i), { target: { value: 'http' } })
+    await waitFor(() => expect(screen.getByLabelText(/obfuscation/i)).toBeTruthy())
+    fireEvent.change(screen.getByLabelText(/obfuscation/i), { target: { value: 'http' } })
 
     const createBtn = screen.getByRole('button', { name: /create/i })
     fireEvent.click(createBtn)
@@ -264,8 +264,8 @@ describe('singbox/InboundDialog', () => {
       { wrapper },
     )
 
-    await waitFor(() => expect(screen.getByLabelText(/obfs/i)).toBeTruthy())
-    fireEvent.change(screen.getByLabelText(/obfs/i), { target: { value: 'http' } })
+    await waitFor(() => expect(screen.getByLabelText(/obfuscation/i)).toBeTruthy())
+    fireEvent.change(screen.getByLabelText(/obfuscation/i), { target: { value: 'http' } })
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
 
     await waitFor(() => expect(spy).toHaveBeenCalled())
@@ -281,13 +281,13 @@ describe('singbox/InboundDialog', () => {
     const select = screen.getByRole('combobox', { name: /protocol/i })
     fireEvent.change(select, { target: { value: 'shadowsocks-2022' } })
 
-    await waitFor(() => expect(screen.getByLabelText('ss password')).toBeTruthy())
+    await waitFor(() => expect(screen.getByLabelText('Password (base64)')).toBeTruthy())
 
     // Method defaults to 2022-blake3-aes-128-gcm; set it explicitly
     const methodSelect = screen.getByRole('combobox', { name: /method/i })
     fireEvent.change(methodSelect, { target: { value: '2022-blake3-aes-128-gcm' } })
 
-    const ssPwInput = screen.getByLabelText('ss password') as HTMLInputElement
+    const ssPwInput = screen.getByLabelText('Password (base64)') as HTMLInputElement
     const newBtn    = screen.getByRole('button', { name: /^new$/i })
     fireEvent.click(newBtn)
 

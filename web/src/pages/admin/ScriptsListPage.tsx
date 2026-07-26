@@ -15,6 +15,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { LoadingState } from '@/components/LoadingState'
 import { EmptyState } from '@/components/EmptyState'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
 const scriptSortAccessors = {
@@ -165,121 +166,112 @@ export default function ScriptsListPage() {
             />
           )
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr>
-                  <SortableTh
-                    label={t('scripts.name', 'Name')}
-                    sortKey="name"
-                    sort={scriptSort}
-                    onToggle={scriptToggle}
-                    className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b"
-                  />
-                  <SortableTh
-                    label={t('scripts.description', 'Description')}
-                    sortKey="description"
-                    sort={scriptSort}
-                    onToggle={scriptToggle}
-                    className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden md:table-cell"
-                  />
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
-                    {t('scripts.params', 'Params')}
-                  </th>
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden lg:table-cell">
-                    {t('scripts.last_run', 'Last run')}
-                  </th>
-                  <th className="text-right font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b">
-                    {t('admin.actions', 'Actions')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedLib.map((s) => {
-                  const paramCount = s.params?.length ?? 0
-                  // Find most recent run for this script
-                  const lastRun = runs
-                    .filter((r) => r.script_id === s.id)
-                    .sort((a, b) => {
-                      const ta = a.started_at ? new Date(a.started_at).getTime() : 0
-                      const tb = b.started_at ? new Date(b.started_at).getTime() : 0
-                      return tb - ta
-                    })[0]
-                  const lastStatus = lastRun
-                    ? lastRun.finished_at
-                      ? 'succeeded'
-                      : 'running'
-                    : null
-                  return (
-                    <tr key={s.id} className="border-t hover:bg-sunken/60 transition-colors">
-                      <td className="px-4 py-2.5">
-                        <Link
-                          to={`/admin/scripts/${s.id}`}
-                          className="font-mono font-medium text-foreground hover:underline text-sm"
-                        >
-                          {s.name}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-2.5 hidden md:table-cell">
-                        <span className="text-muted-foreground text-xs truncate max-w-xs block">
-                          {s.description}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 hidden sm:table-cell">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {paramCount === 0 ? (
-                            <span className="text-fg-dim font-mono text-2xs">none</span>
-                          ) : (
-                            s.params?.map((p) => (
-                              <span
-                                key={p.name}
-                                className={cn(
-                                  'inline-flex items-center h-5 px-1.5 rounded text-2xs font-mono border',
-                                  p.required
-                                    ? 'bg-accent/20 border-accent/40 text-accent-foreground'
-                                    : 'bg-sunken border-border text-fg-dim',
-                                )}
-                              >
-                                {p.name}
-                                {p.required && (
-                                  <span className="text-err ml-0.5 text-2xs">*</span>
-                                )}
-                              </span>
-                            ))
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2.5 hidden lg:table-cell">
-                        {lastStatus ? (
-                          <Pill kind={statusKind(lastStatus)}>{lastStatus}</Pill>
+          <Table wrapperClassName="border-0 rounded-none bg-transparent">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <SortableTh
+                  label={t('scripts.name', 'Name')}
+                  sortKey="name"
+                  sort={scriptSort}
+                  onToggle={scriptToggle}
+                />
+                <SortableTh
+                  label={t('scripts.description', 'Description')}
+                  sortKey="description"
+                  sort={scriptSort}
+                  onToggle={scriptToggle}
+                  className="hidden md:table-cell"
+                />
+                <TableHead className="hidden sm:table-cell">{t('scripts.params', 'Params')}</TableHead>
+                <TableHead className="hidden lg:table-cell">{t('scripts.last_run', 'Last run')}</TableHead>
+                <TableHead className="text-right">{t('admin.actions', 'Actions')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedLib.map((s) => {
+                const paramCount = s.params?.length ?? 0
+                // Find most recent run for this script
+                const lastRun = runs
+                  .filter((r) => r.script_id === s.id)
+                  .sort((a, b) => {
+                    const ta = a.started_at ? new Date(a.started_at).getTime() : 0
+                    const tb = b.started_at ? new Date(b.started_at).getTime() : 0
+                    return tb - ta
+                  })[0]
+                const lastStatus = lastRun
+                  ? lastRun.finished_at
+                    ? 'succeeded'
+                    : 'running'
+                  : null
+                return (
+                  <TableRow key={s.id}>
+                    <TableCell>
+                      <Link
+                        to={`/admin/scripts/${s.id}`}
+                        className="font-mono font-medium text-foreground hover:underline text-sm"
+                      >
+                        {s.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <span className="text-muted-foreground text-xs truncate max-w-xs block">
+                        {s.description}
+                      </span>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {paramCount === 0 ? (
+                          <span className="text-fg-dim font-mono text-2xs">none</span>
                         ) : (
-                          <span className="text-fg-dim font-mono text-2xs">never</span>
+                          s.params?.map((p) => (
+                            <span
+                              key={p.name}
+                              className={cn(
+                                'inline-flex items-center h-5 px-1.5 rounded text-2xs font-mono border',
+                                p.required
+                                  ? 'bg-accent/20 border-accent/40 text-accent-foreground'
+                                  : 'bg-sunken border-border text-fg-dim',
+                              )}
+                            >
+                              {p.name}
+                              {p.required && (
+                                <span className="text-err ml-0.5 text-2xs">*</span>
+                              )}
+                            </span>
+                          ))
                         )}
-                      </td>
-                      <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                        <Button variant="ghost" size="sm" asChild className="h-7 px-2 text-xs">
-                          <Link to={`/admin/scripts/${s.id}/run`}>
-                            <Play className="h-3 w-3 mr-1" />
-                            {t('scripts.run', 'Run')}
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setPendingDeleteScript(s)}
-                          disabled={del.isPending}
-                          className="h-7 w-7 p-0"
-                          aria-label="delete"
-                        >
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      {lastStatus ? (
+                        <Pill kind={statusKind(lastStatus)}>{lastStatus}</Pill>
+                      ) : (
+                        <span className="text-fg-dim font-mono text-2xs">never</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="xs" asChild>
+                        <Link to={`/admin/scripts/${s.id}/run`}>
+                          <Play className="h-3 w-3 mr-1" />
+                          {t('scripts.run', 'Run')}
+                        </Link>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => setPendingDeleteScript(s)}
+                        disabled={del.isPending}
+                        className="w-7 p-0"
+                        aria-label="delete"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
         )}
       </div>
 
@@ -298,85 +290,73 @@ export default function ScriptsListPage() {
             {t('scripts.recent_runs', 'Recent runs')}
           </span>
           <span className="text-fg-dim font-mono text-2xs">· last 30 days</span>
-          <Button asChild size="sm" variant="ghost" className="ml-auto h-7 px-2 text-xs">
+          <Button asChild size="xs" variant="ghost" className="ml-auto">
             <Link to="/admin/script-runs">{t('scripts.view_all', 'View all')}</Link>
           </Button>
         </div>
         {runs.length === 0 ? (
           <EmptyState title={t('scripts.no_runs', 'no runs yet')} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr>
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b w-8" />
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b">
-                    {t('scripts.run_id', 'Run #')}
-                  </th>
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
-                    {t('scripts.script_id', 'Script')}
-                  </th>
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b">
-                    {t('scripts.status', 'Status')}
-                  </th>
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b">
-                    {t('scripts.started_at', 'Started')}
-                  </th>
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden md:table-cell">
-                    {t('scripts.finished_at', 'Finished')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {runs.slice(0, 8).map((r) => {
-                  const runStatus = r.finished_at ? 'succeeded' : 'running'
-                  const isExpanded = expandedRunId === r.id
-                  return (
-                    <Fragment key={r.id}>
-                      <tr
-                        className={cn('border-t transition-colors', isExpanded ? 'bg-sunken/50' : 'hover:bg-sunken/40 cursor-pointer')}
-                        onClick={() => setExpandedRunId(isExpanded ? null : r.id)}
-                      >
-                        <td className="px-4 py-2 w-8">
-                          {isExpanded
-                            ? <ChevronDown className="h-3.5 w-3.5 text-fg-dim" />
-                            : <ChevronRight className="h-3.5 w-3.5 text-fg-dim" />}
-                        </td>
-                        <td className="px-4 py-2">
-                          <Link
-                            to={`/admin/script-runs/${r.id}`}
-                            className="font-mono text-foreground hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            #{r.id}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-2 hidden sm:table-cell font-mono text-fg-dim text-xs">
-                          {r.script_id}
-                        </td>
-                        <td className="px-4 py-2">
-                          <Pill kind={statusKind(runStatus)}>{runStatus}</Pill>
-                        </td>
-                        <td className="px-4 py-2 font-mono text-fg-dim text-2xs whitespace-nowrap">
-                          {r.started_at}
-                        </td>
-                        <td className="px-4 py-2 hidden md:table-cell font-mono text-fg-dim text-2xs whitespace-nowrap">
-                          {r.finished_at ?? '—'}
-                        </td>
-                      </tr>
-                      {isExpanded && (
-                        <tr className="bg-sunken/30 border-t">
-                          <td colSpan={6} className="px-4 py-2">
-                            <ExpandedRunTargets runId={r.id} running={!r.finished_at} serverName={serverName} t={t} />
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <Table wrapperClassName="border-0 rounded-none bg-transparent">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-8" />
+                <TableHead>{t('scripts.run_id', 'Run #')}</TableHead>
+                <TableHead className="hidden sm:table-cell">{t('scripts.script_id', 'Script')}</TableHead>
+                <TableHead>{t('scripts.status', 'Status')}</TableHead>
+                <TableHead>{t('scripts.started_at', 'Started')}</TableHead>
+                <TableHead className="hidden md:table-cell">{t('scripts.finished_at', 'Finished')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {runs.slice(0, 8).map((r) => {
+                const runStatus = r.finished_at ? 'succeeded' : 'running'
+                const isExpanded = expandedRunId === r.id
+                return (
+                  <Fragment key={r.id}>
+                    <TableRow
+                      className={cn(isExpanded ? 'bg-sunken/50 hover:bg-sunken/50' : 'hover:bg-sunken/40 cursor-pointer')}
+                      onClick={() => setExpandedRunId(isExpanded ? null : r.id)}
+                    >
+                      <TableCell className="w-8">
+                        {isExpanded
+                          ? <ChevronDown className="h-3.5 w-3.5 text-fg-dim" />
+                          : <ChevronRight className="h-3.5 w-3.5 text-fg-dim" />}
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          to={`/admin/script-runs/${r.id}`}
+                          className="font-mono text-foreground hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          #{r.id}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell font-mono text-fg-dim text-xs">
+                        {r.script_id}
+                      </TableCell>
+                      <TableCell>
+                        <Pill kind={statusKind(runStatus)}>{runStatus}</Pill>
+                      </TableCell>
+                      <TableCell className="font-mono text-fg-dim text-2xs whitespace-nowrap">
+                        {r.started_at}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell font-mono text-fg-dim text-2xs whitespace-nowrap">
+                        {r.finished_at ?? '—'}
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded && (
+                      <TableRow className="bg-sunken/30 hover:bg-sunken/30">
+                        <TableCell colSpan={6}>
+                          <ExpandedRunTargets runId={r.id} running={!r.finished_at} serverName={serverName} t={t} />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                )
+              })}
+            </TableBody>
+          </Table>
         )}
       </div>
     </div>

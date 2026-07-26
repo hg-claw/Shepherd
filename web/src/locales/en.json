@@ -224,6 +224,7 @@
     "remove": "Remove",
     "remove_confirm": "Remove {{name}}?",
     "preview_failed": "Preview failed: {{err}}",
+    "mkdir_failed": "Create folder failed: {{err}}",
     "new_folder": "New folder",
     "folder_name": "Folder name"
   },

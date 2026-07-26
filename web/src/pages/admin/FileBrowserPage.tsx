@@ -141,6 +141,11 @@ export default function FileBrowserPage() {
   const [mkdirOpen, setMkdirOpen] = useState(false)
   const [mkdirName, setMkdirName] = useState('')
 
+  const closeMkdir = () => {
+    setMkdirOpen(false)
+    setMkdirName('')
+  }
+
   const handleMkdir = async () => {
     if (mkdir.isPending) return
     const name = mkdirName.trim()
@@ -151,10 +156,9 @@ export default function FileBrowserPage() {
         path: cwd === '/' ? `/${name}` : `${cwd}/${name}`,
         mode: 0o755,
       })
-      setMkdirOpen(false)
-      setMkdirName('')
+      closeMkdir()
     } catch (err) {
-      toast('error', String(err))
+      toast('error', t('files.mkdir_failed', { err: String(err) }))
     }
   }
 
@@ -583,7 +587,7 @@ export default function FileBrowserPage() {
           </pre>
         </DialogContent>
       </Dialog>
-      <Dialog open={mkdirOpen} onOpenChange={(open) => { setMkdirOpen(open); if (!open) setMkdirName('') }}>
+      <Dialog open={mkdirOpen} onOpenChange={(open) => (open ? setMkdirOpen(true) : closeMkdir())}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>{t('files.new_folder')}</DialogTitle></DialogHeader>
           <Input
@@ -594,7 +598,7 @@ export default function FileBrowserPage() {
             autoFocus
           />
           <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setMkdirOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="outline" size="sm" onClick={closeMkdir}>{t('common.cancel')}</Button>
             <Button size="sm" onClick={handleMkdir} disabled={!mkdirName.trim() || mkdir.isPending}>{t('common.create')}</Button>
           </div>
         </DialogContent>

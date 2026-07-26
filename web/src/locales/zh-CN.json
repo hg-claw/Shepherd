@@ -243,6 +243,7 @@
     "remove": "删除",
     "remove_confirm": "确认删除 {{name}}？",
     "preview_failed": "预览失败：{{err}}",
+    "mkdir_failed": "新建文件夹失败：{{err}}",
     "new_folder": "新建文件夹",
     "folder_name": "文件夹名称"
   },

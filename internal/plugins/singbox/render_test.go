@@ -636,6 +636,92 @@ func TestRender_SS2022(t *testing.T) {
 	}
 }
 
+func TestRender_SnellV5(t *testing.T) {
+	psk := "psk-abc"
+	in := InboundView{Inbound: Inbound{
+		ServerID: 1, Tag: "landing-snell5", Port: 8443,
+		Role: "landing", Protocol: "snell-v5", Password: &psk,
+	}}
+	got, err := renderInbound(in, nil)
+	if err != nil {
+		t.Fatalf("renderInbound: %v", err)
+	}
+	if got["type"] != "snell" {
+		t.Errorf("type = %v, want snell", got["type"])
+	}
+	if got["version"] != 5 {
+		t.Errorf("version = %v (%T), want 5 (int)", got["version"], got["version"])
+	}
+	if got["psk"] != psk {
+		t.Errorf("psk = %v, want %v", got["psk"], psk)
+	}
+	if got["obfs_mode"] != "none" {
+		t.Errorf("obfs_mode = %v, want none (default)", got["obfs_mode"])
+	}
+	if _, ok := got["tls"]; ok {
+		t.Error("snell must not carry a tls block")
+	}
+	if _, ok := got["users"]; ok {
+		t.Error("snell must not carry a users array")
+	}
+}
+
+func TestRender_SnellV5_ObfsHTTP(t *testing.T) {
+	psk := "psk-abc"
+	extra := `{"obfs_mode":"http"}`
+	in := InboundView{Inbound: Inbound{
+		ServerID: 1, Tag: "landing-snell5", Port: 8443,
+		Role: "landing", Protocol: "snell-v5", Password: &psk, ExtraJSON: &extra,
+	}}
+	got, err := renderInbound(in, nil)
+	if err != nil {
+		t.Fatalf("renderInbound: %v", err)
+	}
+	if got["obfs_mode"] != "http" {
+		t.Errorf("obfs_mode = %v, want http", got["obfs_mode"])
+	}
+}
+
+func TestRender_SnellV6(t *testing.T) {
+	psk := "psk-abc"
+	extra := `{"mode":"unshaped"}`
+	in := InboundView{Inbound: Inbound{
+		ServerID: 1, Tag: "landing-snell6", Port: 8443,
+		Role: "landing", Protocol: "snell-v6", Password: &psk, ExtraJSON: &extra,
+	}}
+	got, err := renderInbound(in, nil)
+	if err != nil {
+		t.Fatalf("renderInbound: %v", err)
+	}
+	if got["version"] != 6 {
+		t.Errorf("version = %v, want 6", got["version"])
+	}
+	if got["mode"] != "unshaped" {
+		t.Errorf("mode = %v, want unshaped", got["mode"])
+	}
+	if _, ok := got["obfs_mode"]; ok {
+		t.Error("v6 must not carry obfs_mode")
+	}
+}
+
+func TestRender_SnellRejectsBadEnum(t *testing.T) {
+	psk := "psk-abc"
+	badObfs := `{"obfs_mode":"tls"}`
+	in := InboundView{Inbound: Inbound{
+		ServerID: 1, Tag: "t", Port: 8443, Role: "landing",
+		Protocol: "snell-v5", Password: &psk, ExtraJSON: &badObfs,
+	}}
+	if _, err := renderInbound(in, nil); err == nil {
+		t.Error("expected error for obfs_mode=tls (only none/http allowed)")
+	}
+	badMode := `{"mode":"turbo"}`
+	in.Protocol = "snell-v6"
+	in.ExtraJSON = &badMode
+	if _, err := renderInbound(in, nil); err == nil {
+		t.Error("expected error for mode=turbo")
+	}
+}
+
 // ── Relay outbound tests ─────────────────────────────────────────────────────
 
 // Forward-mode relays render a sing-box "direct" inbound with

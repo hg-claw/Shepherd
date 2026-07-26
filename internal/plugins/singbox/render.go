@@ -234,6 +234,10 @@ func renderInbound(in InboundView, certsByID map[int64]CertView) (map[string]any
 		return renderAnyTLS(base, in, certsByID)
 	case "shadowsocks-2022":
 		return renderSS2022(base, in)
+	case "snell-v5":
+		return renderSnell(base, in, 5)
+	case "snell-v6":
+		return renderSnell(base, in, 6)
 	default:
 		return nil, fmt.Errorf("unsupported protocol: %s", in.Protocol)
 	}
@@ -375,6 +379,78 @@ func renderSS2022(base map[string]any, in InboundView) (map[string]any, error) {
 	base["method"] = strVal(in.SSMethod)
 	base["password"] = strVal(in.Password)
 	return base, nil
+}
+
+// renderSnell builds a snell inbound. snell has no TLS layer and no
+// transport layer; the psk lives in the shared password column and the
+// version is carried by the protocol name (snell-v5 / snell-v6).
+// Enum values are whitelisted here rather than passed through: sing-box
+// 1.14 rejects unknown enum values at config-parse time with a FATAL the
+// panel never sees.
+func renderSnell(base map[string]any, in InboundView, version int) (map[string]any, error) {
+	psk := strVal(in.Password)
+	if psk == "" {
+		return nil, fmt.Errorf("snell %s: psk (password) is empty", in.Tag)
+	}
+	base["type"] = "snell"
+	base["version"] = version
+	base["psk"] = psk
+
+	extra := map[string]any{}
+	if in.ExtraJSON != nil && *in.ExtraJSON != "" {
+		if err := json.Unmarshal([]byte(*in.ExtraJSON), &extra); err != nil {
+			return nil, fmt.Errorf("snell %s: bad extra_json: %w", in.Tag, err)
+		}
+	}
+
+	if version == 5 {
+		m, err := snellObfsMode(extra)
+		if err != nil {
+			return nil, fmt.Errorf("snell %s: %w", in.Tag, err)
+		}
+		base["obfs_mode"] = m
+		return base, nil
+	}
+	m, err := snellMode(extra)
+	if err != nil {
+		return nil, fmt.Errorf("snell %s: %w", in.Tag, err)
+	}
+	base["mode"] = m
+	return base, nil
+}
+
+// snellObfsMode reads extra_json["obfs_mode"] for snell v5. Defaults to
+// "none"; only "none" and "http" are valid.
+func snellObfsMode(extra map[string]any) (string, error) {
+	v, ok := extra["obfs_mode"]
+	if !ok {
+		return "none", nil
+	}
+	s, _ := v.(string)
+	switch s {
+	case "":
+		return "none", nil
+	case "none", "http":
+		return s, nil
+	}
+	return "", fmt.Errorf("obfs_mode %q invalid (want none or http)", s)
+}
+
+// snellMode reads extra_json["mode"] for snell v6 traffic shaping.
+// Defaults to "default".
+func snellMode(extra map[string]any) (string, error) {
+	v, ok := extra["mode"]
+	if !ok {
+		return "default", nil
+	}
+	s, _ := v.(string)
+	switch s {
+	case "":
+		return "default", nil
+	case "default", "unshaped", "unsafe-raw":
+		return s, nil
+	}
+	return "", fmt.Errorf("mode %q invalid (want default, unshaped or unsafe-raw)", s)
 }
 
 // ── Transport block builder ──────────────────────────────────────────────────

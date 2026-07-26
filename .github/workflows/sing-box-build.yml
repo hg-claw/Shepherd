@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Upstream sing-box tag to build (e.g. v1.13.10). Leave empty to use upstream latest stable.'
+        description: 'Upstream sing-box tag to build (e.g. v1.14.0-beta.2). Leave empty to use upstream latest stable.'
         required: false
       force:
         description: 'Rebuild even if our release already exists for that version.'
@@ -103,7 +103,7 @@ jobs:
           # (needs naiveproxy toolchain — too much for a daily cron), append
           # with_v2ray_api + with_grpc (the point of this whole pipeline).
           default_tags=$(cat release/DEFAULT_BUILD_TAGS)
-          tags=$(echo "$default_tags" | tr ',' '\n' | grep -v '^with_naive_outbound$' | paste -sd,)
+          tags=$(echo "$default_tags" | tr ',' '\n' | grep -v -E '^(with_naive_outbound|with_cloudflared|with_usbip|with_openvpn|with_openconnect)$' | paste -sd,)
           tags="${tags},with_v2ray_api,with_grpc"
           echo "tags=${tags}"
           echo "tags=${tags}" >> "$GITHUB_OUTPUT"

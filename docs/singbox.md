@@ -20,7 +20,7 @@
 
 ### Snell（`snell-v5` / `snell-v6`）
 
-- **需要主机 sing-box ≥ 1.14**：snell inbound 是 sing-box 1.14 才原生支持的协议（底层库 `SagerNet/sing-snell`）。上游目前还没有 1.14 稳定版，只有 `v1.14.0-beta.2` 可用（在 **Deploy** tab 里手动选择该版本）。仍在 1.13.x 的主机上创建/部署 snell 入站会在部署时被明确拒绝，报错提示需要先升级 sing-box。
+- **需要主机 sing-box ≥ 1.14**：snell inbound 是 sing-box 1.14 才原生支持的协议（底层库 `SagerNet/sing-snell`）。上游目前还没有 1.14 稳定版，只有 `v1.14.0-beta.2` 可用（截至 2026-07；在 **Deploy** tab 里手动选择该版本）。仍在 1.13.x 的主机上创建 snell 入站会直接返回 409（创建时预检），部署时也会再拒一次，报错提示需要先升级 sing-box。**例外**：forward 模式的 relay 渲染成 `direct` 入站，主机上并不跑 snell，因此不受 1.14 限制、也不需要 PSK。
 - **不支持多用户**：与本插件其它协议一致，一个入站只对应一组凭据，不支持 sing-box snell 的 `users[]` 多用户列表。
 - **字段落点**（零迁移，不新增数据库列）：
   - PSK 复用现有的 `password` 字段（不是独立的 psk 列）。

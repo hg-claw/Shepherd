@@ -215,9 +215,12 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
         body.ss_password = ssPassword
       }
       // obfs_mode (v5) / mode (v6) travel in the generic `extra` JSON field
-      // — the same channel hysteria2's up_mbps uses server-side.
-      if (protocol === 'snell-v5') body.extra = JSON.stringify({ obfs_mode: snellObfs })
-      if (protocol === 'snell-v6') body.extra = JSON.stringify({ mode: snellMode })
+      // — the same channel hysteria2's up_mbps uses server-side. `extra`
+      // is a whole-column overwrite server-side, so merge into whatever
+      // the row already carried instead of replacing it: this dialog only
+      // knows two keys, and an API client is free to have put others there.
+      if (protocol === 'snell-v5') body.extra = JSON.stringify({ ...initialExtra, obfs_mode: snellObfs })
+      if (protocol === 'snell-v6') body.extra = JSON.stringify({ ...initialExtra, mode: snellMode })
 
       if (isEdit) {
         // Only send patchable fields

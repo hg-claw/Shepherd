@@ -223,6 +223,24 @@ test('snell-v6 create sends mode inside extra', async () => {
   expect(body.extra).toBe(JSON.stringify({ mode: 'unshaped' }))
 })
 
+test('snell edit merges into the existing extra instead of clobbering unknown keys', async () => {
+  const SNELL_EDIT = {
+    id: 44, server_id: 7, server_name: 'alpha', tag: 'snell-8443', alias: 'sg', port: 8443,
+    role: 'landing', protocol: 'snell-v5', password: 'psk',
+    // `extra` is a whole-column overwrite server-side and this form only knows
+    // obfs_mode — a key an API client put here must survive the edit.
+    extra_json: JSON.stringify({ obfs_mode: 'none', custom_key: 'keep-me' }),
+  }
+  mockUseInbounds.mockReturnValue({ data: [SNELL_EDIT] })
+  mockParams = { id: 'singbox', mode: 'edit', inboundId: '44' }
+  const { getByTestId } = render(<InboundFormScreen />)
+  fireEvent.press(getByTestId('snellobfs-http'))
+  fireEvent.press(getByTestId('save'))
+  await waitFor(() => expect(mockPatch).toHaveBeenCalled())
+  const body = mockPatch.mock.calls[0][2]
+  expect(JSON.parse(body.extra)).toEqual({ obfs_mode: 'http', custom_key: 'keep-me' })
+})
+
 test('snell is not in SINGBOX_URL_PROTOCOLS (no de-facto snell:// share-link standard)', () => {
   expect(SINGBOX_URL_PROTOCOLS.has('snell-v5')).toBe(false)
   expect(SINGBOX_URL_PROTOCOLS.has('snell-v6')).toBe(false)

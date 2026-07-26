@@ -237,6 +237,42 @@ describe('singbox/InboundDialog', () => {
     )
   })
 
+  it('preserves unrelated extra_json keys when editing a snell inbound', async () => {
+    const spy = vi.spyOn(pluginsAPI, 'patchSingboxInbound').mockResolvedValue({ id: 7 } as never)
+    const inbound = {
+      id: 7,
+      server_id: 1,
+      server_name: 'S1',
+      tag: 'landing-snell',
+      alias: 'SG snell',
+      port: 8443,
+      role: 'landing' as const,
+      protocol: 'snell-v5' as const,
+      password: 'psk-value',
+      // An API client put `custom_key` here; the dialog doesn't know it
+      // but must not drop it — `extra` is a whole-column overwrite.
+      extra_json: JSON.stringify({ obfs_mode: 'none', custom_key: 'keep-me' }),
+      upstream_inbound_id: null,
+      upstream_tag: null,
+      upstream_server_id: null,
+      upstream_server_name: null,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    }
+    render(
+      <InboundDialog serverID={1} initial={inbound} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+
+    await waitFor(() => expect(screen.getByLabelText(/obfs/i)).toBeTruthy())
+    fireEvent.change(screen.getByLabelText(/obfs/i), { target: { value: 'http' } })
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() => expect(spy).toHaveBeenCalled())
+    const patch = spy.mock.calls[0][1] as { extra: string }
+    expect(JSON.parse(patch.extra)).toEqual({ obfs_mode: 'http', custom_key: 'keep-me' })
+  })
+
   it('SS new button fills ss password with a base64 key of correct length for aes-128-gcm', async () => {
     render(
       <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,

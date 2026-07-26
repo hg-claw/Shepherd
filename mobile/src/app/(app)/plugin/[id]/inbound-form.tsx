@@ -249,9 +249,12 @@ function SingboxForm({ mode, serverIdParam, editing }: {
     if (groups.ss) { body.ss_method = ssMethod; body.ss_password = ssPassword }
     // obfs_mode (v5) / mode (v6) travel in the generic `extra` JSON field — the
     // wire key is `extra` (Go tag json:"extra"), NOT extra_json (that's the
-    // GET-only echo). Matches web InboundDialog exactly.
-    if (protocol === 'snell-v5') body.extra = JSON.stringify({ obfs_mode: snellObfs })
-    if (protocol === 'snell-v6') body.extra = JSON.stringify({ mode: snellMode })
+    // GET-only echo). `extra` is a whole-column overwrite server-side, so merge
+    // into the row's existing extra rather than replacing it: this form only
+    // knows two keys and an API client may have put others there.
+    // Matches web InboundDialog exactly.
+    if (protocol === 'snell-v5') body.extra = JSON.stringify({ ...initialExtra, obfs_mode: snellObfs })
+    if (protocol === 'snell-v6') body.extra = JSON.stringify({ ...initialExtra, mode: snellMode })
 
     try {
       if (isEdit) {

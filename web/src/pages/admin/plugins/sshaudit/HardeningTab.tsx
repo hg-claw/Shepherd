@@ -99,7 +99,7 @@ export default function HardeningTab() {
         <Button
           variant="outline"
           size="sm"
-          className="h-8 text-xs"
+          className="text-xs"
           disabled={!effectiveID || statusQ.isFetching || busy}
           onClick={() => statusQ.refetch()}
         >
@@ -169,7 +169,7 @@ function StatusCard({
         <div className="text-xs text-muted-foreground">
           Enable to install, configure, and start the SSH brute-force jail on this host.
         </div>
-        <Button size="sm" className="h-8 text-xs" disabled={busy} onClick={() => onToggle(true)}>
+        <Button size="sm" className="text-xs" disabled={busy} onClick={() => onToggle(true)}>
           Enable fail2ban
         </Button>
       </div>

@@ -282,7 +282,7 @@ export default function ServerList() {
                   { value: 'table' as const, icon: Rows3, label: t('view.table', 'Table') },
                 ]}
               />
-              <Button asChild size="sm" className="h-8">
+              <Button asChild size="sm">
                 <Link to="/admin/servers/new">
                   <Plus className="mr-1 h-3.5 w-3.5" />
                   {t('admin.add_server', 'Add server')}
@@ -357,11 +357,11 @@ export default function ServerList() {
             {t('server.selected_count', '{{n}} selected', { n: selected.size })}
           </span>
           <Button
-            size="sm"
+            size="xs"
             variant="outline"
             disabled={batchUpdate.isPending}
             onClick={handleBatchUpdate}
-            className="h-7 text-sm"
+            className="text-sm"
           >
             <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
             {batchUpdate.isPending
@@ -518,7 +518,7 @@ export default function ServerList() {
                       {(stage === 'install-failed' || stage === 'not-installed') && (
                         <ReinstallButton server={s} t={t} />
                       )}
-                      <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-sm">
+                      <Button asChild variant="ghost" size="xs" className="text-sm">
                         <Link to={`/admin/servers/${s.id}`}>{t('admin.details', 'Details')}</Link>
                       </Button>
                       <DeleteButton server={s} onDelete={() => handleDelete(s)} t={t} />
@@ -578,7 +578,7 @@ function ReinstallButton({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-sm">
+        <Button variant="ghost" size="xs" className="text-sm">
           {t('server.reinstall', 'Reinstall')}
         </Button>
       </DialogTrigger>
@@ -650,7 +650,7 @@ function DeleteButton({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" aria-label={t('admin.delete', 'Delete')} className="h-7 w-7 p-0">
+        <Button variant="ghost" size="xs" aria-label={t('admin.delete', 'Delete')} className="w-7 p-0">
           <Trash2 className="h-3.5 w-3.5 text-destructive" />
         </Button>
       </DialogTrigger>
@@ -719,13 +719,13 @@ function HostCard({
         <Stat label="TCP" v={online ? tcp.toLocaleString() : '—'} />
       </div>
       <div className="flex items-center gap-1 mt-3 pt-2.5 border-t border-dashed">
-        <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-xs">
+        <Button asChild variant="ghost" size="xs">
           <Link to={`/admin/servers/${server.id}`}>{t('admin.details', 'Details')}</Link>
         </Button>
         <div className="ml-auto" onClick={(e) => e.stopPropagation()}>
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" aria-label={t('admin.delete', 'Delete')}>
+              <Button variant="ghost" size="xs" className="w-7 p-0" aria-label={t('admin.delete', 'Delete')}>
                 <Trash2 className="h-3.5 w-3.5 text-destructive" />
               </Button>
             </DialogTrigger>

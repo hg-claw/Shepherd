@@ -199,9 +199,8 @@ function PluginCard({ p, isPending, onEnable, onDisable }: PluginCardProps) {
         <span className="ml-auto">
           {p.enabled ? (
             <Button
-              size="sm"
+              size="xs"
               variant="outline"
-              className="h-7 text-xs"
               disabled={isPending}
               onClick={onDisable}
             >
@@ -209,8 +208,7 @@ function PluginCard({ p, isPending, onEnable, onDisable }: PluginCardProps) {
             </Button>
           ) : (
             <Button
-              size="sm"
-              className="h-7 text-xs"
+              size="xs"
               disabled={isPending}
               onClick={onEnable}
             >

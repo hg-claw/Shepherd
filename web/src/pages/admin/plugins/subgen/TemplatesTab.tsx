@@ -157,7 +157,7 @@ export default function TemplatesTab() {
         <p className="text-sm text-muted-foreground">
           Templates describe how nodes map to policies and which rule-sets to include. Built-in templates are read-only — clone one to customize.
         </p>
-        <Button size="sm" className="h-8" onClick={openNew}>
+        <Button size="sm" onClick={openNew}>
           <Plus className="h-3.5 w-3.5 mr-1" /> New template
         </Button>
       </div>
@@ -182,17 +182,17 @@ export default function TemplatesTab() {
                 </td>
                 <td className="px-3 py-2 text-right whitespace-nowrap">
                   {t.builtin ? (
-                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs"
+                    <Button variant="outline" size="xs"
                       onClick={() => openClone(t)}>
                       <CopyIcon className="h-3.5 w-3.5 mr-1" /> Clone
                     </Button>
                   ) : (
                     <>
-                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs mr-1"
+                      <Button variant="outline" size="xs" className="mr-1"
                         onClick={() => openEdit(t)}>
                         <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
+                      <Button variant="ghost" size="xs" className="w-7 p-0"
                         disabled={remove.isPending}
                         onClick={() => setRemoveTarget(t)}
                         aria-label="delete">
@@ -563,8 +563,8 @@ export function TemplateEditor({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" size="sm" className="h-8" onClick={onClose}>Cancel</Button>
-          <Button size="sm" className="h-8" disabled={!name.trim() || save.isPending}
+          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button size="sm" disabled={!name.trim() || save.isPending}
             onClick={() => save.mutate()}>Save</Button>
         </DialogFooter>
       </DialogContent>

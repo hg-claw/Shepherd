@@ -112,9 +112,8 @@ export default function TrafficTab() {
           {RANGES.map((r) => (
             <Button
               key={r.key}
-              size="sm"
+              size="xs"
               variant={r.key === rangeKey ? 'default' : 'ghost'}
-              className="h-7 px-2 text-xs"
               onClick={() => setRangeKey(r.key)}
             >
               {r.label}

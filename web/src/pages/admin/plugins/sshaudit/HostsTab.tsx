@@ -194,8 +194,8 @@ function HostRow({
           {enabled && (
             <Button
               variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-2xs"
+              size="xs"
+              className="text-2xs"
               disabled={collecting}
               onClick={onCollect}
               title="Force an immediate collection"
@@ -204,10 +204,10 @@ function HostRow({
               Collect now
             </Button>
           )}
-          <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-2xs">
+          <Button asChild variant="ghost" size="xs" className="text-2xs">
             <a href={`/admin/plugins/sshaudit/sessions?server_id=${server.id}`}>Sessions →</a>
           </Button>
-          <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-2xs">
+          <Button asChild variant="ghost" size="xs" className="text-2xs">
             <a href={`/admin/plugins/sshaudit/history?server_id=${server.id}`}>History →</a>
           </Button>
         </span>

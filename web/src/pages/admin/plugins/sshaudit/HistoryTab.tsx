@@ -85,9 +85,9 @@ export default function HistoryTab() {
           {FILTER_OPTIONS.map((o) => (
             <Button
               key={o.value}
-              size="sm"
+              size="xs"
               variant={o.value === filter ? 'default' : 'outline'}
-              className="h-7 px-2.5 text-2xs"
+              className="px-2.5 text-2xs"
               onClick={() => setFilter(o.value)}
             >
               {o.label}
@@ -99,9 +99,9 @@ export default function HistoryTab() {
           {WINDOW_OPTIONS.map((o) => (
             <Button
               key={o.value}
-              size="sm"
+              size="xs"
               variant={o.value === window ? 'default' : 'outline'}
-              className="h-7 px-2.5 text-2xs"
+              className="px-2.5 text-2xs"
               onClick={() => setWindow(o.value)}
             >
               {o.label}

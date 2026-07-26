@@ -95,9 +95,9 @@ export default function HistoryDrawer({ open, onOpenChange, serverID, targetID, 
           {(['1h', '24h', '7d', '30d'] as TimeRange[]).map((r) => (
             <Button
               key={r}
-              size="sm"
+              size="xs"
               variant={r === range ? 'default' : 'outline'}
-              className="h-7 px-2.5 text-2xs"
+              className="px-2.5 text-2xs"
               onClick={() => setRange(r)}
             >
               {r}

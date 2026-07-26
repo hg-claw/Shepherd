@@ -107,7 +107,7 @@ export default function SubscriptionsTab() {
         <p className="text-sm text-muted-foreground">
           Each subscription exposes a public URL clients import. Pick its template and the inbound nodes it bundles.
         </p>
-        <Button size="sm" className="h-8" onClick={() => setCreating(true)} disabled={templates.length === 0}>
+        <Button size="sm" onClick={() => setCreating(true)} disabled={templates.length === 0}>
           <Plus className="h-3.5 w-3.5 mr-1" /> New subscription
         </Button>
       </div>
@@ -152,23 +152,23 @@ export default function SubscriptionsTab() {
                         <option value="clash">clash</option>
                       </select>
                       <code className="font-mono text-2xs text-fg-dim truncate max-w-[22rem]">{url}</code>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
+                      <Button variant="ghost" size="xs" className="w-7 p-0"
                         onClick={() => copy(url)} aria-label="copy url">
                         <Copy className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
-                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs mr-1"
+                    <Button variant="outline" size="xs" className="mr-1"
                       onClick={() => setNodesFor(s)}>
                       <Server className="h-3.5 w-3.5 mr-1" /> Edit nodes
                     </Button>
-                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs mr-1"
+                    <Button variant="outline" size="xs" className="mr-1"
                       disabled={rotate.isPending}
                       onClick={() => rotate.mutate(s.id)}>
                       <RotateCw className="h-3.5 w-3.5 mr-1" /> Rotate token
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
+                    <Button variant="ghost" size="xs" className="w-7 p-0"
                       disabled={remove.isPending}
                       onClick={() => setRemoveTarget(s)}
                       aria-label="delete">
@@ -250,8 +250,8 @@ function NewSubscriptionDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" size="sm" className="h-8" onClick={onClose}>Cancel</Button>
-          <Button size="sm" className="h-8" disabled={!name.trim() || !tpl || pending}
+          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button size="sm" disabled={!name.trim() || !tpl || pending}
             onClick={() => onCreate(name.trim(), tpl)}>Create</Button>
         </DialogFooter>
       </DialogContent>
@@ -392,8 +392,8 @@ function NodePickerDialog({
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" size="sm" className="h-8" onClick={onClose}>Cancel</Button>
-          <Button size="sm" className="h-8" disabled={save.isPending || loading}
+          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button size="sm" disabled={save.isPending || loading}
             onClick={() => save.mutate()}>Save</Button>
         </DialogFooter>
       </DialogContent>

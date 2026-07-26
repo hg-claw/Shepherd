@@ -92,7 +92,7 @@ function ServerRow({
               <li key={d.id} className="flex items-center gap-2 text-sm">
                 <span className="font-mono">{d.domain}</span>
                 <span className="text-fg-dim text-2xs">→ {d.content} ({d.type})</span>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 ml-auto"
+                <Button variant="ghost" size="xs" className="w-7 p-0 ml-auto"
                   onClick={() => onRemove(d.id)} disabled={pending} aria-label="remove">
                   <Trash2 className="h-3.5 w-3.5 text-destructive" />
                 </Button>
@@ -104,7 +104,7 @@ function ServerRow({
           <Input value={draft} onChange={(e) => setDraft(e.target.value)}
             placeholder="custom.example.com"
             className="h-7 font-mono text-xs max-w-xs" />
-          <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+          <Button size="xs" variant="outline"
             disabled={!draft || pending}
             onClick={() => { onAddCustom(draft); setDraft('') }}>
             <Plus className="h-3.5 w-3.5 mr-1" /> add
@@ -112,7 +112,7 @@ function ServerRow({
         </div>
       </td>
       <td className="px-3 py-2 text-right">
-        <Button size="sm" className="h-7 px-2 text-xs"
+        <Button size="xs"
           onClick={onAddDefault} disabled={pending}>
           <Plus className="h-3.5 w-3.5 mr-1" /> default
         </Button>

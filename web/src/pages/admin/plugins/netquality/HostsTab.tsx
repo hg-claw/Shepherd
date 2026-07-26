@@ -183,8 +183,8 @@ function HostRow({
           {enabled && (
             <Button
               variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-2xs"
+              size="xs"
+              className="text-2xs"
               onClick={onPickTargets}
               title="Pick which targets this host samples"
             >
@@ -192,7 +192,7 @@ function HostRow({
               Targets
             </Button>
           )}
-          <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-2xs">
+          <Button asChild variant="ghost" size="xs" className="text-2xs">
             <a href={`/admin/plugins/netquality/results?server_id=${server.id}`}>Results →</a>
           </Button>
         </span>

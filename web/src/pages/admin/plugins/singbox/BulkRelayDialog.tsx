@@ -323,18 +323,16 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
             <div className="mt-1 flex gap-1 text-xs">
               <Button
                 type="button"
-                size="sm"
+                size="xs"
                 variant={mode === 'forward' ? 'default' : 'outline'}
-                className="h-7"
                 onClick={() => setMode('forward')}
               >
                 Forward (transparent NAT)
               </Button>
               <Button
                 type="button"
-                size="sm"
+                size="xs"
                 variant={mode === 'proxy' ? 'default' : 'outline'}
-                className="h-7"
                 onClick={() => setMode('proxy')}
               >
                 Proxy (per-relay keys)
@@ -390,7 +388,7 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
                           className="h-7 w-24 font-mono" />
                         {mode === 'proxy' && needsX25519(proto) && (
                           <>
-                            <Button size="sm" variant="ghost" className="h-7 px-2 text-2xs"
+                            <Button size="xs" variant="ghost" className="text-2xs"
                               onClick={(e) => { e.preventDefault(); void regenKeys(s.id) }}>↻ keys</Button>
                             <span className="font-mono text-fg-dim text-2xs truncate" title={d.publicKey}>
                               {d.publicKey ? d.publicKey.slice(0, 8) + '…' : 'generating…'}

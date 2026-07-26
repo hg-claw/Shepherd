@@ -59,7 +59,7 @@ export default function SessionsTab() {
         <Button
           variant="outline"
           size="sm"
-          className="h-8 text-xs"
+          className="text-xs"
           disabled={!effectiveID || sessionsQ.isFetching}
           onClick={() => sessionsQ.refetch()}
         >

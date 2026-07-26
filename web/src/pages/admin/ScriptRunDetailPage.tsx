@@ -165,9 +165,9 @@ export default function ScriptRunDetailPage() {
                         <span className="inline-flex items-center gap-1">
                           {st === 'running' && (
                             <Button
-                              size="sm"
+                              size="xs"
                               variant="outline"
-                              className="h-7 px-2 text-xs gap-1"
+                              className="gap-1"
                               onClick={() => attach(tgt.server_id)}
                             >
                               <Terminal className="h-3 w-3" />
@@ -189,7 +189,7 @@ export default function ScriptRunDetailPage() {
                             />
                           )}
                           {tgt.pty_session_id && st !== 'running' && st !== 'failed' && (
-                            <Button size="sm" variant="ghost" asChild className="h-7 px-2 text-xs gap-1">
+                            <Button size="xs" variant="ghost" asChild className="gap-1">
                               <a href={`/admin/recordings/${tgt.pty_session_id}`}>
                                 <PlayCircle className="h-3 w-3" />
                                 {t('recording.replay', 'Replay')}

@@ -121,9 +121,9 @@ export default function TrafficDrawer({
           {(['1h', '24h', '7d', '30d'] as TimeRange[]).map((r) => (
             <Button
               key={r}
-              size="sm"
+              size="xs"
               variant={range === r ? 'default' : 'outline'}
-              className="h-7 px-3 text-xs"
+              className="px-3"
               onClick={() => setRange(r)}
             >
               {r}

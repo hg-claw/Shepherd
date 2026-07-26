@@ -197,7 +197,7 @@ export default function InboundDialog(props: Props) {
               <div className="flex gap-2 mt-1">
                 <Input value={uuid} onChange={(e) => setUUID(e.target.value)}
                   className="h-8 font-mono text-xs" />
-                <Button type="button" variant="outline" size="sm" className="h-8"
+                <Button type="button" variant="outline" size="sm"
                   onClick={() => setUUID(randomUUID())}>new</Button>
               </div>
             </div>
@@ -227,7 +227,7 @@ export default function InboundDialog(props: Props) {
                     className="h-8 font-mono text-2xs" />
                   <Input value={publicKey} placeholder="public" readOnly
                     className="h-8 font-mono text-2xs" />
-                  <Button type="button" variant="outline" size="sm" className="h-8"
+                  <Button type="button" variant="outline" size="sm"
                     onClick={async () => {
                       const kp = await generateX25519()
                       setPrivateKey(kp.private_key); setPublicKey(kp.public_key)
@@ -239,7 +239,7 @@ export default function InboundDialog(props: Props) {
                 <div className="flex gap-2 mt-1">
                   <Input value={shortID} onChange={(e) => setShortID(e.target.value)}
                     className="h-8 font-mono" />
-                  <Button type="button" variant="outline" size="sm" className="h-8"
+                  <Button type="button" variant="outline" size="sm"
                     onClick={async () => {
                       const r = await generateShortID()
                       setShortID(r.short_id)
@@ -277,7 +277,7 @@ export default function InboundDialog(props: Props) {
                   <Input aria-label="ss password" value={ssPassword}
                     onChange={(e) => setSSPassword(e.target.value)}
                     className="h-8 font-mono text-xs" />
-                  <Button type="button" variant="outline" size="sm" className="h-8"
+                  <Button type="button" variant="outline" size="sm"
                     onClick={() => setSSPassword(randomSSKey(ssMethod))}>new</Button>
                 </div>
               </div>

@@ -65,7 +65,7 @@ export default function DnsTab() {
                 <td className="px-3 py-2 font-mono text-xs">{r.content}</td>
                 <td className="px-3 py-2 font-mono text-xs">{r.ttl ?? '—'}</td>
                 <td className="px-3 py-2 text-right">
-                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs"
+                  <Button variant="ghost" size="xs"
                     onClick={() => remove.mutate(r.id)}>Delete</Button>
                 </td>
               </tr>
@@ -89,7 +89,7 @@ export default function DnsTab() {
               </td>
               <td className="px-3 py-2 text-fg-dim text-2xs">auto</td>
               <td className="px-3 py-2 text-right">
-                <Button size="sm" className="h-7 px-2 text-xs"
+                <Button size="xs"
                   disabled={!draft.name || !draft.content}
                   onClick={() => { create.mutate({ ...draft, ttl: 1, proxied: false }); setDraft({ type: 'A', name: '', content: '' }) }}>
                   Add

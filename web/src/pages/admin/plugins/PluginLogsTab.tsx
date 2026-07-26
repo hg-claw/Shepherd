@@ -49,10 +49,10 @@ export function PluginLogsTab({ plugin }: { plugin: 'xray' | 'singbox' }) {
             <option key={h.id} value={h.server_id}>#{h.server_id}</option>
           ))}
         </select>
-        <Button size="sm" variant="outline" className="h-8" onClick={() => setPaused((v) => !v)}>
+        <Button size="sm" variant="outline" onClick={() => setPaused((v) => !v)}>
           {paused ? 'Resume' : 'Pause'}
         </Button>
-        <Button size="sm" variant="outline" className="h-8" onClick={() => setLines([])}>
+        <Button size="sm" variant="outline" onClick={() => setLines([])}>
           Clear
         </Button>
       </div>

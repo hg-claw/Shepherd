@@ -257,7 +257,7 @@ export default function ScriptsListPage() {
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                        <Button variant="ghost" size="sm" asChild className="h-7 px-2 text-xs">
+                        <Button variant="ghost" size="xs" asChild>
                           <Link to={`/admin/scripts/${s.id}/run`}>
                             <Play className="h-3 w-3 mr-1" />
                             {t('scripts.run', 'Run')}
@@ -265,10 +265,10 @@ export default function ScriptsListPage() {
                         </Button>
                         <Button
                           variant="ghost"
-                          size="sm"
+                          size="xs"
                           onClick={() => setPendingDeleteScript(s)}
                           disabled={del.isPending}
-                          className="h-7 w-7 p-0"
+                          className="w-7 p-0"
                           aria-label="delete"
                         >
                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
@@ -298,7 +298,7 @@ export default function ScriptsListPage() {
             {t('scripts.recent_runs', 'Recent runs')}
           </span>
           <span className="text-fg-dim font-mono text-2xs">· last 30 days</span>
-          <Button asChild size="sm" variant="ghost" className="ml-auto h-7 px-2 text-xs">
+          <Button asChild size="xs" variant="ghost" className="ml-auto">
             <Link to="/admin/script-runs">{t('scripts.view_all', 'View all')}</Link>
           </Button>
         </div>

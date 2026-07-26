@@ -65,7 +65,7 @@ function VersionInline({ serverID, current, versions }: { serverID: number; curr
           ))}
         </SelectContent>
       </Select>
-      <Button size="sm" className="h-7 px-2 text-2xs" disabled={apply.isPending}
+      <Button size="xs" className="text-2xs" disabled={apply.isPending}
         onClick={() => apply.mutate()}>Apply</Button>
       <label className="inline-flex items-center gap-1 text-fg-dim text-2xs cursor-pointer" title="Route the binary download via gh-proxy.com (for CN hosts that can't reach github.com)">
         <input type="checkbox" className="h-3 w-3" checked={useMirror} onChange={(e) => setUseMirror(e.target.checked)} />
@@ -91,9 +91,9 @@ function RedeployButton({ serverID, deployedVersion }: { serverID: number; deplo
   return (
     <span className="inline-flex items-center gap-1">
       <Button
-        size="sm"
+        size="xs"
         variant="outline"
-        className="h-7 px-2 text-2xs"
+        className="text-2xs"
         disabled={!deployedVersion || redeploy.isPending}
         onClick={() => redeploy.mutate()}
       >
@@ -143,9 +143,9 @@ function DeployButton({ serverID, versions }: { serverID: number; versions: stri
         </SelectContent>
       </Select>
       <Button
-        size="sm"
+        size="xs"
         variant="outline"
-        className="h-7 px-2 text-2xs"
+        className="text-2xs"
         disabled={!version || deploy.isPending}
         onClick={() => deploy.mutate()}
       >
@@ -170,9 +170,9 @@ function LifecycleButtons({ serverID, status }: { serverID: number; status: Sing
     <span className="inline-flex items-center gap-1">
       {status !== 'running' && (
         <Button
-          size="sm"
+          size="xs"
           variant="ghost"
-          className="h-7 w-7 p-0"
+          className="w-7 p-0"
           disabled={busy}
           title="Start"
           onClick={wrap(() => lc.start.mutateAsync())}
@@ -182,9 +182,9 @@ function LifecycleButtons({ serverID, status }: { serverID: number; status: Sing
       )}
       {status === 'running' && (
         <Button
-          size="sm"
+          size="xs"
           variant="ghost"
-          className="h-7 w-7 p-0"
+          className="w-7 p-0"
           disabled={busy}
           title="Stop"
           onClick={wrap(() => lc.stop.mutateAsync())}
@@ -193,9 +193,9 @@ function LifecycleButtons({ serverID, status }: { serverID: number; status: Sing
         </Button>
       )}
       <Button
-        size="sm"
+        size="xs"
         variant="ghost"
-        className="h-7 w-7 p-0"
+        className="w-7 p-0"
         disabled={busy}
         title="Restart"
         onClick={wrap(() => lc.restart.mutateAsync())}
@@ -203,9 +203,9 @@ function LifecycleButtons({ serverID, status }: { serverID: number; status: Sing
         <RotateCw className="h-3 w-3" />
       </Button>
       <Button
-        size="sm"
+        size="xs"
         variant="ghost"
-        className="h-7 w-7 p-0"
+        className="w-7 p-0"
         disabled={busy}
         title="Refresh status"
         onClick={wrap(() => lc.refreshStatus.mutateAsync())}

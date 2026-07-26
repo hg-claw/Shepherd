@@ -118,8 +118,8 @@ export default function TargetsTab() {
                       {t.source === 'custom' && (
                         <Button
                           variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
+                          size="xs"
+                          className="w-7 p-0"
                           disabled={remove.isPending}
                           onClick={() => setRemoveTarget(t)}
                           title="Delete"
@@ -189,7 +189,6 @@ function NewTargetForm() {
       />
       <Button
         size="sm"
-        className="h-8"
         disabled={create.isPending || !host || !label}
         onClick={() => create.mutate({ isp, region, label, host })}
       >

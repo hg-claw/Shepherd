@@ -69,7 +69,7 @@ export default function SetupTab() {
           Used when auto-generating per-host domains: <code>{'{server}.{prefix}.{zone}'}</code>.
         </p>
       </div>
-      <Button size="sm" className="h-8" disabled={m.isPending}
+      <Button size="sm" disabled={m.isPending}
         onClick={() => m.mutate({ api_token: token, account_id: accountID, zone_id: zoneID, prefix: prefix })}>
         Save
       </Button>

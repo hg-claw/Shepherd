@@ -263,9 +263,9 @@ export default function FileBrowserPage() {
           <div className="flex items-center gap-2 px-3 py-2 border-b">
             <Button
               variant="ghost"
-              size="sm"
+              size="xs"
               onClick={goUp}
-              className="h-7 w-7 p-0"
+              className="w-7 p-0"
               aria-label="up"
               disabled={cwd === '/'}
             >
@@ -302,8 +302,7 @@ export default function FileBrowserPage() {
             />
             <Button
               variant="outline"
-              size="sm"
-              className="h-7 px-2 text-xs"
+              size="xs"
               onClick={() => fileInputRef.current?.click()}
             >
               <UploadIcon className="h-3.5 w-3.5 mr-1" />
@@ -311,8 +310,7 @@ export default function FileBrowserPage() {
             </Button>
             <Button
               variant="outline"
-              size="sm"
-              className="h-7 px-2 text-xs"
+              size="xs"
               onClick={handleMkdir}
             >
               <Plus className="h-3.5 w-3.5" />
@@ -425,8 +423,8 @@ export default function FileBrowserPage() {
                         {!entry.is_dir && (
                           <Button
                             variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
+                            size="xs"
+                            className="w-7 p-0"
                             aria-label="download"
                             onClick={(e) => {
                               e.stopPropagation()
@@ -438,8 +436,8 @@ export default function FileBrowserPage() {
                         )}
                         <Button
                           variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
+                          size="xs"
+                          className="w-7 p-0"
                           aria-label="delete"
                           onClick={(e) => {
                             e.stopPropagation()
@@ -550,8 +548,8 @@ export default function FileBrowserPage() {
               {tr.status === 'active' && tr.cancel && (
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-2xs"
+                  size="xs"
+                  className="text-2xs"
                   onClick={() => tr.cancel?.()}
                 >
                   {t('common.cancel', 'cancel')}

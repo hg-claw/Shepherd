@@ -290,7 +290,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
               <div className="flex gap-2">
                 <Input id="ib-uuid" aria-label="uuid" className={inputCls + ' flex-1'}
                   value={uuid} onChange={(e) => setUUID(e.target.value)} />
-                <Button type="button" variant="outline" size="sm" className="h-8"
+                <Button type="button" variant="outline" size="sm"
                   onClick={() => setUUID(randomUUID())}>new</Button>
               </div>
             </div>
@@ -303,7 +303,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
               <div className="flex gap-2">
                 <Input id="ib-pw" aria-label="password" className={inputCls + ' flex-1'}
                   value={password} onChange={(e) => setPassword(e.target.value)} />
-                <Button type="button" variant="outline" size="sm" className="h-8"
+                <Button type="button" variant="outline" size="sm"
                   onClick={() => setPassword(randomPassword())}>new</Button>
               </div>
             </div>
@@ -330,7 +330,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                     className={inputCls + ' flex-1 text-2xs'} value={privKey} />
                   <Input aria-label="public key" placeholder="public key" readOnly
                     className={inputCls + ' flex-1 text-2xs'} value={pubKey} />
-                  <Button type="button" variant="outline" size="sm" className="h-8"
+                  <Button type="button" variant="outline" size="sm"
                     onClick={genKeypair}>Generate</Button>
                 </div>
                 <p className="text-2xs text-muted-foreground mt-0.5">
@@ -346,7 +346,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                   <div className="flex gap-2">
                     <Input id="ib-sid" aria-label="short id" className={inputCls + ' flex-1 font-mono'}
                       value={shortID} onChange={(e) => setShortID(e.target.value)} />
-                    <Button type="button" variant="outline" size="sm" className="h-8"
+                    <Button type="button" variant="outline" size="sm"
                       onClick={genShortID}>Gen</Button>
                   </div>
                 </div>
@@ -439,7 +439,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                 <div className="flex gap-2">
                   <Input id="ib-sspw" aria-label="ss password" className={inputCls + ' flex-1'}
                     value={ssPassword} onChange={(e) => setSSPassword(e.target.value)} />
-                  <Button type="button" variant="outline" size="sm" className="h-8"
+                  <Button type="button" variant="outline" size="sm"
                     onClick={() => setSSPassword(randomSSKey(ssMethod))}>new</Button>
                 </div>
               </div>

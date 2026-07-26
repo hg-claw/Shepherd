@@ -131,7 +131,7 @@ export default function InboundsTab() {
         <p className="text-sm text-muted-foreground">
           Each row is one xray inbound. A single server can host multiple inbounds.
         </p>
-        <Button size="sm" className="h-8" onClick={() => setDialog({ kind: 'new' })}>
+        <Button size="sm" onClick={() => setDialog({ kind: 'new' })}>
           + New inbound
         </Button>
       </div>
@@ -158,7 +158,7 @@ export default function InboundsTab() {
                   <span className="ml-3"><Pill kind={host.status === 'running' ? 'ok' : 'neutral'}>{host.status}</Pill></span>
                 )}
               </div>
-              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
+              <Button size="xs" variant="ghost"
                 onClick={() => setDialog({ kind: 'new', serverID: s.id })}>
                 + Add inbound
               </Button>
@@ -221,7 +221,7 @@ export default function InboundsTab() {
                       <td className="px-3 py-2 font-mono text-sm">{i.port}</td>
                       <td className="px-3 py-2 font-mono text-sm text-muted-foreground">{i.alias || '—'}</td>
                       <td className="px-3 py-2 text-right whitespace-nowrap">
-                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
+                        <Button size="xs" variant="ghost"
                           disabled={!shareURL}
                           title={shareURL ? 'Copy share URL' : 'cannot build URL'}
                           onClick={async () => {
@@ -232,16 +232,16 @@ export default function InboundsTab() {
                           Copy URL
                         </Button>
                         {isLanding && (
-                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
+                          <Button size="xs" variant="ghost"
                             onClick={() => setDialog({ kind: 'bulk', landing: i })}>
                             + Bulk Relay
                           </Button>
                         )}
-                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs"
+                        <Button size="xs" variant="ghost"
                           onClick={() => setDialog({ kind: 'edit', inbound: i })}>
                           Edit
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-destructive"
+                        <Button size="xs" variant="ghost" className="text-destructive"
                           disabled={del.isPending || dep > 0}
                           title={dep > 0 ? `${dep} relay(s) depend on this landing; delete them first` : undefined}
                           onClick={() => setPendingDelete(i)}>
@@ -324,7 +324,7 @@ function VersionInline({ serverID, current }: { serverID: number; current: strin
     <span className="inline-flex items-center gap-1">
       <Input value={value} onChange={(e) => setValue(e.target.value)}
         className="h-7 w-20 font-mono text-2xs" />
-      <Button size="sm" className="h-7 px-2 text-2xs" disabled={apply.isPending}
+      <Button size="xs" className="text-2xs" disabled={apply.isPending}
         onClick={() => apply.mutate()}>Apply</Button>
       <button className="text-fg-dim text-2xs" onClick={() => setEditing(false)}>cancel</button>
     </span>

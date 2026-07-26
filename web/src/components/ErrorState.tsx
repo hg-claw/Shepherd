@@ -12,7 +12,7 @@ export function ErrorState({ message, onRetry, className }: {
     <div className={cn('flex flex-col items-center justify-center gap-2 py-10 text-center', className)}>
       <div className="text-sm text-err">{message ?? t('common.error')}</div>
       {onRetry && (
-        <Button variant="outline" className="h-7" onClick={onRetry}>
+        <Button variant="outline" size="xs" onClick={onRetry}>
           {t('common.retry')}
         </Button>
       )}

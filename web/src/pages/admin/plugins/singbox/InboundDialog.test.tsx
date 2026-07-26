@@ -148,9 +148,9 @@ describe('singbox/InboundDialog', () => {
     const select = screen.getByRole('combobox', { name: /protocol/i })
     fireEvent.change(select, { target: { value: 'trojan-tls' } })
 
-    await waitFor(() => expect(screen.getByLabelText('password')).toBeTruthy())
+    await waitFor(() => expect(screen.getByLabelText('Password')).toBeTruthy())
 
-    const pwInput = screen.getByLabelText('password') as HTMLInputElement
+    const pwInput = screen.getByLabelText('Password') as HTMLInputElement
     const newBtn  = screen.getByRole('button', { name: /^new$/i })
     fireEvent.click(newBtn)
 
@@ -165,13 +165,13 @@ describe('singbox/InboundDialog', () => {
     const select = screen.getByRole('combobox', { name: /protocol/i })
     fireEvent.change(select, { target: { value: 'shadowsocks-2022' } })
 
-    await waitFor(() => expect(screen.getByLabelText('ss password')).toBeTruthy())
+    await waitFor(() => expect(screen.getByLabelText('Password (base64)')).toBeTruthy())
 
     // Method defaults to 2022-blake3-aes-128-gcm; set it explicitly
     const methodSelect = screen.getByRole('combobox', { name: /method/i })
     fireEvent.change(methodSelect, { target: { value: '2022-blake3-aes-128-gcm' } })
 
-    const ssPwInput = screen.getByLabelText('ss password') as HTMLInputElement
+    const ssPwInput = screen.getByLabelText('Password (base64)') as HTMLInputElement
     const newBtn    = screen.getByRole('button', { name: /^new$/i })
     fireEvent.click(newBtn)
 

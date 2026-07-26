@@ -69,8 +69,8 @@ export default function InboundDialog(props: Props) {
 
   const create = useMutation({
     mutationFn: () => {
-      if (!serverID) throw new Error('select a server')
-      if (role === 'relay' && !upstreamID) throw new Error('relay requires upstream landing')
+      if (!serverID) throw new Error(t('xray.inbound_dialog.err_select_server', 'select a server'))
+      if (role === 'relay' && !upstreamID) throw new Error(t('xray.inbound_dialog.err_relay_upstream', 'relay requires upstream landing'))
       return createXrayInbound({
         server_id: Number(serverID), port, alias: alias || undefined, role, protocol,
         uuid, sni, public_key: publicKey, private_key: privateKey, short_id: shortID,
@@ -118,7 +118,7 @@ export default function InboundDialog(props: Props) {
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-mono">
             {isEdit ? t('xray.inbound_dialog.edit_title', 'Edit inbound {{tag}}', { tag: editing!.tag }) : t('xray.inbound_dialog.new_title', 'New inbound')}
@@ -130,7 +130,6 @@ export default function InboundDialog(props: Props) {
             <div>
               <Label className="text-xs" htmlFor="ind-server">{t('xray.inbound_dialog.server_label', 'Server')}</Label>
               <select id="ind-server"
-                aria-label="server"
                 value={serverID}
                 onChange={(e) => setServerID(Number(e.target.value) || '')}
                 disabled={isEdit}
@@ -144,7 +143,6 @@ export default function InboundDialog(props: Props) {
             <div>
               <Label className="text-xs" htmlFor="ind-role">{t('xray.inbound_dialog.role_label', 'Role')}</Label>
               <select id="ind-role"
-                aria-label="role"
                 value={role}
                 onChange={(e) => setRole(e.target.value as Role)}
                 disabled={isEdit}
@@ -159,7 +157,6 @@ export default function InboundDialog(props: Props) {
             <div>
               <Label className="text-xs" htmlFor="ind-upstream">{t('xray.inbound_dialog.upstream_label', 'Upstream landing-inbound')}</Label>
               <select id="ind-upstream"
-                aria-label="upstream landing-inbound"
                 value={upstreamID}
                 onChange={(e) => setUpstreamID(Number(e.target.value) || '')}
                 disabled={isEdit}
@@ -264,7 +261,6 @@ export default function InboundDialog(props: Props) {
               <div>
                 <Label className="text-xs" htmlFor="ind-ss-method">{t('xray.inbound_dialog.method_label', 'Method')}</Label>
                 <select id="ind-ss-method"
-                  aria-label="method"
                   value={ssMethod}
                   onChange={(e) => setSSMethod(e.target.value)}
                   className="mt-1 h-8 px-2 rounded-md border bg-background text-sm font-mono w-full disabled:opacity-60">
@@ -274,9 +270,9 @@ export default function InboundDialog(props: Props) {
                 </select>
               </div>
               <div>
-                <Label className="text-xs">{t('xray.inbound_dialog.password_label', 'Password (base64)')}</Label>
+                <Label className="text-xs" htmlFor="ind-ss-password">{t('xray.inbound_dialog.password_label', 'Password (base64)')}</Label>
                 <div className="flex gap-2 mt-1">
-                  <Input aria-label="ss password" value={ssPassword}
+                  <Input id="ind-ss-password" value={ssPassword}
                     onChange={(e) => setSSPassword(e.target.value)}
                     className="h-8 font-mono text-xs" />
                   <Button type="button" variant="outline" size="sm"

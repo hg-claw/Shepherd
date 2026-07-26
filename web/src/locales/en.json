@@ -226,12 +226,38 @@
     "preview_failed": "Preview failed: {{err}}",
     "mkdir_failed": "Create folder failed: {{err}}",
     "new_folder": "New folder",
-    "folder_name": "Folder name"
+    "folder_name": "Folder name",
+    "binary_preview": "(binary file — use Download)"
   },
   "plugins": {
     "subtitle": "Extend the Shepherd agent with log parsers, extra metric collectors, and alert routers.",
     "placeholder_title": "Plugin runtime not enabled",
     "placeholder_body": "This release ships without a plugin host. The plugin sandbox, signed distribution, and per-host enablement are tracked separately.",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "hosts": "hosts",
+    "back": "Back to plugins",
+    "unknown": "Unknown plugin",
+    "unknown_body": "No plugin registered with id",
+    "kpi": {
+      "installed": "Installed",
+      "installed_sub": "local registry",
+      "enabled": "Enabled",
+      "enabled_sub": "actively running",
+      "hosts": "Hosts",
+      "hosts_sub": "across all plugins"
+    },
+    "action": {
+      "enable": "Enable",
+      "disable": "Disable"
+    },
+    "pill": {
+      "enabled": "enabled",
+      "disabled": "disabled"
+    },
+    "sshaudit": {
+      "tally_title": "Fleet-wide SSH logins, last 24h"
+    },
     "logs": {
       "select_server_placeholder": "select server",
       "select_server_aria": "select server",
@@ -673,7 +699,9 @@
       "saving": "Saving…",
       "creating": "Creating…",
       "created_toast": "Inbound created",
-      "updated_toast": "Inbound updated"
+      "updated_toast": "Inbound updated",
+      "err_select_server": "select a server",
+      "err_relay_upstream": "relay requires upstream landing"
     },
     "bulk_relay_dialog": {
       "title": "Add relays → {{tag}} @ {{server}}",

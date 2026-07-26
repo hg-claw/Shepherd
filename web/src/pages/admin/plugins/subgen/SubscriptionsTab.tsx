@@ -350,11 +350,11 @@ function NodePickerDialog({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t('subgen.subscriptions.nodes_title', 'Nodes for "{{name}}"', { name: subscription.name })}</DialogTitle>
         </DialogHeader>
-        <div className="max-h-[80vh] overflow-y-auto space-y-4">
+        <div className="min-h-0 overflow-y-auto space-y-4">
           {loading && <div className="text-sm text-muted-foreground">{t('subgen.subscriptions.loading_inbounds', 'Loading inbounds…')}</div>}
           {!loading && servers.map((srv) => {
             const xib = xrayByServer.get(srv.id) ?? []

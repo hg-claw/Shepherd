@@ -245,12 +245,38 @@
     "preview_failed": "预览失败：{{err}}",
     "mkdir_failed": "新建文件夹失败：{{err}}",
     "new_folder": "新建文件夹",
-    "folder_name": "文件夹名称"
+    "folder_name": "文件夹名称",
+    "binary_preview": "（二进制文件，请使用下载）"
   },
   "plugins": {
     "subtitle": "通过日志解析、自定义指标采集、告警转发等插件扩展 Shepherd 代理。",
     "placeholder_title": "插件运行时未启用",
     "placeholder_body": "当前版本未内置插件主机进程。插件沙箱、签名分发与按主机启用功能仍在规划中。",
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "hosts": "台主机",
+    "back": "返回插件列表",
+    "unknown": "未知插件",
+    "unknown_body": "未注册任何 ID 为",
+    "kpi": {
+      "installed": "已安装",
+      "installed_sub": "本地注册表",
+      "enabled": "已启用",
+      "enabled_sub": "正在运行",
+      "hosts": "主机数",
+      "hosts_sub": "覆盖全部插件"
+    },
+    "action": {
+      "enable": "启用",
+      "disable": "禁用"
+    },
+    "pill": {
+      "enabled": "已启用",
+      "disabled": "已禁用"
+    },
+    "sshaudit": {
+      "tally_title": "全部主机近 24 小时 SSH 登录"
+    },
     "logs": {
       "select_server_placeholder": "选择服务器",
       "select_server_aria": "选择服务器",
@@ -495,7 +521,7 @@
       "apply": "应用",
       "cancel": "取消",
       "mirror": "镜像",
-      "mirror_title": "通过 gh-proxy.com 下载二进制（适用于无法访问 github.com 的国内主机）",
+      "mirror_title": "通过 gh-proxy.com 下载二进制（国内主机适用）",
       "mirror_title_long": "通过 gh-proxy.com 下载二进制（适用于无法访问 github.com 的国内主机）",
       "redeploy": "重新部署",
       "deploy": "部署",
@@ -692,7 +718,9 @@
       "saving": "保存中…",
       "creating": "创建中…",
       "created_toast": "入站已创建",
-      "updated_toast": "入站已更新"
+      "updated_toast": "入站已更新",
+      "err_select_server": "请选择服务器",
+      "err_relay_upstream": "中继需要选择上游 landing 入站"
     },
     "bulk_relay_dialog": {
       "title": "添加中继 → {{tag}} @ {{server}}",
@@ -843,9 +871,9 @@
       "no_groups": "未定义任何分组。",
       "custom_rules_label": "自定义规则",
       "custom_rules_desc_pre": "格式为每行一条",
-      "custom_rules_desc_post": "（例如",
+      "custom_rules_desc_post": "(例如",
       "raw_surge_prefix": "原始 Surge",
-      "general_desc_mid": "指令。留空则使用默认值（",
+      "general_desc_mid": "指令。留空则使用默认值(",
       "mitm_desc_post": "指令。留空则省略该段。",
       "url_rewrite_desc_post": "行（仅 Surge / ShadowRocket 支持；Clash 会忽略）。留空则省略。",
       "clash_general_desc_pre": "原始 Clash YAML 顶层字段（",

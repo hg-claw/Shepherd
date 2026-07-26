@@ -29,7 +29,7 @@ function statusKind(
   s: SingboxCertificate['status'],
 ): 'ok' | 'warn' | 'err' | 'neutral' {
   if (s === 'active')  return 'ok'
-  if (s === 'issuing') return 'neutral'
+  if (s === 'issuing') return 'warn'
   if (s === 'failed')  return 'err'
   return 'neutral' // revoked
 }
@@ -321,7 +321,7 @@ export default function CertificatesTab() {
               <TableCell>
                 <div className="flex gap-1">
                   <Button
-                    size="sm"
+                    size="xs"
                     variant="ghost"
                     disabled={renew.isPending}
                     onClick={() => renew.mutate(c.id)}
@@ -329,7 +329,7 @@ export default function CertificatesTab() {
                     {t('singbox.certificates.renew', 'Renew')}
                   </Button>
                   <Button
-                    size="sm"
+                    size="xs"
                     variant="ghost"
                     disabled={usedCertIDs.has(c.id) || del.isPending}
                     title={

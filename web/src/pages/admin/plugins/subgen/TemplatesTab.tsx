@@ -355,14 +355,14 @@ export function TemplateEditor({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing.id == null ? t('subgen.templates.new', 'New template') : t('subgen.templates.edit', 'Edit template')}</DialogTitle>
         </DialogHeader>
 
         <div className="grid gap-4 md:grid-cols-2">
           {/* ── editor column ─────────────────────────────────────────────── */}
-          <div className="max-h-[80vh] overflow-y-auto space-y-4 pr-1">
+          <div className="min-h-0 overflow-y-auto space-y-4 pr-1">
             <div>
               <Label className="text-xs">{t('subgen.templates.name', 'Name')}</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 mt-1" />
@@ -558,7 +558,7 @@ export function TemplateEditor({
           </div>
 
           {/* ── preview column ────────────────────────────────────────────── */}
-          <div className="flex flex-col max-h-[80vh] min-w-0">
+          <div className="flex flex-col min-h-0 overflow-y-auto min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <Label className="text-xs">{t('subgen.templates.preview_label', 'Preview')}</Label>
               <select value={previewTarget} onChange={(e) => setPreviewTarget(e.target.value as PreviewTarget)}

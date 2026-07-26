@@ -264,7 +264,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
             </div>
             <div>
               <Label className={labelCls} htmlFor="ib-proto">{t('singbox.inbound_dialog.protocol_label', 'Protocol')}</Label>
-              <select id="ib-proto" aria-label="protocol"
+              <select id="ib-proto"
                 className={selectCls}
                 value={protocol}
                 disabled={isEdit}
@@ -289,7 +289,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
             <div>
               <Label className={labelCls} htmlFor="ib-uuid">{t('singbox.inbound_dialog.uuid_label', 'UUID')}</Label>
               <div className="flex gap-2">
-                <Input id="ib-uuid" aria-label="uuid" className={inputCls + ' flex-1'}
+                <Input id="ib-uuid" className={inputCls + ' flex-1'}
                   value={uuid} onChange={(e) => setUUID(e.target.value)} />
                 <Button type="button" variant="outline" size="sm"
                   onClick={() => setUUID(randomUUID())}>{t('singbox.inbound_dialog.new_button', 'new')}</Button>
@@ -302,7 +302,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
             <div>
               <Label className={labelCls} htmlFor="ib-pw">{t('singbox.inbound_dialog.password_label', 'Password')}</Label>
               <div className="flex gap-2">
-                <Input id="ib-pw" aria-label="password" className={inputCls + ' flex-1'}
+                <Input id="ib-pw" className={inputCls + ' flex-1'}
                   value={password} onChange={(e) => setPassword(e.target.value)} />
                 <Button type="button" variant="outline" size="sm"
                   onClick={() => setPassword(randomPassword())}>{t('singbox.inbound_dialog.new_button', 'new')}</Button>
@@ -315,7 +315,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
             <>
               <div>
                 <Label className={labelCls} htmlFor="ib-sni-reality">{t('singbox.inbound_dialog.reality_sni_label', 'SNI (REALITY target domain)')}</Label>
-                <Input id="ib-sni-reality" aria-label="sni" className={inputCls}
+                <Input id="ib-sni-reality" className={inputCls}
                   value={sni} onChange={(e) => setSNI(e.target.value)}
                   placeholder="www.icloud.com" />
                 <p className="text-2xs text-muted-foreground mt-0.5">
@@ -327,10 +327,16 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
               <div>
                 <Label className={labelCls}>{t('singbox.inbound_dialog.reality_keypair_label', 'REALITY keypair (Curve25519)')}</Label>
                 <div className="flex gap-2">
-                  <Input aria-label="private key" placeholder={t('singbox.inbound_dialog.reality_private_key_placeholder', 'private key')} readOnly
-                    className={inputCls + ' flex-1 text-2xs'} value={privKey} />
-                  <Input aria-label="public key" placeholder={t('singbox.inbound_dialog.reality_public_key_placeholder', 'public key')} readOnly
-                    className={inputCls + ' flex-1 text-2xs'} value={pubKey} />
+                  <div className="flex-1">
+                    <Label htmlFor="ib-privkey" className="sr-only">{t('singbox.inbound_dialog.reality_private_key_placeholder', 'private key')}</Label>
+                    <Input id="ib-privkey" placeholder={t('singbox.inbound_dialog.reality_private_key_placeholder', 'private key')} readOnly
+                      className={inputCls + ' w-full text-2xs'} value={privKey} />
+                  </div>
+                  <div className="flex-1">
+                    <Label htmlFor="ib-pubkey" className="sr-only">{t('singbox.inbound_dialog.reality_public_key_placeholder', 'public key')}</Label>
+                    <Input id="ib-pubkey" placeholder={t('singbox.inbound_dialog.reality_public_key_placeholder', 'public key')} readOnly
+                      className={inputCls + ' w-full text-2xs'} value={pubKey} />
+                  </div>
                   <Button type="button" variant="outline" size="sm"
                     onClick={genKeypair}>{t('singbox.inbound_dialog.generate_button', 'Generate')}</Button>
                 </div>
@@ -345,7 +351,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                 <div>
                   <Label className={labelCls} htmlFor="ib-sid">{t('singbox.inbound_dialog.short_id_label', 'Short ID')}</Label>
                   <div className="flex gap-2">
-                    <Input id="ib-sid" aria-label="short id" className={inputCls + ' flex-1 font-mono'}
+                    <Input id="ib-sid" className={inputCls + ' flex-1 font-mono'}
                       value={shortID} onChange={(e) => setShortID(e.target.value)} />
                     <Button type="button" variant="outline" size="sm"
                       onClick={genShortID}>{t('singbox.inbound_dialog.gen_button', 'Gen')}</Button>
@@ -377,7 +383,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
             <>
               <div>
                 <Label className={labelCls} htmlFor="ib-sni-tls">{t('singbox.inbound_dialog.tls_sni_label', 'SNI / Domain')}</Label>
-                <Input id="ib-sni-tls" aria-label="sni" className={inputCls}
+                <Input id="ib-sni-tls" className={inputCls}
                   value={sni} onChange={(e) => setSNI(e.target.value)}
                   placeholder="proxy.example.com" />
               </div>
@@ -388,7 +394,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                     {t('singbox.inbound_dialog.cert_none', 'No valid certificates. Issue one in the Certificates tab first.')}
                   </p>
                 ) : (
-                  <select id="ib-cert" aria-label="certificate"
+                  <select id="ib-cert"
                     className={selectCls}
                     value={certID}
                     onChange={(e) => setCertID(e.target.value)}>
@@ -426,7 +432,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
             <>
               <div>
                 <Label className={labelCls} htmlFor="ib-ssm">{t('singbox.inbound_dialog.method_label', 'Method')}</Label>
-                <select id="ib-ssm" aria-label="method"
+                <select id="ib-ssm"
                   className={selectCls}
                   value={ssMethod}
                   onChange={(e) => setSSMethod(e.target.value)}>
@@ -438,7 +444,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
               <div>
                 <Label className={labelCls} htmlFor="ib-sspw">{t('singbox.inbound_dialog.ss_password_label', 'Password (base64)')}</Label>
                 <div className="flex gap-2">
-                  <Input id="ib-sspw" aria-label="ss password" className={inputCls + ' flex-1'}
+                  <Input id="ib-sspw" className={inputCls + ' flex-1'}
                     value={ssPassword} onChange={(e) => setSSPassword(e.target.value)} />
                   <Button type="button" variant="outline" size="sm"
                     onClick={() => setSSPassword(randomSSKey(ssMethod))}>{t('singbox.inbound_dialog.new_button', 'new')}</Button>

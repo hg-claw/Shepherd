@@ -176,7 +176,7 @@ export default function HistoryTab() {
           {events.map((e) => {
             const failed = e.result === 'failed'
             return (
-              <TableRow key={e.id} className={failed ? 'bg-err-soft/30' : ''}>
+              <TableRow key={e.id} className={failed ? 'bg-err-soft/30 hover:bg-err-soft/30' : undefined}>
                 <TableCell className="font-mono text-2xs text-muted-foreground whitespace-nowrap">
                   {e.ts ? new Date(e.ts).toLocaleString() : '—'}
                 </TableCell>

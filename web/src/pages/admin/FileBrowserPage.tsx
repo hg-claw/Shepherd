@@ -123,7 +123,7 @@ export default function FileBrowserPage() {
     previewFile(sid, path)
       .then((r) => {
         setPreviewName(entry.name)
-        setPreviewText(r.binary ? '(binary file — use Download)' : r.text)
+        setPreviewText(r.binary ? t('files.binary_preview', '(binary file — use Download)') : r.text)
         setPreviewOpen(true)
       })
       .catch((err) => toast('error', t('files.preview_failed', { err: String(err) })))

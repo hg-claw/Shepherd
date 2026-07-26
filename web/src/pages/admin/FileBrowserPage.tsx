@@ -22,6 +22,7 @@ import {
 import { openConsole } from '@/api/console'
 import { useServers } from '@/api/servers'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/Pill'
 import { XtermPane } from '@/components/ConsoleDock/XtermPane'
 import {
@@ -32,6 +33,7 @@ import { LoadingState } from '@/components/LoadingState'
 import { ErrorState } from '@/components/ErrorState'
 import { cn } from '@/lib/utils'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { useUI } from '@/store/ui'
 
 function formatMode(m: number): string {
   return (m & 0o777).toString(8).padStart(3, '0')
@@ -59,6 +61,7 @@ const QUICK_PATHS = ['/tmp', '/Users', '/home', '/var/log', '/etc/shepherd', '/o
 
 export default function FileBrowserPage() {
   const { t } = useTranslation()
+  const toast = useUI((s) => s.toast)
   const navigate = useNavigate()
   const { serverId } = useParams<{ serverId: string }>()
   const sid = serverId ? Number(serverId) : 0
@@ -122,7 +125,7 @@ export default function FileBrowserPage() {
         setPreviewText(r.binary ? '(binary file — use Download)' : r.text)
         setPreviewOpen(true)
       })
-      .catch((err) => alert(`preview failed: ${err}`))
+      .catch((err) => toast('error', t('files.preview_failed', { err: String(err) })))
   }
 
   const goUp = () => {
@@ -135,14 +138,19 @@ export default function FileBrowserPage() {
   const breadcrumbs = cwd.split('/').filter(Boolean)
   const goTo = (i: number) => setCwd('/' + breadcrumbs.slice(0, i + 1).join('/'))
 
+  const [mkdirOpen, setMkdirOpen] = useState(false)
+  const [mkdirName, setMkdirName] = useState('')
+
   const handleMkdir = async () => {
-    const name = prompt('Folder name:')
+    const name = mkdirName.trim()
     if (!name) return
     await mkdir.mutateAsync({
       server_id: sid,
       path: cwd === '/' ? `/${name}` : `${cwd}/${name}`,
       mode: 0o755,
     })
+    setMkdirOpen(false)
+    setMkdirName('')
   }
 
   const handleRm = (entry: FileEntry) => {
@@ -311,7 +319,7 @@ export default function FileBrowserPage() {
             <Button
               variant="outline"
               size="xs"
-              onClick={handleMkdir}
+              onClick={() => setMkdirOpen(true)}
             >
               <Plus className="h-3.5 w-3.5" />
             </Button>
@@ -568,6 +576,22 @@ export default function FileBrowserPage() {
           <pre className="font-mono text-xs whitespace-pre-wrap overflow-auto max-h-[80vh] bg-sunken p-3 rounded">
             {previewText}
           </pre>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={mkdirOpen} onOpenChange={setMkdirOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>{t('files.new_folder')}</DialogTitle></DialogHeader>
+          <Input
+            value={mkdirName}
+            onChange={(e) => setMkdirName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleMkdir() }}
+            placeholder={t('files.folder_name')}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setMkdirOpen(false)}>{t('common.cancel')}</Button>
+            <Button size="sm" onClick={handleMkdir} disabled={!mkdirName.trim()}>{t('common.create')}</Button>
+          </div>
         </DialogContent>
       </Dialog>
       <ConfirmDialog

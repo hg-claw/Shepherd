@@ -155,6 +155,7 @@
     "error": "Error",
     "retry": "Retry",
     "cancel": "Cancel",
+    "create": "Create",
     "ok": "OK",
     "copy": "Copy",
     "copied": "Copied",
@@ -221,7 +222,10 @@
     "transfers": "Transfers",
     "no_transfers": "no transfers yet",
     "remove": "Remove",
-    "remove_confirm": "Remove {{name}}?"
+    "remove_confirm": "Remove {{name}}?",
+    "preview_failed": "Preview failed: {{err}}",
+    "new_folder": "New folder",
+    "folder_name": "Folder name"
   },
   "plugins": {
     "subtitle": "Extend the Shepherd agent with log parsers, extra metric collectors, and alert routers.",

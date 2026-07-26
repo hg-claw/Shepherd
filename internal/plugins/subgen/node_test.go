@@ -126,3 +126,48 @@ func TestDedupeNodeNames(t *testing.T) {
 		}
 	}
 }
+
+func TestSingboxInboundToNode_SnellV5(t *testing.T) {
+	psk := "psk-abc"
+	extra := `{"obfs_mode":"http"}`
+	in := singboxLite{
+		Tag: "landing-snell", Port: 8443, Protocol: "snell-v5",
+		Role: "landing", Password: &psk, ExtraJSON: &extra,
+	}
+	srv := serverLite{Host: "1.2.3.4", Name: "hk1", Country: "HK"}
+	n := singboxInboundToNode(in, srv)
+
+	if n.Protocol != "snell" {
+		t.Errorf("Protocol = %q, want snell", n.Protocol)
+	}
+	if n.Password != psk {
+		t.Errorf("Password = %q, want %q", n.Password, psk)
+	}
+	if n.Extra["snell_version"] != 5 {
+		t.Errorf("Extra[snell_version] = %v (%T), want 5 (int)", n.Extra["snell_version"], n.Extra["snell_version"])
+	}
+	if n.Extra["obfs_mode"] != "http" {
+		t.Errorf("Extra[obfs_mode] = %v, want http", n.Extra["obfs_mode"])
+	}
+}
+
+func TestSingboxInboundToNode_SnellV6NoExtraJSON(t *testing.T) {
+	psk := "psk-abc"
+	in := singboxLite{
+		Tag: "landing-snell6", Port: 8443, Protocol: "snell-v6",
+		Role: "landing", Password: &psk,
+	}
+	srv := serverLite{Host: "1.2.3.4", Name: "hk1", Country: "HK"}
+	n := singboxInboundToNode(in, srv)
+
+	if n.Protocol != "snell" {
+		t.Errorf("Protocol = %q, want snell", n.Protocol)
+	}
+	// Extra must exist even with no extra_json — the version lives there.
+	if n.Extra == nil {
+		t.Fatal("Extra is nil; snell_version must be set even without extra_json")
+	}
+	if n.Extra["snell_version"] != 6 {
+		t.Errorf("Extra[snell_version] = %v, want 6", n.Extra["snell_version"])
+	}
+}

@@ -636,6 +636,113 @@ func TestRender_SS2022(t *testing.T) {
 	}
 }
 
+func TestRender_SnellV5(t *testing.T) {
+	psk := "psk-abc"
+	in := InboundView{Inbound: Inbound{
+		ServerID: 1, Tag: "landing-snell5", Port: 8443,
+		Role: "landing", Protocol: "snell-v5", Password: &psk,
+	}}
+	got, err := renderInbound(in, nil)
+	if err != nil {
+		t.Fatalf("renderInbound: %v", err)
+	}
+	if got["type"] != "snell" {
+		t.Errorf("type = %v, want snell", got["type"])
+	}
+	if got["version"] != 5 {
+		t.Errorf("version = %v (%T), want 5 (int)", got["version"], got["version"])
+	}
+	if got["psk"] != psk {
+		t.Errorf("psk = %v, want %v", got["psk"], psk)
+	}
+	if got["obfs_mode"] != "none" {
+		t.Errorf("obfs_mode = %v, want none (default)", got["obfs_mode"])
+	}
+	if _, ok := got["tls"]; ok {
+		t.Error("snell must not carry a tls block")
+	}
+	if _, ok := got["users"]; ok {
+		t.Error("snell must not carry a users array")
+	}
+}
+
+func TestRender_SnellV5_ObfsHTTP(t *testing.T) {
+	psk := "psk-abc"
+	extra := `{"obfs_mode":"http"}`
+	in := InboundView{Inbound: Inbound{
+		ServerID: 1, Tag: "landing-snell5", Port: 8443,
+		Role: "landing", Protocol: "snell-v5", Password: &psk, ExtraJSON: &extra,
+	}}
+	got, err := renderInbound(in, nil)
+	if err != nil {
+		t.Fatalf("renderInbound: %v", err)
+	}
+	if got["obfs_mode"] != "http" {
+		t.Errorf("obfs_mode = %v, want http", got["obfs_mode"])
+	}
+}
+
+func TestRender_SnellV6(t *testing.T) {
+	psk := "psk-abc"
+	extra := `{"mode":"unshaped"}`
+	in := InboundView{Inbound: Inbound{
+		ServerID: 1, Tag: "landing-snell6", Port: 8443,
+		Role: "landing", Protocol: "snell-v6", Password: &psk, ExtraJSON: &extra,
+	}}
+	got, err := renderInbound(in, nil)
+	if err != nil {
+		t.Fatalf("renderInbound: %v", err)
+	}
+	if got["version"] != 6 {
+		t.Errorf("version = %v, want 6", got["version"])
+	}
+	if got["mode"] != "unshaped" {
+		t.Errorf("mode = %v, want unshaped", got["mode"])
+	}
+	if _, ok := got["obfs_mode"]; ok {
+		t.Error("v6 must not carry obfs_mode")
+	}
+	if _, ok := got["tls"]; ok {
+		t.Error("v6 must not carry tls block")
+	}
+	if _, ok := got["users"]; ok {
+		t.Error("v6 must not carry users array")
+	}
+}
+
+func TestRender_SnellRejectsBadEnum(t *testing.T) {
+	psk := "psk-abc"
+	tests := []struct {
+		name     string
+		protocol string
+		extra    string
+		wantErr  bool
+	}{
+		{"obfs_mode bad string", "snell-v5", `{"obfs_mode":"tls"}`, true},
+		{"obfs_mode int", "snell-v5", `{"obfs_mode":42}`, true},
+		{"obfs_mode bool", "snell-v5", `{"obfs_mode":true}`, true},
+		{"obfs_mode object", "snell-v5", `{"obfs_mode":{}}`, true},
+		{"obfs_mode null", "snell-v5", `{"obfs_mode":null}`, true},
+		{"mode bad string", "snell-v6", `{"mode":"turbo"}`, true},
+		{"mode int", "snell-v6", `{"mode":42}`, true},
+		{"mode bool", "snell-v6", `{"mode":true}`, true},
+		{"mode object", "snell-v6", `{"mode":{}}`, true},
+		{"mode null", "snell-v6", `{"mode":null}`, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			in := InboundView{Inbound: Inbound{
+				ServerID: 1, Tag: "t", Port: 8443, Role: "landing",
+				Protocol: tt.protocol, Password: &psk, ExtraJSON: &tt.extra,
+			}}
+			_, err := renderInbound(in, nil)
+			if (err == nil) != !tt.wantErr {
+				t.Errorf("got err=%v, wantErr=%v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 // ── Relay outbound tests ─────────────────────────────────────────────────────
 
 // Forward-mode relays render a sing-box "direct" inbound with
@@ -898,6 +1005,57 @@ func TestRender_SS2022Relay(t *testing.T) {
 	}
 	if ssOB["method"] != "2022-blake3-aes-128-gcm" {
 		t.Errorf("method: %v", ssOB["method"])
+	}
+}
+
+func TestRenderRelayOutbound_SnellV5MapsToVersion4(t *testing.T) {
+	in := InboundView{}
+	in.Tag = "relay-x"
+	in.Role = "relay"
+	in.RelayMode = "proxy"
+	in.UpstreamTag = sql.NullString{String: "landing-snell", Valid: true}
+	in.UpstreamAddress = sql.NullString{String: "1.2.3.4", Valid: true}
+	in.UpstreamPort = sql.NullInt64{Int64: 8443, Valid: true}
+	in.UpstreamProtocol = sql.NullString{String: "snell-v5", Valid: true}
+	in.UpstreamPassword = sql.NullString{String: "psk-abc", Valid: true}
+
+	ob, err := renderRelayOutbound(in)
+	if err != nil {
+		t.Fatalf("renderRelayOutbound: %v", err)
+	}
+	if ob["type"] != "snell" {
+		t.Errorf("type = %v, want snell", ob["type"])
+	}
+	// sing-box snell OUTBOUND only accepts version 4 or 6 — passing 5
+	// makes the config fail to parse.
+	if ob["version"] != 4 {
+		t.Errorf("version = %v, want 4 (v5 landing must dial as v4)", ob["version"])
+	}
+	if ob["psk"] != "psk-abc" {
+		t.Errorf("psk = %v, want psk-abc", ob["psk"])
+	}
+}
+
+func TestRenderRelayOutbound_SnellV6StaysVersion6(t *testing.T) {
+	in := InboundView{}
+	in.Tag = "relay-x"
+	in.Role = "relay"
+	in.RelayMode = "proxy"
+	in.UpstreamTag = sql.NullString{String: "landing-snell6", Valid: true}
+	in.UpstreamAddress = sql.NullString{String: "1.2.3.4", Valid: true}
+	in.UpstreamPort = sql.NullInt64{Int64: 8443, Valid: true}
+	in.UpstreamProtocol = sql.NullString{String: "snell-v6", Valid: true}
+	in.UpstreamPassword = sql.NullString{String: "psk-abc", Valid: true}
+
+	ob, err := renderRelayOutbound(in)
+	if err != nil {
+		t.Fatalf("renderRelayOutbound: %v", err)
+	}
+	if ob["version"] != 6 {
+		t.Errorf("version = %v, want 6", ob["version"])
+	}
+	if _, ok := ob["obfs_mode"]; ok {
+		t.Error("v6 outbound must not carry obfs_mode")
 	}
 }
 

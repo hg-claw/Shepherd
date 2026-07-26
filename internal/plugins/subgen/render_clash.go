@@ -15,7 +15,7 @@ func (*ClashRenderer) Target() string { return "clash" }
 
 func (*ClashRenderer) Supports(p string) bool {
 	switch p {
-	case "shadowsocks", "vmess", "trojan", "vless", "hysteria2", "tuic", "anytls", "wireguard":
+	case "shadowsocks", "vmess", "trojan", "vless", "hysteria2", "tuic", "anytls", "wireguard", "snell":
 		return true
 	}
 	return false
@@ -400,6 +400,23 @@ func clashProxy(n Node) map[string]any {
 		}
 		if n.Insecure {
 			p["skip-cert-verify"] = true
+		}
+	case "snell":
+		ver := snellVersionFor(n, "clash")
+		if ver == 0 {
+			// mihomo rejects snell v6 outright; skip instead of
+			// emitting a proxy the client refuses to load.
+			return nil
+		}
+		p["type"] = "snell"
+		p["psk"] = n.Password
+		p["version"] = ver
+		if m, _ := n.Extra["obfs_mode"].(string); m == "http" {
+			opts := map[string]any{"mode": "http"}
+			if h, _ := n.Extra["obfs_host"].(string); h != "" {
+				opts["host"] = h
+			}
+			p["obfs-opts"] = opts
 		}
 	case "wireguard":
 		p["type"] = "wireguard"

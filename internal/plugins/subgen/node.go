@@ -8,7 +8,7 @@ import (
 
 type Node struct {
 	Name     string
-	Protocol string // vless|vmess|trojan|shadowsocks|hysteria2|tuic|anytls
+	Protocol string // vless|vmess|trojan|shadowsocks|hysteria2|tuic|anytls|snell
 	Server   string
 	Port     int
 	Country  string
@@ -66,6 +66,8 @@ func baseScheme(proto string) string {
 		return "tuic"
 	case proto == "anytls":
 		return "anytls"
+	case proto == "snell-v5" || proto == "snell-v6":
+		return "snell"
 	case proto == "shadowsocks" || proto == "shadowsocks-2022":
 		return "shadowsocks"
 	default:
@@ -220,6 +222,19 @@ func singboxInboundToNode(in singboxLite, srv serverLite) Node {
 		var m map[string]any
 		if json.Unmarshal([]byte(e), &m) == nil {
 			n.Extra = m
+		}
+	}
+	// snell carries its protocol version in the inbound protocol name;
+	// downstream renderers need it to pick the version each client
+	// accepts (Surge takes 5/6, mihomo caps at 4 and rejects 6).
+	if in.Protocol == "snell-v5" || in.Protocol == "snell-v6" {
+		if n.Extra == nil {
+			n.Extra = map[string]any{}
+		}
+		if in.Protocol == "snell-v6" {
+			n.Extra["snell_version"] = 6
+		} else {
+			n.Extra["snell_version"] = 5
 		}
 	}
 	n.Insecure = in.Insecure

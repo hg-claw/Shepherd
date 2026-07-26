@@ -574,6 +574,11 @@
       "updated_toast": "Inbound updated",
       "created_toast": "Inbound created"
     },
+    "snell": {
+      "psk": "PSK",
+      "obfs_mode": "Obfuscation",
+      "mode": "Traffic mode"
+    },
     "bulk_relay_dialog": {
       "title": "Add relays → {{tag}} @ {{server}}",
       "mode_label": "Mode",

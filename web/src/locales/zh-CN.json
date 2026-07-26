@@ -593,6 +593,11 @@
       "updated_toast": "入站已更新",
       "created_toast": "入站已创建"
     },
+    "snell": {
+      "psk": "PSK",
+      "obfs_mode": "混淆",
+      "mode": "流量模式"
+    },
     "bulk_relay_dialog": {
       "title": "添加中继 → {{tag}} @ {{server}}",
       "mode_label": "模式",

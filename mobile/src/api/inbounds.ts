@@ -112,9 +112,11 @@ export function invalidateInbounds(qc: QueryClient, plugin: ProxyPluginID): void
 
 // ─── create ──────────────────────────────────────────────────────────────────
 // Tag is server-generated (store.GenerateTag) — NEVER send it. Create is always
-// role=landing on mobile (relays are a web-only flow). extra_json is omitted —
-// the Go side decodes json key "extra" so the web "extra_json" key is a no-op,
-// and mobile has no use for it.
+// role=landing on mobile (relays are a web-only flow). The generic per-protocol
+// JSON field is `extra` on the wire (Go tag `json:"extra"`) — GET responses echo
+// it back as `extra_json` (see ProxyInboundFull above), but that's a read-only
+// alias and must never be sent on create/patch. Snell's obfs_mode (v5) / mode
+// (v6) are the only mobile fields that ride in `extra` today.
 
 export type CreateInboundBody = Record<string, unknown> & {
   server_id: number
@@ -274,6 +276,10 @@ function qs(pairs: [string, string][]): string {
 }
 
 // The 18 sing-box protocols with implemented share-URL builders.
+// snell-v5/snell-v6 are intentionally excluded — there is no de-facto standard
+// "snell://" share-link format (unlike vless://, vmess://, etc.), so
+// buildSingboxShareURL falls through to its default `return null` for them and
+// the Copy URL button stays disabled. Matches web SINGBOX_URL_PROTOCOLS.
 export const SINGBOX_URL_PROTOCOLS = new Set([
   'vless-reality', 'vless-ws-tls', 'vless-h2-tls', 'vless-httpupgrade-tls',
   'vmess-tcp', 'vmess-http', 'vmess-quic', 'vmess-ws-tls', 'vmess-h2-tls', 'vmess-httpupgrade-tls',
@@ -309,6 +315,8 @@ export const SINGBOX_PROTOCOLS: { value: string; label: string }[] = [
   { value: 'tuic-v5', label: 'TUIC v5' },
   { value: 'anytls', label: 'AnyTLS' },
   { value: 'shadowsocks-2022', label: 'Shadowsocks 2022' },
+  { value: 'snell-v5', label: 'Snell v5' },
+  { value: 'snell-v6', label: 'Snell v6' },
 ]
 
 export const SINGBOX_SS_METHODS = [
@@ -316,6 +324,12 @@ export const SINGBOX_SS_METHODS = [
   '2022-blake3-aes-256-gcm',
   '2022-blake3-chacha20-poly1305',
 ]
+
+// obfs_mode ∈ none|http (v5), mode ∈ default|unshaped|unsafe-raw (v6) — must
+// match the backend enums exactly (internal/plugins/singbox validation).
+// Ported 1:1 from web InboundDialog.
+export const SINGBOX_SNELL_OBFS_MODES = ['none', 'http']
+export const SINGBOX_SNELL_MODES = ['default', 'unshaped', 'unsafe-raw']
 
 export const XRAY_PROTOCOLS: { value: string; label: string }[] = [
   { value: 'vless-reality', label: 'VLESS + REALITY' },
@@ -328,11 +342,16 @@ export const XRAY_SS_METHODS = [
   '2022-blake3-aes-128-gcm', '2022-blake3-aes-256-gcm', '2022-blake3-chacha20-poly1305',
 ]
 
+export function isSnell(p: string): boolean {
+  return p === 'snell-v5' || p === 'snell-v6'
+}
 export function needsUUID(p: string): boolean {
   return p.startsWith('vless-') || p.startsWith('vmess-') || p === 'tuic-v5'
 }
 export function needsPassword(p: string): boolean {
-  return p.startsWith('trojan-') || p === 'hysteria2' || p === 'tuic-v5' || p === 'anytls'
+  // Snell's psk rides in the same `password` field/column as the other
+  // protocols — no separate psk column on the backend.
+  return p.startsWith('trojan-') || p === 'hysteria2' || p === 'tuic-v5' || p === 'anytls' || isSnell(p)
 }
 export function needsSS(p: string): boolean {
   return p === 'shadowsocks-2022'

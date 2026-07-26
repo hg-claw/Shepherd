@@ -75,6 +75,8 @@ function newDraft(
     draft.password = randomPassword()
   } else if (protocol === 'shadowsocks-2022') {
     draft.password = randomPassword()
+  } else if (protocol === 'snell-v5' || protocol === 'snell-v6') {
+    draft.password = randomPassword()
   }
 
   return draft
@@ -180,6 +182,17 @@ function buildRelayBody(
       ...base,
       ss_password: d.password,
       ss_method: landing.ss_method,
+    }
+  }
+
+  if (proto === 'snell-v5' || proto === 'snell-v6') {
+    // snell has no TLS layer — no sni/cert_id/transport — and no uuid.
+    // extra (obfs_mode / mode) is intentionally left unset: the backend
+    // defaults to obfs_mode "none" and mode "default", which is the
+    // right relay behavior.
+    return {
+      ...base,
+      password: d.password,
     }
   }
 

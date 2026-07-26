@@ -28,6 +28,7 @@ func isValidProtocol(p string) bool {
 		"vmess-tcp", "vmess-http", "vmess-quic", "vmess-ws-tls", "vmess-h2-tls", "vmess-httpupgrade-tls",
 		"trojan-tls", "trojan-ws-tls", "trojan-h2-tls", "trojan-httpupgrade-tls",
 		"hysteria2", "tuic-v5", "anytls", "shadowsocks-2022",
+		"snell-v5", "snell-v6",
 	} {
 		if p == v {
 			return true
@@ -88,6 +89,18 @@ func validatePostInbound(ctx context.Context, store *InboundStore, body postInbo
 	}
 	if !isValidProtocol(body.Protocol) {
 		return fmt.Errorf("unknown protocol %q", body.Protocol)
+	}
+	// The psk is only needed by rows that actually terminate snell. A
+	// forward-mode relay renders as {"type":"direct", …} — renderInbound
+	// short-circuits before the protocol switch, so the psk would never
+	// be read. Forward relays deliberately carry no credentials (it is
+	// the default mode in the bulk-relay UI), and demanding one here made
+	// the out-of-the-box "add relays" action on a snell landing fail.
+	if body.Protocol == "snell-v5" || body.Protocol == "snell-v6" {
+		forwardRelay := body.Role == "relay" && body.RelayMode == "forward"
+		if !forwardRelay && (body.Password == nil || *body.Password == "") {
+			return errors.New("password (snell psk) required for snell inbounds")
+		}
 	}
 	existing, _ := store.ListByServer(ctx, body.ServerID)
 	for _, e := range existing {
@@ -182,6 +195,24 @@ func postInboundHandler(deps plugins.Deps) http.HandlerFunc {
 		if err := validatePostInbound(r.Context(), store, body); err != nil {
 			writeErr(w, 409, err.Error())
 			return
+		}
+		// Pre-flight the sing-box version gate. asyncDeploy discards the
+		// error from AssembleAndDeploy and nothing writes
+		// plugin_hosts.last_error, so a row the gate will refuse would
+		// otherwise 201 and then silently freeze that server's config —
+		// for this inbound *and every other inbound on the same server* —
+		// with no UI signal at all. Reject at the boundary instead so the
+		// dialog shows the reason.
+		//
+		// Create-only is sufficient: protocol/role/relay_mode are
+		// immutable post-create (InboundPatch carries none of them and
+		// patchInboundHandler never reads them from the body), so no
+		// PATCH can introduce a snell row.
+		if inboundNeeds114(body.Protocol, body.Role, body.RelayMode) {
+			if err := snellVersionGate(r.Context(), deps.DB, body.ServerID, []string{body.Protocol}); err != nil {
+				writeErr(w, 409, err.Error())
+				return
+			}
 		}
 		in := Inbound{
 			ServerID:               body.ServerID,

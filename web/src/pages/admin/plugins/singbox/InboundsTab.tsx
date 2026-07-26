@@ -18,6 +18,10 @@ import BulkRelayDialog from './BulkRelayDialog'
 import { useServers } from '@/api/servers'
 
 // All 18 protocols that have share-URL builders implemented.
+// snell-v5/snell-v6 are intentionally excluded — there is no de-facto
+// standard "snell://" share-link format (unlike vless://, vmess://, etc.),
+// so buildSingboxShareURL falls through to its default `return null` for
+// them and the Copy URL button stays disabled.
 const SINGBOX_URL_PROTOCOLS = new Set([
   'vless-reality',
   'vless-ws-tls',

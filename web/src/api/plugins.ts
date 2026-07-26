@@ -274,6 +274,7 @@ export type SingboxProtocol =
   | 'vmess-ws-tls' | 'vmess-h2-tls' | 'vmess-httpupgrade-tls'
   | 'trojan-tls'   | 'trojan-ws-tls' | 'trojan-h2-tls' | 'trojan-httpupgrade-tls'
   | 'hysteria2' | 'tuic-v5' | 'anytls' | 'shadowsocks-2022'
+  | 'snell-v5' | 'snell-v6'
 
 export interface SingboxInbound {
   id: number
@@ -333,7 +334,11 @@ export interface CreateSingboxInboundBody {
   ss_method?: string
   ss_password?: string
   cert_id?: number
-  extra_json?: string
+  // Wire key is `extra` (Go tag json:"extra" on postInboundBody.Extra).
+  // GET responses echo it back under the *different* key `extra_json`
+  // (see SingboxInbound above) — that one is read-only and must never be
+  // sent. Naming this field extra_json made it a silent no-op.
+  extra?: string
   upstream_inbound_id?: number
   // Honoured only when role='relay'. "proxy" = legacy dual-termination
   // (relay has its own keys, re-encapsulates to landing). "forward" =
@@ -362,7 +367,9 @@ export interface PatchSingboxInboundBody {
   ss_method?: string
   ss_password?: string
   cert_id?: number | null
-  extra_json?: string | null
+  // See CreateSingboxInboundBody.extra — the PATCH handler reads
+  // body["extra"], not extra_json.
+  extra?: string | null
 }
 
 export interface SingboxCertificate {

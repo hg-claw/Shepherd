@@ -53,6 +53,15 @@ const landingShadowsocks: pluginsAPI.SingboxInbound = {
   created_at: '', updated_at: '',
 }
 
+const landingSnellV5: pluginsAPI.SingboxInbound = {
+  id: 4, server_id: 10, server_name: 'tokyo-1', tag: 'landing-dd', alias: '', port: 9000,
+  role: 'landing', protocol: 'snell-v5',
+  password: 'landing-psk',
+  upstream_inbound_id: null, upstream_tag: null, upstream_server_id: null, upstream_server_name: null,
+  cert_id: null,
+  created_at: '', updated_at: '',
+}
+
 function wrap(node: React.ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(<QueryClientProvider client={qc}>{node}</QueryClientProvider>)
@@ -163,5 +172,33 @@ describe('singbox/BulkRelayDialog', () => {
     expect(call.ss_method).toBe('2022-blake3-aes-128-gcm')
     expect(typeof call.ss_password).toBe('string')
     expect(call.ss_password).not.toBe(landingShadowsocks.ss_password)
+  })
+
+  it('calls createSingboxInbound with a generated psk (password) for snell-v5, no sni/cert/uuid', async () => {
+    wrap(<BulkRelayDialog open={true} onOpenChange={() => {}}
+      landingInbound={landingSnellV5} allInbounds={[landingSnellV5]} />)
+    // Snell relays terminate the protocol themselves (there's no
+    // transparent-forward-only concern here beyond the other proxy
+    // protocols), so flip to "Proxy" mode like the other per-relay-
+    // credential tests do.
+    fireEvent.click(await screen.findByRole('button', { name: /proxy.*per-relay/i }))
+    fireEvent.click(await screen.findByLabelText(/select osaka-1/))
+    fireEvent.click(screen.getByRole('button', { name: /deploy all/i }))
+    await waitFor(() => {
+      expect(pluginsAPI.createSingboxInbound).toHaveBeenCalledTimes(1)
+    })
+    const call = (pluginsAPI.createSingboxInbound as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(call.role).toBe('relay')
+    expect(call.protocol).toBe('snell-v5')
+    expect(call.upstream_inbound_id).toBe(landingSnellV5.id)
+    expect(typeof call.password).toBe('string')
+    expect(call.password).not.toBe('')
+    expect(call.password).not.toBe(landingSnellV5.password) // relay gets its own psk
+    // snell has no TLS layer, no transport, no uuid.
+    expect(call.sni).toBeUndefined()
+    expect(call.cert_id).toBeUndefined()
+    expect(call.uuid).toBeUndefined()
+    expect(call.transport_path).toBeUndefined()
+    expect(call.extra).toBeUndefined()
   })
 })

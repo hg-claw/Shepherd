@@ -178,7 +178,7 @@ export default function AuditLogPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="[&_tr:last-child]:border-0">
+              <tbody>
                 {rows.length === 0 ? (
                   <tr>
                     <td colSpan={COLS}>
@@ -195,7 +195,7 @@ export default function AuditLogPage() {
                           key={r.id}
                           data-index={vi.index}
                           className={cn(
-                            'border-b transition-colors',
+                            'border-t transition-colors',
                             r.result === 'error'
                               ? 'bg-err-soft/20 hover:bg-err-soft/30'
                               : 'hover:bg-sunken/60',

@@ -31,6 +31,7 @@ import {
 import { PageHeader } from '@/components/PageHeader'
 import { LoadingState } from '@/components/LoadingState'
 import { ErrorState } from '@/components/ErrorState'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { useUI } from '@/store/ui'
@@ -377,36 +378,30 @@ export default function FileBrowserPage() {
             ) : error ? (
               <ErrorState message={(error as Error).message} onRetry={refetch} />
             ) : (
-              <table className="w-full text-sm border-collapse">
-                <thead className="sticky top-0 bg-elev">
-                  <tr>
-                    <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3 py-1.5">
-                      {t('files.name', 'Name')}
-                    </th>
-                    <th className="text-right font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3 py-1.5">
-                      {t('files.size', 'Size')}
-                    </th>
-                    <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3 py-1.5 hidden md:table-cell">
-                      {t('files.mode', 'Perms')}
-                    </th>
-                    <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3 py-1.5 hidden lg:table-cell">
-                      {t('files.mtime', 'Modified')}
-                    </th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
+              // wrapperClassName cancels Table's own border/rounded/bg/scroll
+              // chrome — this table lives inside the pane's own scrollable,
+              // drag-and-drop div above, which already owns overflow-auto
+              // and must stay the nearest scrolling ancestor for the sticky
+              // header below to stick against.
+              <Table wrapperClassName="border-0 rounded-none bg-transparent overflow-visible">
+                <TableHeader className="sticky top-0 bg-elev">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>{t('files.name', 'Name')}</TableHead>
+                    <TableHead className="text-right">{t('files.size', 'Size')}</TableHead>
+                    <TableHead className="hidden md:table-cell">{t('files.mode', 'Perms')}</TableHead>
+                    <TableHead className="hidden lg:table-cell">{t('files.mtime', 'Modified')}</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {(data ?? []).map((entry) => (
-                    <tr
+                    <TableRow
                       key={entry.name}
-                      className={cn(
-                        'border-t cursor-pointer hover:bg-sunken/60',
-                        selected === entry.name && 'bg-sunken',
-                      )}
+                      className={cn('cursor-pointer', selected === entry.name && 'bg-sunken')}
                       onClick={() => setSelected(entry.name)}
                       onDoubleClick={() => enter(entry)}
                     >
-                      <td className="px-3 py-1.5">
+                      <TableCell>
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="font-mono text-fg-dim w-3 text-center shrink-0">
                             {entry.is_dir ? '▸' : '·'}
@@ -426,17 +421,17 @@ export default function FileBrowserPage() {
                             {entry.name}
                           </button>
                         </div>
-                      </td>
-                      <td className="px-3 py-1.5 text-right font-mono text-fg-dim text-2xs tabular-nums whitespace-nowrap">
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-fg-dim text-2xs tabular-nums whitespace-nowrap">
                         {entry.is_dir ? '—' : formatSize(entry.size)}
-                      </td>
-                      <td className="px-3 py-1.5 font-mono text-fg-dim text-2xs hidden md:table-cell">
+                      </TableCell>
+                      <TableCell className="font-mono text-fg-dim text-2xs hidden md:table-cell">
                         {formatMode(entry.mode)}
-                      </td>
-                      <td className="px-3 py-1.5 font-mono text-fg-dim text-2xs whitespace-nowrap hidden lg:table-cell">
+                      </TableCell>
+                      <TableCell className="font-mono text-fg-dim text-2xs whitespace-nowrap hidden lg:table-cell">
                         {new Date(entry.mtime * 1000).toLocaleString()}
-                      </td>
-                      <td className="px-3 py-1.5 text-right whitespace-nowrap">
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
                         {!entry.is_dir && (
                           <Button
                             variant="ghost"
@@ -463,11 +458,11 @@ export default function FileBrowserPage() {
                         >
                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             )}
           </div>
 

@@ -45,7 +45,9 @@ export default function HardeningTab() {
     onSuccess: (status, vars) => {
       // Write through so the UI reflects the new state without a refetch gap.
       qc.setQueryData(['sshaudit', 'fail2ban', vars.serverID], status)
-      toast('success', vars.enabled ? 'fail2ban enabled' : 'fail2ban disabled')
+      toast('success', vars.enabled
+        ? t('sshaudit.hardening.enabled_toast', 'fail2ban enabled')
+        : t('sshaudit.hardening.disabled_toast', 'fail2ban disabled'))
     },
     onError: (e: unknown) => toast('error', String((e as Error)?.message ?? e)),
   })
@@ -68,14 +70,15 @@ export default function HardeningTab() {
 
   return (
     <div className="space-y-4">
-      <div className="text-sm text-muted-foreground">
-        fail2ban watches the SSH auth log and temporarily bans source IPs after repeated failed
-        logins — defensive hardening for your managed hosts. Enable it to install, configure, and
-        start the jail; disable to stop it.
-      </div>
+      <p className="text-sm text-muted-foreground">
+        {t(
+          'sshaudit.hardening.description',
+          'fail2ban watches the SSH auth log and temporarily bans source IPs after repeated failed logins — defensive hardening for your managed hosts. Enable it to install, configure, and start the jail; disable to stop it.',
+        )}
+      </p>
 
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-sm text-muted-foreground">Server</span>
+        <span className="text-sm text-muted-foreground">{t('sshaudit.hardening.server_label', 'Server')}</span>
         <Select
           value={effectiveID ? String(effectiveID) : ''}
           onValueChange={(v) => {
@@ -86,7 +89,7 @@ export default function HardeningTab() {
           }}
         >
           <SelectTrigger className="h-8 w-72 text-sm">
-            <SelectValue placeholder="Pick a server" />
+            <SelectValue placeholder={t('sshaudit.hardening.server_placeholder', 'Pick a server')} />
           </SelectTrigger>
           <SelectContent>
             {servers.map((s: ServerRecord) => (
@@ -104,7 +107,7 @@ export default function HardeningTab() {
           onClick={() => statusQ.refetch()}
         >
           <RefreshCw className={`h-3.5 w-3.5 mr-1 ${statusQ.isFetching ? 'animate-spin' : ''}`} />
-          Refresh
+          {t('sshaudit.refresh', 'Refresh')}
         </Button>
       </div>
 
@@ -112,25 +115,26 @@ export default function HardeningTab() {
         <div className="border rounded-md p-6 text-center bg-elev">
           <div className="inline-flex items-center gap-2 text-sm font-medium">
             <Loader2 className="h-4 w-4 animate-spin" />
-            {toggle.variables?.enabled ? 'Installing fail2ban…' : 'Stopping fail2ban…'}
+            {toggle.variables?.enabled
+              ? t('sshaudit.hardening.installing', 'Installing fail2ban…')
+              : t('sshaudit.hardening.stopping', 'Stopping fail2ban…')}
           </div>
           <div className="text-xs text-muted-foreground mt-1">
-            This can take a moment while the agent runs on the host.
+            {t('sshaudit.hardening.busy_hint', 'This can take a moment while the agent runs on the host.')}
           </div>
         </div>
       ) : offline ? (
         <div className="border rounded-md p-6 text-center bg-elev">
-          <div className="text-sm font-medium">Host offline / no agent</div>
+          <div className="text-sm font-medium">{t('sshaudit.offline_title', 'Host offline / no agent')}</div>
           <div className="text-xs text-muted-foreground mt-1">
-            Couldn't reach the agent to read fail2ban status. Make sure the server is online and try
-            again.
+            {t('sshaudit.hardening.offline_desc', "Couldn't reach the agent to read fail2ban status. Make sure the server is online and try again.")}
           </div>
         </div>
       ) : err ? (
         <p className="text-sm text-err">{err.message}</p>
       ) : statusQ.isLoading ? (
         <div className="border rounded-md p-6 text-center text-muted-foreground text-sm">
-          Loading…
+          {t('common.loading', 'Loading…')}
         </div>
       ) : status ? (
         <StatusCard status={status} busy={busy} onToggle={onToggle} />
@@ -139,8 +143,8 @@ export default function HardeningTab() {
       <ConfirmDialog
         open={confirmEnable}
         onOpenChange={setConfirmEnable}
-        title={t('sshaudit.enable_fail2ban')}
-        description={t('sshaudit.enable_fail2ban_confirm')}
+        title={t('sshaudit.enable_fail2ban', 'Enable fail2ban')}
+        description={t('sshaudit.enable_fail2ban_confirm', 'Install, configure, and start the SSH brute-force jail on this host.')}
         destructive={false}
         onConfirm={() => toggle.mutate({ serverID: effectiveID!, enabled: true })}
       />
@@ -157,6 +161,7 @@ function StatusCard({
   busy: boolean
   onToggle: (next: boolean) => void
 }) {
+  const { t } = useTranslation()
   // Not installed → a clean call-to-action to enable. Installed → show the
   // running/stopped state, ban counts, and the banned-IP list.
   if (!status.installed) {
@@ -164,13 +169,13 @@ function StatusCard({
       <div className="border rounded-md p-6 text-center bg-elev space-y-3">
         <div className="inline-flex items-center gap-2 text-sm font-medium">
           <ShieldOff className="h-4 w-4 text-muted-foreground" />
-          fail2ban is not installed
+          {t('sshaudit.hardening.not_installed', 'fail2ban is not installed')}
         </div>
         <div className="text-xs text-muted-foreground">
-          Enable to install, configure, and start the SSH brute-force jail on this host.
+          {t('sshaudit.hardening.not_installed_hint', 'Enable to install, configure, and start the SSH brute-force jail on this host.')}
         </div>
         <Button size="sm" className="text-xs" disabled={busy} onClick={() => onToggle(true)}>
-          Enable fail2ban
+          {t('sshaudit.enable_fail2ban', 'Enable fail2ban')}
         </Button>
       </div>
     )
@@ -185,12 +190,14 @@ function StatusCard({
           ) : (
             <ShieldOff className="h-4 w-4 text-muted-foreground" />
           )}
-          <span className="text-sm font-medium">fail2ban</span>
-          <Pill kind={status.active ? 'ok' : 'neutral'}>{status.active ? 'active' : 'stopped'}</Pill>
+          <span className="text-sm font-medium">{t('sshaudit.hardening.fail2ban_label', 'fail2ban')}</span>
+          <Pill kind={status.active ? 'ok' : 'neutral'}>
+            {status.active ? t('sshaudit.hardening.active', 'active') : t('sshaudit.hardening.stopped', 'stopped')}
+          </Pill>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">
-            {status.active ? 'Enabled' : 'Disabled'}
+            {status.active ? t('sshaudit.hardening.enabled', 'Enabled') : t('sshaudit.hardening.disabled', 'Disabled')}
           </span>
           <Switch
             checked={status.active}
@@ -201,30 +208,32 @@ function StatusCard({
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-        <StatCard label="Currently banned" value={status.currently_banned} tone="warn" />
-        <StatCard label="Total banned" value={status.total_banned} />
-        <StatCard label="Banned IPs" value={status.banned_ips.length} />
+        <StatCard label={t('sshaudit.hardening.currently_banned', 'Currently banned')} value={status.currently_banned} tone="warn" />
+        <StatCard label={t('sshaudit.hardening.total_banned', 'Total banned')} value={status.total_banned} />
+        <StatCard label={t('sshaudit.hardening.banned_ips', 'Banned IPs')} value={status.banned_ips.length} />
       </div>
 
       {status.max_retry > 0 && status.find_time > 0 && status.ban_time > 0 ? (
         <div className="border rounded-md p-3">
-          <div className="text-muted-foreground text-2xs uppercase tracking-wide mb-1">
-            Ban policy
+          <div className="text-muted-foreground text-2xs uppercase tracking-[0.05em] mb-1">
+            {t('sshaudit.hardening.ban_policy', 'Ban policy')}
           </div>
           <div className="text-sm">
-            <span className="font-mono tabular-nums">{status.max_retry}</span> failed attempts within{' '}
-            <span className="font-mono tabular-nums">{humanSeconds(status.find_time)}</span> → ban for{' '}
+            <span className="font-mono tabular-nums">{status.max_retry}</span>{' '}
+            {t('sshaudit.hardening.ban_policy_within', 'failed attempts within')}{' '}
+            <span className="font-mono tabular-nums">{humanSeconds(status.find_time)}</span>{' '}
+            {t('sshaudit.hardening.ban_policy_arrow', '→ ban for')}{' '}
             <span className="font-mono tabular-nums">{humanSeconds(status.ban_time)}</span>
           </div>
         </div>
       ) : null}
 
       <div className="border rounded-md p-3">
-        <div className="text-muted-foreground text-2xs uppercase tracking-wide mb-2">
-          Banned IPs
+        <div className="text-muted-foreground text-2xs uppercase tracking-[0.05em] mb-2">
+          {t('sshaudit.hardening.banned_ips', 'Banned IPs')}
         </div>
         {status.banned_ips.length === 0 ? (
-          <div className="text-xs text-muted-foreground">No IPs are currently banned.</div>
+          <div className="text-xs text-muted-foreground">{t('sshaudit.hardening.banned_ips_empty', 'No IPs are currently banned.')}</div>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {status.banned_ips.map((ip) => (
@@ -252,7 +261,7 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone?:
   const toneClass = tone === 'warn' && value > 0 ? 'text-warn' : ''
   return (
     <div className="border rounded-md p-3">
-      <div className="text-muted-foreground text-2xs uppercase tracking-wide">{label}</div>
+      <div className="text-muted-foreground text-2xs uppercase tracking-[0.05em]">{label}</div>
       <div className={`text-title font-mono tabular-nums ${toneClass}`}>{value}</div>
     </div>
   )

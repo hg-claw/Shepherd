@@ -323,7 +323,97 @@
   },
   "sshaudit": {
     "enable_fail2ban": "启用 fail2ban",
-    "enable_fail2ban_confirm": "将在此主机上安装、配置并启动 SSH 暴力破解防护（fail2ban）。"
+    "enable_fail2ban_confirm": "将在此主机上安装、配置并启动 SSH 暴力破解防护（fail2ban）。",
+    "offline_title": "主机离线 / 无 agent",
+    "refresh": "刷新",
+    "empty": {
+      "hosts": "尚未注册任何服务器。",
+      "history": "暂无登录事件记录。",
+      "sessions": "当前没有活动的 SSH 会话。"
+    },
+    "hosts": {
+      "description_pre": "在某台服务器上启用 SSH 审计，然后选择 agent 采集登录历史的频率（最小 1 分钟）。使用",
+      "collect_now": "立即采集",
+      "description_mid": "可强制执行一次采集。实时会话与登录历史分别位于",
+      "sessions_tab_name": "会话",
+      "description_and": "和",
+      "history_tab_name": "登录历史",
+      "description_post": "标签页下。",
+      "collect_now_title": "强制立即执行一次采集",
+      "server": "服务器",
+      "enabled": "启用",
+      "interval": "间隔",
+      "last_collect": "最近采集",
+      "logins_24h": "24 小时登录",
+      "last_error": "最近错误",
+      "sessions_link": "会话 →",
+      "history_link": "历史 →",
+      "updated_toast": "已更新",
+      "collected_toast": "已采集（新增 {{n}} 条）",
+      "interval_options": {
+        "m1": "1 分钟",
+        "m5": "5 分钟",
+        "m15": "15 分钟",
+        "m30": "30 分钟"
+      }
+    },
+    "history": {
+      "server_label": "服务器",
+      "server_placeholder": "选择一个服务器",
+      "filter_options": {
+        "all": "全部",
+        "accepted": "成功",
+        "failed": "失败"
+      },
+      "accepted_label": "成功（{{h}} 小时）",
+      "failed_label": "失败（{{h}} 小时）",
+      "unique_source_ips": "唯一来源 IP",
+      "top_sources": "主要来源",
+      "top_failed_usernames": "主要失败用户名",
+      "time": "时间",
+      "result": "结果",
+      "username": "用户名",
+      "method": "方式",
+      "source_ip": "来源 IP",
+      "port": "端口",
+      "invalid_user_badge": "无效"
+    },
+    "sessions": {
+      "server_label": "服务器",
+      "server_placeholder": "选择一个服务器",
+      "as_of": "截至",
+      "offline_desc": "无法连接到 agent 读取实时会话。请确认服务器在线后重试。",
+      "user": "用户",
+      "source_ip": "来源 IP",
+      "tty": "TTY",
+      "login_at": "登录时间",
+      "pid": "PID"
+    },
+    "hardening": {
+      "description": "fail2ban 监控 SSH 认证日志，对多次登录失败的来源 IP 进行临时封禁——为受管主机提供额外防护。启用后将安装、配置并启动该防护；禁用则将其停止。",
+      "server_label": "服务器",
+      "server_placeholder": "选择一个服务器",
+      "installing": "正在安装 fail2ban…",
+      "stopping": "正在停止 fail2ban…",
+      "enabled_toast": "fail2ban 已启用",
+      "disabled_toast": "fail2ban 已禁用",
+      "busy_hint": "此操作可能需要一些时间，因为 agent 需要在主机上执行。",
+      "offline_desc": "无法连接到 agent 读取 fail2ban 状态。请确认服务器在线后重试。",
+      "not_installed": "尚未安装 fail2ban",
+      "not_installed_hint": "启用后将在此主机上安装、配置并启动 SSH 暴力破解防护。",
+      "fail2ban_label": "fail2ban",
+      "active": "运行中",
+      "stopped": "已停止",
+      "enabled": "已启用",
+      "disabled": "已禁用",
+      "currently_banned": "当前封禁",
+      "total_banned": "累计封禁",
+      "banned_ips": "已封禁 IP",
+      "banned_ips_empty": "当前没有被封禁的 IP。",
+      "ban_policy": "封禁策略",
+      "ban_policy_within": "次失败尝试，时间窗口为",
+      "ban_policy_arrow": "→ 封禁时长"
+    }
   },
   "singbox": {
     "delete_inbound": "删除入站",

@@ -304,7 +304,97 @@
   },
   "sshaudit": {
     "enable_fail2ban": "Enable fail2ban",
-    "enable_fail2ban_confirm": "Install, configure, and start the SSH brute-force jail on this host."
+    "enable_fail2ban_confirm": "Install, configure, and start the SSH brute-force jail on this host.",
+    "offline_title": "Host offline / no agent",
+    "refresh": "Refresh",
+    "empty": {
+      "hosts": "No servers registered yet.",
+      "history": "No login events recorded yet.",
+      "sessions": "No active SSH sessions."
+    },
+    "hosts": {
+      "description_pre": "Enable SSH auditing on a server, then pick how often the agent should collect login history (the minimum is 1 min). Use",
+      "collect_now": "Collect now",
+      "description_mid": "to force an immediate pull. Live sessions and the login history live under the",
+      "sessions_tab_name": "Sessions",
+      "description_and": "and",
+      "history_tab_name": "Login History",
+      "description_post": "tabs.",
+      "collect_now_title": "Force an immediate collection",
+      "server": "Server",
+      "enabled": "Enabled",
+      "interval": "Interval",
+      "last_collect": "Last collect",
+      "logins_24h": "24h logins",
+      "last_error": "Last error",
+      "sessions_link": "Sessions →",
+      "history_link": "History →",
+      "updated_toast": "Updated",
+      "collected_toast": "Collected ({{n}} new)",
+      "interval_options": {
+        "m1": "1 min",
+        "m5": "5 min",
+        "m15": "15 min",
+        "m30": "30 min"
+      }
+    },
+    "history": {
+      "server_label": "Server",
+      "server_placeholder": "Pick a server",
+      "filter_options": {
+        "all": "All",
+        "accepted": "Accepted",
+        "failed": "Failed"
+      },
+      "accepted_label": "Accepted ({{h}}h)",
+      "failed_label": "Failed ({{h}}h)",
+      "unique_source_ips": "Unique source IPs",
+      "top_sources": "Top sources",
+      "top_failed_usernames": "Top failed usernames",
+      "time": "Time",
+      "result": "Result",
+      "username": "Username",
+      "method": "Method",
+      "source_ip": "Source IP",
+      "port": "Port",
+      "invalid_user_badge": "invalid"
+    },
+    "sessions": {
+      "server_label": "Server",
+      "server_placeholder": "Pick a server",
+      "as_of": "as of",
+      "offline_desc": "Couldn't reach the agent to read live sessions. Make sure the server is online and try again.",
+      "user": "User",
+      "source_ip": "Source IP",
+      "tty": "TTY",
+      "login_at": "Login at",
+      "pid": "PID"
+    },
+    "hardening": {
+      "description": "fail2ban watches the SSH auth log and temporarily bans source IPs after repeated failed logins — defensive hardening for your managed hosts. Enable it to install, configure, and start the jail; disable to stop it.",
+      "server_label": "Server",
+      "server_placeholder": "Pick a server",
+      "installing": "Installing fail2ban…",
+      "stopping": "Stopping fail2ban…",
+      "enabled_toast": "fail2ban enabled",
+      "disabled_toast": "fail2ban disabled",
+      "busy_hint": "This can take a moment while the agent runs on the host.",
+      "offline_desc": "Couldn't reach the agent to read fail2ban status. Make sure the server is online and try again.",
+      "not_installed": "fail2ban is not installed",
+      "not_installed_hint": "Enable to install, configure, and start the SSH brute-force jail on this host.",
+      "fail2ban_label": "fail2ban",
+      "active": "active",
+      "stopped": "stopped",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "currently_banned": "Currently banned",
+      "total_banned": "Total banned",
+      "banned_ips": "Banned IPs",
+      "banned_ips_empty": "No IPs are currently banned.",
+      "ban_policy": "Ban policy",
+      "ban_policy_within": "failed attempts within",
+      "ban_policy_arrow": "→ ban for"
+    }
   },
   "singbox": {
     "delete_inbound": "Delete inbound",

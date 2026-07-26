@@ -318,7 +318,81 @@
   },
   "netquality": {
     "delete_target": "Delete target",
-    "delete_target_confirm": "Delete custom target \"{{name}}\"?"
+    "delete_target_confirm": "Delete custom target \"{{name}}\"?",
+    "isp": {
+      "telecom": "Telecom",
+      "unicom": "Unicom",
+      "mobile": "Mobile",
+      "overseas": "Overseas"
+    },
+    "empty": {
+      "hosts": "No servers registered yet.",
+      "targets": "No targets configured yet."
+    },
+    "hosts": {
+      "description_pre": "Enable the netquality probe on a server, then pick how often the agent should run the ping burst. Builtin targets are used; manage the catalog under the",
+      "description_targets_tab": "Targets",
+      "description_post": "tab.",
+      "server": "Server",
+      "enabled": "Enabled",
+      "interval": "Interval",
+      "last_error": "Last error",
+      "updated": "Updated",
+      "updated_toast": "Updated",
+      "pick_targets": "Targets",
+      "pick_targets_title": "Pick which targets this host samples",
+      "results_link": "Results →",
+      "interval_options": {
+        "m1": "1 min",
+        "m3": "3 min",
+        "m5": "5 min",
+        "m10": "10 min",
+        "m30": "30 min"
+      }
+    },
+    "targets": {
+      "description": "Toggle which destinations are sampled. Builtin entries can be disabled (history stays intact) but not deleted. Custom entries are scoped to your install.",
+      "region": "Region",
+      "label": "Label",
+      "host": "Host",
+      "source": "Source",
+      "enabled": "Enabled",
+      "add_toast": "Added",
+      "removed_toast": "Removed",
+      "region_placeholder": "Region (e.g. HK)",
+      "label_placeholder": "Label (e.g. My VPS)",
+      "host_placeholder": "Host or IP",
+      "add_custom": "Add custom"
+    },
+    "results": {
+      "server_label": "Server",
+      "server_placeholder": "Pick a server",
+      "empty_pre": "No samples yet. Enable the plugin on this server under",
+      "empty_hosts_tab": "Hosts",
+      "empty_post": ", then wait one sample interval.",
+      "region": "Region",
+      "target": "Target",
+      "rtt": "RTT",
+      "loss": "Loss",
+      "last_sample": "Last sample"
+    },
+    "host_targets": {
+      "title": "Targets for {{name}}",
+      "description": "Pick which targets this server should ping. Disabling a target here just opts THIS host out — the catalog stays unchanged.",
+      "clear_group": "click to clear group",
+      "partial_group": "partial — click to select all",
+      "select_all_group": "click to select all",
+      "selected_count": "{{count}} selected",
+      "saving": "Saving…",
+      "updated_toast": "Targets updated",
+      "empty": "No targets available yet."
+    },
+    "history": {
+      "avg_rtt": "Avg RTT",
+      "avg_loss": "Avg loss",
+      "empty": "No samples in this range yet.",
+      "resolution": "Resolution:"
+    }
   },
   "subgen": {
     "delete_subscription": "Delete subscription",

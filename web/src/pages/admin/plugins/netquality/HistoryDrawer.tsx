@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import {
   Area,
@@ -49,6 +50,7 @@ function fmtAxisTime(iso: string): string {
 }
 
 export default function HistoryDrawer({ open, onOpenChange, serverID, targetID, label }: Props) {
+  const { t } = useTranslation()
   const [range, setRange] = useState<TimeRange>('1h')
   const { resolution, ms } = rangeToParams(range)
 
@@ -88,66 +90,72 @@ export default function HistoryDrawer({ open, onOpenChange, serverID, targetID, 
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[560px] max-w-full overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="text-lg">{label}</SheetTitle>
+          <SheetTitle>{label}</SheetTitle>
         </SheetHeader>
 
-        <div className="mt-3 flex gap-1">
-          {(['1h', '24h', '7d', '30d'] as TimeRange[]).map((r) => (
-            <Button
-              key={r}
-              size="xs"
-              variant={r === range ? 'default' : 'outline'}
-              className="px-2.5 text-2xs"
-              onClick={() => setRange(r)}
-            >
-              {r}
-            </Button>
-          ))}
-        </div>
+        <div className="mt-4 space-y-4">
+          <div className="flex gap-1">
+            {(['1h', '24h', '7d', '30d'] as TimeRange[]).map((r) => (
+              <Button
+                key={r}
+                size="xs"
+                variant={r === range ? 'default' : 'outline'}
+                className="px-2.5 text-2xs"
+                onClick={() => setRange(r)}
+              >
+                {r}
+              </Button>
+            ))}
+          </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-          <div className="border rounded-md p-3">
-            <div className="text-muted-foreground text-2xs uppercase tracking-wide">Avg RTT</div>
-            <div className="text-lg font-mono tabular-nums">
-              {avgRTT != null ? `${avgRTT.toFixed(1)} ms` : '—'}
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="border rounded-md p-3">
+              <div className="text-muted-foreground text-2xs uppercase tracking-[0.05em]">
+                {t('netquality.history.avg_rtt', 'Avg RTT')}
+              </div>
+              <div className="text-lg font-mono tabular-nums">
+                {avgRTT != null ? `${avgRTT.toFixed(1)} ms` : '—'}
+              </div>
+            </div>
+            <div className="border rounded-md p-3">
+              <div className="text-muted-foreground text-2xs uppercase tracking-[0.05em]">
+                {t('netquality.history.avg_loss', 'Avg loss')}
+              </div>
+              <div className="text-lg font-mono tabular-nums">
+                {avgLoss != null ? `${avgLoss.toFixed(1)}%` : '—'}
+              </div>
             </div>
           </div>
-          <div className="border rounded-md p-3">
-            <div className="text-muted-foreground text-2xs uppercase tracking-wide">Avg loss</div>
-            <div className="text-lg font-mono tabular-nums">
-              {avgLoss != null ? `${avgLoss.toFixed(1)}%` : '—'}
-            </div>
+
+          <div className="h-64">
+            {points.length === 0 ? (
+              <div className="h-full grid place-items-center text-sm text-muted-foreground">
+                {t('netquality.history.empty', 'No samples in this range yet.')}
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData}>
+                  <XAxis dataKey="ts" tickFormatter={fmtAxisTime} tick={{ fontSize: 11 }} />
+                  <YAxis yAxisId="rtt" orientation="left" tick={{ fontSize: 11 }} />
+                  <YAxis yAxisId="loss" orientation="right" tick={{ fontSize: 11 }} unit="%" domain={[0, 100]} />
+                  <Tooltip
+                    labelFormatter={(v) => new Date(v as string).toLocaleString()}
+                    formatter={(value, key) => {
+                      if (key === 'rtt') return [`${(value as number)?.toFixed(1)} ms`, t('netquality.results.rtt', 'RTT')]
+                      if (key === 'loss') return [`${(value as number)?.toFixed(1)}%`, t('netquality.results.loss', 'Loss')]
+                      return [value, key]
+                    }}
+                  />
+                  <Area yAxisId="rtt" type="monotone" dataKey="rtt" stroke="hsl(var(--ok))" fill="hsl(var(--ok))" fillOpacity={0.2} />
+                  <Line yAxisId="loss" type="monotone" dataKey="loss" stroke="hsl(var(--err))" dot={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            )}
           </div>
-        </div>
 
-        <div className="mt-4 h-64">
-          {points.length === 0 ? (
-            <div className="h-full grid place-items-center text-sm text-muted-foreground">
-              No samples in this range yet.
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={chartData}>
-                <XAxis dataKey="ts" tickFormatter={fmtAxisTime} tick={{ fontSize: 11 }} />
-                <YAxis yAxisId="rtt" orientation="left" tick={{ fontSize: 11 }} />
-                <YAxis yAxisId="loss" orientation="right" tick={{ fontSize: 11 }} unit="%" domain={[0, 100]} />
-                <Tooltip
-                  labelFormatter={(v) => new Date(v as string).toLocaleString()}
-                  formatter={(value, key) => {
-                    if (key === 'rtt') return [`${(value as number)?.toFixed(1)} ms`, 'RTT']
-                    if (key === 'loss') return [`${(value as number)?.toFixed(1)}%`, 'Loss']
-                    return [value, key]
-                  }}
-                />
-                <Area yAxisId="rtt" type="monotone" dataKey="rtt" stroke="hsl(var(--ok))" fill="hsl(var(--ok))" fillOpacity={0.2} />
-                <Line yAxisId="loss" type="monotone" dataKey="loss" stroke="hsl(var(--err))" dot={false} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        <div className="mt-4 text-2xs text-muted-foreground">
-          Resolution: <span className="font-mono">{q.data?.resolution ?? resolution}</span>
+          <div className="text-2xs text-muted-foreground">
+            {t('netquality.history.resolution', 'Resolution:')} <span className="font-mono">{q.data?.resolution ?? resolution}</span>
+          </div>
         </div>
       </SheetContent>
     </Sheet>

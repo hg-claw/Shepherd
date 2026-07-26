@@ -337,7 +337,81 @@
   },
   "netquality": {
     "delete_target": "删除目标",
-    "delete_target_confirm": "确认删除自定义目标 \"{{name}}\"？"
+    "delete_target_confirm": "确认删除自定义目标 \"{{name}}\"？",
+    "isp": {
+      "telecom": "电信",
+      "unicom": "联通",
+      "mobile": "移动",
+      "overseas": "海外"
+    },
+    "empty": {
+      "hosts": "尚未注册任何服务器。",
+      "targets": "暂无目标配置。"
+    },
+    "hosts": {
+      "description_pre": "在服务器上启用 netquality 探测后，可选择 agent 运行 ping 探测的间隔。默认使用内置目标；如需管理目标列表，请前往",
+      "description_targets_tab": "目标",
+      "description_post": "标签页。",
+      "server": "服务器",
+      "enabled": "启用",
+      "interval": "间隔",
+      "last_error": "最近错误",
+      "updated": "更新时间",
+      "updated_toast": "已更新",
+      "pick_targets": "目标",
+      "pick_targets_title": "选择该主机采样的目标",
+      "results_link": "结果 →",
+      "interval_options": {
+        "m1": "1 分钟",
+        "m3": "3 分钟",
+        "m5": "5 分钟",
+        "m10": "10 分钟",
+        "m30": "30 分钟"
+      }
+    },
+    "targets": {
+      "description": "可开关采样的目标。内置条目可禁用（历史数据保留）但不能删除；自定义条目仅作用于本次安装。",
+      "region": "地区",
+      "label": "标签",
+      "host": "主机",
+      "source": "来源",
+      "enabled": "启用",
+      "add_toast": "已添加",
+      "removed_toast": "已移除",
+      "region_placeholder": "地区（如 HK）",
+      "label_placeholder": "标签（如 My VPS）",
+      "host_placeholder": "主机或 IP",
+      "add_custom": "添加自定义"
+    },
+    "results": {
+      "server_label": "服务器",
+      "server_placeholder": "选择一个服务器",
+      "empty_pre": "暂无采样数据。请先在",
+      "empty_hosts_tab": "主机",
+      "empty_post": "标签页启用探测，并等待一个采样周期。",
+      "region": "地区",
+      "target": "目标",
+      "rtt": "RTT",
+      "loss": "丢包率",
+      "last_sample": "最近采样"
+    },
+    "host_targets": {
+      "title": "{{name}} 的目标",
+      "description": "选择该服务器应探测的目标。在此禁用某个目标，只会让这台主机不再采样它——目标目录本身不受影响。",
+      "clear_group": "点击清空该分组",
+      "partial_group": "部分选中 —— 点击全选",
+      "select_all_group": "点击全选",
+      "selected_count": "已选择 {{count}} 项",
+      "saving": "保存中…",
+      "updated_toast": "目标已更新",
+      "empty": "暂无可用目标。"
+    },
+    "history": {
+      "avg_rtt": "平均 RTT",
+      "avg_loss": "平均丢包率",
+      "empty": "该时间范围内暂无采样数据。",
+      "resolution": "分辨率："
+    }
   },
   "subgen": {
     "delete_subscription": "删除订阅",

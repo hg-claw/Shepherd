@@ -57,6 +57,20 @@ func TestShadowrocket_SnellV5DowngradesToV4(t *testing.T) {
 	}
 }
 
+func TestShadowrocket_SnellV5WithObfsDowngradesToV4WithObfs(t *testing.T) {
+	n := Node{
+		Name: "hk1", Protocol: "snell", Server: "1.2.3.4", Port: 8443,
+		Password: "psk-abc",
+		Extra:    map[string]any{"snell_version": 5, "obfs_mode": "http", "obfs_host": "bing.com"},
+	}
+	line := (&ShadowRocketRenderer{}).proxyLine(n, "shadowrocket")
+	for _, want := range []string{"version=4", "obfs=http", "obfs-host=bing.com"} {
+		if !strings.Contains(line, want) {
+			t.Errorf("shadowrocket v5 obfs downgrade missing %q, got %q", want, line)
+		}
+	}
+}
+
 func TestShadowrocket_SnellV6Skipped(t *testing.T) {
 	n := Node{
 		Name: "hk1", Protocol: "snell", Server: "1.2.3.4", Port: 8443,

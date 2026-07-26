@@ -121,7 +121,10 @@ func (r *SurgeRenderer) proxyLine(n Node, target string) string {
 func snellVersionFor(n Node, target string) int {
 	v, _ := n.Extra["snell_version"].(int)
 	if v == 0 {
-		// Tolerate float64 from a JSON round-trip.
+		// Tolerate float64 from a JSON round-trip. Node.Extra is a free-form map
+		// that could be populated by future JSON-backed sources (e.g., custom nodes,
+		// template-supplied nodes), so this defensive assertion is kept despite the
+		// current Go code path always storing an int.
 		if f, ok := n.Extra["snell_version"].(float64); ok {
 			v = int(f)
 		}

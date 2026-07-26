@@ -224,7 +224,7 @@ func TestSurge_SnellV6HasNoObfs(t *testing.T) {
 	n := Node{
 		Name: "hk1", Protocol: "snell", Server: "1.2.3.4", Port: 8443,
 		Password: "psk-abc",
-		Extra:    map[string]any{"snell_version": 6},
+		Extra:    map[string]any{"snell_version": 6, "obfs_mode": "http", "obfs_host": "bing.com"},
 	}
 	line := (&SurgeRenderer{}).proxyLine(n, "surge")
 	if !strings.Contains(line, "version=6") {

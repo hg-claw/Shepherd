@@ -1,14 +1,17 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/table'
 import { useServers, type ServerRecord } from '@/api/servers'
 import { APIError } from '@/api/client'
 import { fetchSSHAuditSessions, type SSHSession } from '@/api/sshaudit'
 
 export default function SessionsTab() {
+  const { t } = useTranslation()
   const [sp, setSP] = useSearchParams()
   const initialID = Number(sp.get('server_id') || 0) || undefined
 
@@ -35,7 +38,7 @@ export default function SessionsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <span className="text-sm text-muted-foreground">Server</span>
+        <span className="text-sm text-muted-foreground">{t('sshaudit.sessions.server_label', 'Server')}</span>
         <Select
           value={effectiveID ? String(effectiveID) : ''}
           onValueChange={(v) => {
@@ -46,7 +49,7 @@ export default function SessionsTab() {
           }}
         >
           <SelectTrigger className="h-8 w-72 text-sm">
-            <SelectValue placeholder="Pick a server" />
+            <SelectValue placeholder={t('sshaudit.sessions.server_placeholder', 'Pick a server')} />
           </SelectTrigger>
           <SelectContent>
             {servers.map((s: ServerRecord) => (
@@ -59,71 +62,64 @@ export default function SessionsTab() {
         <Button
           variant="outline"
           size="sm"
-          className="h-8 text-xs"
+          className="text-xs"
           disabled={!effectiveID || sessionsQ.isFetching}
           onClick={() => sessionsQ.refetch()}
         >
           <RefreshCw className={`h-3.5 w-3.5 mr-1 ${sessionsQ.isFetching ? 'animate-spin' : ''}`} />
-          Refresh
+          {t('sshaudit.refresh', 'Refresh')}
         </Button>
         {sessionsQ.data?.collected_at && !offline && (
           <span className="text-2xs text-muted-foreground font-mono">
-            as of {new Date(sessionsQ.data.collected_at).toLocaleTimeString()}
+            {t('sshaudit.sessions.as_of', 'as of')} {new Date(sessionsQ.data.collected_at).toLocaleTimeString()}
           </span>
         )}
       </div>
 
       {offline ? (
         <div className="border rounded-md p-6 text-center bg-elev">
-          <div className="text-sm font-medium">Host offline / no agent</div>
+          <div className="text-sm font-medium">{t('sshaudit.offline_title', 'Host offline / no agent')}</div>
           <div className="text-xs text-muted-foreground mt-1">
-            Couldn't reach the agent to read live sessions. Make sure the server is online and try
-            again.
+            {t('sshaudit.sessions.offline_desc', "Couldn't reach the agent to read live sessions. Make sure the server is online and try again.")}
           </div>
         </div>
       ) : err ? (
         <p className="text-sm text-err">{err.message}</p>
       ) : (
-        <div className="border rounded-md overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-2xs text-muted-foreground uppercase tracking-wide">
-                <th className="text-left py-2 pl-3 pr-4 font-medium">User</th>
-                <th className="text-left py-2 pr-4 font-medium font-mono">Source IP</th>
-                <th className="text-left py-2 pr-4 font-medium">TTY</th>
-                <th className="text-left py-2 pr-4 font-medium">Login at</th>
-                <th className="text-left py-2 pr-3 font-medium">PID</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sessions.map((s, i) => (
-                <tr key={`${s.tty}-${s.pid ?? i}`} className="border-b last:border-0">
-                  <td className="py-2 pl-3 pr-4 font-medium">{s.user}</td>
-                  <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">{s.source_ip || '—'}</td>
-                  <td className="py-2 pr-4 font-mono text-xs">{s.tty || '—'}</td>
-                  <td className="py-2 pr-4 text-xs">
-                    {s.login_at ? new Date(s.login_at).toLocaleString() : '—'}
-                  </td>
-                  <td className="py-2 pr-3 font-mono text-xs text-muted-foreground">{s.pid ?? '—'}</td>
-                </tr>
-              ))}
-              {sessions.length === 0 && !sessionsQ.isLoading && (
-                <tr>
-                  <td colSpan={5} className="py-6 text-center text-muted-foreground text-sm">
-                    No active SSH sessions.
-                  </td>
-                </tr>
-              )}
-              {sessionsQ.isLoading && (
-                <tr>
-                  <td colSpan={5} className="py-6 text-center text-muted-foreground text-sm">
-                    Loading…
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>{t('sshaudit.sessions.user', 'User')}</TableHead>
+              <TableHead className="font-mono">{t('sshaudit.sessions.source_ip', 'Source IP')}</TableHead>
+              <TableHead>{t('sshaudit.sessions.tty', 'TTY')}</TableHead>
+              <TableHead>{t('sshaudit.sessions.login_at', 'Login at')}</TableHead>
+              <TableHead>{t('sshaudit.sessions.pid', 'PID')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sessions.map((s, i) => (
+              <TableRow key={`${s.tty}-${s.pid ?? i}`}>
+                <TableCell className="font-medium">{s.user}</TableCell>
+                <TableCell className="font-mono text-xs text-muted-foreground">{s.source_ip || '—'}</TableCell>
+                <TableCell className="font-mono text-xs">{s.tty || '—'}</TableCell>
+                <TableCell className="text-xs">
+                  {s.login_at ? new Date(s.login_at).toLocaleString() : '—'}
+                </TableCell>
+                <TableCell className="font-mono text-xs text-muted-foreground">{s.pid ?? '—'}</TableCell>
+              </TableRow>
+            ))}
+            {sessions.length === 0 && !sessionsQ.isLoading && (
+              <TableEmpty colSpan={5}>{t('sshaudit.empty.sessions', 'No active SSH sessions.')}</TableEmpty>
+            )}
+            {sessionsQ.isLoading && (
+              <TableRow>
+                <TableCell colSpan={5} className="py-6 text-center text-muted-foreground text-sm">
+                  {t('common.loading', 'Loading…')}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       )}
     </div>
   )

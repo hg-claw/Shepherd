@@ -1,9 +1,12 @@
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from '@/components/ui/table'
 
 interface Zone { id: string; name: string; status?: string; plan?: { name?: string } }
 
 export default function ZonesTab() {
+  const { t } = useTranslation()
   const q = useQuery({
     queryKey: ['cf-zones'],
     queryFn: () => api.get<Zone[]>('/api/admin/plugins/cloudflare/zones'),
@@ -11,33 +14,37 @@ export default function ZonesTab() {
   })
   const zones = q.data ?? []
   if (q.isError) {
-    return <div className="text-err text-sm">Failed to load zones: {(q.error as Error).message}</div>
+    return (
+      <div className="text-err text-sm">
+        {t('cloudflare.zones.load_error', 'Failed to load zones: {{message}}', {
+          message: (q.error as Error).message,
+        })}
+      </div>
+    )
   }
   return (
-    <div className="rounded-lg border bg-elev overflow-x-auto">
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="text-left">
-            <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Name</th>
-            <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Status</th>
-            <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">Plan</th>
-            <th className="px-3 py-2 text-2xs uppercase tracking-[0.05em] text-muted-foreground">ID</th>
-          </tr>
-        </thead>
-        <tbody>
-          {zones.map((z) => (
-            <tr key={z.id} className="border-t">
-              <td className="px-3 py-2 font-mono">{z.name}</td>
-              <td className="px-3 py-2 text-xs text-muted-foreground">{z.status ?? '—'}</td>
-              <td className="px-3 py-2 text-xs text-muted-foreground">{z.plan?.name ?? '—'}</td>
-              <td className="px-3 py-2 font-mono text-2xs text-fg-dim">{z.id}</td>
-            </tr>
-          ))}
-          {zones.length === 0 && (
-            <tr><td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">No zones.</td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+    <Table>
+      <TableHeader>
+        <TableRow className="hover:bg-transparent">
+          <TableHead>{t('cloudflare.zones.name', 'Name')}</TableHead>
+          <TableHead>{t('cloudflare.zones.status', 'Status')}</TableHead>
+          <TableHead>{t('cloudflare.zones.plan', 'Plan')}</TableHead>
+          <TableHead>{t('cloudflare.zones.id', 'ID')}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {zones.map((z) => (
+          <TableRow key={z.id}>
+            <TableCell className="font-mono">{z.name}</TableCell>
+            <TableCell className="text-xs text-muted-foreground">{z.status ?? '—'}</TableCell>
+            <TableCell className="text-xs text-muted-foreground">{z.plan?.name ?? '—'}</TableCell>
+            <TableCell className="font-mono text-2xs text-fg-dim">{z.id}</TableCell>
+          </TableRow>
+        ))}
+        {zones.length === 0 && (
+          <TableEmpty colSpan={4}>{t('cloudflare.empty.zones', 'No zones.')}</TableEmpty>
+        )}
+      </TableBody>
+    </Table>
   )
 }

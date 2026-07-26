@@ -2,18 +2,21 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-const Table = React.forwardRef<
-  HTMLTableElement,
-  React.HTMLAttributes<HTMLTableElement>
->(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto">
-    <table
-      ref={ref}
-      className={cn("w-full caption-bottom text-xs", className)}
-      {...props}
-    />
-  </div>
-))
+interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
+  wrapperClassName?: string
+}
+
+const Table = React.forwardRef<HTMLTableElement, TableProps>(
+  ({ className, wrapperClassName, ...props }, ref) => (
+    <div className={cn("w-full overflow-x-auto rounded-lg border bg-elev", wrapperClassName)}>
+      <table
+        ref={ref}
+        className={cn("w-full caption-bottom text-sm", className)}
+        {...props}
+      />
+    </div>
+  )
+)
 Table.displayName = "Table"
 
 const TableHeader = React.forwardRef<
@@ -73,7 +76,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-9 px-3 text-left align-middle font-medium text-2xs uppercase tracking-[0.05em] text-muted-foreground [&:has([role=checkbox])]:pr-0",
+      "px-3 py-2 text-left align-middle font-medium text-2xs uppercase tracking-[0.05em] text-muted-foreground [&:has([role=checkbox])]:pr-0",
       className
     )}
     {...props}
@@ -105,6 +108,16 @@ const TableCaption = React.forwardRef<
 ))
 TableCaption.displayName = "TableCaption"
 
+function TableEmpty({ colSpan, children }: { colSpan: number; children: React.ReactNode }) {
+  return (
+    <tr>
+      <td colSpan={colSpan} className="px-3 py-6 text-center text-sm text-muted-foreground">
+        {children}
+      </td>
+    </tr>
+  )
+}
+
 export {
   Table,
   TableHeader,
@@ -114,4 +127,5 @@ export {
   TableRow,
   TableCell,
   TableCaption,
+  TableEmpty,
 }

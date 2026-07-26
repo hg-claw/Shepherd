@@ -12,6 +12,7 @@ import { RunLogDialog } from '@/components/RunLogDialog'
 import { PageHeader } from '@/components/PageHeader'
 import { LoadingState } from '@/components/LoadingState'
 import { EmptyState } from '@/components/EmptyState'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
 function statusKind(s: string): PillKind {
@@ -111,99 +112,86 @@ export default function ScriptRunDetailPage() {
         {targets.length === 0 ? (
           <EmptyState title={t('scripts.no_targets', 'no target results yet')} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr>
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b">
-                    {t('admin.servers', 'Server')}
-                  </th>
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b">
-                    {t('scripts.status', 'Status')}
-                  </th>
-                  <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b hidden sm:table-cell">
-                    {t('scripts.exit_code', 'Exit')}
-                  </th>
-                  <th className="text-right font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-4 py-2 border-b">
-                    {t('admin.actions', 'Actions')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {targets.map((tgt) => {
-                  const name = serverName(tgt.server_id)
-                  const online = serverOnline(tgt.server_id)
-                  const st = tgt.status ?? 'pending'
-                  return (
-                    <tr
-                      key={tgt.id}
-                      className={cn(
-                        'border-t transition-colors',
-                        st === 'failed' ? 'hover:bg-err-soft/30' : 'hover:bg-sunken/60',
-                      )}
-                    >
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <OnlineDot online={online} />
-                          <span className="font-mono font-medium text-sm">{name}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <Pill kind={statusKind(st)}>{st}</Pill>
-                      </td>
-                      <td className="px-4 py-2.5 hidden sm:table-cell">
-                        <span
-                          className={cn(
-                            'font-mono text-xs tabular-nums',
-                            tgt.exit_code != null && tgt.exit_code !== 0 ? 'text-err' : 'text-fg-dim',
-                          )}
-                        >
-                          {tgt.exit_code ?? '—'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1">
-                          {st === 'running' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 px-2 text-xs gap-1"
-                              onClick={() => attach(tgt.server_id)}
-                            >
-                              <Terminal className="h-3 w-3" />
-                              {t('console.attach', 'Attach')}
-                            </Button>
-                          )}
-                          {/* Full execution log — available for every target
-                              with a recording, regardless of status. */}
-                          {tgt.pty_session_id && (
-                            <RunLogDialog
-                              ptySessionId={tgt.pty_session_id}
-                              running={st === 'running'}
-                              triggerClassName={cn(
-                                'inline-flex items-center gap-1 h-7 px-2 text-xs rounded-md hover:bg-sunken',
-                                st === 'failed' ? 'text-err' : 'text-muted-foreground',
-                              )}
-                              triggerLabel={t('scripts.view_log', 'View log')}
-                              title={`${t('scripts.execution_log', 'Execution log')} · ${name}`}
-                            />
-                          )}
-                          {tgt.pty_session_id && st !== 'running' && st !== 'failed' && (
-                            <Button size="sm" variant="ghost" asChild className="h-7 px-2 text-xs gap-1">
-                              <a href={`/admin/recordings/${tgt.pty_session_id}`}>
-                                <PlayCircle className="h-3 w-3" />
-                                {t('recording.replay', 'Replay')}
-                              </a>
-                            </Button>
-                          )}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <Table wrapperClassName="border-0 rounded-none bg-transparent">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>{t('admin.servers', 'Server')}</TableHead>
+                <TableHead>{t('scripts.status', 'Status')}</TableHead>
+                <TableHead className="hidden sm:table-cell">{t('scripts.exit_code', 'Exit')}</TableHead>
+                <TableHead className="text-right">{t('admin.actions', 'Actions')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {targets.map((tgt) => {
+                const name = serverName(tgt.server_id)
+                const online = serverOnline(tgt.server_id)
+                const st = tgt.status ?? 'pending'
+                return (
+                  <TableRow
+                    key={tgt.id}
+                    className={st === 'failed' ? 'hover:bg-err-soft/30' : undefined}
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <OnlineDot online={online} />
+                        <span className="font-mono font-medium text-sm">{name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Pill kind={statusKind(st)}>{st}</Pill>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <span
+                        className={cn(
+                          'font-mono text-xs tabular-nums',
+                          tgt.exit_code != null && tgt.exit_code !== 0 ? 'text-err' : 'text-fg-dim',
+                        )}
+                      >
+                        {tgt.exit_code ?? '—'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1">
+                        {st === 'running' && (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="gap-1"
+                            onClick={() => attach(tgt.server_id)}
+                          >
+                            <Terminal className="h-3 w-3" />
+                            {t('console.attach', 'Attach')}
+                          </Button>
+                        )}
+                        {/* Full execution log — available for every target
+                            with a recording, regardless of status. */}
+                        {tgt.pty_session_id && (
+                          <RunLogDialog
+                            ptySessionId={tgt.pty_session_id}
+                            running={st === 'running'}
+                            triggerClassName={cn(
+                              'inline-flex items-center gap-1 h-7 px-2 text-xs rounded-md hover:bg-sunken',
+                              st === 'failed' ? 'text-err' : 'text-muted-foreground',
+                            )}
+                            triggerLabel={t('scripts.view_log', 'View log')}
+                            title={`${t('scripts.execution_log', 'Execution log')} · ${name}`}
+                          />
+                        )}
+                        {tgt.pty_session_id && st !== 'running' && st !== 'failed' && (
+                          <Button size="xs" variant="ghost" asChild className="gap-1">
+                            <a href={`/admin/recordings/${tgt.pty_session_id}`}>
+                              <PlayCircle className="h-3 w-3" />
+                              {t('recording.replay', 'Replay')}
+                            </a>
+                          </Button>
+                        )}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
         )}
       </div>
     </div>

@@ -130,9 +130,9 @@ export default function ScriptEditPage({ mode }: Props) {
           </span>
           <span className="text-fg-dim font-mono text-2xs">{params.length} defined</span>
           <Button
-            size="sm"
+            size="xs"
             variant="outline"
-            className="ml-auto h-7 px-2 text-xs gap-1"
+            className="ml-auto gap-1"
             onClick={() => setParams([...params, { name: '', required: false, default: '' }])}
           >
             <Plus className="h-3 w-3" />

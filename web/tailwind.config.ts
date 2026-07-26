@@ -59,16 +59,16 @@ const config: Config = {
           alert: 'hsl(var(--level-alert))',
         },
         ok: {
-          DEFAULT: 'hsl(var(--ok))',
-          soft: 'hsl(var(--ok-soft))',
+          DEFAULT: 'hsl(var(--ok) / <alpha-value>)',
+          soft: 'hsl(var(--ok-soft) / <alpha-value>)',
         },
         warn: {
-          DEFAULT: 'hsl(var(--warn))',
-          soft: 'hsl(var(--warn-soft))',
+          DEFAULT: 'hsl(var(--warn) / <alpha-value>)',
+          soft: 'hsl(var(--warn-soft) / <alpha-value>)',
         },
         err: {
-          DEFAULT: 'hsl(var(--err))',
-          soft: 'hsl(var(--err-soft))',
+          DEFAULT: 'hsl(var(--err) / <alpha-value>)',
+          soft: 'hsl(var(--err-soft) / <alpha-value>)',
         },
         chart: {
           1: 'hsl(var(--chart-1))',

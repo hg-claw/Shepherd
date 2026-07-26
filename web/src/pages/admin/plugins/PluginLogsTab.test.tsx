@@ -39,14 +39,14 @@ describe('PluginLogsTab pause', () => {
     send('line-A')
     expect(screen.getByText('line-A')).toBeTruthy()
 
-    fireEvent.click(screen.getByText('Pause'))
+    fireEvent.click(screen.getByText('暂停'))
     expect(FakeWS.instances.length).toBe(1)
     expect(screen.getByText('line-A')).toBeTruthy()
     send('line-B')
     expect(screen.queryByText('line-B')).toBeNull()
     expect(screen.getByText('line-A')).toBeTruthy()
 
-    fireEvent.click(screen.getByText('Resume'))
+    fireEvent.click(screen.getByText('继续'))
     send('line-C')
     expect(screen.getByText('line-C')).toBeTruthy()
     expect(screen.getByText('line-A')).toBeTruthy()

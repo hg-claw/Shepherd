@@ -163,7 +163,7 @@ export default function Settings() {
 
           {tab !== 'about' && tab !== 'keys' && tab !== 'appearance' && tab !== 'traffic' && (
             <div className="flex items-center gap-2 pt-1">
-              <Button type="submit" size="sm" className="h-8 px-4">
+              <Button type="submit" size="sm" className="px-4">
                 {t('admin.save')}
               </Button>
             </div>

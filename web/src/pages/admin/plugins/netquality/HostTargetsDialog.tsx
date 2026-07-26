@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -18,14 +19,15 @@ interface Props {
   serverName: string
 }
 
-const ISP_LABEL: Record<NetqualityISP, string> = {
-  telecom: '电信',
-  unicom: '联通',
-  mobile: '移动',
-  overseas: '海外',
+const ISP_LABEL_FALLBACK: Record<NetqualityISP, string> = {
+  telecom: 'Telecom',
+  unicom: 'Unicom',
+  mobile: 'Mobile',
+  overseas: 'Overseas',
 }
 
 export default function HostTargetsDialog({ open, onOpenChange, serverID, serverName }: Props) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
 
@@ -57,7 +59,7 @@ export default function HostTargetsDialog({ open, onOpenChange, serverID, server
   const save = useMutation({
     mutationFn: () => updateHostTargets(serverID, Array.from(selected)),
     onSuccess: () => {
-      toast('success', 'Targets updated')
+      toast('success', t('netquality.host_targets.updated_toast', 'Targets updated'))
       qc.invalidateQueries({ queryKey: ['netquality', 'host-targets', serverID] })
       qc.invalidateQueries({ queryKey: ['netquality', 'latest', serverID] })
       onOpenChange(false)
@@ -92,18 +94,24 @@ export default function HostTargetsDialog({ open, onOpenChange, serverID, server
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-sm">
-            Targets for <span className="font-mono">{serverName}</span>
+            {t('netquality.host_targets.title', 'Targets for {{name}}', { name: serverName })}
           </DialogTitle>
         </DialogHeader>
 
-        {q.isLoading && <div className="py-6 text-sm text-muted-foreground">Loading…</div>}
+        {q.isLoading && <div className="py-6 text-sm text-muted-foreground">{t('common.loading', 'Loading…')}</div>}
 
         {!q.isLoading && (
           <div className="space-y-3">
             <div className="text-xs text-muted-foreground">
-              Pick which targets this server should ping. Disabling a target here just opts THIS
-              host out — the catalog stays unchanged.
+              {t('netquality.host_targets.description', 'Pick which targets this server should ping. Disabling a target here just opts THIS host out — the catalog stays unchanged.')}
             </div>
+
+            {(q.data ?? []).length === 0 && (
+              <div className="text-xs text-muted-foreground">
+                {t('netquality.host_targets.empty', 'No targets available yet.')}
+              </div>
+            )}
+
             {(['telecom', 'unicom', 'mobile', 'overseas'] as NetqualityISP[]).map((isp) => {
               const rows = grouped.get(isp) ?? []
               if (rows.length === 0) return null
@@ -116,11 +124,15 @@ export default function HostTargetsDialog({ open, onOpenChange, serverID, server
                     onClick={() => toggleGroup(isp)}
                   >
                     <span>
-                      {ISP_LABEL[isp]}{' '}
+                      {t(`netquality.isp.${isp}`, ISP_LABEL_FALLBACK[isp])}{' '}
                       <span className="text-muted-foreground">({rows.filter((r) => selected.has(r.target_id)).length}/{rows.length})</span>
                     </span>
                     <span className="text-2xs text-muted-foreground">
-                      {allSelected ? 'click to clear group' : someSelected ? 'partial — click to select all' : 'click to select all'}
+                      {allSelected
+                        ? t('netquality.host_targets.clear_group', 'click to clear group')
+                        : someSelected
+                          ? t('netquality.host_targets.partial_group', 'partial — click to select all')
+                          : t('netquality.host_targets.select_all_group', 'click to select all')}
                     </span>
                   </div>
                   <div className="divide-y">
@@ -145,14 +157,14 @@ export default function HostTargetsDialog({ open, onOpenChange, serverID, server
 
             <div className="flex items-center justify-between pt-2 border-t">
               <span className="text-xs text-muted-foreground">
-                {selected.size} selected
+                {t('netquality.host_targets.selected_count', '{{count}} selected', { count: selected.size })}
               </span>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button size="sm" disabled={save.isPending} onClick={() => save.mutate()}>
-                  {save.isPending ? 'Saving…' : 'Save'}
+                  {save.isPending ? t('netquality.host_targets.saving', 'Saving…') : t('admin.save', 'Save')}
                 </Button>
               </div>
             </div>

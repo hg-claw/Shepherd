@@ -27,6 +27,7 @@
     --border: 45 13% 89%;               /* #e7e6e1 */
     --input: 45 13% 89%;
     --ring: 217 89% 47%;
+    --glow-primary: 217 89% 47%;        /* button/Login glow — follows primary */
     --radius: 0.375rem;                 /* 6px to match design --radius */
     /* Surfaces for elevated/sunken slots not present in shadcn defaults. */
     --bg-elev: 0 0% 100%;
@@ -78,6 +79,7 @@
     --border: 240 6% 15%;               /* #232327 */
     --input: 240 6% 15%;
     --ring: 213 92% 67%;
+    --glow-primary: 213 92% 67%;
     --bg-elev: 240 5% 8%;
     --bg-sunken: 240 6% 10%;
     --border-strong: 240 6% 19%;

@@ -1,17 +1,19 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Pill, type PillKind } from '@/components/Pill'
 import { useServers, type ServerRecord } from '@/api/servers'
 import { fetchNetqualityLatest, type NetqualityISP, type NetqualityLatestRow } from '@/api/netquality'
 import HistoryDrawer from './HistoryDrawer'
 
-const ISP_LABEL: Record<NetqualityISP, string> = {
-  telecom: '电信',
-  unicom: '联通',
-  mobile: '移动',
-  overseas: '海外',
+const ISP_LABEL_FALLBACK: Record<NetqualityISP, string> = {
+  telecom: 'Telecom',
+  unicom: 'Unicom',
+  mobile: 'Mobile',
+  overseas: 'Overseas',
 }
 
 // Latency thresholds for the colour pill. Tunable per operator preference;
@@ -36,6 +38,7 @@ function fmtLoss(loss?: number) {
 }
 
 export default function ResultsTab() {
+  const { t } = useTranslation()
   const [sp, setSP] = useSearchParams()
   const initialID = Number(sp.get('server_id') || 0) || undefined
 
@@ -70,7 +73,7 @@ export default function ResultsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <span className="text-sm text-muted-foreground">Server</span>
+        <span className="text-sm text-muted-foreground">{t('netquality.results.server_label', 'Server')}</span>
         <Select
           value={effectiveID ? String(effectiveID) : ''}
           onValueChange={(v) => {
@@ -81,7 +84,7 @@ export default function ResultsTab() {
           }}
         >
           <SelectTrigger className="h-8 w-72 text-sm">
-            <SelectValue placeholder="Pick a server" />
+            <SelectValue placeholder={t('netquality.results.server_placeholder', 'Pick a server')} />
           </SelectTrigger>
           <SelectContent>
             {servers.map((s: ServerRecord) => (
@@ -91,13 +94,14 @@ export default function ResultsTab() {
             ))}
           </SelectContent>
         </Select>
-        {latestQ.isLoading && <span className="text-xs text-muted-foreground">loading…</span>}
+        {latestQ.isLoading && <span className="text-xs text-muted-foreground">{t('common.loading', 'Loading…')}</span>}
       </div>
 
       {(latestQ.data ?? []).length === 0 && !latestQ.isLoading && (
         <p className="text-sm text-muted-foreground">
-          No samples yet. Enable the plugin on this server under <em>Hosts</em>, then wait one
-          sample interval.
+          {t('netquality.results.empty_pre', 'No samples yet. Enable the plugin on this server under')}{' '}
+          <em>{t('netquality.results.empty_hosts_tab', 'Hosts')}</em>
+          {t('netquality.results.empty_post', ', then wait one sample interval.')}
         </p>
       )}
 
@@ -107,38 +111,38 @@ export default function ResultsTab() {
         return (
           <div key={isp} className="border rounded-md overflow-hidden">
             <div className="px-3 py-2 bg-elev border-b text-xs font-medium">
-              {ISP_LABEL[isp]}
+              {t(`netquality.isp.${isp}`, ISP_LABEL_FALLBACK[isp])}
             </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-2xs text-muted-foreground uppercase tracking-wide">
-                  <th className="text-left py-2 pl-3 pr-4 font-medium">Region</th>
-                  <th className="text-left py-2 pr-4 font-medium">Target</th>
-                  <th className="text-left py-2 pr-4 font-medium">RTT</th>
-                  <th className="text-left py-2 pr-4 font-medium">Loss</th>
-                  <th className="text-left py-2 pr-3 font-medium">Last sample</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table wrapperClassName="border-0 rounded-none bg-transparent">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>{t('netquality.results.region', 'Region')}</TableHead>
+                  <TableHead>{t('netquality.results.target', 'Target')}</TableHead>
+                  <TableHead>{t('netquality.results.rtt', 'RTT')}</TableHead>
+                  <TableHead>{t('netquality.results.loss', 'Loss')}</TableHead>
+                  <TableHead>{t('netquality.results.last_sample', 'Last sample')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {rows.map((r) => (
-                  <tr
+                  <TableRow
                     key={r.target_id}
-                    className="border-b last:border-0 hover:bg-sunken/60 cursor-pointer"
+                    className="cursor-pointer"
                     onClick={() => setDrillFor({ targetID: r.target_id, label: r.label })}
                   >
-                    <td className="py-2 pl-3 pr-4">{r.region}</td>
-                    <td className="py-2 pr-4">{r.label}</td>
-                    <td className="py-2 pr-4">
+                    <TableCell>{r.region}</TableCell>
+                    <TableCell>{r.label}</TableCell>
+                    <TableCell>
                       <Pill kind={rttKind(r.rtt_avg_ms, r.loss_pct)}>{fmtRTT(r.rtt_avg_ms)}</Pill>
-                    </td>
-                    <td className="py-2 pr-4">{fmtLoss(r.loss_pct)}</td>
-                    <td className="py-2 pr-3 font-mono text-2xs text-muted-foreground">
+                    </TableCell>
+                    <TableCell>{fmtLoss(r.loss_pct)}</TableCell>
+                    <TableCell className="font-mono text-2xs text-muted-foreground">
                       {r.ts ? new Date(r.ts).toLocaleTimeString() : '—'}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )
       })}

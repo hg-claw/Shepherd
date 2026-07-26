@@ -97,10 +97,10 @@ export default function ScriptRunPage() {
             {targets.length}/{allServers.length} selected
           </span>
           <div className="ml-auto flex items-center gap-1">
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={pickAll}>
+            <Button variant="ghost" size="xs" onClick={pickAll}>
               Select online
             </Button>
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={pickNone}>
+            <Button variant="ghost" size="xs" onClick={pickNone}>
               Clear
             </Button>
           </div>

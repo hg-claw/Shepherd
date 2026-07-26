@@ -22,6 +22,7 @@ import {
 import { openConsole } from '@/api/console'
 import { useServers } from '@/api/servers'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Pill } from '@/components/Pill'
 import { XtermPane } from '@/components/ConsoleDock/XtermPane'
 import {
@@ -30,8 +31,10 @@ import {
 import { PageHeader } from '@/components/PageHeader'
 import { LoadingState } from '@/components/LoadingState'
 import { ErrorState } from '@/components/ErrorState'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { useUI } from '@/store/ui'
 
 function formatMode(m: number): string {
   return (m & 0o777).toString(8).padStart(3, '0')
@@ -59,6 +62,7 @@ const QUICK_PATHS = ['/tmp', '/Users', '/home', '/var/log', '/etc/shepherd', '/o
 
 export default function FileBrowserPage() {
   const { t } = useTranslation()
+  const toast = useUI((s) => s.toast)
   const navigate = useNavigate()
   const { serverId } = useParams<{ serverId: string }>()
   const sid = serverId ? Number(serverId) : 0
@@ -119,10 +123,10 @@ export default function FileBrowserPage() {
     previewFile(sid, path)
       .then((r) => {
         setPreviewName(entry.name)
-        setPreviewText(r.binary ? '(binary file — use Download)' : r.text)
+        setPreviewText(r.binary ? t('files.binary_preview', '(binary file — use Download)') : r.text)
         setPreviewOpen(true)
       })
-      .catch((err) => alert(`preview failed: ${err}`))
+      .catch((err) => toast('error', t('files.preview_failed', { err: String(err) })))
   }
 
   const goUp = () => {
@@ -135,14 +139,28 @@ export default function FileBrowserPage() {
   const breadcrumbs = cwd.split('/').filter(Boolean)
   const goTo = (i: number) => setCwd('/' + breadcrumbs.slice(0, i + 1).join('/'))
 
+  const [mkdirOpen, setMkdirOpen] = useState(false)
+  const [mkdirName, setMkdirName] = useState('')
+
+  const closeMkdir = () => {
+    setMkdirOpen(false)
+    setMkdirName('')
+  }
+
   const handleMkdir = async () => {
-    const name = prompt('Folder name:')
+    if (mkdir.isPending) return
+    const name = mkdirName.trim()
     if (!name) return
-    await mkdir.mutateAsync({
-      server_id: sid,
-      path: cwd === '/' ? `/${name}` : `${cwd}/${name}`,
-      mode: 0o755,
-    })
+    try {
+      await mkdir.mutateAsync({
+        server_id: sid,
+        path: cwd === '/' ? `/${name}` : `${cwd}/${name}`,
+        mode: 0o755,
+      })
+      closeMkdir()
+    } catch (err) {
+      toast('error', t('files.mkdir_failed', { err: String(err) }))
+    }
   }
 
   const handleRm = (entry: FileEntry) => {
@@ -263,9 +281,9 @@ export default function FileBrowserPage() {
           <div className="flex items-center gap-2 px-3 py-2 border-b">
             <Button
               variant="ghost"
-              size="sm"
+              size="xs"
               onClick={goUp}
-              className="h-7 w-7 p-0"
+              className="w-7 p-0"
               aria-label="up"
               disabled={cwd === '/'}
             >
@@ -302,8 +320,7 @@ export default function FileBrowserPage() {
             />
             <Button
               variant="outline"
-              size="sm"
-              className="h-7 px-2 text-xs"
+              size="xs"
               onClick={() => fileInputRef.current?.click()}
             >
               <UploadIcon className="h-3.5 w-3.5 mr-1" />
@@ -311,9 +328,8 @@ export default function FileBrowserPage() {
             </Button>
             <Button
               variant="outline"
-              size="sm"
-              className="h-7 px-2 text-xs"
-              onClick={handleMkdir}
+              size="xs"
+              onClick={() => setMkdirOpen(true)}
             >
               <Plus className="h-3.5 w-3.5" />
             </Button>
@@ -362,36 +378,30 @@ export default function FileBrowserPage() {
             ) : error ? (
               <ErrorState message={(error as Error).message} onRetry={refetch} />
             ) : (
-              <table className="w-full text-sm border-collapse">
-                <thead className="sticky top-0 bg-elev">
-                  <tr>
-                    <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3 py-1.5">
-                      {t('files.name', 'Name')}
-                    </th>
-                    <th className="text-right font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3 py-1.5">
-                      {t('files.size', 'Size')}
-                    </th>
-                    <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3 py-1.5 hidden md:table-cell">
-                      {t('files.mode', 'Perms')}
-                    </th>
-                    <th className="text-left font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3 py-1.5 hidden lg:table-cell">
-                      {t('files.mtime', 'Modified')}
-                    </th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
+              // wrapperClassName cancels Table's own border/rounded/bg/scroll
+              // chrome — this table lives inside the pane's own scrollable,
+              // drag-and-drop div above, which already owns overflow-auto
+              // and must stay the nearest scrolling ancestor for the sticky
+              // header below to stick against.
+              <Table wrapperClassName="border-0 rounded-none bg-transparent overflow-visible">
+                <TableHeader className="sticky top-0 bg-elev">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>{t('files.name', 'Name')}</TableHead>
+                    <TableHead className="text-right">{t('files.size', 'Size')}</TableHead>
+                    <TableHead className="hidden md:table-cell">{t('files.mode', 'Perms')}</TableHead>
+                    <TableHead className="hidden lg:table-cell">{t('files.mtime', 'Modified')}</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {(data ?? []).map((entry) => (
-                    <tr
+                    <TableRow
                       key={entry.name}
-                      className={cn(
-                        'border-t cursor-pointer hover:bg-sunken/60',
-                        selected === entry.name && 'bg-sunken',
-                      )}
+                      className={cn('cursor-pointer', selected === entry.name && 'bg-sunken')}
                       onClick={() => setSelected(entry.name)}
                       onDoubleClick={() => enter(entry)}
                     >
-                      <td className="px-3 py-1.5">
+                      <TableCell>
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="font-mono text-fg-dim w-3 text-center shrink-0">
                             {entry.is_dir ? '▸' : '·'}
@@ -411,22 +421,22 @@ export default function FileBrowserPage() {
                             {entry.name}
                           </button>
                         </div>
-                      </td>
-                      <td className="px-3 py-1.5 text-right font-mono text-fg-dim text-2xs tabular-nums whitespace-nowrap">
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-fg-dim text-2xs tabular-nums whitespace-nowrap">
                         {entry.is_dir ? '—' : formatSize(entry.size)}
-                      </td>
-                      <td className="px-3 py-1.5 font-mono text-fg-dim text-2xs hidden md:table-cell">
+                      </TableCell>
+                      <TableCell className="font-mono text-fg-dim text-2xs hidden md:table-cell">
                         {formatMode(entry.mode)}
-                      </td>
-                      <td className="px-3 py-1.5 font-mono text-fg-dim text-2xs whitespace-nowrap hidden lg:table-cell">
+                      </TableCell>
+                      <TableCell className="font-mono text-fg-dim text-2xs whitespace-nowrap hidden lg:table-cell">
                         {new Date(entry.mtime * 1000).toLocaleString()}
-                      </td>
-                      <td className="px-3 py-1.5 text-right whitespace-nowrap">
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
                         {!entry.is_dir && (
                           <Button
                             variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
+                            size="xs"
+                            className="w-7 p-0"
                             aria-label="download"
                             onClick={(e) => {
                               e.stopPropagation()
@@ -438,8 +448,8 @@ export default function FileBrowserPage() {
                         )}
                         <Button
                           variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
+                          size="xs"
+                          className="w-7 p-0"
                           aria-label="delete"
                           onClick={(e) => {
                             e.stopPropagation()
@@ -448,11 +458,11 @@ export default function FileBrowserPage() {
                         >
                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             )}
           </div>
 
@@ -550,8 +560,8 @@ export default function FileBrowserPage() {
               {tr.status === 'active' && tr.cancel && (
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-2xs"
+                  size="xs"
+                  className="text-2xs"
                   onClick={() => tr.cancel?.()}
                 >
                   {t('common.cancel', 'cancel')}
@@ -563,13 +573,29 @@ export default function FileBrowserPage() {
       </div>
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-4xl w-[calc(100vw-2rem)]">
+        <DialogContent className="max-w-2xl w-[calc(100vw-2rem)]">
           <DialogHeader>
             <DialogTitle className="break-all font-mono">{previewName}</DialogTitle>
           </DialogHeader>
-          <pre className="font-mono text-xs whitespace-pre-wrap overflow-auto max-h-[60vh] bg-sunken p-3 rounded">
+          <pre className="font-mono text-xs whitespace-pre-wrap overflow-auto max-h-[80vh] bg-sunken p-3 rounded">
             {previewText}
           </pre>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={mkdirOpen} onOpenChange={(open) => (open ? setMkdirOpen(true) : closeMkdir())}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>{t('files.new_folder')}</DialogTitle></DialogHeader>
+          <Input
+            value={mkdirName}
+            onChange={(e) => setMkdirName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleMkdir() }}
+            placeholder={t('files.folder_name')}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={closeMkdir}>{t('common.cancel')}</Button>
+            <Button size="sm" onClick={handleMkdir} disabled={!mkdirName.trim() || mkdir.isPending}>{t('common.create')}</Button>
+          </div>
         </DialogContent>
       </Dialog>
       <ConfirmDialog

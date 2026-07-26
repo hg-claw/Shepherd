@@ -8,6 +8,7 @@ import { SortableTh } from '@/components/SortableTh'
 import { useUI } from '@/store/ui'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Pill, type PillKind } from '@/components/Pill'
 import { StatCard } from '@/components/StatCard'
 import { OnlineDot } from '@/components/OnlineDot'
@@ -282,7 +283,7 @@ export default function ServerList() {
                   { value: 'table' as const, icon: Rows3, label: t('view.table', 'Table') },
                 ]}
               />
-              <Button asChild size="sm" className="h-8">
+              <Button asChild size="sm">
                 <Link to="/admin/servers/new">
                   <Plus className="mr-1 h-3.5 w-3.5" />
                   {t('admin.add_server', 'Add server')}
@@ -357,11 +358,11 @@ export default function ServerList() {
             {t('server.selected_count', '{{n}} selected', { n: selected.size })}
           </span>
           <Button
-            size="sm"
+            size="xs"
             variant="outline"
             disabled={batchUpdate.isPending}
             onClick={handleBatchUpdate}
-            className="h-7 text-sm"
+            className="text-sm"
           >
             <ArrowUpCircle className="h-3.5 w-3.5 mr-1" />
             {batchUpdate.isPending
@@ -415,120 +416,116 @@ export default function ServerList() {
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border bg-elev overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="text-left">
-                <Th className="w-8">
-                  <input
-                    type="checkbox"
-                    aria-label={t('server.select_all', 'Select all')}
-                    checked={servers.length > 0 && selected.size === servers.length}
-                    onChange={toggleSelectAll}
-                    className="h-3.5 w-3.5 cursor-pointer"
-                  />
-                </Th>
-                <SortableTh
-                  label={t('admin.name', 'Name')}
-                  sortKey="name"
-                  sort={serverSort}
-                  onToggle={serverToggle}
-                  className="font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0 text-left"
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-8">
+                <input
+                  type="checkbox"
+                  aria-label={t('server.select_all', 'Select all')}
+                  checked={servers.length > 0 && selected.size === servers.length}
+                  onChange={toggleSelectAll}
+                  className="h-3.5 w-3.5 cursor-pointer"
                 />
-                <Th className="hidden md:table-cell">{t('admin.host', 'Host')}</Th>
-                <Th className="hidden lg:table-cell">OS</Th>
-                <Th className="hidden md:table-cell">Stage</Th>
-                <Th className="hidden lg:table-cell">{t('admin.agent_last_seen', 'Last seen')}</Th>
-                <SortableTh
-                  label="CPU"
-                  sortKey="cpu"
-                  sort={serverSort}
-                  onToggle={serverToggle}
-                  className="font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0 text-left"
-                />
-                <SortableTh
-                  label="MEM"
-                  sortKey="mem"
-                  sort={serverSort}
-                  onToggle={serverToggle}
-                  className="hidden sm:table-cell font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0 text-left"
-                />
-                <Th className="text-right">{t('admin.actions', 'Actions')}</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {servers.map((s) => {
-                const online = isOnline(s)
-                const lastSeen = relativeTime(s.agent_last_seen?.Valid ? s.agent_last_seen.Time : null)
-                const memPct = pct(s.latest?.mem_used, s.latest?.mem_total)
-                const stage = hostStage(s)
-                return (
-                  <tr
-                    key={s.id}
-                    className="border-t hover:bg-sunken/60 cursor-pointer"
-                    onClick={() => navigate(`/admin/servers/${s.id}`)}
-                  >
-                    <Td onClick={(e) => { e.stopPropagation(); toggleSelect(s.id) }}>
-                      <input
-                        type="checkbox"
-                        aria-label={t('server.select', 'Select {{name}}', { name: s.name })}
-                        checked={selected.has(s.id)}
-                        onChange={() => toggleSelect(s.id)}
+              </TableHead>
+              <SortableTh
+                label={t('admin.name', 'Name')}
+                sortKey="name"
+                sort={serverSort}
+                onToggle={serverToggle}
+              />
+              <TableHead className="hidden md:table-cell">{t('admin.host', 'Host')}</TableHead>
+              <TableHead className="hidden lg:table-cell">OS</TableHead>
+              <TableHead className="hidden md:table-cell">Stage</TableHead>
+              <TableHead className="hidden lg:table-cell">{t('admin.agent_last_seen', 'Last seen')}</TableHead>
+              <SortableTh
+                label="CPU"
+                sortKey="cpu"
+                sort={serverSort}
+                onToggle={serverToggle}
+              />
+              <SortableTh
+                label="MEM"
+                sortKey="mem"
+                sort={serverSort}
+                onToggle={serverToggle}
+                className="hidden sm:table-cell"
+              />
+              <TableHead className="text-right">{t('admin.actions', 'Actions')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {servers.map((s) => {
+              const online = isOnline(s)
+              const lastSeen = relativeTime(s.agent_last_seen?.Valid ? s.agent_last_seen.Time : null)
+              const memPct = pct(s.latest?.mem_used, s.latest?.mem_total)
+              const stage = hostStage(s)
+              return (
+                <TableRow
+                  key={s.id}
+                  className="cursor-pointer"
+                  onClick={() => navigate(`/admin/servers/${s.id}`)}
+                >
+                  <TableCell onClick={(e) => { e.stopPropagation(); toggleSelect(s.id) }}>
+                    <input
+                      type="checkbox"
+                      aria-label={t('server.select', 'Select {{name}}', { name: s.name })}
+                      checked={selected.has(s.id)}
+                      onChange={() => toggleSelect(s.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-3.5 w-3.5 cursor-pointer"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <OnlineDot online={online} />
+                      <Link
+                        to={`/admin/servers/${s.id}`}
+                        className="font-mono font-medium truncate hover:underline"
                         onClick={(e) => e.stopPropagation()}
-                        className="h-3.5 w-3.5 cursor-pointer"
-                      />
-                    </Td>
-                    <Td>
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <OnlineDot online={online} />
-                        <Link
-                          to={`/admin/servers/${s.id}`}
-                          className="font-mono font-medium truncate hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {s.name}
-                        </Link>
-                        {s.country_code?.String && (
-                          <CountryFlag code={s.country_code.String} />
-                        )}
-                      </div>
-                    </Td>
-                    <Td className="hidden md:table-cell font-mono text-xs text-muted-foreground">
-                      {s.ssh_host?.String ?? '—'}
-                    </Td>
-                    <Td className="hidden lg:table-cell font-mono text-xs text-fg-dim">
-                      {[s.agent_os?.String, s.agent_arch?.String].filter(Boolean).join('/') || '—'}
-                    </Td>
-                    <Td className="hidden md:table-cell">
-                      {(() => {
-                        const st = hostStage(s)
-                        return (
-                          <Pill kind={hostStageKind(st)}>
-                            {t(`host_stage.${st}`, st)}
-                          </Pill>
-                        )
-                      })()}
-                    </Td>
-                    <Td className="hidden lg:table-cell text-xs text-muted-foreground font-mono tabular-nums">
-                      {lastSeen ? t(lastSeen.key, { n: lastSeen.n, lng: i18n.language }) : '—'}
-                    </Td>
-                    <Td><Bar value={s.latest?.cpu_pct} /></Td>
-                    <Td className="hidden sm:table-cell"><Bar value={memPct} /></Td>
-                    <Td className="text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      {(stage === 'install-failed' || stage === 'not-installed') && (
-                        <ReinstallButton server={s} t={t} />
+                      >
+                        {s.name}
+                      </Link>
+                      {s.country_code?.String && (
+                        <CountryFlag code={s.country_code.String} />
                       )}
-                      <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-sm">
-                        <Link to={`/admin/servers/${s.id}`}>{t('admin.details', 'Details')}</Link>
-                      </Button>
-                      <DeleteButton server={s} onDelete={() => handleDelete(s)} t={t} />
-                    </Td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell font-mono text-xs text-muted-foreground">
+                    {s.ssh_host?.String ?? '—'}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell font-mono text-xs text-fg-dim">
+                    {[s.agent_os?.String, s.agent_arch?.String].filter(Boolean).join('/') || '—'}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {(() => {
+                      const st = hostStage(s)
+                      return (
+                        <Pill kind={hostStageKind(st)}>
+                          {t(`host_stage.${st}`, st)}
+                        </Pill>
+                      )
+                    })()}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground font-mono tabular-nums">
+                    {lastSeen ? t(lastSeen.key, { n: lastSeen.n, lng: i18n.language }) : '—'}
+                  </TableCell>
+                  <TableCell><Bar value={s.latest?.cpu_pct} /></TableCell>
+                  <TableCell className="hidden sm:table-cell"><Bar value={memPct} /></TableCell>
+                  <TableCell className="text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                    {(stage === 'install-failed' || stage === 'not-installed') && (
+                      <ReinstallButton server={s} t={t} />
+                    )}
+                    <Button asChild variant="ghost" size="xs" className="text-sm">
+                      <Link to={`/admin/servers/${s.id}`}>{t('admin.details', 'Details')}</Link>
+                    </Button>
+                    <DeleteButton server={s} onDelete={() => handleDelete(s)} t={t} />
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
       )}
     </div>
   )
@@ -578,7 +575,7 @@ function ReinstallButton({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-sm">
+        <Button variant="ghost" size="xs" className="text-sm">
           {t('server.reinstall', 'Reinstall')}
         </Button>
       </DialogTrigger>
@@ -650,7 +647,7 @@ function DeleteButton({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" aria-label={t('admin.delete', 'Delete')} className="h-7 w-7 p-0">
+        <Button variant="ghost" size="xs" aria-label={t('admin.delete', 'Delete')} className="w-7 p-0">
           <Trash2 className="h-3.5 w-3.5 text-destructive" />
         </Button>
       </DialogTrigger>
@@ -719,13 +716,13 @@ function HostCard({
         <Stat label="TCP" v={online ? tcp.toLocaleString() : '—'} />
       </div>
       <div className="flex items-center gap-1 mt-3 pt-2.5 border-t border-dashed">
-        <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-xs">
+        <Button asChild variant="ghost" size="xs">
           <Link to={`/admin/servers/${server.id}`}>{t('admin.details', 'Details')}</Link>
         </Button>
         <div className="ml-auto" onClick={(e) => e.stopPropagation()}>
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" aria-label={t('admin.delete', 'Delete')}>
+              <Button variant="ghost" size="xs" className="w-7 p-0" aria-label={t('admin.delete', 'Delete')}>
                 <Trash2 className="h-3.5 w-3.5 text-destructive" />
               </Button>
             </DialogTrigger>
@@ -756,21 +753,4 @@ function Stat({ label, v }: { label: string; v: string }) {
       <div className="font-mono font-medium text-sm tabular-nums mt-0.5">{v}</div>
     </div>
   )
-}
-
-function Th({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <th
-      className={cn(
-        'font-medium text-muted-foreground text-2xs uppercase tracking-[0.05em] px-3.5 py-2 bg-elev sticky top-0 text-left',
-        className,
-      )}
-    >
-      {children}
-    </th>
-  )
-}
-
-function Td({ children, className, onClick }: { children: React.ReactNode; className?: string; onClick?: React.MouseEventHandler<HTMLTableCellElement> }) {
-  return <td className={cn('px-3.5 py-2.5 align-middle', className)} onClick={onClick}>{children}</td>
 }

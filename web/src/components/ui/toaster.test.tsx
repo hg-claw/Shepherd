@@ -21,4 +21,13 @@ describe('Toaster (useUI source)', () => {
     expect(screen.queryByText('alpha')).toBeNull()
     expect(screen.queryByText('bravo')).toBeNull()
   })
+
+  it('success and info toasts are visually distinct', () => {
+    useUI.getState().toast('success', 'saved')
+    useUI.getState().toast('info', 'heads up')
+    render(<Toaster />)
+    const success = screen.getByText('saved').closest('li')!
+    const info = screen.getByText('heads up').closest('li')!
+    expect(success.className).not.toEqual(info.className)
+  })
 })

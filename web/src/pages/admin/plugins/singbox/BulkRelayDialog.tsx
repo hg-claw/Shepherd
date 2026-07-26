@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -186,6 +187,7 @@ function buildRelayBody(
 }
 
 export default function BulkRelayDialog({ open, onOpenChange, landingInbound, allInbounds }: Props) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
   const serversQ = useServers()
@@ -289,10 +291,10 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
         try {
           await createSingboxInbound(buildRelayBody(refresh, landingInbound, mode))
           ok++
-          toast('success', `Deployed relay on ${d.serverName}`)
+          toast('success', t('singbox.bulk_relay_dialog.deployed_toast', 'Deployed relay on {{server}}', { server: d.serverName }))
         } catch (e: any) {
           fail++
-          toast('error', `${d.serverName}: ${String(e?.message ?? e)}`)
+          toast('error', t('singbox.bulk_relay_dialog.error_toast', '{{server}}: {{message}}', { server: d.serverName, message: String(e?.message ?? e) }))
         }
       }
       return { ok, fail }
@@ -302,7 +304,7 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
       qc.invalidateQueries({ queryKey: ['plugin-hosts', 'singbox'] })
     },
     onSuccess: ({ ok, fail }) => {
-      toast(fail === 0 ? 'success' : 'info', `Bulk relay: ${ok} ok, ${fail} failed`)
+      toast(fail === 0 ? 'success' : 'info', t('singbox.bulk_relay_dialog.summary_toast', 'Bulk relay: {{ok}} ok, {{fail}} failed', { ok, fail }))
       if (fail === 0) onOpenChange(false)
     },
   })
@@ -312,46 +314,44 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="font-mono">
-            Add relays → {landingInbound.tag} @ {landingInbound.server_name}
+            {t('singbox.bulk_relay_dialog.title', 'Add relays → {{tag}} @ {{server}}', { tag: landingInbound.tag, server: landingInbound.server_name })}
           </DialogTitle>
           <p className="text-xs text-muted-foreground font-mono">{proto}</p>
         </DialogHeader>
 
         <div className="space-y-3">
           <div>
-            <Label className="text-xs">Mode</Label>
+            <Label className="text-xs">{t('singbox.bulk_relay_dialog.mode_label', 'Mode')}</Label>
             <div className="mt-1 flex gap-1 text-xs">
               <Button
                 type="button"
-                size="sm"
+                size="xs"
                 variant={mode === 'forward' ? 'default' : 'outline'}
-                className="h-7"
                 onClick={() => setMode('forward')}
               >
-                Forward (transparent NAT)
+                {t('singbox.bulk_relay_dialog.mode_forward', 'Forward (transparent NAT)')}
               </Button>
               <Button
                 type="button"
-                size="sm"
+                size="xs"
                 variant={mode === 'proxy' ? 'default' : 'outline'}
-                className="h-7"
                 onClick={() => setMode('proxy')}
               >
-                Proxy (per-relay keys)
+                {t('singbox.bulk_relay_dialog.mode_proxy', 'Proxy (per-relay keys)')}
               </Button>
             </div>
             <p className="mt-1 text-2xs text-muted-foreground">
               {mode === 'forward'
-                ? 'Relay just NATs traffic to the landing. Client uses the landing’s URL with the relay’s IP:port. No per-relay keys, no double encryption — cheaper and the same URL works for every IP.'
-                : 'Relay terminates the protocol with its own keys and re-encapsulates to the landing. Each relay gets a unique share URL. Use this when you specifically want per-relay credentials for revocation.'}
+                ? t('singbox.bulk_relay_dialog.mode_forward_desc', 'Relay just NATs traffic to the landing. Client uses the landing’s URL with the relay’s IP:port. No per-relay keys, no double encryption — cheaper and the same URL works for every IP.')
+                : t('singbox.bulk_relay_dialog.mode_proxy_desc', 'Relay terminates the protocol with its own keys and re-encapsulates to the landing. Each relay gets a unique share URL. Use this when you specifically want per-relay credentials for revocation.')}
             </p>
           </div>
 
           <div>
-            <Label className="text-xs">Target servers</Label>
+            <Label className="text-xs">{t('singbox.bulk_relay_dialog.targets_label', 'Target servers')}</Label>
             <div className="mt-1 rounded-md border bg-elev max-h-64 overflow-y-auto">
               {targets.length === 0 && (
-                <p className="px-3 py-4 text-xs text-muted-foreground">No eligible servers.</p>
+                <p className="px-3 py-4 text-xs text-muted-foreground">{t('singbox.bulk_relay_dialog.no_eligible_servers', 'No eligible servers.')}</p>
               )}
               {targets.map((s) => {
                 const alreadyDeployed = existingRelayServerIDs.has(s.id)
@@ -371,18 +371,18 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
                       aria-label={`select ${s.name}`} />
                     <span className="font-mono w-32 truncate">{s.name}</span>
                     {alreadyDeployed && (
-                      <span className="text-2xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-ok/15 text-ok">
-                        deployed
+                      <span className="text-2xs uppercase tracking-[0.05em] px-1.5 py-0.5 rounded bg-ok/15 text-ok">
+                        {t('singbox.bulk_relay_dialog.deployed_badge', 'deployed')}
                       </span>
                     )}
                     {taken.size > 0 && (
-                      <span className="text-fg-dim text-2xs" title={`used: ${Array.from(taken).join(', ')}`}>
-                        {taken.size} port(s) in use
+                      <span className="text-fg-dim text-2xs" title={t('singbox.bulk_relay_dialog.ports_in_use_title', 'used: {{ports}}', { ports: Array.from(taken).join(', ') })}>
+                        {t('singbox.bulk_relay_dialog.ports_in_use', '{{n}} port(s) in use', { n: taken.size })}
                       </span>
                     )}
                     {checked && !alreadyDeployed && d && (
                       <>
-                        <span className="font-mono text-fg-dim">port</span>
+                        <span className="font-mono text-fg-dim">{t('singbox.bulk_relay_dialog.port_label', 'port')}</span>
                         <Input type="number" value={d.port}
                           onChange={(e) => setDrafts((prev) => {
                             const m = new Map(prev); m.set(s.id, { ...d, port: Number(e.target.value) }); return m
@@ -390,10 +390,10 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
                           className="h-7 w-24 font-mono" />
                         {mode === 'proxy' && needsX25519(proto) && (
                           <>
-                            <Button size="sm" variant="ghost" className="h-7 px-2 text-2xs"
-                              onClick={(e) => { e.preventDefault(); void regenKeys(s.id) }}>↻ keys</Button>
+                            <Button size="xs" variant="ghost" className="text-2xs"
+                              onClick={(e) => { e.preventDefault(); void regenKeys(s.id) }}>{t('singbox.bulk_relay_dialog.regen_keys', '↻ keys')}</Button>
                             <span className="font-mono text-fg-dim text-2xs truncate" title={d.publicKey}>
-                              {d.publicKey ? d.publicKey.slice(0, 8) + '…' : 'generating…'}
+                              {d.publicKey ? d.publicKey.slice(0, 8) + '…' : t('singbox.bulk_relay_dialog.generating_key', 'generating…')}
                             </span>
                           </>
                         )}
@@ -407,10 +407,10 @@ export default function BulkRelayDialog({ open, onOpenChange, landingInbound, al
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('common.cancel', 'Cancel')}</Button>
           <Button disabled={deploy.isPending || selected.size === 0}
             onClick={() => deploy.mutate()}>
-            {deploy.isPending ? 'Deploying…' : `Deploy all (${selected.size})`}
+            {deploy.isPending ? t('singbox.bulk_relay_dialog.deploying', 'Deploying…') : t('singbox.bulk_relay_dialog.deploy_all', 'Deploy all ({{n}})', { n: selected.size })}
           </Button>
         </DialogFooter>
       </DialogContent>

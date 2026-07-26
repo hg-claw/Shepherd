@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
@@ -37,6 +37,10 @@ function renderTab() {
 }
 
 describe('sshaudit/HostsTab', () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage('en')
+  })
+
   it('renders a row per server', async () => {
     renderTab()
     expect(await screen.findByText('Server 1')).toBeTruthy()

@@ -59,6 +59,10 @@ func AssembleAndDeploy(ctx context.Context, deps plugins.Deps, serverID int64) e
 		return pusher.Stop(ctx, osName, serverID, unitName)
 	}
 
+	if err := checkSnellVersionGate(ctx, deps.DB, serverID, mine); err != nil {
+		return err
+	}
+
 	// Ensure the state dir exists before sing-box tries to open
 	// cache.db there. systemd's StateDirectory= would create it on
 	// linux for free, but launchd has no equivalent and on linux it

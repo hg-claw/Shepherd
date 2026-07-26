@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { SortState } from '@/lib/useTableSort'
+import { TableHead } from '@/components/ui/table'
 
 export function SortableTh({
   label,
@@ -17,7 +18,7 @@ export function SortableTh({
 }) {
   const active = sort?.key === sortKey
   return (
-    <th
+    <TableHead
       className={cn('cursor-pointer select-none', className)}
       aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
       onClick={() => onToggle(sortKey)}
@@ -31,6 +32,6 @@ export function SortableTh({
             <ChevronDown className="h-3 w-3" />
           ))}
       </span>
-    </th>
+    </TableHead>
   )
 }

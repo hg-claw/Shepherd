@@ -188,3 +188,90 @@ func TestClash_NoDisabledIsParity(t *testing.T) {
 		t.Fatalf("empty disabled set changed Clash output")
 	}
 }
+
+func TestClash_SnellV5DowngradesToV4(t *testing.T) {
+	n := Node{
+		Name: "hk1", Protocol: "snell", Server: "1.2.3.4", Port: 8443,
+		Password: "psk-abc",
+		Extra:    map[string]any{"snell_version": 5, "obfs_mode": "http", "obfs_host": "bing.com"},
+	}
+	p := clashProxy(n)
+	if p == nil {
+		t.Fatal("clashProxy returned nil for snell v5")
+	}
+	if p["type"] != "snell" {
+		t.Errorf("type = %v, want snell", p["type"])
+	}
+	if p["psk"] != "psk-abc" {
+		t.Errorf("psk = %v, want psk-abc", p["psk"])
+	}
+	// mihomo silently rewrites 5 to 4; writing 4 ourselves keeps the
+	// emitted config honest. Omitting version entirely would default to
+	// v1 in mihomo and fail to connect.
+	if p["version"] != 4 {
+		t.Errorf("version = %v, want 4", p["version"])
+	}
+	obfs, ok := p["obfs-opts"].(map[string]any)
+	if !ok {
+		t.Fatalf("obfs-opts missing or wrong type: %#v", p["obfs-opts"])
+	}
+	if obfs["mode"] != "http" || obfs["host"] != "bing.com" {
+		t.Errorf("obfs-opts = %#v, want mode=http host=bing.com", obfs)
+	}
+}
+
+func TestClash_SnellV6Skipped(t *testing.T) {
+	n := Node{
+		Name: "hk1", Protocol: "snell", Server: "1.2.3.4", Port: 8443,
+		Password: "psk-abc",
+		Extra:    map[string]any{"snell_version": 6},
+	}
+	// mihomo hard-errors on version 6 ("snell version error: 6"), so the
+	// node must be omitted rather than downgraded.
+	if p := clashProxy(n); p != nil {
+		t.Errorf("clashProxy must return nil for snell v6, got %#v", p)
+	}
+}
+
+// TestClash_SkippedSnellNodeLeavesNoTrace guards the Render loop itself: a
+// node whose clashProxy comes back nil must vanish completely — absent from
+// the proxies list AND absent from every proxy-group's member list (both the
+// {{NODES}}-expanded custom group and the fixed template's own groups, which
+// also expand through {{NODES}}). The strongest check for "no trace" is that
+// including the doomed node changes nothing at all versus never having sent
+// it.
+func TestClash_SkippedSnellNodeLeavesNoTrace(t *testing.T) {
+	withV6 := Intermediate{
+		Nodes: []Node{
+			{Name: "hk-v5", Protocol: "snell", Server: "5.6.7.8", Port: 8443, Password: "psk-def", Extra: map[string]any{"snell_version": 5}},
+			{Name: "hk-v6", Protocol: "snell", Server: "1.2.3.4", Port: 8443, Password: "psk-abc", Extra: map[string]any{"snell_version": 6}},
+		},
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"{{NODES}}"}}},
+		Rules:  []Rule{{Final: true, Target: "PROXY"}},
+	}
+	withoutV6 := withV6
+	withoutV6.Nodes = []Node{withV6.Nodes[0]}
+
+	outWith := (&ClashRenderer{}).Render(withV6, "", DefaultRulesetBase)
+	outWithout := (&ClashRenderer{}).Render(withoutV6, "", DefaultRulesetBase)
+	if outWith != outWithout {
+		t.Fatalf("a fully-skipped snell v6 node must leave rendering byte-identical to it never existing.\nwith v6:\n%s\n\nwithout v6:\n%s", outWith, outWithout)
+	}
+	if strings.Contains(outWith, "hk-v6") {
+		t.Fatalf("skipped node name leaked into output:\n%s", outWith)
+	}
+	var doc map[string]any
+	if err := yaml.Unmarshal([]byte(outWith), &doc); err != nil {
+		t.Fatalf("invalid yaml: %v\n%s", err, outWith)
+	}
+	groups, _ := doc["proxy-groups"].([]any)
+	for _, g := range groups {
+		gm := g.(map[string]any)
+		members, _ := gm["proxies"].([]any)
+		for _, m := range members {
+			if m == "hk-v6" {
+				t.Fatalf("skipped node leaked into proxy-group %v member list:\n%s", gm["name"], outWith)
+			}
+		}
+	}
+}

@@ -270,6 +270,57 @@
     "title": "录制回放",
     "replay": "重放"
   },
+  "cloudflare": {
+    "zones": {
+      "load_error": "加载 zone 失败：{{message}}",
+      "name": "名称",
+      "status": "状态",
+      "plan": "套餐",
+      "id": "ID"
+    },
+    "dns": {
+      "name": "名称",
+      "type": "类型",
+      "content": "内容",
+      "ttl": "TTL",
+      "ttl_auto": "自动",
+      "name_placeholder": "记录名称",
+      "content_placeholder": "内容",
+      "add": "添加"
+    },
+    "hosts": {
+      "description_pre": "按服务器配置域名映射。点击「添加默认」会创建",
+      "description_post": "指向该服务器的 SSH 地址；也可通过输入框添加自定义域名。",
+      "server": "服务器",
+      "domains": "域名",
+      "add_header": "添加",
+      "no_domains": "暂无域名",
+      "custom_domain_placeholder": "custom.example.com",
+      "add": "添加",
+      "default": "默认",
+      "remove_aria": "移除"
+    },
+    "activity": {
+      "body_pre": "Cloudflare 审计日志集成另行跟踪 —— 待",
+      "body_post": "接口接入后，本标签页将展示最近事件。"
+    },
+    "setup": {
+      "api_token_label": "API Token",
+      "api_token_hint": "限定权限的 Token（Zone:Read + DNS:Edit）。保存在服务端，不会发送到浏览器。",
+      "account_id_label": "Account ID（可选）",
+      "default_zone_label": "默认 zone",
+      "select_zone_placeholder": "— 选择一个 zone —",
+      "default_zone_hint": "Hosts 标签页中按主机生成域名映射时使用的默认 zone。",
+      "prefix_label": "子域名前缀",
+      "prefix_placeholder": "hosts",
+      "prefix_hint_pre": "自动生成按主机域名时使用："
+    },
+    "empty": {
+      "zones": "暂无 zone。",
+      "dns": "暂无 DNS 记录。",
+      "hosts": "未找到服务器。"
+    }
+  },
   "sshaudit": {
     "enable_fail2ban": "启用 fail2ban",
     "enable_fail2ban_confirm": "将在此主机上安装、配置并启动 SSH 暴力破解防护（fail2ban）。"

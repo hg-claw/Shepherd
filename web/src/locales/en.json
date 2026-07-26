@@ -251,6 +251,57 @@
     "title": "Recording",
     "replay": "Replay"
   },
+  "cloudflare": {
+    "zones": {
+      "load_error": "Failed to load zones: {{message}}",
+      "name": "Name",
+      "status": "Status",
+      "plan": "Plan",
+      "id": "ID"
+    },
+    "dns": {
+      "name": "Name",
+      "type": "Type",
+      "content": "Content",
+      "ttl": "TTL",
+      "ttl_auto": "auto",
+      "name_placeholder": "record name",
+      "content_placeholder": "content",
+      "add": "Add"
+    },
+    "hosts": {
+      "description_pre": "Per-server domain mappings. The \"Add default\" button creates",
+      "description_post": "pointing to the server's SSH host. Add custom domains via the input.",
+      "server": "Server",
+      "domains": "Domains",
+      "add_header": "Add",
+      "no_domains": "no domains",
+      "custom_domain_placeholder": "custom.example.com",
+      "add": "add",
+      "default": "default",
+      "remove_aria": "remove"
+    },
+    "activity": {
+      "body_pre": "Cloudflare audit log integration is tracked separately — this tab will surface the most recent events once the",
+      "body_post": "endpoint is wired up."
+    },
+    "setup": {
+      "api_token_label": "API token",
+      "api_token_hint": "Scoped token (Zone:Read + DNS:Edit). Stored on the server; never sent to the browser.",
+      "account_id_label": "Account ID (optional)",
+      "default_zone_label": "Default zone",
+      "select_zone_placeholder": "— select a zone —",
+      "default_zone_hint": "Default zone used for per-host domain mappings on the Hosts tab.",
+      "prefix_label": "Subdomain prefix",
+      "prefix_placeholder": "hosts",
+      "prefix_hint_pre": "Used when auto-generating per-host domains:"
+    },
+    "empty": {
+      "zones": "No zones.",
+      "dns": "No DNS records yet.",
+      "hosts": "No servers found."
+    }
+  },
   "sshaudit": {
     "enable_fail2ban": "Enable fail2ban",
     "enable_fail2ban_confirm": "Install, configure, and start the SSH brute-force jail on this host."

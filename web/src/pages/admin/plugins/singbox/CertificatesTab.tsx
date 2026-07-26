@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { Pill } from '@/components/Pill'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -24,13 +24,13 @@ import { APIError } from '@/api/client'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-function statusVariant(
+function statusKind(
   s: SingboxCertificate['status'],
-): 'default' | 'secondary' | 'destructive' | 'outline' {
-  if (s === 'active')  return 'default'
-  if (s === 'issuing') return 'secondary'
-  if (s === 'failed')  return 'destructive'
-  return 'outline' // revoked
+): 'ok' | 'warn' | 'err' | 'neutral' {
+  if (s === 'active')  return 'ok'
+  if (s === 'issuing') return 'neutral'
+  if (s === 'failed')  return 'err'
+  return 'neutral' // revoked
 }
 
 /** Color class for expires_at cell.
@@ -274,7 +274,7 @@ export default function CertificatesTab() {
 
                 {/* Status pill */}
                 <td className="px-3 py-2">
-                  <Badge variant={statusVariant(c.status)}>{c.status}</Badge>
+                  <Pill kind={statusKind(c.status)}>{c.status}</Pill>
                 </td>
 
                 {/* Issuer */}

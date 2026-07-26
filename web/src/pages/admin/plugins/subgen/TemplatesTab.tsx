@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
+import { Pill } from '@/components/Pill'
 import {
   Dialog,
   DialogContent,
@@ -177,8 +177,8 @@ export default function TemplatesTab() {
                 <td className="px-3 py-2 font-mono">{t.name}</td>
                 <td className="px-3 py-2">
                   {t.builtin
-                    ? <Badge variant="secondary">built-in</Badge>
-                    : <Badge variant="outline">custom</Badge>}
+                    ? <Pill kind="neutral">built-in</Pill>
+                    : <Pill kind="neutral">custom</Pill>}
                 </td>
                 <td className="px-3 py-2 text-right whitespace-nowrap">
                   {t.builtin ? (

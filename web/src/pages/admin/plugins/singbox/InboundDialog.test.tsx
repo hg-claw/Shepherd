@@ -609,42 +609,29 @@ describe('singbox/InboundDialog', () => {
     await waitFor(() => expect(screen.queryByText(/1\.14/)).not.toBeInTheDocument())
   })
 
-  it('does not warn for a forward-mode relay pointing at a snell landing', async () => {
-    // A landing whose protocol is snell — normally enough to trigger the
-    // warning — but a forward relay renders as `direct` and never runs
-    // snell, so it must be exempt even though the host is on 1.13.14
-    // (the default fixture, below the gate).
-    vi.spyOn(pluginsAPI, 'listSingboxInbounds').mockResolvedValueOnce([
-      {
-        id: 21,
-        server_id: 1,
-        server_name: 'S1',
-        tag: 'snell-landing-fixture',
-        alias: '',
-        port: 5201,
-        role: 'landing',
-        protocol: 'snell-v5',
-        password: 'landing-psk',
-        upstream_inbound_id: null,
-        upstream_tag: null,
-        upstream_server_id: null,
-        upstream_server_name: null,
-        created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
-      },
-    ])
+  it('does not warn for a forward-mode relay whose protocol state is snell', async () => {
+    // Select snell-v5 while `role` is still 'landing' — the protocol
+    // picker only renders when `!isForward`, so this is the only way to
+    // genuinely put `protocol` state into a snell value before flipping
+    // to a forward relay (where the picker disappears but the state
+    // persists).
     render(
       <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
       { wrapper },
     )
-    fireEvent.change(screen.getByLabelText(/role/i), { target: { value: 'relay' } })
+    const protoSelect = screen.getByRole('combobox', { name: /protocol/i })
+    fireEvent.change(protoSelect, { target: { value: 'snell-v5' } })
+    // Sanity check: with role still 'landing' the warning fires (default
+    // host fixture is on 1.13.14, below the gate) — proves protocol state
+    // really is snell before we flip to forward mode.
+    await waitFor(() => expect(screen.getByText(/1\.14/)).toBeInTheDocument())
 
-    await waitFor(() => {
-      const opts = within(screen.getByLabelText(/upstream/i)).getAllByRole('option')
-      expect(opts.some((o) => (o.textContent ?? '').includes('snell-landing-fixture'))).toBe(true)
-    })
-    fireEvent.change(screen.getByLabelText(/upstream/i), { target: { value: '21' } })
-    // forward is the default relay mode — protocol picker stays hidden
+    // Flip to relay + forward (forward is the default relay mode). The
+    // protocol picker disappears — it can no longer be changed via the
+    // UI — but `protocol` state persists as snell-v5. isSnellProtocol and
+    // the sub-1.14 host-version term are both still true here, so only
+    // `!isForward` can be suppressing the warning now.
+    fireEvent.change(screen.getByLabelText(/role/i), { target: { value: 'relay' } })
     expect(screen.queryByLabelText(/protocol/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/1\.14/)).not.toBeInTheDocument()
   })

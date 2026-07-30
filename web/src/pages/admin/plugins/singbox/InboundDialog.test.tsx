@@ -564,6 +564,96 @@ describe('singbox/InboundDialog', () => {
     expect(spy.mock.calls.length).toBe(callsBefore)
   })
 
+  // ── relay edit notice (protocol accuracy) ──
+
+  it('does not render REALITY-specific wording when editing a non-reality proxy relay (snell-v5)', async () => {
+    const inbound = {
+      id: 20,
+      server_id: 1,
+      server_name: 'S1',
+      tag: 'relay-snell',
+      alias: '',
+      port: 9000,
+      role: 'relay' as const,
+      protocol: 'snell-v5' as const,
+      password: 'relay-psk',
+      relay_mode: 'proxy' as const,
+      upstream_inbound_id: 11,
+      upstream_tag: 'landing-fixture-tag',
+      upstream_server_id: 1,
+      upstream_server_name: 'S1',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    }
+    render(
+      <InboundDialog serverID={1} initial={inbound} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    // Base notice must still render — this is a relay edit.
+    await waitFor(() => expect(screen.getByText(/editing a relay/i)).toBeInTheDocument())
+    // Only the base (protocol-agnostic) sentence applies to a snell relay —
+    // the REALITY-specific line must not be present.
+    expect(screen.queryByText(/REALITY handshake target/i)).toBeNull()
+  })
+
+  it('renders REALITY-specific wording when editing a proxy relay whose own protocol is vless-reality', async () => {
+    const inbound = {
+      id: 21,
+      server_id: 1,
+      server_name: 'S1',
+      tag: 'relay-reality',
+      alias: '',
+      port: 9001,
+      role: 'relay' as const,
+      protocol: 'vless-reality' as const,
+      uuid: '11111111-1111-1111-1111-111111111111',
+      reality_public_key: 'pub456',
+      reality_short_id: 'aabb1122',
+      relay_mode: 'proxy' as const,
+      upstream_inbound_id: 11,
+      upstream_tag: 'landing-fixture-tag',
+      upstream_server_id: 1,
+      upstream_server_name: 'S1',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    }
+    render(
+      <InboundDialog serverID={1} initial={inbound} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    await waitFor(() => expect(screen.getByText(/REALITY handshake target/i)).toBeInTheDocument())
+  })
+
+  it('does not render REALITY-specific wording for a forward relay even when the inherited protocol is vless-reality', async () => {
+    // Forward relays inherit the landing's protocol as a label only — no
+    // credentials, nothing copied. If the landing happens to be
+    // vless-reality, the inherited `protocol` column on this row is also
+    // 'vless-reality', but the relay still owns no keypair/handshake data.
+    const inbound = {
+      id: 22,
+      server_id: 1,
+      server_name: 'S1',
+      tag: 'relay-forward-reality',
+      alias: '',
+      port: 9002,
+      role: 'relay' as const,
+      protocol: 'vless-reality' as const,
+      relay_mode: 'forward' as const,
+      upstream_inbound_id: 11,
+      upstream_tag: 'landing-fixture-tag',
+      upstream_server_id: 1,
+      upstream_server_name: 'S1',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    }
+    render(
+      <InboundDialog serverID={1} initial={inbound} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    await waitFor(() => expect(screen.getByText(/editing a relay/i)).toBeInTheDocument())
+    expect(screen.queryByText(/REALITY handshake target/i)).toBeNull()
+  })
+
   // ── snell / sing-box 1.14 version warning ──
 
   it('warns when snell is picked on a host below sing-box 1.14', async () => {

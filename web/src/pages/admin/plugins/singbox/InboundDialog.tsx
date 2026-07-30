@@ -347,7 +347,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
         <div className="space-y-3 py-1">
           {isRelayEdit && (
             <div className="rounded border border-warn/50 bg-warn/10 px-2.5 py-1.5 text-2xs text-warn">
-              {t('singbox.inbound_dialog.relay_edit_notice', 'Editing a relay. Handshake server / port are inherited from the upstream landing and not editable here — change them on the landing inbound to propagate.')}
+              {t('singbox.inbound_dialog.relay_edit_notice', 'Editing a relay. Its REALITY handshake target was copied from the upstream landing when the relay was created and is stored on this row — changing the landing does not propagate here.')}
             </div>
           )}
 

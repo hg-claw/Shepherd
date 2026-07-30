@@ -541,7 +541,7 @@
       "edit_title": "Edit — {{tag}}",
       "new_title": "New inbound",
       "relay_limited_badge": "relay · limited",
-      "relay_edit_notice": "Editing a relay. Handshake server / port are inherited from the upstream landing and not editable here — change them on the landing inbound to propagate.",
+      "relay_edit_notice": "Editing a relay. Its REALITY handshake target was copied from the upstream landing when the relay was created and is stored on this row — changing the landing does not propagate here.",
       "role": "Role",
       "role_landing": "Landing",
       "role_relay": "Relay",

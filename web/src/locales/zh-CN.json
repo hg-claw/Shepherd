@@ -560,7 +560,7 @@
       "edit_title": "编辑 — {{tag}}",
       "new_title": "新建入站",
       "relay_limited_badge": "中继 · 受限",
-      "relay_edit_notice": "正在编辑中继。握手服务器/端口继承自上游 landing，此处不可编辑——如需更改请修改 landing 入站以同步传播。",
+      "relay_edit_notice": "正在编辑中继。它的 REALITY handshake 目标是创建时从上游落地复制过来的，存在这一行上——改落地不会传播到这里。",
       "role": "角色",
       "role_landing": "落地",
       "role_relay": "中继",

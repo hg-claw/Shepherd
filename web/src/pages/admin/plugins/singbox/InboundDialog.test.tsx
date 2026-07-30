@@ -462,6 +462,66 @@ describe('singbox/InboundDialog', () => {
     )
   })
 
+  it('forward mode hides the protocol picker and all credential fields', async () => {
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    fireEvent.change(screen.getByLabelText(/role/i), { target: { value: 'relay' } })
+
+    await waitFor(() => {
+      const opts = within(screen.getByLabelText(/upstream/i)).getAllByRole('option')
+      expect(opts.some((o) => (o.textContent ?? '').includes('landing-fixture-tag'))).toBe(true)
+    })
+    fireEvent.change(screen.getByLabelText(/upstream/i), { target: { value: '11' } })
+    // forward is the default relay mode
+
+    expect(screen.queryByLabelText(/protocol/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/uuid/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/sni/i)).not.toBeInTheDocument()
+  })
+
+  it('forward mode submits the landing protocol and no credentials', async () => {
+    const spy = vi.spyOn(pluginsAPI, 'createSingboxInbound')
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    fireEvent.change(screen.getByLabelText(/role/i), { target: { value: 'relay' } })
+
+    await waitFor(() => {
+      const opts = within(screen.getByLabelText(/upstream/i)).getAllByRole('option')
+      expect(opts.some((o) => (o.textContent ?? '').includes('landing-fixture-tag'))).toBe(true)
+    })
+    // landing fixture (id 11) is trojan-tls; forward is the default relay mode
+    fireEvent.change(screen.getByLabelText(/upstream/i), { target: { value: '11' } })
+
+    const createBtn = screen.getByRole('button', { name: /create/i })
+    fireEvent.click(createBtn)
+
+    // Spy isn't cleared between tests (see file-level beforeEach) — this
+    // role/relay_mode/protocol combination is unique to this test.
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          role: 'relay',
+          relay_mode: 'forward',
+          upstream_inbound_id: 11,
+          // protocol is inherited from the landing so subgen's forward
+          // special-case and the inbound list's protocol label keep working
+          protocol: 'trojan-tls',
+        }),
+      )
+    )
+    const call = spy.mock.calls.find(
+      (c) => (c[0] as unknown as Record<string, unknown>).relay_mode === 'forward',
+    )![0] as unknown as Record<string, unknown>
+    expect(call.uuid).toBeUndefined()
+    expect(call.sni).toBeUndefined()
+    expect(call.reality_private_key).toBeUndefined()
+    expect(call.cert_id).toBeUndefined()
+  })
+
   it('blocks relay creation without upstream selection and shows error', async () => {
     const spy = vi.spyOn(pluginsAPI, 'createSingboxInbound')
     const callsBefore = spy.mock.calls.length

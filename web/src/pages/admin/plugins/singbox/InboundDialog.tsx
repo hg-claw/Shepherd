@@ -186,10 +186,12 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
   const [upstreamID, setUpstreamID] = useState<string>('')
   const [relayMode, setRelayMode]   = useState<'forward' | 'proxy'>('forward')
 
-  // Not consumed yet — forward-mode field collapsing / protocol
-  // inheritance from the landing is Task 3.
   const selectedLanding = landings.find((l) => String(l.id) === upstreamID)
-  void selectedLanding
+
+  // Forward relays render as a sing-box "direct" inbound — the protocol
+  // switch is short-circuited server-side, so every protocol field is
+  // dead weight. Collapse them and inherit the landing's protocol.
+  const isForward = role === 'relay' && relayMode === 'forward'
 
   const [error, setError] = useState<string | null>(null)
 
@@ -202,46 +204,52 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
       const body: Record<string, unknown> = {
         server_id: serverID,
         port:      Number(port),
-        protocol,
+        // Forward relays skip the protocol picker entirely, so they have
+        // no protocol of their own — inherit the landing's. subgen's
+        // forward special-case and the inbound list's protocol column
+        // both read this field, so it must not be blank.
+        protocol:  isForward && selectedLanding ? selectedLanding.protocol : protocol,
       }
 
       body.alias = alias
 
-      if (needsUUID(protocol))       body.uuid = uuid
-      if (needsPassword(protocol))   body.password = password
-      if (needsCertAndSNI(protocol)) { body.sni = sni; body.cert_id = certID ? Number(certID) : undefined }
-      if (needsTransport(protocol))  { body.transport_path = transportPath; body.transport_host = transportHost }
-      if (needsReality(protocol))    {
-        body.sni = sni
-        // Omit private_key on PATCH when the input is empty — that
-        // means the admin didn't touch the field. The field starts
-        // empty because the GET response redacts the secret;
-        // sending an empty string would otherwise overwrite the
-        // stored key with "" and break the REALITY handshake.
-        if (!isEdit || privKey !== '') {
-          body.reality_private_key = privKey
+      if (!isForward) {
+        if (needsUUID(protocol))       body.uuid = uuid
+        if (needsPassword(protocol))   body.password = password
+        if (needsCertAndSNI(protocol)) { body.sni = sni; body.cert_id = certID ? Number(certID) : undefined }
+        if (needsTransport(protocol))  { body.transport_path = transportPath; body.transport_host = transportHost }
+        if (needsReality(protocol))    {
+          body.sni = sni
+          // Omit private_key on PATCH when the input is empty — that
+          // means the admin didn't touch the field. The field starts
+          // empty because the GET response redacts the secret;
+          // sending an empty string would otherwise overwrite the
+          // stored key with "" and break the REALITY handshake.
+          if (!isEdit || privKey !== '') {
+            body.reality_private_key = privKey
+          }
+          body.reality_public_key        = pubKey
+          body.reality_short_id          = shortID
+          // Skip the landing-only handshake fields when editing a relay
+          // — relays don't have these in our schema and overwriting
+          // with the dialog's empty defaults corrupts the row.
+          if (!isRelayEdit) {
+            body.reality_handshake_server  = hsServer
+            body.reality_handshake_port    = Number(hsPort)
+          }
         }
-        body.reality_public_key        = pubKey
-        body.reality_short_id          = shortID
-        // Skip the landing-only handshake fields when editing a relay
-        // — relays don't have these in our schema and overwriting
-        // with the dialog's empty defaults corrupts the row.
-        if (!isRelayEdit) {
-          body.reality_handshake_server  = hsServer
-          body.reality_handshake_port    = Number(hsPort)
+        if (needsSS(protocol)) {
+          body.ss_method   = ssMethod
+          body.ss_password = ssPassword
         }
+        // obfs_mode (v5) / mode (v6) travel in the generic `extra` JSON field
+        // — the same channel hysteria2's up_mbps uses server-side. `extra`
+        // is a whole-column overwrite server-side, so merge into whatever
+        // the row already carried instead of replacing it: this dialog only
+        // knows two keys, and an API client is free to have put others there.
+        if (protocol === 'snell-v5') body.extra = JSON.stringify({ ...initialExtra, obfs_mode: snellObfs })
+        if (protocol === 'snell-v6') body.extra = JSON.stringify({ ...initialExtra, mode: snellMode })
       }
-      if (needsSS(protocol)) {
-        body.ss_method   = ssMethod
-        body.ss_password = ssPassword
-      }
-      // obfs_mode (v5) / mode (v6) travel in the generic `extra` JSON field
-      // — the same channel hysteria2's up_mbps uses server-side. `extra`
-      // is a whole-column overwrite server-side, so merge into whatever
-      // the row already carried instead of replacing it: this dialog only
-      // knows two keys, and an API client is free to have put others there.
-      if (protocol === 'snell-v5') body.extra = JSON.stringify({ ...initialExtra, obfs_mode: snellObfs })
-      if (protocol === 'snell-v6') body.extra = JSON.stringify({ ...initialExtra, mode: snellMode })
 
       if (isEdit) {
         // Only send patchable fields
@@ -388,25 +396,28 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
             </>
           )}
 
-          {/* ── Port + Protocol ── */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* ── Port + Protocol ── Protocol is omitted for forward relays:
+              they inherit the landing's protocol (see isForward below). */}
+          <div className={isForward ? '' : 'grid grid-cols-2 gap-3'}>
             <div>
               <Label className={labelCls} htmlFor="ib-port">{t('singbox.inbound_dialog.port_label', 'Port')}</Label>
               <Input id="ib-port" className={inputCls} value={port}
                 onChange={(e) => setPort(e.target.value)} placeholder="443" />
             </div>
-            <div>
-              <Label className={labelCls} htmlFor="ib-proto">{t('singbox.inbound_dialog.protocol_label', 'Protocol')}</Label>
-              <select id="ib-proto"
-                className={selectCls}
-                value={protocol}
-                disabled={isEdit}
-                onChange={(e) => { setProtocol(e.target.value as SingboxProtocol); setError(null) }}>
-                {PROTOCOLS.map(({ value, label }) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            </div>
+            {!isForward && (
+              <div>
+                <Label className={labelCls} htmlFor="ib-proto">{t('singbox.inbound_dialog.protocol_label', 'Protocol')}</Label>
+                <select id="ib-proto"
+                  className={selectCls}
+                  value={protocol}
+                  disabled={isEdit}
+                  onChange={(e) => { setProtocol(e.target.value as SingboxProtocol); setError(null) }}>
+                  {PROTOCOLS.map(({ value, label }) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* ── Alias (optional) ── */}
@@ -417,204 +428,208 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
               placeholder={t('singbox.inbound_dialog.alias_placeholder', 'Optional — node alias, defaults to an auto-generated name if left blank')} />
           </div>
 
-          {/* ── UUID (vless / vmess / tuic) ── */}
-          {needsUUID(protocol) && (
-            <div>
-              <Label className={labelCls} htmlFor="ib-uuid">{t('singbox.inbound_dialog.uuid_label', 'UUID')}</Label>
-              <div className="flex gap-2">
-                <Input id="ib-uuid" className={inputCls + ' flex-1'}
-                  value={uuid} onChange={(e) => setUUID(e.target.value)} />
-                <Button type="button" variant="outline" size="sm"
-                  onClick={() => setUUID(randomUUID())}>{t('singbox.inbound_dialog.new_button', 'new')}</Button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Password (trojan / hysteria2 / tuic / anytls / snell psk) ── */}
-          {needsPassword(protocol) && (
-            <div>
-              <Label className={labelCls} htmlFor="ib-pw">
-                {isSnell(protocol)
-                  ? t('singbox.snell.psk', 'PSK')
-                  : t('singbox.inbound_dialog.password_label', 'Password')}
-              </Label>
-              <div className="flex gap-2">
-                <Input id="ib-pw" className={inputCls + ' flex-1'}
-                  value={password} onChange={(e) => setPassword(e.target.value)} />
-                <Button type="button" variant="outline" size="sm"
-                  onClick={() => setPassword(randomPassword())}>{t('singbox.inbound_dialog.new_button', 'new')}</Button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Snell obfs_mode (v5) / mode (v6) ── */}
-          {protocol === 'snell-v5' && (
-            <div>
-              <Label className={labelCls} htmlFor="ib-snell-obfs">{t('singbox.snell.obfs_mode', 'Obfuscation')}</Label>
-              <select id="ib-snell-obfs"
-                className={selectCls}
-                value={snellObfs}
-                onChange={(e) => setSnellObfs(e.target.value)}>
-                {SNELL_OBFS_MODES.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-          )}
-          {protocol === 'snell-v6' && (
-            <div>
-              <Label className={labelCls} htmlFor="ib-snell-mode">{t('singbox.snell.mode', 'Traffic mode')}</Label>
-              <select id="ib-snell-mode"
-                className={selectCls}
-                value={snellMode}
-                onChange={(e) => setSnellMode(e.target.value)}>
-                {SNELL_MODES.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* ── REALITY fields ── */}
-          {needsReality(protocol) && (
+          {!isForward && (
             <>
+            {/* ── UUID (vless / vmess / tuic) ── */}
+            {needsUUID(protocol) && (
               <div>
-                <Label className={labelCls} htmlFor="ib-sni-reality">{t('singbox.inbound_dialog.reality_sni_label', 'SNI (REALITY target domain)')}</Label>
-                <Input id="ib-sni-reality" className={inputCls}
-                  value={sni} onChange={(e) => setSNI(e.target.value)}
-                  placeholder="www.icloud.com" />
-                <p className="text-2xs text-muted-foreground mt-0.5">
-                  {t('singbox.inbound_dialog.reality_sni_hint', 'Must be a single-tenant TLS endpoint — not a multi-tenant CDN.')}
-                </p>
-              </div>
-
-              {/* Keypair */}
-              <div>
-                <Label className={labelCls}>{t('singbox.inbound_dialog.reality_keypair_label', 'REALITY keypair (Curve25519)')}</Label>
+                <Label className={labelCls} htmlFor="ib-uuid">{t('singbox.inbound_dialog.uuid_label', 'UUID')}</Label>
                 <div className="flex gap-2">
-                  <div className="flex-1">
-                    <Label htmlFor="ib-privkey" className="sr-only">{t('singbox.inbound_dialog.reality_private_key_placeholder', 'private key')}</Label>
-                    <Input id="ib-privkey" placeholder={t('singbox.inbound_dialog.reality_private_key_placeholder', 'private key')} readOnly
-                      className={inputCls + ' w-full text-2xs'} value={privKey} />
-                  </div>
-                  <div className="flex-1">
-                    <Label htmlFor="ib-pubkey" className="sr-only">{t('singbox.inbound_dialog.reality_public_key_placeholder', 'public key')}</Label>
-                    <Input id="ib-pubkey" placeholder={t('singbox.inbound_dialog.reality_public_key_placeholder', 'public key')} readOnly
-                      className={inputCls + ' w-full text-2xs'} value={pubKey} />
-                  </div>
+                  <Input id="ib-uuid" className={inputCls + ' flex-1'}
+                    value={uuid} onChange={(e) => setUUID(e.target.value)} />
                   <Button type="button" variant="outline" size="sm"
-                    onClick={genKeypair}>{t('singbox.inbound_dialog.generate_button', 'Generate')}</Button>
+                    onClick={() => setUUID(randomUUID())}>{t('singbox.inbound_dialog.new_button', 'new')}</Button>
                 </div>
-                <p className="text-2xs text-muted-foreground mt-0.5">
-                  {t('singbox.inbound_dialog.reality_keypair_hint', 'Uses the same Curve25519 endpoint as Xray (shared crypto).')}
-                </p>
               </div>
+            )}
 
-              {/* Short ID + Handshake host (handshake hidden for relays —
-                  not part of their schema). */}
-              <div className={isRelayEdit ? '' : 'grid grid-cols-2 gap-3'}>
-                <div>
-                  <Label className={labelCls} htmlFor="ib-sid">{t('singbox.inbound_dialog.short_id_label', 'Short ID')}</Label>
-                  <div className="flex gap-2">
-                    <Input id="ib-sid" className={inputCls + ' flex-1 font-mono'}
-                      value={shortID} onChange={(e) => setShortID(e.target.value)} />
-                    <Button type="button" variant="outline" size="sm"
-                      onClick={genShortID}>{t('singbox.inbound_dialog.gen_button', 'Gen')}</Button>
-                  </div>
+            {/* ── Password (trojan / hysteria2 / tuic / anytls / snell psk) ── */}
+            {needsPassword(protocol) && (
+              <div>
+                <Label className={labelCls} htmlFor="ib-pw">
+                  {isSnell(protocol)
+                    ? t('singbox.snell.psk', 'PSK')
+                    : t('singbox.inbound_dialog.password_label', 'Password')}
+                </Label>
+                <div className="flex gap-2">
+                  <Input id="ib-pw" className={inputCls + ' flex-1'}
+                    value={password} onChange={(e) => setPassword(e.target.value)} />
+                  <Button type="button" variant="outline" size="sm"
+                    onClick={() => setPassword(randomPassword())}>{t('singbox.inbound_dialog.new_button', 'new')}</Button>
                 </div>
-                {!isRelayEdit && (
-                  <div>
-                    <Label className={labelCls} htmlFor="ib-hs">{t('singbox.inbound_dialog.handshake_host_label', 'Handshake host')}</Label>
-                    <Input id="ib-hs" className={inputCls}
-                      value={hsServer} onChange={(e) => setHSServer(e.target.value)}
-                      placeholder="www.apple.com" />
-                  </div>
-                )}
               </div>
+            )}
 
-              {!isRelayEdit && (
-                <div>
-                  <Label className={labelCls} htmlFor="ib-hp">{t('singbox.inbound_dialog.handshake_port_label', 'Handshake port')}</Label>
-                  <Input id="ib-hp" className={inputCls + ' w-28'}
-                    value={hsPort} onChange={(e) => setHSPort(e.target.value)}
-                    placeholder="443" />
-                </div>
-              )}
-            </>
-          )}
-
-          {/* ── Cert + SNI (TLS protocols, non-reality) ── */}
-          {needsCertAndSNI(protocol) && (
-            <>
+            {/* ── Snell obfs_mode (v5) / mode (v6) ── */}
+            {protocol === 'snell-v5' && (
               <div>
-                <Label className={labelCls} htmlFor="ib-sni-tls">{t('singbox.inbound_dialog.tls_sni_label', 'SNI / Domain')}</Label>
-                <Input id="ib-sni-tls" className={inputCls}
-                  value={sni} onChange={(e) => setSNI(e.target.value)}
-                  placeholder="proxy.example.com" />
-              </div>
-              <div>
-                <Label className={labelCls} htmlFor="ib-cert">{t('singbox.inbound_dialog.cert_label', 'Certificate')}</Label>
-                {validCerts.length === 0 ? (
-                  <p className="text-2xs text-muted-foreground">
-                    {t('singbox.inbound_dialog.cert_none', 'No valid certificates. Issue one in the Certificates tab first.')}
-                  </p>
-                ) : (
-                  <select id="ib-cert"
-                    className={selectCls}
-                    value={certID}
-                    onChange={(e) => setCertID(e.target.value)}>
-                    <option value="">{t('singbox.inbound_dialog.cert_select_placeholder', '— select certificate —')}</option>
-                    {validCerts.map((c) => (
-                      <option key={c.id} value={String(c.id)}>
-                        {c.domain}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            </>
-          )}
-
-          {/* ── Transport path + host (ws / h2 / httpupgrade / vmess-http) ── */}
-          {needsTransport(protocol) && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className={labelCls} htmlFor="ib-path">{t('singbox.inbound_dialog.path_label', 'Path')}</Label>
-                <Input id="ib-path" className={inputCls}
-                  value={transportPath} onChange={(e) => setTransportPath(e.target.value)}
-                  placeholder="/proxy" />
-              </div>
-              <div>
-                <Label className={labelCls} htmlFor="ib-host">{t('singbox.inbound_dialog.host_header_label', 'Host header')}</Label>
-                <Input id="ib-host" className={inputCls}
-                  value={transportHost} onChange={(e) => setTransportHost(e.target.value)} />
-              </div>
-            </div>
-          )}
-
-          {/* ── Shadowsocks 2022 ── */}
-          {needsSS(protocol) && (
-            <>
-              <div>
-                <Label className={labelCls} htmlFor="ib-ssm">{t('singbox.inbound_dialog.method_label', 'Method')}</Label>
-                <select id="ib-ssm"
+                <Label className={labelCls} htmlFor="ib-snell-obfs">{t('singbox.snell.obfs_mode', 'Obfuscation')}</Label>
+                <select id="ib-snell-obfs"
                   className={selectCls}
-                  value={ssMethod}
-                  onChange={(e) => setSSMethod(e.target.value)}>
-                  {SS_METHODS.map((m) => (
+                  value={snellObfs}
+                  onChange={(e) => setSnellObfs(e.target.value)}>
+                  {SNELL_OBFS_MODES.map((m) => (
                     <option key={m} value={m}>{m}</option>
                   ))}
                 </select>
               </div>
+            )}
+            {protocol === 'snell-v6' && (
               <div>
-                <Label className={labelCls} htmlFor="ib-sspw">{t('singbox.inbound_dialog.ss_password_label', 'Password (base64)')}</Label>
-                <div className="flex gap-2">
-                  <Input id="ib-sspw" className={inputCls + ' flex-1'}
-                    value={ssPassword} onChange={(e) => setSSPassword(e.target.value)} />
-                  <Button type="button" variant="outline" size="sm"
-                    onClick={() => setSSPassword(randomSSKey(ssMethod))}>{t('singbox.inbound_dialog.new_button', 'new')}</Button>
+                <Label className={labelCls} htmlFor="ib-snell-mode">{t('singbox.snell.mode', 'Traffic mode')}</Label>
+                <select id="ib-snell-mode"
+                  className={selectCls}
+                  value={snellMode}
+                  onChange={(e) => setSnellMode(e.target.value)}>
+                  {SNELL_MODES.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* ── REALITY fields ── */}
+            {needsReality(protocol) && (
+              <>
+                <div>
+                  <Label className={labelCls} htmlFor="ib-sni-reality">{t('singbox.inbound_dialog.reality_sni_label', 'SNI (REALITY target domain)')}</Label>
+                  <Input id="ib-sni-reality" className={inputCls}
+                    value={sni} onChange={(e) => setSNI(e.target.value)}
+                    placeholder="www.icloud.com" />
+                  <p className="text-2xs text-muted-foreground mt-0.5">
+                    {t('singbox.inbound_dialog.reality_sni_hint', 'Must be a single-tenant TLS endpoint — not a multi-tenant CDN.')}
+                  </p>
+                </div>
+
+                {/* Keypair */}
+                <div>
+                  <Label className={labelCls}>{t('singbox.inbound_dialog.reality_keypair_label', 'REALITY keypair (Curve25519)')}</Label>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <Label htmlFor="ib-privkey" className="sr-only">{t('singbox.inbound_dialog.reality_private_key_placeholder', 'private key')}</Label>
+                      <Input id="ib-privkey" placeholder={t('singbox.inbound_dialog.reality_private_key_placeholder', 'private key')} readOnly
+                        className={inputCls + ' w-full text-2xs'} value={privKey} />
+                    </div>
+                    <div className="flex-1">
+                      <Label htmlFor="ib-pubkey" className="sr-only">{t('singbox.inbound_dialog.reality_public_key_placeholder', 'public key')}</Label>
+                      <Input id="ib-pubkey" placeholder={t('singbox.inbound_dialog.reality_public_key_placeholder', 'public key')} readOnly
+                        className={inputCls + ' w-full text-2xs'} value={pubKey} />
+                    </div>
+                    <Button type="button" variant="outline" size="sm"
+                      onClick={genKeypair}>{t('singbox.inbound_dialog.generate_button', 'Generate')}</Button>
+                  </div>
+                  <p className="text-2xs text-muted-foreground mt-0.5">
+                    {t('singbox.inbound_dialog.reality_keypair_hint', 'Uses the same Curve25519 endpoint as Xray (shared crypto).')}
+                  </p>
+                </div>
+
+                {/* Short ID + Handshake host (handshake hidden for relays —
+                    not part of their schema). */}
+                <div className={isRelayEdit ? '' : 'grid grid-cols-2 gap-3'}>
+                  <div>
+                    <Label className={labelCls} htmlFor="ib-sid">{t('singbox.inbound_dialog.short_id_label', 'Short ID')}</Label>
+                    <div className="flex gap-2">
+                      <Input id="ib-sid" className={inputCls + ' flex-1 font-mono'}
+                        value={shortID} onChange={(e) => setShortID(e.target.value)} />
+                      <Button type="button" variant="outline" size="sm"
+                        onClick={genShortID}>{t('singbox.inbound_dialog.gen_button', 'Gen')}</Button>
+                    </div>
+                  </div>
+                  {!isRelayEdit && (
+                    <div>
+                      <Label className={labelCls} htmlFor="ib-hs">{t('singbox.inbound_dialog.handshake_host_label', 'Handshake host')}</Label>
+                      <Input id="ib-hs" className={inputCls}
+                        value={hsServer} onChange={(e) => setHSServer(e.target.value)}
+                        placeholder="www.apple.com" />
+                    </div>
+                  )}
+                </div>
+
+                {!isRelayEdit && (
+                  <div>
+                    <Label className={labelCls} htmlFor="ib-hp">{t('singbox.inbound_dialog.handshake_port_label', 'Handshake port')}</Label>
+                    <Input id="ib-hp" className={inputCls + ' w-28'}
+                      value={hsPort} onChange={(e) => setHSPort(e.target.value)}
+                      placeholder="443" />
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── Cert + SNI (TLS protocols, non-reality) ── */}
+            {needsCertAndSNI(protocol) && (
+              <>
+                <div>
+                  <Label className={labelCls} htmlFor="ib-sni-tls">{t('singbox.inbound_dialog.tls_sni_label', 'SNI / Domain')}</Label>
+                  <Input id="ib-sni-tls" className={inputCls}
+                    value={sni} onChange={(e) => setSNI(e.target.value)}
+                    placeholder="proxy.example.com" />
+                </div>
+                <div>
+                  <Label className={labelCls} htmlFor="ib-cert">{t('singbox.inbound_dialog.cert_label', 'Certificate')}</Label>
+                  {validCerts.length === 0 ? (
+                    <p className="text-2xs text-muted-foreground">
+                      {t('singbox.inbound_dialog.cert_none', 'No valid certificates. Issue one in the Certificates tab first.')}
+                    </p>
+                  ) : (
+                    <select id="ib-cert"
+                      className={selectCls}
+                      value={certID}
+                      onChange={(e) => setCertID(e.target.value)}>
+                      <option value="">{t('singbox.inbound_dialog.cert_select_placeholder', '— select certificate —')}</option>
+                      {validCerts.map((c) => (
+                        <option key={c.id} value={String(c.id)}>
+                          {c.domain}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* ── Transport path + host (ws / h2 / httpupgrade / vmess-http) ── */}
+            {needsTransport(protocol) && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className={labelCls} htmlFor="ib-path">{t('singbox.inbound_dialog.path_label', 'Path')}</Label>
+                  <Input id="ib-path" className={inputCls}
+                    value={transportPath} onChange={(e) => setTransportPath(e.target.value)}
+                    placeholder="/proxy" />
+                </div>
+                <div>
+                  <Label className={labelCls} htmlFor="ib-host">{t('singbox.inbound_dialog.host_header_label', 'Host header')}</Label>
+                  <Input id="ib-host" className={inputCls}
+                    value={transportHost} onChange={(e) => setTransportHost(e.target.value)} />
                 </div>
               </div>
+            )}
+
+            {/* ── Shadowsocks 2022 ── */}
+            {needsSS(protocol) && (
+              <>
+                <div>
+                  <Label className={labelCls} htmlFor="ib-ssm">{t('singbox.inbound_dialog.method_label', 'Method')}</Label>
+                  <select id="ib-ssm"
+                    className={selectCls}
+                    value={ssMethod}
+                    onChange={(e) => setSSMethod(e.target.value)}>
+                    {SS_METHODS.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label className={labelCls} htmlFor="ib-sspw">{t('singbox.inbound_dialog.ss_password_label', 'Password (base64)')}</Label>
+                  <div className="flex gap-2">
+                    <Input id="ib-sspw" className={inputCls + ' flex-1'}
+                      value={ssPassword} onChange={(e) => setSSPassword(e.target.value)} />
+                    <Button type="button" variant="outline" size="sm"
+                      onClick={() => setSSPassword(randomSSKey(ssMethod))}>{t('singbox.inbound_dialog.new_button', 'new')}</Button>
+                  </div>
+                </div>
+              </>
+            )}
             </>
           )}
 

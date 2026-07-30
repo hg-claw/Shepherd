@@ -461,4 +461,32 @@ describe('singbox/InboundDialog', () => {
       )
     )
   })
+
+  it('blocks relay creation without upstream selection and shows error', async () => {
+    const spy = vi.spyOn(pluginsAPI, 'createSingboxInbound')
+    const callsBefore = spy.mock.calls.length
+
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+
+    fireEvent.change(screen.getByLabelText(/role/i), { target: { value: 'relay' } })
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/upstream/i)).toBeInTheDocument()
+    })
+
+    // Leave upstream picker on its empty placeholder value, click create
+    const createBtn = screen.getByRole('button', { name: /create/i })
+    fireEvent.click(createBtn)
+
+    // Error message should appear (case-insensitive match for the English copy)
+    await waitFor(() => {
+      expect(screen.getByText(/select an upstream landing/i)).toBeInTheDocument()
+    })
+
+    // createSingboxInbound was NOT called
+    expect(spy.mock.calls.length).toBe(callsBefore)
+  })
 })

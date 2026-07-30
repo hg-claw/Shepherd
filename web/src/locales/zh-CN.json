@@ -574,6 +574,7 @@
       "mode_proxy_desc": "本中继用自己的凭据终结自己的协议，再拨号到落地。下面的协议可以随便选，不必与落地相同。",
       "port_label": "端口",
       "protocol_label": "协议",
+      "snell_needs_114": "Snell 需要该主机的 sing-box 1.14+，请先在部署页升级。",
       "alias_label": "别名（可选）",
       "alias_placeholder": "可选：节点别名，留空用默认命名",
       "uuid_label": "UUID",

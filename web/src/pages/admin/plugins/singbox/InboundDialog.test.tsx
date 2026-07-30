@@ -66,6 +66,20 @@ vi.mock('@/api/plugins', () => ({
   patchSingboxInbound:  vi.fn().mockResolvedValue({ id: 1 }),
   generateX25519:       vi.fn().mockResolvedValue({ private_key: 'priv123', public_key: 'pub456' }),
   generateShortID:      vi.fn().mockResolvedValue({ short_id: 'aabb1122' }),
+  // Default host fixture: server_id 1 is on sing-box 1.13.14 — below the
+  // snell 1.14 gate. Tests that need a different version override this
+  // per-render with vi.spyOn(...).mockResolvedValueOnce(...).
+  listPluginHosts:      vi.fn().mockResolvedValue([
+    {
+      id: 1,
+      server_id: 1,
+      config: null,
+      deployed_version: '1.13.14',
+      status: 'running',
+      last_error: null,
+      updated_at: '2026-01-01T00:00:00Z',
+    },
+  ]),
 }))
 
 vi.mock('@/store/ui', () => ({
@@ -548,5 +562,90 @@ describe('singbox/InboundDialog', () => {
 
     // createSingboxInbound was NOT called
     expect(spy.mock.calls.length).toBe(callsBefore)
+  })
+
+  // ── snell / sing-box 1.14 version warning ──
+
+  it('warns when snell is picked on a host below sing-box 1.14', async () => {
+    // Default host fixture (server_id 1) is on 1.13.14 — below the gate.
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    const select = screen.getByRole('combobox', { name: /protocol/i })
+    fireEvent.change(select, { target: { value: 'snell-v5' } })
+    await waitFor(() => expect(screen.getByText(/1\.14/)).toBeInTheDocument())
+  })
+
+  it('does not warn for snell on a host at 1.14, nor for non-snell on a host below 1.14', async () => {
+    vi.spyOn(pluginsAPI, 'listPluginHosts').mockResolvedValueOnce([
+      {
+        id: 1,
+        server_id: 1,
+        config: null,
+        deployed_version: 'v1.14.0-beta.2',
+        status: 'running',
+        last_error: null,
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+    ])
+    const first = render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    fireEvent.change(screen.getByRole('combobox', { name: /protocol/i }), { target: { value: 'snell-v5' } })
+    await waitFor(() => expect(screen.getByLabelText(/psk/i)).toBeTruthy())
+    await waitFor(() => expect(screen.queryByText(/1\.14/)).not.toBeInTheDocument())
+    first.unmount()
+
+    // Default fixture host (server_id 1) is on 1.13.14 — a non-snell
+    // protocol must never warn, regardless of host version.
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    fireEvent.change(screen.getByRole('combobox', { name: /protocol/i }), { target: { value: 'trojan-tls' } })
+    await waitFor(() => expect(screen.getByLabelText(/password/i)).toBeTruthy())
+    await waitFor(() => expect(screen.queryByText(/1\.14/)).not.toBeInTheDocument())
+  })
+
+  it('does not warn for a forward-mode relay pointing at a snell landing', async () => {
+    // A landing whose protocol is snell — normally enough to trigger the
+    // warning — but a forward relay renders as `direct` and never runs
+    // snell, so it must be exempt even though the host is on 1.13.14
+    // (the default fixture, below the gate).
+    vi.spyOn(pluginsAPI, 'listSingboxInbounds').mockResolvedValueOnce([
+      {
+        id: 21,
+        server_id: 1,
+        server_name: 'S1',
+        tag: 'snell-landing-fixture',
+        alias: '',
+        port: 5201,
+        role: 'landing',
+        protocol: 'snell-v5',
+        password: 'landing-psk',
+        upstream_inbound_id: null,
+        upstream_tag: null,
+        upstream_server_id: null,
+        upstream_server_name: null,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+    ])
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    fireEvent.change(screen.getByLabelText(/role/i), { target: { value: 'relay' } })
+
+    await waitFor(() => {
+      const opts = within(screen.getByLabelText(/upstream/i)).getAllByRole('option')
+      expect(opts.some((o) => (o.textContent ?? '').includes('snell-landing-fixture'))).toBe(true)
+    })
+    fireEvent.change(screen.getByLabelText(/upstream/i), { target: { value: '21' } })
+    // forward is the default relay mode — protocol picker stays hidden
+    expect(screen.queryByLabelText(/protocol/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/1\.14/)).not.toBeInTheDocument()
   })
 })

@@ -10,10 +10,11 @@ import {
 import { useUI } from '@/store/ui'
 import {
   listSingboxCerts, listSingboxInbounds, createSingboxInbound, patchSingboxInbound,
-  generateX25519, generateShortID,
+  generateX25519, generateShortID, listPluginHosts,
   type SingboxInbound, type SingboxProtocol,
 } from '@/api/plugins'
 import { randomUUID, randomPort, randomPassword, randomSSKey } from '../xray/templates'
+import { singboxMinorAtLeast } from './version'
 
 // ─── Protocol list ───────────────────────────────────────────────────────────
 
@@ -192,6 +193,22 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
   // switch is short-circuited server-side, so every protocol field is
   // dead weight. Collapse them and inherit the landing's protocol.
   const isForward = role === 'relay' && relayMode === 'forward'
+
+  // ── Snell / sing-box 1.14 version warning ──
+  // Same query key as InboundsTab uses — served from cache, no second
+  // request. Rows carry deployed_version, which is free-form and often
+  // null on hosts installed before the version column was populated.
+  const { data: hosts = [] } = useQuery({
+    queryKey: ['plugin-hosts', 'singbox'],
+    queryFn: () => listPluginHosts('singbox'),
+  })
+  const hostVersion = hosts.find((h) => h.server_id === serverID)?.deployed_version ?? null
+  const isSnellProtocol = protocol === 'snell-v5' || protocol === 'snell-v6'
+  // Backend refuses the create with 409 anyway (inboundNeeds114); this is
+  // just so it isn't a surprise. Not a disable — the host's version can
+  // change while the dialog is open. Forward relays are exempt: they
+  // render as `direct` and never run snell (see isForward above).
+  const snellNeedsUpgrade = !isForward && isSnellProtocol && !singboxMinorAtLeast(hostVersion, 1, 14)
 
   const [error, setError] = useState<string | null>(null)
 
@@ -419,6 +436,12 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
               </div>
             )}
           </div>
+
+          {snellNeedsUpgrade && (
+            <p className="text-xs text-warn">
+              {t('singbox.inbound_dialog.snell_needs_114', 'Snell requires sing-box 1.14+ on this host — upgrade it on the Deploy tab first.')}
+            </p>
+          )}
 
           {/* ── Alias (optional) ── */}
           <div>

@@ -555,6 +555,7 @@
       "mode_proxy_desc": "This relay terminates its own protocol with its own credentials, then dials the landing. Pick any protocol below — it does not have to match the landing.",
       "port_label": "Port",
       "protocol_label": "Protocol",
+      "snell_needs_114": "Snell requires sing-box 1.14+ on this host — upgrade it on the Deploy tab first.",
       "alias_label": "Alias (optional)",
       "alias_placeholder": "Optional — node alias, defaults to an auto-generated name if left blank",
       "uuid_label": "UUID",

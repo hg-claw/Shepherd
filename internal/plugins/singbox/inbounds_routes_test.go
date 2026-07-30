@@ -394,3 +394,55 @@ func TestRoute_CreateNonSnellIgnoresGate(t *testing.T) {
 		t.Fatalf("non-snell create must be unaffected by the gate, got %d: %s", rr.Code, rr.Body)
 	}
 }
+
+// seedRealityLanding inserts a vless-reality landing (server 1, already
+// created by newDeployTestDB) directly via the store, mirroring the
+// construction style in TestAssembleAndDeploy_NoCerts. Returns its id.
+func seedRealityLanding(t *testing.T, store *InboundStore) int64 {
+	t.Helper()
+	id, err := store.Insert(context.Background(), Inbound{
+		ServerID: 1, Tag: store.GenerateTag("landing"), Port: 443,
+		Role: "landing", Protocol: "vless-reality",
+		UUID:                   ptrStr("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+		RealityPrivateKey:      ptrStr("PRIV"),
+		RealityPublicKey:       ptrStr("PUB"),
+		RealityShortID:         ptrStr("aabb1122"),
+		RealityHandshakeServer: ptrStr("www.icloud.com"),
+		RealityHandshakePort:   ptrI64(443),
+		SNI:                    ptrStr("www.icloud.com"),
+	})
+	if err != nil {
+		t.Fatalf("seed reality landing: %v", err)
+	}
+	return id
+}
+
+func TestValidatePostInbound_ForwardRelayExemptFromRealityCredentials(t *testing.T) {
+	ctx := context.Background()
+	store := &InboundStore{DB: newDeployTestDB(t), Now: time.Now}
+	landingID := seedRealityLanding(t, store)
+
+	// A forward relay renders as a sing-box "direct" inbound — renderInbound
+	// short-circuits before the protocol switch, so no reality field is ever
+	// read. Demanding them makes the default bulk-relay action fail.
+	fwd := postInboundBody{
+		ServerID: 2, Port: 8443, Role: "relay", RelayMode: "forward",
+		Protocol: "vless-reality", UpstreamInboundID: &landingID,
+	}
+	if err := validatePostInbound(ctx, store, fwd); err != nil {
+		t.Fatalf("forward relay must not require reality credentials, got: %v", err)
+	}
+
+	// Proxy relays and landings still must carry them.
+	proxy := fwd
+	proxy.RelayMode = "proxy"
+	if err := validatePostInbound(ctx, store, proxy); err == nil {
+		t.Error("proxy relay without reality_private_key must still be rejected")
+	}
+	landing := postInboundBody{
+		ServerID: 2, Port: 8444, Role: "landing", Protocol: "vless-reality",
+	}
+	if err := validatePostInbound(ctx, store, landing); err == nil {
+		t.Error("landing without reality_private_key must still be rejected")
+	}
+}

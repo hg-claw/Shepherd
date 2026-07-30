@@ -124,7 +124,13 @@ func validatePostInbound(ctx context.Context, store *InboundStore, body postInbo
 	// sing-box fails at runtime with "REALITY: failed to dial dest:
 	// invalid address". Catch at the API boundary so the UI surfaces
 	// the real reason instead of a sing-box crash log.
-	if body.Protocol == "vless-reality" {
+	//
+	// Forward relays are exempt for the same reason snell's psk check is:
+	// renderInbound short-circuits them into a "direct" inbound before the
+	// protocol switch, so none of these fields is ever read. Demanding them
+	// made the default bulk-relay action on a reality landing fail.
+	forwardRelay := body.Role == "relay" && body.RelayMode == "forward"
+	if body.Protocol == "vless-reality" && !forwardRelay {
 		if body.RealityPrivateKey == nil || *body.RealityPrivateKey == "" {
 			return errors.New("reality_private_key required for vless-reality")
 		}

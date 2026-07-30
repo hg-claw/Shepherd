@@ -63,7 +63,7 @@
 
 凭据沿用现有生成按钮（UUID / 密码 / SS key / x25519 / short id）。
 
-这条路径天然修掉了一个既有 bug：`validatePostInbound`（`inbounds_routes.go:127-136`）对 `vless-reality` 无条件要求 `reality_handshake_server` 与 `reality_handshake_port`，而 `BulkRelayDialog` 的 proxy+reality 分支不发这两个字段，所以用批量对话框创建代理模式的 reality 中继今天会被 API 拒绝。InboundDialog 本来就有 handshake 字段，走这条路即可正确创建。
+这条路径天然绕开了一个既有 bug（该 bug 本身在下一节单独修）：`validatePostInbound`（`inbounds_routes.go:127-136`）对 `vless-reality` 无条件要求 `reality_handshake_server` 与 `reality_handshake_port`，而 `BulkRelayDialog` 的 proxy+reality 分支不发这两个字段。InboundDialog 本来就有 handshake 字段，走这条路即可正确创建。
 
 ### 版本提示
 
@@ -73,9 +73,22 @@
 
 这只是提前提示：创建仍会被后端 409 拦下（`inboundNeeds114` 前置校验），警告的作用是让它不成为意外。
 
+### 修复 BulkRelayDialog 的 proxy+reality 创建失败
+
+`buildRelayBody`（`BulkRelayDialog.tsx:113-121`）的 `vless-reality` 分支只发 uuid、sni 与三把 reality 密钥，**不发 handshake**，而后端无条件要求它。结果：批量对话框在代理模式下建 reality 中继一定失败，报 `reality_handshake_server required for vless-reality`。该分支还特意做了 x25519 密钥生成与竞态保护，却在最后一步过不去。
+
+修法是从落地继承 handshake 目标（两个字段已在 GET 响应中暴露，只有私钥被脱敏）：
+
+```ts
+reality_handshake_server: landing.reality_handshake_server,
+reality_handshake_port: landing.reality_handshake_port,
+```
+
+中继仍使用自己新生成的密钥对（`d.privateKey` / `d.publicKey` / `d.shortID`），只是复用同一个伪装目标——这既是合理默认值，也无需新增 UI。
+
 ### 顺带修正
 
-`InboundDialog.tsx:289` 编辑中继时的说明文字称「handshake server / port 从上游落地继承，此处不可编辑」——这是错的。`renderVlessReality`（`render.go:248-281`）读的是**中继行自己的** `RealityHandshakeServer` / `RealityHandshakePort`，没有任何继承。修正措辞。
+`InboundDialog.tsx:289` 编辑中继时的说明文字称「handshake server / port 从上游落地继承，此处不可编辑」。`renderVlessReality`（`render.go:248-281`）读的是**中继行自己的** `RealityHandshakeServer` / `RealityHandshakePort`——上面的修复让批量创建的中继确实是从落地复制来的，但值存在中继行上，不存在运行期继承。修正措辞，避免读者以为改落地就能传播到中继。
 
 ## 测试
 
@@ -85,11 +98,11 @@
 - 代理模式 + snell-v5：提交 `password`（psk）与 `extra` 的 `obfs_mode`，不含 sni / cert_id / transport。
 - 代理模式 + vless-reality：提交包含 `reality_handshake_server` 与 `reality_handshake_port`（这是 BulkRelayDialog 缺失、导致创建失败的字段）。
 - 代理模式 + trojan-ws-tls：提交包含 `cert_id`、`sni`、`transport_path`。
+- BulkRelayDialog 代理模式 + reality 落地：提交体包含从落地复制来的 `reality_handshake_server` 与 `reality_handshake_port`，且 reality 密钥仍是新生成的（不等于落地的公钥）。该测试在修复前必须失败。
 - 版本警告：目标服务器 1.13.x + snell 时出现；1.14.0-beta.2 + snell 时不出现；1.13.x + 非 snell 时不出现。
 - 既有落地创建流程与中继编辑流程无回归。
 
 ## 不做
 
 - mobile 的中继创建（既有缺口，另开一轮评估）。
-- 修 `BulkRelayDialog` 的 proxy+reality handshake 缺失——批量中继按用户判断优先级不高，且 InboundDialog 这条路已能正确建 reality 中继。仅在该分支处留注释指向正确路径。
-- 批量创建混合协议中继。
+- 给 BulkRelayDialog 加协议选择器 / 批量创建混合协议中继——批量场景按用户判断优先级不高，混合协议走 InboundDialog。BulkRelayDialog 本次只修 reality handshake 缺失。

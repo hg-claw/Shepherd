@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog'
 import { useUI } from '@/store/ui'
 import {
-  listSingboxCerts, createSingboxInbound, patchSingboxInbound,
+  listSingboxCerts, listSingboxInbounds, createSingboxInbound, patchSingboxInbound,
   generateX25519, generateShortID,
   type SingboxInbound, type SingboxProtocol,
 } from '@/api/plugins'
@@ -132,6 +132,15 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
   })
   const validCerts = certs.filter((c) => c.status === 'active')
 
+  // ── Inbounds (for the relay upstream picker) ──
+  // Same key as InboundsTab's list — react-query serves this from cache
+  // instead of refetching. Only needed while creating a relay.
+  const { data: allInbounds = [] } = useQuery({
+    queryKey: ['singbox', 'inbounds'],
+    queryFn: () => listSingboxInbounds(),
+  })
+  const landings = allInbounds.filter((i) => i.role === 'landing')
+
   // ── Form state ──
   const [protocol, setProtocol] = useState<SingboxProtocol>(initial?.protocol ?? 'vless-reality')
   const [port, setPort]         = useState<string>(String(initial?.port ?? randomPort()))
@@ -169,6 +178,18 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
   const [snellMode, setSnellMode] = useState<string>(
     typeof initialExtra.mode === 'string' ? initialExtra.mode : SNELL_MODES[0],
   )
+
+  // Relay wiring. These three are create-only: the backend's InboundPatch
+  // carries no role / relay_mode / protocol / upstream_inbound_id, so the
+  // patch path neither reads nor writes them.
+  const [role, setRole]             = useState<'landing' | 'relay'>('landing')
+  const [upstreamID, setUpstreamID] = useState<string>('')
+  const [relayMode, setRelayMode]   = useState<'forward' | 'proxy'>('forward')
+
+  // Not consumed yet — forward-mode field collapsing / protocol
+  // inheritance from the landing is Task 3.
+  const selectedLanding = landings.find((l) => String(l.id) === upstreamID)
+  void selectedLanding
 
   const [error, setError] = useState<string | null>(null)
 
@@ -228,7 +249,13 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
         void _sid; void _proto
         return patchSingboxInbound(initial!.id, patch as never)
       }
-      body.role = 'landing'
+      if (role === 'relay') {
+        body.role = 'relay'
+        body.relay_mode = relayMode
+        body.upstream_inbound_id = Number(upstreamID)
+      } else {
+        body.role = 'landing'
+      }
       return createSingboxInbound(body as never)
     },
     onSuccess: () => {
@@ -263,6 +290,15 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
     }
   }
 
+  function handleSave() {
+    setError(null)
+    if (!isEdit && role === 'relay' && !upstreamID) {
+      setError(t('singbox.inbound_dialog.upstream_required', 'Select an upstream landing'))
+      return
+    }
+    save.mutate()
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
 
   const inputCls = 'h-8 font-mono text-sm mt-0.5'
@@ -289,6 +325,69 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
               {t('singbox.inbound_dialog.relay_edit_notice', 'Editing a relay. Handshake server / port are inherited from the upstream landing and not editable here — change them on the landing inbound to propagate.')}
             </div>
           )}
+
+          {/* ── Role / upstream / relay mode — create-only. The backend's
+              InboundPatch carries none of these, so editing never shows
+              them (see isRelayEdit above for the edit-mode relay view). ── */}
+          {!isEdit && (
+            <>
+              <div>
+                <Label className={labelCls} htmlFor="ib-role">{t('singbox.inbound_dialog.role', 'Role')}</Label>
+                <select id="ib-role"
+                  className={selectCls}
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as 'landing' | 'relay')}>
+                  <option value="landing">{t('singbox.inbound_dialog.role_landing', 'Landing')}</option>
+                  <option value="relay">{t('singbox.inbound_dialog.role_relay', 'Relay')}</option>
+                </select>
+              </div>
+              {role === 'relay' && (
+                <>
+                  <div>
+                    <Label className={labelCls} htmlFor="ib-upstream">{t('singbox.inbound_dialog.upstream', 'Upstream landing')}</Label>
+                    <select id="ib-upstream"
+                      className={selectCls}
+                      value={upstreamID}
+                      onChange={(e) => setUpstreamID(e.target.value)}>
+                      <option value="">{t('singbox.inbound_dialog.upstream_placeholder', 'Select a landing…')}</option>
+                      {landings.map((l) => (
+                        <option key={l.id} value={String(l.id)}>
+                          {l.server_name} / {l.tag} / {l.protocol}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label className={labelCls}>{t('singbox.inbound_dialog.relay_mode', 'Relay mode')}</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={relayMode === 'forward' ? 'default' : 'outline'}
+                        onClick={() => setRelayMode('forward')}
+                      >
+                        {t('singbox.inbound_dialog.mode_forward', 'Forward')}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={relayMode === 'proxy' ? 'default' : 'outline'}
+                        onClick={() => setRelayMode('proxy')}
+                      >
+                        {t('singbox.inbound_dialog.mode_proxy', 'Proxy')}
+                      </Button>
+                    </div>
+                    <p className="text-2xs text-muted-foreground mt-0.5">
+                      {relayMode === 'forward'
+                        ? t('singbox.inbound_dialog.mode_forward_desc', 'Transparently forwards raw bytes to the landing. Clients speak the landing\'s protocol; this relay needs no credentials.')
+                        : t('singbox.inbound_dialog.mode_proxy_desc', 'This relay terminates its own protocol with its own credentials, then dials the landing. Pick any protocol below — it does not have to match the landing.')}
+                    </p>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
           {/* ── Port + Protocol ── */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -524,7 +623,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>{t('common.cancel', 'Cancel')}</Button>
-          <Button disabled={save.isPending} onClick={() => save.mutate()}>
+          <Button disabled={save.isPending} onClick={handleSave}>
             {save.isPending
               ? (isEdit ? t('singbox.inbound_dialog.saving', 'Saving…') : t('singbox.inbound_dialog.creating', 'Creating…'))
               : (isEdit ? t('singbox.inbound_dialog.save_button', 'Save') : t('common.create', 'Create'))}

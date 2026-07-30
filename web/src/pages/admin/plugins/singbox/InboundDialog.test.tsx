@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nextProvider } from 'react-i18next'
@@ -17,6 +17,47 @@ vi.mock('@/api/plugins', () => ({
       challenge_type: 'http-01',
       last_renew_attempt_at: null,
       last_error: null,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    },
+  ]),
+  // Fixtures for the relay-wiring controls: one landing (id 11 — the
+  // dialog's upstream picker must offer it) and one relay (the picker
+  // must NOT offer it — only landings can be upstreams).
+  listSingboxInbounds:  vi.fn().mockResolvedValue([
+    {
+      id: 11,
+      server_id: 1,
+      server_name: 'S1',
+      tag: 'landing-fixture-tag',
+      alias: '',
+      port: 443,
+      role: 'landing',
+      protocol: 'trojan-tls',
+      password: 'landing-pass',
+      sni: 'example.com',
+      cert_id: null,
+      upstream_inbound_id: null,
+      upstream_tag: null,
+      upstream_server_id: null,
+      upstream_server_name: null,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    },
+    {
+      id: 12,
+      server_id: 1,
+      server_name: 'S1',
+      tag: 'relay-fixture-tag',
+      alias: '',
+      port: 8443,
+      role: 'relay',
+      protocol: 'trojan-tls',
+      relay_mode: 'forward',
+      upstream_inbound_id: 11,
+      upstream_tag: 'landing-fixture-tag',
+      upstream_server_id: 1,
+      upstream_server_name: 'S1',
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     },
@@ -334,6 +375,89 @@ describe('singbox/InboundDialog', () => {
       expect(spy).toHaveBeenCalledWith(
         5,
         expect.objectContaining({ alias: '' }),
+      )
+    )
+  })
+
+  // ── Relay wiring (role / upstream / relay_mode) — create-only ──
+
+  it('landing is the default role and shows no relay controls', () => {
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    expect(screen.queryByLabelText(/upstream/i)).not.toBeInTheDocument()
+  })
+
+  it('choosing relay reveals the upstream picker and mode toggle', async () => {
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    fireEvent.change(screen.getByLabelText(/role/i), { target: { value: 'relay' } })
+    expect(screen.getByLabelText(/upstream/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /proxy/i })).toBeInTheDocument()
+  })
+
+  it('the upstream picker lists only landings', async () => {
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    fireEvent.change(screen.getByLabelText(/role/i), { target: { value: 'relay' } })
+
+    // fixture inbounds include a relay row (id 12, role='relay') — it must
+    // never appear as an upstream option, only the landing (id 11) can.
+    await waitFor(() => {
+      const opts = within(screen.getByLabelText(/upstream/i)).getAllByRole('option')
+      const labels = opts.map((o) => o.textContent ?? '')
+      expect(labels.some((l) => l.includes('landing-fixture-tag'))).toBe(true)
+    })
+    const opts = within(screen.getByLabelText(/upstream/i)).getAllByRole('option')
+    const labels = opts.map((o) => o.textContent ?? '')
+    expect(labels.some((l) => l.includes('relay-fixture-tag'))).toBe(false)
+  })
+
+  it('proxy-mode relay submits role, upstream and its own protocol credentials', async () => {
+    const spy = vi.spyOn(pluginsAPI, 'createSingboxInbound')
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+
+    fireEvent.change(screen.getByLabelText(/role/i), { target: { value: 'relay' } })
+
+    // Wait for the landings query to resolve so the id=11 option exists
+    // before selecting it.
+    await waitFor(() => {
+      const opts = within(screen.getByLabelText(/upstream/i)).getAllByRole('option')
+      expect(opts.some((o) => (o.textContent ?? '').includes('landing-fixture-tag'))).toBe(true)
+    })
+    fireEvent.change(screen.getByLabelText(/upstream/i), { target: { value: '11' } })
+    fireEvent.click(screen.getByRole('button', { name: /proxy/i }))
+
+    const protoSelect = screen.getByRole('combobox', { name: /protocol/i })
+    fireEvent.change(protoSelect, { target: { value: 'snell-v5' } })
+
+    await waitFor(() => expect(screen.getByLabelText(/psk/i)).toBeTruthy())
+    fireEvent.change(screen.getByLabelText(/psk/i), { target: { value: 'relay-psk-value' } })
+
+    const createBtn = screen.getByRole('button', { name: /create/i })
+    fireEvent.click(createBtn)
+
+    // This spy isn't cleared between tests (see file-level beforeEach), so
+    // match by shape rather than indexing into mock.calls[0] — earlier
+    // tests in this file already invoked createSingboxInbound.
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          role: 'relay',
+          relay_mode: 'proxy',
+          upstream_inbound_id: 11,
+          // the relay speaks its OWN protocol, not the landing's
+          protocol: 'snell-v5',
+          password: 'relay-psk-value',
+        }),
       )
     )
   })

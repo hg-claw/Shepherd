@@ -439,6 +439,15 @@ func TestValidatePostInbound_ForwardRelayExemptFromRealityCredentials(t *testing
 	if err := validatePostInbound(ctx, store, proxy); err == nil {
 		t.Error("proxy relay without reality_private_key must still be rejected")
 	}
+	// An omitted relay_mode means proxy, not forward: InboundStore.Insert
+	// normalizes "" -> "proxy" to match the column DEFAULT. This case is
+	// what distinguishes the shipped `== "forward"` exemption from a
+	// `!= "proxy"` one, which would wrongly wave such a row through.
+	defaulted := fwd
+	defaulted.RelayMode = ""
+	if err := validatePostInbound(ctx, store, defaulted); err == nil {
+		t.Error("relay with empty relay_mode (= proxy) without reality_private_key must still be rejected")
+	}
 	landing := postInboundBody{
 		ServerID: 2, Port: 8444, Role: "landing", Protocol: "vless-reality",
 	}

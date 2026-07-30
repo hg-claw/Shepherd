@@ -116,14 +116,10 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
     try { return initial?.extra_json ? JSON.parse(initial.extra_json) : {} }
     catch { return {} }
   })()
-  // Relays have a different shape from landings: they're created by
-  // BulkRelayDialog and store the relay-side keys, NOT the landing-side
-  // handshake server / private key (those are landing-only concepts in
-  // our model — see render.go renderVlessReality). Treating a relay
-  // like a landing during edit overwrote the relay's NULL columns with
-  // dialog defaults ('', '443'), which the renderer then emitted into
-  // the config and broke the relay. Detect role and adapt: hide the
-  // landing-only fields and skip them in the patch body.
+  // Relays have a different shape from landings: only their own
+  // inbound-side credentials live on the row — everything upstream-side is
+  // read live off the landing through the JOIN on every deploy. Detect the
+  // role so the edit view can say so and adapt its field set.
   const isRelayEdit = isEdit && initial!.role === 'relay'
 
   // ── Certs ──
@@ -194,6 +190,21 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
   // dead weight. Collapse them and inherit the landing's protocol.
   const isForward = role === 'relay' && relayMode === 'forward'
 
+  // `role`/`relayMode` are create-only state and are deliberately never
+  // seeded from `initial`, so `isForward` is structurally false for every
+  // edit. Anything that must also behave correctly while *editing* a
+  // forward relay has to consult the row itself — use this predicate, not
+  // `isForward`, so create and edit cannot drift apart.
+  const isForwardRelay = isForward || initial?.relay_mode === 'forward'
+
+  // Forward relays own no reality data at all: renderInbound short-circuits
+  // to `direct` before the protocol switch, so their reality columns stay
+  // NULL and writing the dialog's empty defaults ('', 443) into them
+  // corrupts the row. Proxy relays are the opposite — renderVlessReality
+  // reads reality_handshake_server/_port off the relay's own row, and both
+  // creation paths fill them in, so they must stay editable.
+  const hideRelayHandshake = isRelayEdit && isForwardRelay
+
   // ── Snell / sing-box 1.14 version warning ──
   // Same query key as InboundsTab uses — served from cache, no second
   // request. Rows carry deployed_version, which is free-form and often
@@ -203,12 +214,20 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
     queryFn: () => listPluginHosts('singbox'),
   })
   const hostVersion = hosts.find((h) => h.server_id === serverID)?.deployed_version ?? null
-  const isSnellProtocol = protocol === 'snell-v5' || protocol === 'snell-v6'
+  const hostBelow114 = !singboxMinorAtLeast(hostVersion, 1, 14)
   // Backend refuses the create with 409 anyway (inboundNeeds114); this is
   // just so it isn't a surprise. Not a disable — the host's version can
   // change while the dialog is open. Forward relays are exempt: they
-  // render as `direct` and never run snell (see isForward above).
-  const snellNeedsUpgrade = !isForward && isSnellProtocol && !singboxMinorAtLeast(hostVersion, 1, 14)
+  // render as `direct` and never run snell (see isForwardRelay above).
+  const snellNeedsUpgrade = !isForwardRelay && isSnell(protocol) && hostBelow114
+  // A proxy relay dialing a snell landing gets a {"type":"snell"} OUTBOUND
+  // on *this* host (render.go renderRelayOutbound), which a 1.13 binary
+  // rejects outright. inboundNeeds114 / the create pre-flight are
+  // inbound-only by construction and gate on the relay's own protocol, so
+  // nothing server-side catches this combination — warn here.
+  const upstreamSnellNeedsUpgrade =
+    role === 'relay' && relayMode === 'proxy' &&
+    !!selectedLanding && isSnell(selectedLanding.protocol) && hostBelow114
 
   const [error, setError] = useState<string | null>(null)
 
@@ -247,10 +266,10 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
           }
           body.reality_public_key        = pubKey
           body.reality_short_id          = shortID
-          // Skip the landing-only handshake fields when editing a relay
-          // — relays don't have these in our schema and overwriting
-          // with the dialog's empty defaults corrupts the row.
-          if (!isRelayEdit) {
+          // Skip the handshake fields only when editing a forward relay:
+          // its reality columns are NULL by design and the dialog's empty
+          // defaults would corrupt the row (see hideRelayHandshake).
+          if (!hideRelayHandshake) {
             body.reality_handshake_server  = hsServer
             body.reality_handshake_port    = Number(hsPort)
           }
@@ -317,7 +336,12 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
 
   function handleSave() {
     setError(null)
-    if (!isEdit && role === 'relay' && !upstreamID) {
+    // Guard on the resolved landing, not just the raw id: a set-but-
+    // unresolvable upstreamID would otherwise fall through and submit the
+    // relay's own hidden `protocol` state as a forward relay's inherited
+    // label (the reality carve-out now lets such a body pass validation),
+    // silently persisting the wrong protocol.
+    if (!isEdit && role === 'relay' && !selectedLanding) {
       setError(t('singbox.inbound_dialog.upstream_required', 'Select an upstream landing'))
       return
     }
@@ -347,16 +371,23 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
         <div className="space-y-3 py-1">
           {isRelayEdit && (
             <div className="rounded border border-warn/50 bg-warn/10 px-2.5 py-1.5 text-2xs text-warn">
-              <p>{t('singbox.inbound_dialog.relay_edit_notice', "Editing a relay. Its settings live on this row and were fixed when the relay was created — editing the upstream landing does not propagate here.")}</p>
-              {/* Only true for proxy-mode relays whose own protocol is
-                  vless-reality: those carry a keypair + handshake target
-                  that was copied from the landing at creation (or typed by
-                  the admin). Forward relays inherit the landing's protocol
-                  as a label only — nothing was copied — so they must not
-                  see this line even when that inherited protocol happens
-                  to be vless-reality. */}
-              {needsReality(protocol) && initial?.relay_mode !== 'forward' && (
-                <p className="mt-1">{t('singbox.inbound_dialog.relay_edit_notice_reality', 'Its REALITY handshake target was copied from the landing at creation and is stored on this row.')}</p>
+              {/* Deliberately claims nothing about propagation: the
+                  upstream side is NOT frozen at creation. renderInbound
+                  fills a forward relay's override_address/port from the
+                  landing, renderRelayOutbound reads the landing's
+                  protocol/uuid/password/sni live, and subgen + the share
+                  URL build a forward relay's client config from the landing
+                  — all through the JOIN in ListAllWithUpstream, on every
+                  deploy. Only the relay's own inbound-side credentials live
+                  on this row. */}
+              <p>{t('singbox.inbound_dialog.relay_edit_notice', 'Editing a relay. The credentials below belong to this relay row, not to the upstream landing.')}</p>
+              {/* Only proxy-mode vless-reality relays carry a keypair +
+                  handshake target on their own row (renderVlessReality
+                  reads them from it). Forward relays inherit the landing's
+                  protocol as a label only, so they must not see this line
+                  even when that inherited protocol is vless-reality. */}
+              {needsReality(protocol) && !isForwardRelay && (
+                <p className="mt-1">{t('singbox.inbound_dialog.relay_edit_notice_reality', 'Its REALITY handshake target is stored on this relay row.')}</p>
               )}
             </div>
           )}
@@ -399,6 +430,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                         type="button"
                         size="sm"
                         variant={relayMode === 'forward' ? 'default' : 'outline'}
+                        aria-pressed={relayMode === 'forward'}
                         onClick={() => setRelayMode('forward')}
                       >
                         {t('singbox.inbound_dialog.mode_forward', 'Forward')}
@@ -407,6 +439,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                         type="button"
                         size="sm"
                         variant={relayMode === 'proxy' ? 'default' : 'outline'}
+                        aria-pressed={relayMode === 'proxy'}
                         onClick={() => setRelayMode('proxy')}
                       >
                         {t('singbox.inbound_dialog.mode_proxy', 'Proxy')}
@@ -450,6 +483,12 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
           {snellNeedsUpgrade && (
             <p className="text-xs text-warn">
               {t('singbox.inbound_dialog.snell_needs_114', 'Snell requires sing-box 1.14+ on this host — upgrade it on the Deploy tab first.')}
+            </p>
+          )}
+
+          {upstreamSnellNeedsUpgrade && (
+            <p className="text-xs text-warn">
+              {t('singbox.inbound_dialog.upstream_snell_needs_114', 'This landing speaks Snell, so a proxy relay dials it with a Snell outbound — that needs sing-box 1.14+ on this host. Upgrade it on the Deploy tab first, or use Forward mode.')}
             </p>
           )}
 
@@ -556,9 +595,9 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                   </p>
                 </div>
 
-                {/* Short ID + Handshake host (handshake hidden for relays —
-                    not part of their schema). */}
-                <div className={isRelayEdit ? '' : 'grid grid-cols-2 gap-3'}>
+                {/* Short ID + Handshake host (handshake hidden only when
+                    editing a forward relay — see hideRelayHandshake). */}
+                <div className={hideRelayHandshake ? '' : 'grid grid-cols-2 gap-3'}>
                   <div>
                     <Label className={labelCls} htmlFor="ib-sid">{t('singbox.inbound_dialog.short_id_label', 'Short ID')}</Label>
                     <div className="flex gap-2">
@@ -568,7 +607,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                         onClick={genShortID}>{t('singbox.inbound_dialog.gen_button', 'Gen')}</Button>
                     </div>
                   </div>
-                  {!isRelayEdit && (
+                  {!hideRelayHandshake && (
                     <div>
                       <Label className={labelCls} htmlFor="ib-hs">{t('singbox.inbound_dialog.handshake_host_label', 'Handshake host')}</Label>
                       <Input id="ib-hs" className={inputCls}
@@ -578,7 +617,7 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
                   )}
                 </div>
 
-                {!isRelayEdit && (
+                {!hideRelayHandshake && (
                   <div>
                     <Label className={labelCls} htmlFor="ib-hp">{t('singbox.inbound_dialog.handshake_port_label', 'Handshake port')}</Label>
                     <Input id="ib-hp" className={inputCls + ' w-28'}

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nextProvider } from 'react-i18next'
@@ -21,9 +21,9 @@ vi.mock('@/api/plugins', () => ({
       updated_at: '2026-01-01T00:00:00Z',
     },
   ]),
-  // Fixtures for the relay-wiring controls: one landing (id 11 — the
-  // dialog's upstream picker must offer it) and one relay (the picker
-  // must NOT offer it — only landings can be upstreams).
+  // Fixtures for the relay-wiring controls: two landings (id 11 and the
+  // snell id 13 — the dialog's upstream picker must offer both) and one
+  // relay (the picker must NOT offer it — only landings can be upstreams).
   listSingboxInbounds:  vi.fn().mockResolvedValue([
     {
       id: 11,
@@ -58,6 +58,25 @@ vi.mock('@/api/plugins', () => ({
       upstream_tag: 'landing-fixture-tag',
       upstream_server_id: 1,
       upstream_server_name: 'S1',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    },
+    // A snell landing: dialing it from a proxy relay emits a snell
+    // OUTBOUND on the relay's host, which needs sing-box 1.14+ there.
+    {
+      id: 13,
+      server_id: 2,
+      server_name: 'S2',
+      tag: 'landing-snell-tag',
+      alias: '',
+      port: 8388,
+      role: 'landing',
+      protocol: 'snell-v5',
+      password: 'landing-psk',
+      upstream_inbound_id: null,
+      upstream_tag: null,
+      upstream_server_id: null,
+      upstream_server_name: null,
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     },
@@ -596,6 +615,39 @@ describe('singbox/InboundDialog', () => {
     expect(screen.queryByText(/REALITY handshake target/i)).toBeNull()
   })
 
+  it('the relay edit notice claims credential ownership, not frozen upstream data', async () => {
+    const inbound = {
+      id: 23,
+      server_id: 1,
+      server_name: 'S1',
+      tag: 'relay-notice',
+      alias: '',
+      port: 9003,
+      role: 'relay' as const,
+      protocol: 'trojan-tls' as const,
+      password: 'relay-pass',
+      relay_mode: 'proxy' as const,
+      upstream_inbound_id: 11,
+      upstream_tag: 'landing-fixture-tag',
+      upstream_server_id: 1,
+      upstream_server_name: 'S1',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    }
+    render(
+      <InboundDialog serverID={1} initial={inbound} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    const notice = await waitFor(() => screen.getByText(/editing a relay/i))
+    expect(notice.textContent).toMatch(/belong to this relay row/i)
+    // The upstream side is NOT frozen at creation: ListAllWithUpstream JOINs
+    // the landing on every deploy, and renderInbound / renderRelayOutbound /
+    // subgen / the share URL all read it live. Any wording claiming landing
+    // edits don't reach the relay is false.
+    expect(notice.textContent).not.toMatch(/propagate/i)
+    expect(notice.textContent).not.toMatch(/fixed when the relay was created/i)
+  })
+
   it('renders REALITY-specific wording when editing a proxy relay whose own protocol is vless-reality', async () => {
     const inbound = {
       id: 21,
@@ -724,5 +776,246 @@ describe('singbox/InboundDialog', () => {
     fireEvent.change(screen.getByLabelText(/role/i), { target: { value: 'relay' } })
     expect(screen.queryByLabelText(/protocol/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/1\.14/)).not.toBeInTheDocument()
+  })
+
+  it('does not warn when EDITING a forward relay whose inherited protocol is snell', async () => {
+    // `role`/`relayMode` are create-only state, so the create-time
+    // `isForward` is false for every edit. A forward relay renders as
+    // `direct` and never runs snell, so the warning must stay away — which
+    // only works if the predicate also consults initial.relay_mode.
+    const base = {
+      id: 30,
+      server_id: 1,
+      server_name: 'S1',
+      tag: 'relay-forward-snell',
+      alias: '',
+      port: 9100,
+      role: 'relay' as const,
+      protocol: 'snell-v5' as const,
+      upstream_inbound_id: 13,
+      upstream_tag: 'landing-snell-tag',
+      upstream_server_id: 2,
+      upstream_server_name: 'S2',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    }
+    // Positive control first: the same row in proxy mode DOES run snell on
+    // this host (1.13.14 fixture), so the warning must appear. This proves
+    // the negative case below isn't passing for some unrelated reason.
+    const proxyView = render(
+      <InboundDialog serverID={1} initial={{ ...base, relay_mode: 'proxy' as const }}
+        open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    await waitFor(() => expect(screen.getByText(/Snell requires sing-box 1\.14/i)).toBeInTheDocument())
+    proxyView.unmount()
+
+    render(
+      <InboundDialog serverID={1} initial={{ ...base, relay_mode: 'forward' as const }}
+        open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    // Wait for the dialog to be fully rendered before asserting absence.
+    await waitFor(() => expect(screen.getByText(/editing a relay/i)).toBeInTheDocument())
+    expect(screen.queryByText(/Snell requires sing-box 1\.14/i)).toBeNull()
+  })
+
+  it('warns when a proxy relay dials a snell landing from a host below 1.14', async () => {
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    fireEvent.change(screen.getByLabelText(/role/i), { target: { value: 'relay' } })
+    await waitFor(() => {
+      const opts = within(screen.getByLabelText(/upstream/i)).getAllByRole('option')
+      expect(opts.some((o) => (o.textContent ?? '').includes('landing-snell-tag'))).toBe(true)
+    })
+    // Snell landing (id 13) + forward mode: the relay renders as `direct`,
+    // no snell outbound is emitted, so nothing to warn about.
+    fireEvent.change(screen.getByLabelText(/upstream/i), { target: { value: '13' } })
+    expect(screen.queryByText(/Snell outbound/i)).toBeNull()
+
+    // Proxy mode against the same landing emits a snell outbound on this
+    // host — the relay's own protocol (vless-reality) never triggers the
+    // inbound-side warning, so only the upstream warning can fire here.
+    fireEvent.click(screen.getByRole('button', { name: /^proxy$/i }))
+    await waitFor(() => expect(screen.getByText(/Snell outbound/i)).toBeInTheDocument())
+
+    // A non-snell landing (id 11, trojan-tls) must not warn.
+    fireEvent.change(screen.getByLabelText(/upstream/i), { target: { value: '11' } })
+    expect(screen.queryByText(/Snell outbound/i)).toBeNull()
+  })
+
+  it('does not warn about a snell upstream when the relay host is on 1.14', async () => {
+    vi.spyOn(pluginsAPI, 'listPluginHosts').mockResolvedValueOnce([
+      {
+        id: 1,
+        server_id: 1,
+        config: null,
+        deployed_version: '1.14.2',
+        status: 'running',
+        last_error: null,
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+    ])
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    fireEvent.change(screen.getByLabelText(/role/i), { target: { value: 'relay' } })
+    await waitFor(() => {
+      const opts = within(screen.getByLabelText(/upstream/i)).getAllByRole('option')
+      expect(opts.some((o) => (o.textContent ?? '').includes('landing-snell-tag'))).toBe(true)
+    })
+    fireEvent.change(screen.getByLabelText(/upstream/i), { target: { value: '13' } })
+    fireEvent.click(screen.getByRole('button', { name: /^proxy$/i }))
+    await waitFor(() => expect(screen.queryByText(/Snell outbound/i)).toBeNull())
+  })
+
+  // ── relay mode toggle a11y ──
+
+  it('exposes the relay mode toggle selection via aria-pressed', async () => {
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    fireEvent.change(screen.getByLabelText(/role/i), { target: { value: 'relay' } })
+
+    // forward is the default relay mode
+    expect(screen.getByRole('button', { name: /^forward$/i })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /^proxy$/i })).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.click(screen.getByRole('button', { name: /^proxy$/i }))
+    expect(screen.getByRole('button', { name: /^forward$/i })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: /^proxy$/i })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  // ── unresolvable upstream ──
+
+  it('blocks relay creation when the selected upstream no longer resolves', async () => {
+    // A set-but-unresolvable upstreamID used to fall through the `!upstreamID`
+    // guard and submit the relay's own hidden protocol state as the forward
+    // relay's inherited label — which the reality carve-out now lets pass
+    // backend validation, silently persisting a wrong protocol.
+    const spy = vi.spyOn(pluginsAPI, 'createSingboxInbound')
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <I18nextProvider i18n={i18n}>
+        <QueryClientProvider client={qc}>
+          <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />
+        </QueryClientProvider>
+      </I18nextProvider>,
+    )
+
+    fireEvent.change(screen.getByLabelText(/role/i), { target: { value: 'relay' } })
+    await waitFor(() => {
+      const opts = within(screen.getByLabelText(/upstream/i)).getAllByRole('option')
+      expect(opts.some((o) => (o.textContent ?? '').includes('landing-fixture-tag'))).toBe(true)
+    })
+    fireEvent.change(screen.getByLabelText(/upstream/i), { target: { value: '11' } })
+
+    // The landing disappears from the shared cache — e.g. deleted from the
+    // inbounds table in another tab, which invalidates this same query key.
+    // upstreamID stays '11'; it just no longer resolves.
+    // Must be awaited: react-query notifies observers in a microtask, so a
+    // synchronous act() would leave the component holding the stale list.
+    await act(async () => { qc.setQueryData(['singbox', 'inbounds'], []) })
+    await waitFor(() => {
+      const opts = within(screen.getByLabelText(/upstream/i)).getAllByRole('option')
+      expect(opts.length).toBe(1) // placeholder only
+    })
+
+    const callsBefore = spy.mock.calls.length
+    fireEvent.click(screen.getByRole('button', { name: /create/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/select an upstream landing/i)).toBeInTheDocument()
+    })
+    expect(spy.mock.calls.length).toBe(callsBefore)
+  })
+
+  // ── proxy relays own their REALITY handshake target ──
+
+  it('lets a proxy reality relay edit its own handshake target and sends it in the patch', async () => {
+    const spy = vi.spyOn(pluginsAPI, 'patchSingboxInbound').mockResolvedValue({ id: 31 } as never)
+    const inbound = {
+      id: 31,
+      server_id: 1,
+      server_name: 'S1',
+      tag: 'relay-proxy-reality',
+      alias: '',
+      port: 9200,
+      role: 'relay' as const,
+      protocol: 'vless-reality' as const,
+      relay_mode: 'proxy' as const,
+      uuid: '22222222-2222-2222-2222-222222222222',
+      sni: 'www.icloud.com',
+      reality_public_key: 'pub456',
+      reality_short_id: 'aabb1122',
+      reality_handshake_server: 'www.apple.com',
+      reality_handshake_port: 443,
+      upstream_inbound_id: 11,
+      upstream_tag: 'landing-fixture-tag',
+      upstream_server_id: 1,
+      upstream_server_name: 'S1',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    }
+    render(
+      <InboundDialog serverID={1} initial={inbound} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+
+    // renderVlessReality reads reality_handshake_server/_port off the relay's
+    // OWN row, so the fields must be present and seeded.
+    const hs = await waitFor(() => screen.getByLabelText(/handshake host/i) as HTMLInputElement)
+    expect(hs.value).toBe('www.apple.com')
+    expect((screen.getByLabelText(/handshake port/i) as HTMLInputElement).value).toBe('443')
+
+    fireEvent.change(hs, { target: { value: 'www.microsoft.com' } })
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() => expect(spy).toHaveBeenCalled())
+    expect(spy).toHaveBeenCalledWith(31, expect.objectContaining({
+      reality_handshake_server: 'www.microsoft.com',
+      reality_handshake_port: 443,
+    }))
+  })
+
+  it('still hides the handshake fields when editing a forward relay with an inherited reality protocol', async () => {
+    const spy = vi.spyOn(pluginsAPI, 'patchSingboxInbound').mockResolvedValue({ id: 32 } as never)
+    const inbound = {
+      id: 32,
+      server_id: 1,
+      server_name: 'S1',
+      tag: 'relay-forward-reality-2',
+      alias: '',
+      port: 9201,
+      role: 'relay' as const,
+      protocol: 'vless-reality' as const,
+      relay_mode: 'forward' as const,
+      upstream_inbound_id: 11,
+      upstream_tag: 'landing-fixture-tag',
+      upstream_server_id: 1,
+      upstream_server_name: 'S1',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    }
+    render(
+      <InboundDialog serverID={1} initial={inbound} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    // A forward relay's reality columns are NULL by design (renderInbound
+    // short-circuits to `direct`) — writing the dialog's empty defaults
+    // into them would corrupt the row.
+    await waitFor(() => expect(screen.getByText(/editing a relay/i)).toBeInTheDocument())
+    expect(screen.queryByLabelText(/handshake host/i)).toBeNull()
+    expect(screen.queryByLabelText(/handshake port/i)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    await waitFor(() => expect(spy).toHaveBeenCalled())
+    const patch = spy.mock.calls.find((c) => c[0] === 32)![1] as Record<string, unknown>
+    expect(patch.reality_handshake_server).toBeUndefined()
+    expect(patch.reality_handshake_port).toBeUndefined()
   })
 })

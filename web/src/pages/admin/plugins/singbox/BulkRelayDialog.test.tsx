@@ -31,6 +31,7 @@ const landingVlessReality: pluginsAPI.SingboxInbound = {
   role: 'landing', protocol: 'vless-reality',
   uuid: 'ul', sni: 'www.lovelive-anime.jp',
   reality_public_key: 'PL', reality_private_key: '[REDACTED]', reality_short_id: 'aa',
+  reality_handshake_server: 'www.microsoft.com', reality_handshake_port: 443,
   upstream_inbound_id: null, upstream_tag: null, upstream_server_id: null, upstream_server_name: null,
   cert_id: null,
   created_at: '', updated_at: '',
@@ -200,5 +201,28 @@ describe('singbox/BulkRelayDialog', () => {
     expect(call.uuid).toBeUndefined()
     expect(call.transport_path).toBeUndefined()
     expect(call.extra).toBeUndefined()
+  })
+
+  it('proxy-mode reality relay carries the landing handshake target with its own keys', async () => {
+    // landing fixture must be vless-reality with a handshake target set
+    wrap(<BulkRelayDialog open={true} onOpenChange={() => {}}
+      landingInbound={landingVlessReality} allInbounds={[landingVlessReality]} />)
+    fireEvent.click(await screen.findByRole('button', { name: /proxy.*per-relay/i }))
+    fireEvent.click(await screen.findByLabelText(/select osaka-1/))
+    // Wait for eager fill to generate keys before deploying
+    await waitFor(() => {
+      expect(pluginsAPI.generateX25519).toHaveBeenCalled()
+    })
+    fireEvent.click(screen.getByRole('button', { name: /deploy all/i }))
+    await waitFor(() => {
+      expect(pluginsAPI.createSingboxInbound).toHaveBeenCalledTimes(1)
+    })
+    const call = (pluginsAPI.createSingboxInbound as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(call.reality_handshake_server).toBe('www.microsoft.com')
+    expect(call.reality_handshake_port).toBe(443)
+    // the relay gets FRESH keys — it must not clone the landing's identity
+    expect(call.reality_private_key).toBeTruthy()
+    expect(call.reality_public_key).toBeTruthy()
+    expect(call.reality_public_key).not.toBe('PL')
   })
 })

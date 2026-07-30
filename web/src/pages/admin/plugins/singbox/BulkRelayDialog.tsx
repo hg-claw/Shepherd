@@ -113,6 +113,12 @@ function buildRelayBody(
       reality_public_key: d.publicKey,
       reality_private_key: d.privateKey,
       reality_short_id: d.shortID,
+      // The backend requires a handshake target for vless-reality
+      // unconditionally. Reuse the landing's — the relay still gets its
+      // own freshly generated keypair above, only the camouflage target
+      // is shared.
+      reality_handshake_server: landing.reality_handshake_server,
+      reality_handshake_port: landing.reality_handshake_port,
     }
   }
 

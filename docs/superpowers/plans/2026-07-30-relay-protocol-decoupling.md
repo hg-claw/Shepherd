@@ -12,7 +12,7 @@
 
 - 工作目录 `/Users/hg/project/Shepherd`，分支 `relay-protocol-decoupling`（已存在，spec 在其上）。
 - 前端验证：`web/` 下 `npm run build && npm test`；仓库根 `bash scripts/check-ui-tokens.sh`。
-- **后端不得修改**。任何需要动 `internal/` 的想法都说明理解有误——先停下报告。
+- **后端只允许 Task 2b 那一处改动**（给 `validatePostInbound` 的 vless-reality 校验加转发中继豁免）。除此之外任何 `internal/` 下的改动都说明理解有误——先停下报告。
 - i18n：新增文案的 key 必须同时加入 `web/src/locales/en.json` 与 `web/src/locales/zh-CN.json`，**两个文件的 key 结构必须完全一致**（本仓库已有的硬性不变量）。key 放 `singbox.inbound_dialog.*` 命名空间。
 - 设计系统约束（本仓库已收敛，勿回退）：Button 只用 `size="xs"`(h-7)/`sm`(h-8)/`default`，**禁止**用 className 覆盖高度；Dialog 宽度只用 `max-w-sm`/`max-w-lg`/`max-w-2xl`；状态徽章统一用 `Pill`。
 - **角色、上游、中继模式都是创建期字段**：后端 `InboundPatch` 没有 `Role`/`RelayMode`/`Protocol`/`UpstreamInboundID`，patch 路径既不读也不写它们。因此这三个控件**只在创建模式出现**，编辑模式（含 `isRelayEdit`）行为完全不变。
@@ -310,6 +310,115 @@ Expected: 全绿
 ```bash
 git add web/src/pages/admin/plugins/singbox/InboundDialog.tsx web/src/pages/admin/plugins/singbox/InboundDialog.test.tsx web/src/locales
 git commit -m "feat(web): create relay inbounds from the inbound dialog"
+```
+
+---
+
+### Task 2b: 给 vless-reality 的凭据校验加转发中继豁免（后端）
+
+**Files:**
+- Modify: `internal/plugins/singbox/inbounds_routes.go`（`validatePostInbound` 的 `vless-reality` 块）
+- Test: `internal/plugins/singbox/inbounds_routes_test.go`
+
+**Interfaces:**
+- Consumes: 无。
+- Produces: 无新接口——放宽一条已有校验。
+
+**背景（这是一个生产 bug，不只是为 Task 3 铺路）**
+
+`validatePostInbound` 里两个协议的凭据校验不对称：
+
+- snell 块（`inbounds_routes.go:99-104`）有转发中继豁免，注释写明「转发中继故意不带凭据，它是批量中继 UI 的默认模式」。
+- vless-reality 块（`:127-137`）**没有**豁免，无条件要求 `reality_private_key`、`reality_handshake_server`、`reality_handshake_port`。
+
+转发中继的提交体是「落地协议 + 零凭据」（`BulkRelayDialog.tsx` 的 `if (mode === 'forward') return base`）。所以落地是 vless-reality 时，用**默认**的转发模式建中继今天必然失败，报 `reality_private_key required for vless-reality`。转发是默认模式、reality 是主力协议，这条路径的使用频率高于 Task 1 修的代理模式。
+
+为什么放宽是安全的：转发中继在 `renderInbound`（`render.go`）里于协议 switch **之前**短路，渲染成 `direct` 入站，reality 的任何字段都不会被读取，因此这些字段对它确实无意义。
+
+- [ ] **Step 1: 写失败测试**
+
+追加到 `inbounds_routes_test.go`（沿用该文件既有的 store 构造与断言风格）：
+
+```go
+func TestValidatePostInbound_ForwardRelayExemptFromRealityCredentials(t *testing.T) {
+	ctx := context.Background()
+	store := newTestInboundStore(t) // 若该 helper 不存在，改用文件里现有的构造方式
+	landingID := seedRealityLanding(t, store) // 同上：用文件里已有的落地播种方式
+
+	// A forward relay renders as a sing-box "direct" inbound — renderInbound
+	// short-circuits before the protocol switch, so no reality field is ever
+	// read. Demanding them makes the default bulk-relay action fail.
+	fwd := postInboundBody{
+		ServerID: 2, Port: 8443, Role: "relay", RelayMode: "forward",
+		Protocol: "vless-reality", UpstreamInboundID: &landingID,
+	}
+	if err := validatePostInbound(ctx, store, fwd); err != nil {
+		t.Fatalf("forward relay must not require reality credentials, got: %v", err)
+	}
+
+	// Proxy relays and landings still must carry them.
+	proxy := fwd
+	proxy.RelayMode = "proxy"
+	if err := validatePostInbound(ctx, store, proxy); err == nil {
+		t.Error("proxy relay without reality_private_key must still be rejected")
+	}
+	landing := postInboundBody{
+		ServerID: 2, Port: 8444, Role: "landing", Protocol: "vless-reality",
+	}
+	if err := validatePostInbound(ctx, store, landing); err == nil {
+		t.Error("landing without reality_private_key must still be rejected")
+	}
+}
+```
+
+- [ ] **Step 2: 跑测试确认失败**
+
+Run: `go test ./internal/plugins/singbox/ -run 'ForwardRelayExempt' -v`
+Expected: FAIL —— `forward relay must not require reality credentials, got: reality_private_key required for vless-reality`
+
+- [ ] **Step 3: 实现**
+
+把 vless-reality 块改成与 snell 块同构：
+
+```go
+	// vless-reality needs handshake target + private key — without them
+	// sing-box fails at runtime with "REALITY: failed to dial dest:
+	// invalid address". Catch at the API boundary so the UI surfaces
+	// the real reason instead of a sing-box crash log.
+	//
+	// Forward relays are exempt for the same reason snell's psk check is:
+	// renderInbound short-circuits them into a "direct" inbound before the
+	// protocol switch, so none of these fields is ever read. Demanding them
+	// made the default bulk-relay action on a reality landing fail.
+	if body.Protocol == "vless-reality" && !(body.Role == "relay" && body.RelayMode == "forward") {
+		if body.RealityPrivateKey == nil || *body.RealityPrivateKey == "" {
+			return errors.New("reality_private_key required for vless-reality")
+		}
+		if body.RealityHandshakeServer == nil || *body.RealityHandshakeServer == "" {
+			return errors.New("reality_handshake_server required for vless-reality (e.g. www.microsoft.com)")
+		}
+		if body.RealityHandshakePort == nil || *body.RealityHandshakePort <= 0 {
+			return errors.New("reality_handshake_port required for vless-reality (typically 443)")
+		}
+	}
+```
+
+> `golangci-lint` 的 staticcheck 可能对 `!(a && b)` 报 QF1001（De Morgan）。若报了，改用具名局部变量 `forwardRelay := body.Role == "relay" && body.RelayMode == "forward"` 后 `if body.Protocol == "vless-reality" && !forwardRelay {`——与 snell 块的写法一致。
+
+- [ ] **Step 4: 审一遍还有没有同类问题**
+
+`validatePostInbound` 里逐个协议看一遍：还有哪个协议的凭据校验会对转发中继生效？把结论（哪些有、哪些没有、为什么不需要改）写进报告。**只改 vless-reality**；发现别的协议也缺豁免就在报告里列出来，不要顺手改。
+
+- [ ] **Step 5: 跑测试确认通过**
+
+Run: `go test -race ./internal/plugins/singbox/ && golangci-lint run ./internal/plugins/singbox/...`
+Expected: PASS，lint 无输出
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add internal/plugins/singbox/inbounds_routes.go internal/plugins/singbox/inbounds_routes_test.go
+git commit -m "fix(singbox): exempt forward relays from vless-reality credential checks"
 ```
 
 ---
@@ -619,7 +728,7 @@ git commit -m "docs: correct the relay handshake notice and document mixed-proto
 
 ## Self-Review 记录
 
-- **Spec 覆盖**：三控件→T2；转发折叠与协议继承→T3；代理自由协议→T2（提交体）+T3（`!isForward` 包裹）；版本提示→T4；BulkRelayDialog reality 修复→T1；说明文案修正→T5；测试要求逐条落在 T1–T4 的 Step 1。无缺口。
+- **Spec 覆盖**：三控件→T2；vless-reality 转发豁免→T2b（执行中新增：审阅者发现落地为 reality 时默认的转发模式必然被后端 409 拒绝，T3 的转发模式没有它就不可用；用户已批准放开后端约束）；转发折叠与协议继承→T3；代理自由协议→T2（提交体）+T3（`!isForward` 包裹）；版本提示→T4；BulkRelayDialog reality 修复→T1；说明文案修正→T5；测试要求逐条落在 T1–T4 的 Step 1。无缺口。
 - **类型一致**：`role: 'landing'|'relay'`、`relayMode: 'forward'|'proxy'`、`upstreamID: string`、`selectedLanding`、`isForward`、`singboxMinorAtLeast(version, major, minor)` 全程一致；`upstream_inbound_id` 提交为 `number`（`Number(upstreamID)`）。
 - **后端零改动**已写入 Global Constraints，并要求发现需要动 `internal/` 时先停下报告。
 - **T1 的 Step 2 明确要求先看到失败**，并说明为何（本轮此前出现过空转测试）。

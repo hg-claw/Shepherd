@@ -22,6 +22,7 @@ func TestRenderedConfigPassesSingboxCheck(t *testing.T) {
 	extraV5 := `{"obfs_mode":"http"}`
 	extraV6 := `{"mode":"unshaped"}`
 	upstreamID := int64(1)
+	upstreamID6 := int64(2)
 	views := []InboundView{
 		{Inbound: Inbound{ServerID: 1, Tag: "landing-snell5", Port: 8443, Role: "landing", Protocol: "snell-v5", Password: &psk, ExtraJSON: &extraV5}},
 		{Inbound: Inbound{ServerID: 1, Tag: "landing-snell6", Port: 8444, Role: "landing", Protocol: "snell-v6", Password: &psk, ExtraJSON: &extraV6}},
@@ -43,6 +44,18 @@ func TestRenderedConfigPassesSingboxCheck(t *testing.T) {
 			UpstreamProtocol:  sql.NullString{String: "snell-v5", Valid: true},
 			UpstreamPassword:  sql.NullString{String: psk, Valid: true},
 			UpstreamExtraJSON: sql.NullString{String: extraV5, Valid: true},
+		},
+		{
+			Inbound: Inbound{
+				ServerID: 1, Tag: "relay-snell6", Port: 8446, Role: "relay",
+				Protocol: "snell-v6", Password: &psk, UpstreamInboundID: &upstreamID6, RelayMode: "proxy",
+			},
+			UpstreamTag:       sql.NullString{String: "landing-snell6", Valid: true},
+			UpstreamPort:      sql.NullInt64{Int64: 8444, Valid: true},
+			UpstreamAddress:   sql.NullString{String: "203.0.113.11", Valid: true},
+			UpstreamProtocol:  sql.NullString{String: "snell-v6", Valid: true},
+			UpstreamPassword:  sql.NullString{String: psk, Valid: true},
+			UpstreamExtraJSON: sql.NullString{String: extraV6, Valid: true},
 		},
 	}
 	cfg, err := RenderServerConfig(views, nil)

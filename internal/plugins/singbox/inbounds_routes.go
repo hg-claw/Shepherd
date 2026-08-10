@@ -101,6 +101,11 @@ func validatePostInbound(ctx context.Context, store *InboundStore, body postInbo
 		if !forwardRelay && (body.Password == nil || *body.Password == "") {
 			return errors.New("password (snell psk) required for snell inbounds")
 		}
+		if !forwardRelay && body.Protocol == "snell-v6" && body.Password != nil {
+			if n := len([]byte(*body.Password)); n < 12 || n > 255 {
+				return errors.New("snell v6 psk length must be between 12 and 255 bytes")
+			}
+		}
 	}
 	existing, _ := store.ListByServer(ctx, body.ServerID)
 	for _, e := range existing {
@@ -357,6 +362,12 @@ func patchInboundHandler(deps plugins.Deps) http.HandlerFunc {
 		if err != nil {
 			writeErr(w, 404, "inbound not found")
 			return
+		}
+		if row.Protocol == "snell-v6" && row.RelayMode != "forward" && patch.Password != nil {
+			if n := len([]byte(*patch.Password)); n < 12 || n > 255 {
+				writeErr(w, 409, "snell v6 psk length must be between 12 and 255 bytes")
+				return
+			}
 		}
 		if patch.Port != nil && *patch.Port != row.Port {
 			if *patch.Port == clashAPIPort {

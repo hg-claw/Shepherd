@@ -173,19 +173,23 @@ func TestCollectNodes_SingboxCertSNIInsecure(t *testing.T) {
 
 	cases := []struct {
 		id           int
+		protocol     string
 		sni          string
 		certID       interface{} // nil → no cert
 		wantInsecure bool
 	}{
-		{10, "vpn.example.com", 1, false},
-		{11, "www.bing.com", 1, true},
-		{12, "a.example.com", 2, false},
-		{13, "", 1, false},
-		{14, "vpn.example.com", nil, false},
+		{10, "anytls", "vpn.example.com", 1, false},
+		{11, "anytls", "www.bing.com", 1, true},
+		{12, "anytls", "a.example.com", 2, false},
+		{13, "anytls", "", 1, false},
+		// A TLS node with no managed cert cannot prove that the endpoint's
+		// certificate covers its SNI; generated clients must opt out.
+		{14, "anytls", "vpn.example.com", nil, true},
+		{15, "shadowsocks-2022", "www.bing.com", 1, false},
 	}
 	for _, c := range cases {
 		d.MustExec(`INSERT INTO singbox_inbounds(id,server_id,tag,port,role,relay_mode,protocol,sni,password,cert_id)
-		            VALUES (?,1,'t',443,'landing','proxy','anytls',?,'pw',?)`, c.id, c.sni, c.certID)
+		            VALUES (?,1,'t',443,'landing','proxy',?,?, 'pw',?)`, c.id, c.protocol, c.sni, c.certID)
 	}
 	for _, c := range cases {
 		nodes, warns, err := CollectNodes(ctx, d, []Selection{{Source: "singbox", InboundID: int64(c.id)}})
@@ -196,7 +200,10 @@ func TestCollectNodes_SingboxCertSNIInsecure(t *testing.T) {
 			t.Fatalf("id %d: nodes=%+v warns=%v", c.id, nodes, warns)
 		}
 		if nodes[0].Insecure != c.wantInsecure {
-			t.Errorf("id %d (sni=%q certID=%v): Insecure=%v want %v", c.id, c.sni, c.certID, nodes[0].Insecure, c.wantInsecure)
+			t.Errorf("id %d (proto=%s sni=%q certID=%v): Insecure=%v want %v", c.id, c.protocol, c.sni, c.certID, nodes[0].Insecure, c.wantInsecure)
+		}
+		if c.id == 13 && nodes[0].SNI != "vpn.example.com" {
+			t.Errorf("id %d: SNI=%q want certificate domain fallback", c.id, nodes[0].SNI)
 		}
 	}
 }

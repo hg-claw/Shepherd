@@ -392,6 +392,9 @@ func renderSnell(base map[string]any, in InboundView, version int) (map[string]a
 	if psk == "" {
 		return nil, fmt.Errorf("snell %s: psk (password) is empty", in.Tag)
 	}
+	if version == 6 && (len([]byte(psk)) < 12 || len([]byte(psk)) > 255) {
+		return nil, fmt.Errorf("snell %s: v6 psk length must be between 12 and 255 bytes", in.Tag)
+	}
 	base["type"] = "snell"
 	base["version"] = version
 	base["psk"] = psk
@@ -598,6 +601,17 @@ func renderRelayOutbound(in InboundView) (map[string]any, error) {
 		// as v4; sending 5 fails config parsing outright.
 		if in.UpstreamProtocol.String == "snell-v6" {
 			ob["version"] = 6
+			var extra map[string]any
+			if in.UpstreamExtraJSON.Valid && in.UpstreamExtraJSON.String != "" {
+				if err := json.Unmarshal([]byte(in.UpstreamExtraJSON.String), &extra); err != nil {
+					return nil, fmt.Errorf("relay %s: bad upstream extra_json: %w", in.Tag, err)
+				}
+			}
+			m, err := snellMode(extra)
+			if err != nil {
+				return nil, fmt.Errorf("relay %s: %w", in.Tag, err)
+			}
+			ob["mode"] = m
 		} else {
 			ob["version"] = 4
 			var extra map[string]any

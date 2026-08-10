@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -163,21 +164,21 @@ func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, string, e
 		}
 		n := singboxInboundToNode(singboxLite{
 			Tag: r.Tag, Alias: r.Alias, Port: r.Port, Protocol: r.UpProtocol.String, Role: r.Role, RelayMode: r.RelayMode,
-			UUID: ns(r.UpUUID), Flow: ns(r.UpFlow), Password: ns(r.UpPassword), SNI: ns(r.UpSNI),
+			UUID: ns(r.UpUUID), Flow: ns(r.UpFlow), Password: ns(r.UpPassword), SNI: stringPtr(fallbackSNI(r.UpSNI, r.UpCertDomain.String)),
 			RealityPublicKey: ns(r.UpRealityPub), RealityShortID: ns(r.UpRealitySID),
 			TransportPath: ns(r.UpTransportPath), TransportHost: ns(r.UpTransportHost),
 			SSMethod: ns(r.UpSSMethod), ExtraJSON: ns(r.UpExtraJSON),
-			Insecure: certDomainMismatch(r.UpCertDomain.String, r.UpSNI),
+			Insecure: certVerificationInsecure(r.UpProtocol.String, r.UpCertDomain.String, r.UpSNI),
 		}, serverLite{Name: r.SrvName, Host: r.SrvHost.String, Country: r.SrvCountry.String})
 		return n, "", nil
 	}
 	n := singboxInboundToNode(singboxLite{
 		Tag: r.Tag, Alias: r.Alias, Port: r.Port, Protocol: r.Protocol, Role: r.Role, RelayMode: r.RelayMode,
-		UUID: ns(r.UUID), Flow: ns(r.Flow), Password: ns(r.Password), SNI: ns(r.SNI),
+		UUID: ns(r.UUID), Flow: ns(r.Flow), Password: ns(r.Password), SNI: stringPtr(fallbackSNI(r.SNI, r.CertDomain.String)),
 		RealityPublicKey: ns(r.RealityPub), RealityShortID: ns(r.RealitySID),
 		TransportPath: ns(r.TransportPath), TransportHost: ns(r.TransportHost),
 		SSMethod: ns(r.SSMethod), ExtraJSON: ns(r.ExtraJSON),
-		Insecure: certDomainMismatch(r.CertDomain.String, r.SNI),
+		Insecure: certVerificationInsecure(r.Protocol, r.CertDomain.String, r.SNI),
 	}, serverLite{Name: r.SrvName, Host: r.SrvHost.String, Country: r.SrvCountry.String})
 	return n, "", nil
 }
@@ -187,6 +188,33 @@ func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, string, e
 func certDomainMismatch(certDomain string, sni sql.NullString) bool {
 	if certDomain == "" || !sni.Valid || sni.String == "" {
 		return false
+	}
+	return !certMatchesSNI(certDomain, sni.String)
+}
+
+func stringPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// certVerificationInsecure is conservative for TLS landings: when the
+// certificate domain is unknown (old rows or externally managed certs), the
+// generated client cannot prove that the SNI is covered, so it must opt out of
+// certificate verification. Non-TLS protocols never receive this flag.
+func certVerificationInsecure(protocol, certDomain string, sni sql.NullString) bool {
+	if !tlsProtocol(protocol) {
+		return false
+	}
+	if certDomain == "" {
+		return true
+	}
+	if !sni.Valid || sni.String == "" {
+		// A wildcard certificate cannot be used as a ClientHello SNI. With no
+		// explicit SNI the client falls back to the relay address, so verification
+		// would fail even though the certificate may be otherwise valid.
+		return strings.HasPrefix(strings.TrimSpace(certDomain), "*.")
 	}
 	return !certMatchesSNI(certDomain, sni.String)
 }

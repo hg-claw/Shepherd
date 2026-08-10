@@ -29,8 +29,17 @@ type Node struct {
 	SSMethod string
 	Insecure bool
 	ALPN     []string
+	SSH      *SSHForward
 
 	Extra map[string]any
+}
+
+type SSHForward struct {
+	Host         string
+	Port         int
+	Username     string
+	PrivateKey   string
+	UseLocalhost bool
 }
 
 type serverLite struct {
@@ -185,23 +194,29 @@ func dedupeNodeNames(nodes []Node) {
 }
 
 type singboxLite struct {
-	Tag              string
-	Alias            string
-	Port             int
-	Protocol         string
-	Role             string
-	RelayMode        string
-	UUID             *string
-	Flow             *string
-	Password         *string
-	SNI              *string
-	RealityPublicKey *string
-	RealityShortID   *string
-	TransportPath    *string
-	TransportHost    *string
-	SSMethod         *string
-	ExtraJSON        *string
-	Insecure         bool
+	Tag               string
+	Alias             string
+	Port              int
+	Protocol          string
+	Role              string
+	RelayMode         string
+	UUID              *string
+	Flow              *string
+	Password          *string
+	SNI               *string
+	RealityPublicKey  *string
+	RealityShortID    *string
+	TransportPath     *string
+	TransportHost     *string
+	SSMethod          *string
+	ExtraJSON         *string
+	Insecure          bool
+	SSHForwardEnabled bool
+	SSHHost           string
+	SSHPort           int
+	SSHUsername       string
+	SSHPrivateKey     string
+	SSHUseLocalhost   bool
 }
 
 func deref(p *string) string {
@@ -263,6 +278,12 @@ func singboxInboundToNode(in singboxLite, srv serverLite) Node {
 		}
 	}
 	n.Insecure = in.Insecure
+	if in.SSHForwardEnabled {
+		n.SSH = &SSHForward{
+			Host: in.SSHHost, Port: in.SSHPort, Username: in.SSHUsername,
+			PrivateKey: in.SSHPrivateKey, UseLocalhost: in.SSHUseLocalhost,
+		}
+	}
 	n.Name = aliasOrDefault(in.Alias, srv, n.Protocol)
 	return n
 }

@@ -85,38 +85,44 @@ func collectXray(ctx context.Context, db *sqlx.DB, id int64) (Node, string, erro
 }
 
 type singboxRow struct {
-	Tag             string         `db:"tag"`
-	Alias           string         `db:"alias"`
-	Port            int            `db:"port"`
-	Protocol        string         `db:"protocol"`
-	Role            string         `db:"role"`
-	RelayMode       string         `db:"relay_mode"`
-	UUID            sql.NullString `db:"uuid"`
-	Flow            sql.NullString `db:"flow"`
-	Password        sql.NullString `db:"password"`
-	SNI             sql.NullString `db:"sni"`
-	RealityPub      sql.NullString `db:"reality_public_key"`
-	RealitySID      sql.NullString `db:"reality_short_id"`
-	TransportPath   sql.NullString `db:"transport_path"`
-	TransportHost   sql.NullString `db:"transport_host"`
-	SSMethod        sql.NullString `db:"ss_method"`
-	ExtraJSON       sql.NullString `db:"extra_json"`
-	UpProtocol      sql.NullString `db:"upstream_protocol"`
-	UpUUID          sql.NullString `db:"upstream_uuid"`
-	UpFlow          sql.NullString `db:"upstream_flow"`
-	UpPassword      sql.NullString `db:"upstream_password"`
-	UpSNI           sql.NullString `db:"upstream_sni"`
-	UpRealityPub    sql.NullString `db:"upstream_reality_public_key"`
-	UpRealitySID    sql.NullString `db:"upstream_reality_short_id"`
-	UpTransportPath sql.NullString `db:"upstream_transport_path"`
-	UpTransportHost sql.NullString `db:"upstream_transport_host"`
-	UpSSMethod      sql.NullString `db:"upstream_ss_method"`
-	UpExtraJSON     sql.NullString `db:"upstream_extra_json"`
-	CertDomain      sql.NullString `db:"cert_domain"`
-	UpCertDomain    sql.NullString `db:"upstream_cert_domain"`
-	SrvName         string         `db:"srv_name"`
-	SrvHost         sql.NullString `db:"srv_host"`
-	SrvCountry      sql.NullString `db:"srv_country"`
+	Tag               string         `db:"tag"`
+	Alias             string         `db:"alias"`
+	Port              int            `db:"port"`
+	Protocol          string         `db:"protocol"`
+	Role              string         `db:"role"`
+	RelayMode         string         `db:"relay_mode"`
+	UUID              sql.NullString `db:"uuid"`
+	Flow              sql.NullString `db:"flow"`
+	Password          sql.NullString `db:"password"`
+	SNI               sql.NullString `db:"sni"`
+	RealityPub        sql.NullString `db:"reality_public_key"`
+	RealitySID        sql.NullString `db:"reality_short_id"`
+	TransportPath     sql.NullString `db:"transport_path"`
+	TransportHost     sql.NullString `db:"transport_host"`
+	SSMethod          sql.NullString `db:"ss_method"`
+	ExtraJSON         sql.NullString `db:"extra_json"`
+	UpProtocol        sql.NullString `db:"upstream_protocol"`
+	UpUUID            sql.NullString `db:"upstream_uuid"`
+	UpFlow            sql.NullString `db:"upstream_flow"`
+	UpPassword        sql.NullString `db:"upstream_password"`
+	UpSNI             sql.NullString `db:"upstream_sni"`
+	UpRealityPub      sql.NullString `db:"upstream_reality_public_key"`
+	UpRealitySID      sql.NullString `db:"upstream_reality_short_id"`
+	UpTransportPath   sql.NullString `db:"upstream_transport_path"`
+	UpTransportHost   sql.NullString `db:"upstream_transport_host"`
+	UpSSMethod        sql.NullString `db:"upstream_ss_method"`
+	UpExtraJSON       sql.NullString `db:"upstream_extra_json"`
+	SSHForwardEnabled bool           `db:"ssh_forward_enabled"`
+	SSHHost           string         `db:"ssh_host"`
+	SSHPort           int            `db:"ssh_port"`
+	SSHUsername       string         `db:"ssh_username"`
+	SSHPrivateKey     string         `db:"ssh_private_key"`
+	SSHUseLocalhost   bool           `db:"ssh_use_localhost"`
+	CertDomain        sql.NullString `db:"cert_domain"`
+	UpCertDomain      sql.NullString `db:"upstream_cert_domain"`
+	SrvName           string         `db:"srv_name"`
+	SrvHost           sql.NullString `db:"srv_host"`
+	SrvCountry        sql.NullString `db:"srv_country"`
 }
 
 func ns(v sql.NullString) *string {
@@ -133,6 +139,7 @@ func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, string, e
 		SELECT i.tag, COALESCE(i.alias,'') AS alias, i.port, i.protocol, i.role, i.relay_mode, i.uuid, i.flow, i.password, i.sni,
 		       i.reality_public_key, i.reality_short_id, i.transport_path, i.transport_host,
 		       i.ss_method, i.extra_json,
+		       i.ssh_forward_enabled, i.ssh_host, i.ssh_port, i.ssh_username, i.ssh_private_key, i.ssh_use_localhost,
 		       u.protocol AS upstream_protocol, u.uuid AS upstream_uuid, u.flow AS upstream_flow,
 		       u.password AS upstream_password, u.sni AS upstream_sni,
 		       u.reality_public_key AS upstream_reality_public_key, u.reality_short_id AS upstream_reality_short_id,
@@ -168,7 +175,9 @@ func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, string, e
 			RealityPublicKey: ns(r.UpRealityPub), RealityShortID: ns(r.UpRealitySID),
 			TransportPath: ns(r.UpTransportPath), TransportHost: ns(r.UpTransportHost),
 			SSMethod: ns(r.UpSSMethod), ExtraJSON: ns(r.UpExtraJSON),
-			Insecure: certVerificationInsecure(r.UpProtocol.String, r.UpCertDomain.String, r.UpSNI),
+			Insecure:          certVerificationInsecure(r.UpProtocol.String, r.UpCertDomain.String, r.UpSNI),
+			SSHForwardEnabled: r.SSHForwardEnabled, SSHHost: r.SSHHost, SSHPort: r.SSHPort,
+			SSHUsername: r.SSHUsername, SSHPrivateKey: r.SSHPrivateKey, SSHUseLocalhost: r.SSHUseLocalhost,
 		}, serverLite{Name: r.SrvName, Host: r.SrvHost.String, Country: r.SrvCountry.String})
 		return n, "", nil
 	}
@@ -178,7 +187,9 @@ func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, string, e
 		RealityPublicKey: ns(r.RealityPub), RealityShortID: ns(r.RealitySID),
 		TransportPath: ns(r.TransportPath), TransportHost: ns(r.TransportHost),
 		SSMethod: ns(r.SSMethod), ExtraJSON: ns(r.ExtraJSON),
-		Insecure: certVerificationInsecure(r.Protocol, r.CertDomain.String, r.SNI),
+		Insecure:          certVerificationInsecure(r.Protocol, r.CertDomain.String, r.SNI),
+		SSHForwardEnabled: r.SSHForwardEnabled, SSHHost: r.SSHHost, SSHPort: r.SSHPort,
+		SSHUsername: r.SSHUsername, SSHPrivateKey: r.SSHPrivateKey, SSHUseLocalhost: r.SSHUseLocalhost,
 	}, serverLite{Name: r.SrvName, Host: r.SrvHost.String, Country: r.SrvCountry.String})
 	return n, "", nil
 }

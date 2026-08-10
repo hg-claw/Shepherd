@@ -95,6 +95,7 @@ function needsTransport(p: SingboxProtocol): boolean {
 
 interface Props {
   serverID: number
+  serverHost?: string
   /** If provided, dialog is in edit mode */
   initial?: SingboxInbound
   open: boolean
@@ -104,7 +105,7 @@ interface Props {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function InboundDialog({ serverID, initial, open, onClose, onSaved }: Props) {
+export default function InboundDialog({ serverID, serverHost, initial, open, onClose, onSaved }: Props) {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const toast = useUI((s) => s.toast)
@@ -175,6 +176,19 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
   const [snellMode, setSnellMode] = useState<string>(
     typeof initialExtra.mode === 'string' ? initialExtra.mode : SNELL_MODES[0],
   )
+
+  // Surge-only SSH forwarding. The private key is the name of a key already
+  // configured in Surge, never the private key material itself.
+  const [sshEnabled, setSSHEnabled] = useState<boolean>(initial?.ssh_forward_enabled ?? false)
+  const [sshHost, setSSHHost] = useState<string>(initial?.ssh_host ?? serverHost ?? '')
+  const [sshPort, setSSHPort] = useState<string>(String(initial?.ssh_port ?? 22))
+  const [sshUsername, setSSHUsername] = useState<string>(initial?.ssh_username ?? 'root')
+  const [sshPrivateKey, setSSHPrivateKey] = useState<string>(initial?.ssh_private_key ?? '')
+  const [sshUseLocalhost, setSSHUseLocalhost] = useState<boolean>(initial?.ssh_use_localhost ?? false)
+
+  useEffect(() => {
+    if (sshEnabled && !sshHost && serverHost) setSSHHost(serverHost)
+  }, [serverHost, sshEnabled, sshHost])
 
   // Relay wiring. These three are create-only: the backend's InboundPatch
   // carries no role / relay_mode / protocol / upstream_inbound_id, so the
@@ -248,6 +262,12 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
       }
 
       body.alias = alias
+      body.ssh_forward_enabled = sshEnabled
+      body.ssh_host = sshHost
+      body.ssh_port = Number(sshPort)
+      body.ssh_username = sshUsername
+      body.ssh_private_key = sshPrivateKey
+      body.ssh_use_localhost = sshEnabled && sshUseLocalhost
 
       if (!isForward) {
         if (needsUUID(protocol))       body.uuid = uuid
@@ -336,6 +356,17 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
 
   function handleSave() {
     setError(null)
+    if (sshEnabled) {
+      if (!sshHost.trim() || !sshUsername.trim() || !sshPrivateKey.trim()) {
+        setError(t('singbox.inbound_dialog.ssh_required', 'SSH host, username, and private key name are required'))
+        return
+      }
+      const sshPortNumber = Number(sshPort)
+      if (!Number.isInteger(sshPortNumber) || sshPortNumber <= 0 || sshPortNumber > 65535) {
+        setError(t('singbox.inbound_dialog.ssh_port_invalid', 'SSH port must be between 1 and 65535'))
+        return
+      }
+    }
     // Guard on the resolved landing, not just the raw id: a set-but-
     // unresolvable upstreamID would otherwise fall through and submit the
     // relay's own hidden `protocol` state as a forward relay's inherited
@@ -498,6 +529,41 @@ export default function InboundDialog({ serverID, initial, open, onClose, onSave
             <Input id="ib-alias" className={inputCls}
               value={alias} onChange={(e) => setAlias(e.target.value)}
               placeholder={t('singbox.inbound_dialog.alias_placeholder', 'Optional — node alias, defaults to an auto-generated name if left blank')} />
+          </div>
+
+          <div className="border-t pt-3 space-y-2">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" className="h-3.5 w-3.5" checked={sshEnabled} onChange={(e) => setSSHEnabled(e.target.checked)} />
+              <span>{t('singbox.inbound_dialog.ssh_forward', 'Surge SSH forwarding')}</span>
+            </label>
+            {sshEnabled && (
+              <div className="space-y-2 pl-5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className={labelCls} htmlFor="ib-ssh-host">{t('singbox.inbound_dialog.ssh_host', 'SSH host')}</Label>
+                    <Input id="ib-ssh-host" className={inputCls} value={sshHost} onChange={(e) => setSSHHost(e.target.value)} placeholder={serverHost || 'server IP'} />
+                  </div>
+                  <div>
+                    <Label className={labelCls} htmlFor="ib-ssh-port">{t('singbox.inbound_dialog.ssh_port', 'SSH port')}</Label>
+                    <Input id="ib-ssh-port" className={inputCls} value={sshPort} onChange={(e) => setSSHPort(e.target.value)} placeholder="22" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className={labelCls} htmlFor="ib-ssh-user">{t('singbox.inbound_dialog.ssh_username', 'SSH username')}</Label>
+                    <Input id="ib-ssh-user" className={inputCls} value={sshUsername} onChange={(e) => setSSHUsername(e.target.value)} placeholder="root" />
+                  </div>
+                  <div>
+                    <Label className={labelCls} htmlFor="ib-ssh-key">{t('singbox.inbound_dialog.ssh_private_key', 'Surge private key name')}</Label>
+                    <Input id="ib-ssh-key" className={inputCls} value={sshPrivateKey} onChange={(e) => setSSHPrivateKey(e.target.value)} placeholder="key-name" />
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-2xs text-muted-foreground cursor-pointer">
+                  <input type="checkbox" className="h-3 w-3" checked={sshUseLocalhost} onChange={(e) => setSSHUseLocalhost(e.target.checked)} />
+                  <span>{t('singbox.inbound_dialog.ssh_localhost', 'Use localhost for the generated node address')}</span>
+                </label>
+              </div>
+            )}
           </div>
 
           {!isForward && (

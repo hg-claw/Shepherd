@@ -42,17 +42,25 @@ func TestCollectNodes_Singbox(t *testing.T) {
 	d.MustExec(`CREATE TABLE singbox_inbounds (
 		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, alias TEXT, port INTEGER, role TEXT, relay_mode TEXT, protocol TEXT,
 		uuid TEXT, flow TEXT, password TEXT, sni TEXT, reality_public_key TEXT, reality_short_id TEXT,
-		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT, upstream_inbound_id INTEGER, cert_id INTEGER)`)
+		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT, upstream_inbound_id INTEGER, cert_id INTEGER,
+		ssh_forward_enabled INTEGER DEFAULT 0, ssh_host TEXT DEFAULT '', ssh_port INTEGER DEFAULT 22,
+		ssh_username TEXT DEFAULT '', ssh_private_key TEXT DEFAULT '', ssh_use_localhost INTEGER DEFAULT 0)`)
 	d.MustExec(`CREATE TABLE singbox_certificates (id INTEGER PRIMARY KEY, domain TEXT)`)
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (1,'hk','9.9.9.9','HK')`)
-	d.MustExec(`INSERT INTO singbox_inbounds(id,server_id,tag,port,role,relay_mode,protocol,password,sni,extra_json)
-	            VALUES (20,1,'h',443,'landing','proxy','hysteria2','pw','h.example.com','{"up_mbps":100}')`)
+	d.MustExec(`INSERT INTO singbox_inbounds(
+		id,server_id,tag,port,role,relay_mode,protocol,password,sni,extra_json,
+		ssh_forward_enabled,ssh_host,ssh_port,ssh_username,ssh_private_key,ssh_use_localhost)
+		VALUES (20,1,'h',443,'landing','proxy','hysteria2','pw','h.example.com','{"up_mbps":100}',
+		1,'10.0.0.8',2222,'root','edge-key',1)`)
 	nodes, warns, err := CollectNodes(ctx, d, []Selection{{Source: "singbox", InboundID: 20}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(nodes) != 1 || nodes[0].Protocol != "hysteria2" || nodes[0].Server != "9.9.9.9" {
 		t.Fatalf("nodes=%+v warns=%v", nodes, warns)
+	}
+	if nodes[0].SSH == nil || nodes[0].SSH.Host != "10.0.0.8" || nodes[0].SSH.Port != 2222 || !nodes[0].SSH.UseLocalhost {
+		t.Fatalf("SSH forwarding not collected: %+v", nodes[0].SSH)
 	}
 }
 
@@ -64,7 +72,9 @@ func TestCollectNodes_SkipsForwardRelay(t *testing.T) {
 	d.MustExec(`CREATE TABLE singbox_inbounds (
 		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, alias TEXT, port INTEGER, role TEXT, relay_mode TEXT, protocol TEXT,
 		uuid TEXT, flow TEXT, password TEXT, sni TEXT, reality_public_key TEXT, reality_short_id TEXT,
-		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT, upstream_inbound_id INTEGER, cert_id INTEGER)`)
+		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT, upstream_inbound_id INTEGER, cert_id INTEGER,
+		ssh_forward_enabled INTEGER DEFAULT 0, ssh_host TEXT DEFAULT '', ssh_port INTEGER DEFAULT 22,
+		ssh_username TEXT DEFAULT '', ssh_private_key TEXT DEFAULT '', ssh_use_localhost INTEGER DEFAULT 0)`)
 	d.MustExec(`CREATE TABLE singbox_certificates (id INTEGER PRIMARY KEY, domain TEXT)`)
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (1,'hk','9.9.9.9','HK')`)
 	d.MustExec(`INSERT INTO singbox_inbounds(id,server_id,tag,port,role,relay_mode,protocol)
@@ -88,7 +98,9 @@ func TestCollectNodes_ForwardRelayUsesLandingCreds(t *testing.T) {
 	d.MustExec(`CREATE TABLE singbox_inbounds (
 		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, alias TEXT, port INTEGER, role TEXT, relay_mode TEXT, protocol TEXT,
 		uuid TEXT, flow TEXT, password TEXT, sni TEXT, reality_public_key TEXT, reality_short_id TEXT,
-		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT, upstream_inbound_id INTEGER, cert_id INTEGER)`)
+		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT, upstream_inbound_id INTEGER, cert_id INTEGER,
+		ssh_forward_enabled INTEGER DEFAULT 0, ssh_host TEXT DEFAULT '', ssh_port INTEGER DEFAULT 22,
+		ssh_username TEXT DEFAULT '', ssh_private_key TEXT DEFAULT '', ssh_use_localhost INTEGER DEFAULT 0)`)
 	d.MustExec(`CREATE TABLE singbox_certificates (id INTEGER PRIMARY KEY, domain TEXT)`)
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (1,'jp','1.1.1.1','JP')`)
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (2,'hk','2.2.2.2','HK')`)
@@ -166,7 +178,9 @@ func TestCollectNodes_SingboxCertSNIInsecure(t *testing.T) {
 	d.MustExec(`CREATE TABLE singbox_inbounds (
 		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, alias TEXT, port INTEGER, role TEXT, relay_mode TEXT, protocol TEXT,
 		uuid TEXT, flow TEXT, password TEXT, sni TEXT, reality_public_key TEXT, reality_short_id TEXT,
-		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT, upstream_inbound_id INTEGER, cert_id INTEGER)`)
+		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT, upstream_inbound_id INTEGER, cert_id INTEGER,
+		ssh_forward_enabled INTEGER DEFAULT 0, ssh_host TEXT DEFAULT '', ssh_port INTEGER DEFAULT 22,
+		ssh_username TEXT DEFAULT '', ssh_private_key TEXT DEFAULT '', ssh_use_localhost INTEGER DEFAULT 0)`)
 	d.MustExec(`CREATE TABLE singbox_certificates (id INTEGER PRIMARY KEY, domain TEXT)`)
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (1,'s','1.1.1.1','JP')`)
 	d.MustExec(`INSERT INTO singbox_certificates(id,domain) VALUES (1,'vpn.example.com'),(2,'*.example.com')`)
@@ -215,7 +229,9 @@ func TestCollectNodes_ForwardRelayCertSNIInsecure(t *testing.T) {
 	d.MustExec(`CREATE TABLE singbox_inbounds (
 		id INTEGER PRIMARY KEY, server_id INTEGER, tag TEXT, alias TEXT, port INTEGER, role TEXT, relay_mode TEXT, protocol TEXT,
 		uuid TEXT, flow TEXT, password TEXT, sni TEXT, reality_public_key TEXT, reality_short_id TEXT,
-		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT, upstream_inbound_id INTEGER, cert_id INTEGER)`)
+		transport_path TEXT, transport_host TEXT, ss_method TEXT, extra_json TEXT, upstream_inbound_id INTEGER, cert_id INTEGER,
+		ssh_forward_enabled INTEGER DEFAULT 0, ssh_host TEXT DEFAULT '', ssh_port INTEGER DEFAULT 22,
+		ssh_username TEXT DEFAULT '', ssh_private_key TEXT DEFAULT '', ssh_use_localhost INTEGER DEFAULT 0)`)
 	d.MustExec(`CREATE TABLE singbox_certificates (id INTEGER PRIMARY KEY, domain TEXT)`)
 	d.MustExec(`INSERT INTO servers(id,name,ssh_host,country_code) VALUES (1,'jp','1.1.1.1','JP'),(2,'hk','2.2.2.2','HK')`)
 	d.MustExec(`INSERT INTO singbox_certificates(id,domain) VALUES (1,'vpn.example.com')`)

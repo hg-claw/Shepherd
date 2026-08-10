@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/hg-claw/Shepherd/internal/httpjson"
 	"github.com/hg-claw/Shepherd/internal/plugins"
@@ -63,7 +64,13 @@ type postInboundBody struct {
 	// (legacy dual-termination), "forward" (transparent sing-box
 	// direct inbound). Empty defaults to "proxy" for backward
 	// compatibility with existing clients.
-	RelayMode string `json:"relay_mode"`
+	RelayMode         string `json:"relay_mode"`
+	SSHForwardEnabled bool   `json:"ssh_forward_enabled"`
+	SSHHost           string `json:"ssh_host"`
+	SSHPort           int    `json:"ssh_port"`
+	SSHUsername       string `json:"ssh_username"`
+	SSHPrivateKey     string `json:"ssh_private_key"`
+	SSHUseLocalhost   bool   `json:"ssh_use_localhost"`
 }
 
 func writeJSON(w http.ResponseWriter, code int, body any) {
@@ -86,6 +93,9 @@ func validatePostInbound(ctx context.Context, store *InboundStore, body postInbo
 	}
 	if body.Role != "landing" && body.Role != "relay" {
 		return fmt.Errorf("role must be landing or relay, got %q", body.Role)
+	}
+	if err := validateSSHForward(body.SSHForwardEnabled, body.SSHHost, body.SSHPort, body.SSHUsername, body.SSHPrivateKey); err != nil {
+		return err
 	}
 	if !isValidProtocol(body.Protocol) {
 		return fmt.Errorf("unknown protocol %q", body.Protocol)
@@ -149,6 +159,25 @@ func validatePostInbound(ctx context.Context, store *InboundStore, body postInbo
 	return nil
 }
 
+func validateSSHForward(enabled bool, host string, port int, username, privateKey string) error {
+	if !enabled {
+		return nil
+	}
+	if strings.TrimSpace(host) == "" {
+		return errors.New("ssh_host required when ssh forwarding is enabled")
+	}
+	if port <= 0 || port > 65535 {
+		return errors.New("ssh_port out of range")
+	}
+	if strings.TrimSpace(username) == "" {
+		return errors.New("ssh_username required when ssh forwarding is enabled")
+	}
+	if strings.TrimSpace(privateKey) == "" {
+		return errors.New("ssh_private_key required when ssh forwarding is enabled")
+	}
+	return nil
+}
+
 // inboundToMap converts an InboundView to a JSON-serialisable map.
 // reality_private_key is always redacted. All other pointer fields are included as-is
 // (nil becomes JSON null), so callers see the full schema shape.
@@ -180,6 +209,12 @@ func inboundToMap(v InboundView) map[string]any {
 		"extra_json":               v.ExtraJSON,
 		"upstream_inbound_id":      v.UpstreamInboundID,
 		"relay_mode":               v.RelayMode,
+		"ssh_forward_enabled":      v.SSHForwardEnabled,
+		"ssh_host":                 v.SSHHost,
+		"ssh_port":                 v.SSHPort,
+		"ssh_username":             v.SSHUsername,
+		"ssh_private_key":          v.SSHPrivateKey,
+		"ssh_use_localhost":        v.SSHUseLocalhost,
 		"created_at":               v.CreatedAt,
 		"updated_at":               v.UpdatedAt,
 	}
@@ -249,6 +284,12 @@ func postInboundHandler(deps plugins.Deps) http.HandlerFunc {
 			ExtraJSON:              body.Extra,
 			UpstreamInboundID:      body.UpstreamInboundID,
 			RelayMode:              body.RelayMode,
+			SSHForwardEnabled:      body.SSHForwardEnabled,
+			SSHHost:                body.SSHHost,
+			SSHPort:                body.SSHPort,
+			SSHUsername:            body.SSHUsername,
+			SSHPrivateKey:          body.SSHPrivateKey,
+			SSHUseLocalhost:        body.SSHUseLocalhost,
 		}
 		id, err := store.Insert(r.Context(), in)
 		if err != nil {
@@ -347,6 +388,25 @@ func patchInboundHandler(deps plugins.Deps) http.HandlerFunc {
 		if v, ok := body["extra"].(string); ok {
 			patch.ExtraJSON = &v
 		}
+		if v, ok := body["ssh_forward_enabled"].(bool); ok {
+			patch.SSHForwardEnabled = &v
+		}
+		if v, ok := body["ssh_host"].(string); ok {
+			patch.SSHHost = &v
+		}
+		if v, ok := body["ssh_port"].(float64); ok {
+			port := int(v)
+			patch.SSHPort = &port
+		}
+		if v, ok := body["ssh_username"].(string); ok {
+			patch.SSHUsername = &v
+		}
+		if v, ok := body["ssh_private_key"].(string); ok {
+			patch.SSHPrivateKey = &v
+		}
+		if v, ok := body["ssh_use_localhost"].(bool); ok {
+			patch.SSHUseLocalhost = &v
+		}
 		if v, ok := body["alias"].(string); ok {
 			patch.Alias = &v
 		}
@@ -368,6 +428,27 @@ func patchInboundHandler(deps plugins.Deps) http.HandlerFunc {
 				writeErr(w, 409, "snell v6 psk length must be between 12 and 255 bytes")
 				return
 			}
+		}
+		sshEnabled := row.SSHForwardEnabled
+		if patch.SSHForwardEnabled != nil {
+			sshEnabled = *patch.SSHForwardEnabled
+		}
+		sshHost, sshPort, sshUsername, sshPrivateKey := row.SSHHost, row.SSHPort, row.SSHUsername, row.SSHPrivateKey
+		if patch.SSHHost != nil {
+			sshHost = *patch.SSHHost
+		}
+		if patch.SSHPort != nil {
+			sshPort = *patch.SSHPort
+		}
+		if patch.SSHUsername != nil {
+			sshUsername = *patch.SSHUsername
+		}
+		if patch.SSHPrivateKey != nil {
+			sshPrivateKey = *patch.SSHPrivateKey
+		}
+		if err := validateSSHForward(sshEnabled, sshHost, sshPort, sshUsername, sshPrivateKey); err != nil {
+			writeErr(w, 409, err.Error())
+			return
 		}
 		if patch.Port != nil && *patch.Port != row.Port {
 			if *patch.Port == clashAPIPort {

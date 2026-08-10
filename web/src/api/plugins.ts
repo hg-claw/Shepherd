@@ -302,6 +302,12 @@ export interface SingboxInbound {
   ss_password?: string
   cert_id?: number | null
   extra_json?: string | null
+  ssh_forward_enabled?: boolean
+  ssh_host?: string
+  ssh_port?: number
+  ssh_username?: string
+  ssh_private_key?: string
+  ssh_use_localhost?: boolean
   // upstream JOIN fields (relay rows only)
   upstream_inbound_id?: number | null
   upstream_tag?: string | null
@@ -346,6 +352,12 @@ export interface CreateSingboxInboundBody {
   // uses landing's URL with relay's IP:port. Default server-side is
   // "proxy" for backward compat; new UI defaults to "forward".
   relay_mode?: 'proxy' | 'forward'
+  ssh_forward_enabled?: boolean
+  ssh_host?: string
+  ssh_port?: number
+  ssh_username?: string
+  ssh_private_key?: string
+  ssh_use_localhost?: boolean
 }
 
 export interface PatchSingboxInboundBody {
@@ -370,6 +382,12 @@ export interface PatchSingboxInboundBody {
   // See CreateSingboxInboundBody.extra — the PATCH handler reads
   // body["extra"], not extra_json.
   extra?: string | null
+  ssh_forward_enabled?: boolean
+  ssh_host?: string
+  ssh_port?: number
+  ssh_username?: string
+  ssh_private_key?: string
+  ssh_use_localhost?: boolean
 }
 
 export interface SingboxCertificate {

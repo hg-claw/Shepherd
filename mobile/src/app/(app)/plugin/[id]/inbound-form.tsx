@@ -12,6 +12,7 @@ import {
   type ProxyPluginID, type ProxyInboundFull,
 } from '@/api/inbounds'
 import { useSingboxCerts, type SingboxCertificate } from '@/api/plugins'
+import { useServers } from '@/api/servers'
 import { useTheme } from '@/theme'
 import { Screen } from '@/components/Screen'
 import { NavBar, Card, Field, Input, Hint, ErrLine, Button, Empty, Pill } from '@/components/ds'
@@ -149,6 +150,13 @@ function SingboxForm({ mode, serverIdParam, editing }: {
   const qc = useQueryClient()
   const isEdit = mode === 'edit'
   const isRelayEdit = isEdit && editing?.role === 'relay'
+  const serversQ = useServers()
+  const effectiveServerID = serverIdParam ?? editing?.server_id ?? null
+  const serverSSHHost = (() => {
+    const raw = serversQ.data?.find((s) => s.id === effectiveServerID)?.ssh_host
+    if (typeof raw === 'string') return raw
+    return raw?.Valid ? raw.String : ''
+  })()
 
   // Snell's obfs_mode (v5) / mode (v6) ride in the generic `extra` JSON field on
   // the wire — parse whatever GET echoed back as extra_json so editing an
@@ -183,6 +191,16 @@ function SingboxForm({ mode, serverIdParam, editing }: {
   const [snellMode, setSnellMode] = useState<string>(
     typeof initialExtra.mode === 'string' ? initialExtra.mode : SINGBOX_SNELL_MODES[0],
   )
+  // Surge-only SSH forwarding. Store the configured Surge key name, not key material.
+  const [sshEnabled, setSSHEnabled] = useState<boolean>(editing?.ssh_forward_enabled ?? false)
+  // null means the user has not overridden the server address yet, so an
+  // asynchronously loaded ssh_host can remain the live default.
+  const [sshHostOverride, setSSHHostOverride] = useState<string | null>(editing?.ssh_host || null)
+  const sshHost = sshHostOverride ?? serverSSHHost
+  const [sshPort, setSSHPort] = useState<string>(String(editing?.ssh_port ?? 22))
+  const [sshUsername, setSSHUsername] = useState<string>(editing?.ssh_username ?? 'root')
+  const [sshPrivateKey, setSSHPrivateKey] = useState<string>(editing?.ssh_private_key ?? '')
+  const [sshUseLocalhost, setSSHUseLocalhost] = useState<boolean>(editing?.ssh_use_localhost ?? false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -219,9 +237,20 @@ function SingboxForm({ mode, serverIdParam, editing }: {
   const save = async () => {
     const portN = Number(port)
     if (!Number.isFinite(portN) || portN <= 0 || portN > 65535) { setError('port must be 1–65535'); return }
+    const sshPortN = Number(sshPort)
+    if (sshEnabled) {
+      if (!sshHost.trim() || !sshUsername.trim() || !sshPrivateKey.trim()) { setError('SSH host, username, and private key name are required'); return }
+      if (!Number.isFinite(sshPortN) || sshPortN <= 0 || sshPortN > 65535) { setError('SSH port must be 1–65535'); return }
+    }
     setBusy(true); setError(null)
 
     const body: Record<string, unknown> = { port: portN, alias }
+    body.ssh_forward_enabled = sshEnabled
+    body.ssh_host = sshHost
+    body.ssh_port = sshPortN
+    body.ssh_username = sshUsername
+    body.ssh_private_key = sshPrivateKey
+    body.ssh_use_localhost = sshEnabled && sshUseLocalhost
     if (groups.uuid) body.uuid = uuid
     if (groups.password) body.password = password
     if (groups.certAndSNI) {
@@ -301,6 +330,45 @@ function SingboxForm({ mode, serverIdParam, editing }: {
       <Field label="Alias">
         <Input testID="alias" mono value={alias} onChangeText={setAlias} autoCapitalize="none" autoCorrect={false} placeholder="optional label" />
       </Field>
+
+      <Card>
+        <View style={{ padding: 14, gap: 12 }}>
+          <Pressable
+            testID="ssh-enabled"
+            onPress={() => setSSHEnabled((v) => !v)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: sshEnabled }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+          >
+            <View style={{ width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: sshEnabled ? t.primary : t.borderStrong, backgroundColor: sshEnabled ? t.primary : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+              {sshEnabled ? <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: t.primaryFg }} /> : null}
+            </View>
+            <Text style={{ fontFamily: t.font(600), fontSize: 13, color: t.text }}>Surge SSH forwarding</Text>
+          </Pressable>
+          {sshEnabled ? (
+            <View style={{ gap: 10 }}>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}><Field label="SSH host"><Input testID="ssh-host" mono value={sshHost} onChangeText={setSSHHostOverride} autoCapitalize="none" autoCorrect={false} placeholder={serverSSHHost || 'server IP'} /></Field></View>
+                <View style={{ width: 100 }}><Field label="SSH port"><Input testID="ssh-port" mono keyboardType="number-pad" value={sshPort} onChangeText={setSSHPort} placeholder="22" /></Field></View>
+              </View>
+              <Field label="SSH username"><Input testID="ssh-username" mono value={sshUsername} onChangeText={setSSHUsername} autoCapitalize="none" autoCorrect={false} placeholder="root" /></Field>
+              <Field label="Surge private key name"><Input testID="ssh-private-key" mono value={sshPrivateKey} onChangeText={setSSHPrivateKey} autoCapitalize="none" autoCorrect={false} placeholder="key-name" /></Field>
+              <Pressable
+                testID="ssh-localhost"
+                onPress={() => setSSHUseLocalhost((v) => !v)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: sshUseLocalhost }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+              >
+                <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 1.5, borderColor: sshUseLocalhost ? t.primary : t.borderStrong, backgroundColor: sshUseLocalhost ? t.primary : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                  {sshUseLocalhost ? <View style={{ width: 7, height: 7, borderRadius: 2, backgroundColor: t.primaryFg }} /> : null}
+                </View>
+                <Text style={{ fontFamily: t.font(), fontSize: 12, color: t.muted }}>Use localhost for generated node address</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+      </Card>
 
       {groups.uuid ? (
         <Field label="UUID">

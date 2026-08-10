@@ -129,6 +129,32 @@ describe('singbox/InboundDialog', () => {
     expect(screen.getByLabelText('Port')).toBeTruthy()
   })
 
+  it('submits Surge SSH forwarding settings and defaults the host from the server', async () => {
+    const spy = vi.spyOn(pluginsAPI, 'createSingboxInbound').mockResolvedValue({ id: 99 } as never)
+    render(
+      <InboundDialog serverID={1} serverHost="10.0.0.8" open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+
+    fireEvent.click(screen.getByLabelText('Surge SSH forwarding'))
+    expect((screen.getByLabelText('SSH host') as HTMLInputElement).value).toBe('10.0.0.8')
+    fireEvent.change(screen.getByLabelText('SSH port'), { target: { value: '2222' } })
+    fireEvent.change(screen.getByLabelText('SSH username'), { target: { value: 'deploy' } })
+    fireEvent.change(screen.getByLabelText('Surge private key name'), { target: { value: 'edge-key' } })
+    fireEvent.click(screen.getByLabelText('Use localhost for the generated node address'))
+    fireEvent.click(screen.getByRole('button', { name: /^create$/i }))
+
+    await waitFor(() => expect(spy).toHaveBeenCalled())
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({
+      ssh_forward_enabled: true,
+      ssh_host: '10.0.0.8',
+      ssh_port: 2222,
+      ssh_username: 'deploy',
+      ssh_private_key: 'edge-key',
+      ssh_use_localhost: true,
+    }))
+  })
+
   it('shows uuid field when protocol is vless-reality (default)', async () => {
     render(
       <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,

@@ -172,6 +172,38 @@ func TestSurge_InsecureSkipCertVerify(t *testing.T) {
 	}
 }
 
+func TestSurge_SSHForwardHiddenFromProxyGroups(t *testing.T) {
+	im := Intermediate{
+		Nodes: []Node{{
+			Name: "🇯🇵 node", Protocol: "anytls", Server: "10.0.0.8", Port: 443,
+			Password: "p", SNI: "proxy.example.com",
+			SSH: &SSHForward{Host: "10.0.0.8", Port: 2222, Username: "root", PrivateKey: "edge-key", UseLocalhost: true},
+		}},
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"{{NODES}}"}}},
+	}
+	out := (&SurgeRenderer{}).Render(im, "x", DefaultRulesetBase)
+	if !strings.Contains(out, "🇯🇵 node SSH = ssh, 10.0.0.8, 2222, username=root, private-key=edge-key") {
+		t.Fatalf("missing SSH proxy line:\n%s", out)
+	}
+	if !strings.Contains(out, "🇯🇵 node = anytls, localhost, 443, password=p, sni=proxy.example.com, underlying-proxy=🇯🇵 node SSH") {
+		t.Fatalf("missing localhost underlying proxy:\n%s", out)
+	}
+	if strings.Contains(out, "PROXY = select, 🇯🇵 node SSH") || strings.Contains(out, "Proxy = select, 🇯🇵 node SSH") {
+		t.Fatalf("SSH helper must not be in proxy groups:\n%s", out)
+	}
+}
+
+func TestSurge_SSHForwardIgnoredForOtherTargets(t *testing.T) {
+	im := Intermediate{Nodes: []Node{{
+		Name: "node", Protocol: "anytls", Server: "10.0.0.8", Port: 443, Password: "p",
+		SSH: &SSHForward{Host: "10.0.0.8", Port: 22, Username: "root", PrivateKey: "key", UseLocalhost: true},
+	}}}
+	out := (&SurgeRenderer{}).render(im, "x", DefaultRulesetBase, "shadowrocket")
+	if strings.Contains(out, " = ssh,") || strings.Contains(out, "underlying-proxy=") || strings.Contains(out, "localhost, 443") {
+		t.Fatalf("SSH forwarding must only render for Surge:\n%s", out)
+	}
+}
+
 func TestSurge_DisabledGroupsDropped(t *testing.T) {
 	im := Intermediate{
 		Nodes:          []Node{{Name: "🟢 A", Protocol: "shadowsocks", Server: "1.1.1.1", Port: 8388, SSMethod: "aes-256-gcm", Password: "p"}},

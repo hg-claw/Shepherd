@@ -72,6 +72,12 @@ export type ProxyInboundFull = {
   // sing-box-only
   cert_id?: number | null
   extra_json?: string | null
+  ssh_forward_enabled?: boolean
+  ssh_host?: string
+  ssh_port?: number
+  ssh_username?: string
+  ssh_private_key?: string
+  ssh_use_localhost?: boolean
   relay_mode?: 'proxy' | 'forward'
 
   // relay upstream join (handler-unwrapped: bare value or absent — NOT nullStr)

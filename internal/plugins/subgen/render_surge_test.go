@@ -220,18 +220,43 @@ func TestSurge_SnellV5(t *testing.T) {
 	}
 }
 
-func TestSurge_SnellV6HasNoObfs(t *testing.T) {
+func TestSurge_SnellV6IncludesModeAndHasNoObfs(t *testing.T) {
 	n := Node{
 		Name: "hk1", Protocol: "snell", Server: "1.2.3.4", Port: 8443,
 		Password: "psk-abc",
-		Extra:    map[string]any{"snell_version": 6, "obfs_mode": "http", "obfs_host": "bing.com"},
+		Extra:    map[string]any{"snell_version": 6, "mode": "unshaped", "obfs_mode": "http", "obfs_host": "bing.com"},
 	}
 	line := (&SurgeRenderer{}).proxyLine(n, "surge")
 	if !strings.Contains(line, "version=6") {
 		t.Errorf("surge line %q missing version=6", line)
 	}
+	if !strings.Contains(line, "mode=unshaped") {
+		t.Errorf("surge line %q missing v6 mode", line)
+	}
 	if strings.Contains(line, "obfs") {
 		t.Errorf("surge v6 line must not carry obfs: %q", line)
+	}
+}
+
+func TestSurge_SnellV6DefaultsMode(t *testing.T) {
+	n := Node{
+		Name: "hk1", Protocol: "snell", Server: "1.2.3.4", Port: 8443,
+		Password: "psk-abc", Extra: map[string]any{"snell_version": 6},
+	}
+	line := (&SurgeRenderer{}).proxyLine(n, "surge")
+	if !strings.Contains(line, "mode=default") {
+		t.Errorf("surge line %q missing default v6 mode", line)
+	}
+}
+
+func TestSurge_SnellV6UnsafeRawMode(t *testing.T) {
+	n := Node{
+		Name: "hk1", Protocol: "snell", Server: "1.2.3.4", Port: 8443,
+		Password: "psk-abc", Extra: map[string]any{"snell_version": 6, "mode": "unsafe-raw"},
+	}
+	line := (&SurgeRenderer{}).proxyLine(n, "surge")
+	if !strings.Contains(line, "mode=unsafe-raw") {
+		t.Errorf("surge line %q missing unsafe-raw v6 mode", line)
 	}
 }
 

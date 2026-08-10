@@ -99,9 +99,17 @@ func (r *SurgeRenderer) proxyLine(n Node, target string) string {
 			return ""
 		}
 		fmt.Fprintf(&b, "%s = snell, %s, %d, psk=%s, version=%d", n.Name, n.Server, n.Port, n.Password, ver)
-		// obfs belongs to the v4/v5 generation; v6 replaces it with
-		// server-side traffic shaping and takes no client-side param.
-		if ver != 6 {
+		if ver == 6 {
+			// Snell v6's transport mode is negotiated as part of the
+			// protocol profile. It must match the server's mode; older
+			// rows without an explicit value use sing-box's default.
+			mode, _ := n.Extra["mode"].(string)
+			if mode == "" {
+				mode = "default"
+			}
+			b.WriteString(", mode=" + mode)
+		} else {
+			// obfs belongs to the v4/v5 generation; v6 does not support it.
 			if m, _ := n.Extra["obfs_mode"].(string); m == "http" {
 				b.WriteString(", obfs=http")
 				if h, _ := n.Extra["obfs_host"].(string); h != "" {

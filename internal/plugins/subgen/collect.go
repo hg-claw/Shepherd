@@ -183,15 +183,6 @@ func collectSingbox(ctx context.Context, db *sqlx.DB, id int64) (Node, string, e
 	return n, "", nil
 }
 
-// certDomainMismatch reports whether a cert is present with a non-empty SNI that
-// the cert does not cover — i.e. the client must skip cert verification.
-func certDomainMismatch(certDomain string, sni sql.NullString) bool {
-	if certDomain == "" || !sni.Valid || sni.String == "" {
-		return false
-	}
-	return !certMatchesSNI(certDomain, sni.String)
-}
-
 func stringPtr(s string) *string {
 	if s == "" {
 		return nil

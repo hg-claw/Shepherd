@@ -1074,6 +1074,48 @@ func TestRenderRelayOutbound_SnellV6StaysVersion6(t *testing.T) {
 	}
 }
 
+func TestRenderRelayOutbound_TLSInsecureFollowsCertificateSNI(t *testing.T) {
+	base := InboundView{}
+	base.UpstreamTag = sql.NullString{String: "landing-anytls", Valid: true}
+	base.UpstreamAddress = sql.NullString{String: "203.0.113.10", Valid: true}
+	base.UpstreamPort = sql.NullInt64{Int64: 443, Valid: true}
+	base.UpstreamProtocol = sql.NullString{String: "anytls", Valid: true}
+	base.UpstreamPassword = sql.NullString{String: "password", Valid: true}
+	base.UpstreamSNI = sql.NullString{String: "www.example.com", Valid: true}
+	base.UpstreamCertDomain = sql.NullString{String: "proxy.example.com", Valid: true}
+
+	ob, err := renderRelayOutbound(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tls := ob["tls"].(map[string]any)
+	if tls["insecure"] != true {
+		t.Fatalf("mismatched certificate/SNI must set tls.insecure=true: %v", tls)
+	}
+
+	base.UpstreamSNI.String = "proxy.example.com"
+	ob, err = renderRelayOutbound(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tls = ob["tls"].(map[string]any)
+	if _, ok := tls["insecure"]; ok {
+		t.Fatalf("matching certificate/SNI must keep strict verification: %v", tls)
+	}
+}
+
+func TestRelayTLSInsecureWildcardAndReality(t *testing.T) {
+	if relayTLSInsecure("anytls", "*.example.com", "node.example.com") {
+		t.Fatal("single-label wildcard SNI should verify")
+	}
+	if !relayTLSInsecure("anytls", "*.example.com", "deep.node.example.com") {
+		t.Fatal("multi-label wildcard SNI should skip verification")
+	}
+	if relayTLSInsecure("vless-reality", "proxy.example.com", "camouflage.example.com") {
+		t.Fatal("REALITY must not set tls.insecure")
+	}
+}
+
 func TestBuildTransport(t *testing.T) {
 	ws := buildTransport("ws", "/p", "h.com", true)
 	if ws["path"] != "/p" {

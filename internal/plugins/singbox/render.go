@@ -500,6 +500,53 @@ func renderTransport(ttype string, in InboundView) map[string]any {
 
 // ── Relay outbound renderer ──────────────────────────────────────────────────
 
+// relayTLS builds the TLS block used by relay outbounds. Managed certificates
+// are issued for the upstream landing's certificate domain, which may differ
+// from the SNI used for camouflage. In that case sing-box must skip certificate
+// verification or the relay handshake fails. Unknown certificate metadata is
+// treated conservatively for certificate-authenticated protocols.
+func relayTLS(in InboundView, fields map[string]any) map[string]any {
+	if fields == nil {
+		fields = map[string]any{}
+	}
+	fields["enabled"] = true
+	fields["server_name"] = in.UpstreamSNI.String
+	if relayTLSInsecure(in.UpstreamProtocol.String, in.UpstreamCertDomain.String, in.UpstreamSNI.String) {
+		fields["insecure"] = true
+	}
+	return fields
+}
+
+func relayTLSInsecure(protocol, certDomain, sni string) bool {
+	if protocol == "vless-reality" {
+		return false
+	}
+	if !strings.HasSuffix(protocol, "-tls") && protocol != "hysteria2" && protocol != "tuic-v5" && protocol != "anytls" {
+		return false
+	}
+	certDomain = strings.ToLower(strings.TrimSpace(certDomain))
+	sni = strings.ToLower(strings.TrimSpace(sni))
+	if certDomain == "" {
+		return true
+	}
+	if sni == "" {
+		return strings.HasPrefix(certDomain, "*.")
+	}
+	if certDomain == sni {
+		return false
+	}
+	if strings.HasPrefix(certDomain, "*.") {
+		base := certDomain[1:]
+		if strings.HasSuffix(sni, base) {
+			label := sni[:len(sni)-len(base)]
+			if label != "" && !strings.Contains(label, ".") {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // renderRelayOutbound generates the "to-<upstream.tag>" outbound for a relay inbound.
 func renderRelayOutbound(in InboundView) (map[string]any, error) {
 	upTag := in.UpstreamTag.String
@@ -513,7 +560,7 @@ func renderRelayOutbound(in InboundView) (map[string]any, error) {
 		ob["type"] = "vless"
 		ob["uuid"] = in.UpstreamUUID.String
 		ob["flow"] = "xtls-rprx-vision"
-		ob["tls"] = map[string]any{
+		ob["tls"] = relayTLS(in, map[string]any{
 			"enabled":     true,
 			"server_name": in.UpstreamSNI.String,
 			"utls":        map[string]any{"enabled": true, "fingerprint": "chrome"},
@@ -522,11 +569,11 @@ func renderRelayOutbound(in InboundView) (map[string]any, error) {
 				"public_key": in.UpstreamRealityPublicKey.String,
 				"short_id":   in.UpstreamRealityShortID.String,
 			},
-		}
+		})
 	case "vless-ws-tls", "vless-h2-tls", "vless-httpupgrade-tls":
 		ob["type"] = "vless"
 		ob["uuid"] = in.UpstreamUUID.String
-		ob["tls"] = map[string]any{"enabled": true, "server_name": in.UpstreamSNI.String}
+		ob["tls"] = relayTLS(in, nil)
 		ob["transport"] = renderUpstreamTransport(protoToTransport(in.UpstreamProtocol.String), in)
 	case "vmess-tcp":
 		ob["type"] = "vmess"
@@ -550,21 +597,21 @@ func renderRelayOutbound(in InboundView) (map[string]any, error) {
 		ob["uuid"] = in.UpstreamUUID.String
 		ob["alter_id"] = 0
 		ob["security"] = "auto"
-		ob["tls"] = map[string]any{"enabled": true, "server_name": in.UpstreamSNI.String}
+		ob["tls"] = relayTLS(in, nil)
 		ob["transport"] = renderUpstreamTransport(protoToTransport(in.UpstreamProtocol.String), in)
 	case "trojan-tls":
 		ob["type"] = "trojan"
 		ob["password"] = in.UpstreamPassword.String
-		ob["tls"] = map[string]any{"enabled": true, "server_name": in.UpstreamSNI.String}
+		ob["tls"] = relayTLS(in, nil)
 	case "trojan-ws-tls", "trojan-h2-tls", "trojan-httpupgrade-tls":
 		ob["type"] = "trojan"
 		ob["password"] = in.UpstreamPassword.String
-		ob["tls"] = map[string]any{"enabled": true, "server_name": in.UpstreamSNI.String}
+		ob["tls"] = relayTLS(in, nil)
 		ob["transport"] = renderUpstreamTransport(protoToTransport(in.UpstreamProtocol.String), in)
 	case "hysteria2":
 		ob["type"] = "hysteria2"
 		ob["password"] = in.UpstreamPassword.String
-		ob["tls"] = map[string]any{"enabled": true, "server_name": in.UpstreamSNI.String}
+		ob["tls"] = relayTLS(in, nil)
 		if in.UpstreamExtraJSON.Valid && in.UpstreamExtraJSON.String != "" {
 			var extra map[string]any
 			if err := json.Unmarshal([]byte(in.UpstreamExtraJSON.String), &extra); err == nil {
@@ -580,15 +627,15 @@ func renderRelayOutbound(in InboundView) (map[string]any, error) {
 		ob["type"] = "tuic"
 		ob["uuid"] = in.UpstreamUUID.String
 		ob["password"] = in.UpstreamPassword.String
-		ob["tls"] = map[string]any{
+		ob["tls"] = relayTLS(in, map[string]any{
 			"enabled":     true,
 			"server_name": in.UpstreamSNI.String,
 			"alpn":        []any{"h3"},
-		}
+		})
 	case "anytls":
 		ob["type"] = "anytls"
 		ob["password"] = in.UpstreamPassword.String
-		ob["tls"] = map[string]any{"enabled": true, "server_name": in.UpstreamSNI.String}
+		ob["tls"] = relayTLS(in, nil)
 	case "shadowsocks-2022":
 		ob["type"] = "shadowsocks"
 		ob["method"] = in.UpstreamSSMethod.String

@@ -1,6 +1,7 @@
 package subgen
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -118,6 +119,30 @@ func certMatchesSNI(certDomain, sni string) bool {
 		}
 	}
 	return false
+}
+
+// tlsProtocol reports protocols whose client handshake verifies a server
+// certificate. REALITY is deliberately excluded: it authenticates with the
+// REALITY public key instead of the landing certificate.
+func tlsProtocol(proto string) bool {
+	if proto == "vless-reality" {
+		return false
+	}
+	return strings.HasSuffix(proto, "-tls") || proto == "hysteria2" || proto == "tuic-v5" || proto == "anytls"
+}
+
+// fallbackSNI uses the certificate's concrete domain when an inbound has no
+// explicit SNI. A wildcard certificate is not a valid ClientHello name, so it
+// is left unset and the renderer can choose whether to skip verification.
+func fallbackSNI(sni sql.NullString, certDomain string) string {
+	if sni.Valid && strings.TrimSpace(sni.String) != "" {
+		return strings.TrimSpace(sni.String)
+	}
+	certDomain = strings.TrimSpace(certDomain)
+	if certDomain != "" && !strings.HasPrefix(certDomain, "*.") {
+		return certDomain
+	}
+	return ""
 }
 
 // aliasOrDefault returns a trimmed non-empty alias verbatim, else the

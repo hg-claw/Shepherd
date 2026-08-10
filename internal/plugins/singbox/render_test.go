@@ -637,7 +637,7 @@ func TestRender_SS2022(t *testing.T) {
 }
 
 func TestRender_SnellV5(t *testing.T) {
-	psk := "psk-abc"
+	psk := "psk-abcdefghijklmnop"
 	in := InboundView{Inbound: Inbound{
 		ServerID: 1, Tag: "landing-snell5", Port: 8443,
 		Role: "landing", Protocol: "snell-v5", Password: &psk,
@@ -667,7 +667,7 @@ func TestRender_SnellV5(t *testing.T) {
 }
 
 func TestRender_SnellV5_ObfsHTTP(t *testing.T) {
-	psk := "psk-abc"
+	psk := "psk-abcdefghijklmnop"
 	extra := `{"obfs_mode":"http"}`
 	in := InboundView{Inbound: Inbound{
 		ServerID: 1, Tag: "landing-snell5", Port: 8443,
@@ -683,7 +683,7 @@ func TestRender_SnellV5_ObfsHTTP(t *testing.T) {
 }
 
 func TestRender_SnellV6(t *testing.T) {
-	psk := "psk-abc"
+	psk := "psk-abcdefghijklmnop"
 	extra := `{"mode":"unshaped"}`
 	in := InboundView{Inbound: Inbound{
 		ServerID: 1, Tag: "landing-snell6", Port: 8443,
@@ -711,7 +711,7 @@ func TestRender_SnellV6(t *testing.T) {
 }
 
 func TestRender_SnellRejectsBadEnum(t *testing.T) {
-	psk := "psk-abc"
+	psk := "psk-abcdefghijklmnop"
 	tests := []struct {
 		name     string
 		protocol string
@@ -740,6 +740,17 @@ func TestRender_SnellRejectsBadEnum(t *testing.T) {
 				t.Errorf("got err=%v, wantErr=%v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestRender_SnellV6RejectsShortPSK(t *testing.T) {
+	psk := "too-short"
+	in := InboundView{Inbound: Inbound{
+		ServerID: 1, Tag: "landing-snell6", Port: 8443,
+		Role: "landing", Protocol: "snell-v6", Password: &psk,
+	}}
+	if _, err := renderInbound(in, nil); err == nil || !strings.Contains(err.Error(), "12 and 255") {
+		t.Fatalf("short v6 psk should be rejected with a length error, got %v", err)
 	}
 }
 
@@ -1017,7 +1028,7 @@ func TestRenderRelayOutbound_SnellV5MapsToVersion4(t *testing.T) {
 	in.UpstreamAddress = sql.NullString{String: "1.2.3.4", Valid: true}
 	in.UpstreamPort = sql.NullInt64{Int64: 8443, Valid: true}
 	in.UpstreamProtocol = sql.NullString{String: "snell-v5", Valid: true}
-	in.UpstreamPassword = sql.NullString{String: "psk-abc", Valid: true}
+	in.UpstreamPassword = sql.NullString{String: "psk-abcdefghijklmnop", Valid: true}
 
 	ob, err := renderRelayOutbound(in)
 	if err != nil {
@@ -1031,8 +1042,8 @@ func TestRenderRelayOutbound_SnellV5MapsToVersion4(t *testing.T) {
 	if ob["version"] != 4 {
 		t.Errorf("version = %v, want 4 (v5 landing must dial as v4)", ob["version"])
 	}
-	if ob["psk"] != "psk-abc" {
-		t.Errorf("psk = %v, want psk-abc", ob["psk"])
+	if ob["psk"] != "psk-abcdefghijklmnop" {
+		t.Errorf("psk = %v, want psk-abcdefghijklmnop", ob["psk"])
 	}
 }
 
@@ -1045,7 +1056,8 @@ func TestRenderRelayOutbound_SnellV6StaysVersion6(t *testing.T) {
 	in.UpstreamAddress = sql.NullString{String: "1.2.3.4", Valid: true}
 	in.UpstreamPort = sql.NullInt64{Int64: 8443, Valid: true}
 	in.UpstreamProtocol = sql.NullString{String: "snell-v6", Valid: true}
-	in.UpstreamPassword = sql.NullString{String: "psk-abc", Valid: true}
+	in.UpstreamPassword = sql.NullString{String: "psk-abcdefghijklmnop", Valid: true}
+	in.UpstreamExtraJSON = sql.NullString{String: `{"mode":"unshaped"}`, Valid: true}
 
 	ob, err := renderRelayOutbound(in)
 	if err != nil {
@@ -1053,6 +1065,9 @@ func TestRenderRelayOutbound_SnellV6StaysVersion6(t *testing.T) {
 	}
 	if ob["version"] != 6 {
 		t.Errorf("version = %v, want 6", ob["version"])
+	}
+	if ob["mode"] != "unshaped" {
+		t.Errorf("mode = %v, want unshaped", ob["mode"])
 	}
 	if _, ok := ob["obfs_mode"]; ok {
 		t.Error("v6 outbound must not carry obfs_mode")

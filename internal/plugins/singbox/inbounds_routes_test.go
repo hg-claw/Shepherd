@@ -40,10 +40,10 @@ func TestRoute_CreateLanding(t *testing.T) {
 	deps := newRouteDeps(t)
 	rr := postJSON(t, postInboundHandler(deps), map[string]any{
 		"server_id": 1, "port": 443, "role": "landing", "protocol": "vless-reality",
-		"uuid":                    "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-		"reality_private_key":     "PRIV",
-		"reality_public_key":      "PUB",
-		"reality_short_id":        "aabb1122",
+		"uuid":                     "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+		"reality_private_key":      "PRIV",
+		"reality_public_key":       "PUB",
+		"reality_short_id":         "aabb1122",
 		"reality_handshake_server": "www.icloud.com", "reality_handshake_port": 443,
 		"sni": "www.icloud.com",
 	})
@@ -270,6 +270,21 @@ func TestValidatePostInbound_SnellRequiresPassword(t *testing.T) {
 	body.Password = &psk
 	if err := validatePostInbound(context.Background(), store, body); err != nil {
 		t.Fatalf("unexpected error with psk set: %v", err)
+	}
+}
+
+func TestValidatePostInbound_SnellV6PSKLength(t *testing.T) {
+	deps := newRouteDeps(t)
+	store := &InboundStore{DB: deps.DB}
+	short := "too-short"
+	body := postInboundBody{ServerID: 1, Port: 8443, Role: "landing", Protocol: "snell-v6", Password: &short}
+	if err := validatePostInbound(context.Background(), store, body); err == nil || !strings.Contains(err.Error(), "12 and 255") {
+		t.Fatalf("expected v6 psk length error, got %v", err)
+	}
+	valid := "psk-abcdefghijklmnop"
+	body.Password = &valid
+	if err := validatePostInbound(context.Background(), store, body); err != nil {
+		t.Fatalf("valid v6 psk rejected: %v", err)
 	}
 }
 

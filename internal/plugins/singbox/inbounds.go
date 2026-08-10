@@ -16,28 +16,28 @@ import (
 // Field names mirror the column names in the migration (snake_case → CamelCase).
 // extra_json is stored as *string (JSON text); callers unmarshal as needed.
 type Inbound struct {
-	ID                     int64      `db:"id"`
-	ServerID               int64      `db:"server_id"`
-	Tag                    string     `db:"tag"`
-	Alias                  string     `db:"alias"`
-	Port                   int        `db:"port"`
-	Role                   string     `db:"role"`     // "landing" | "relay"
-	Protocol               string     `db:"protocol"` // e.g. "vless-reality", "hysteria2"
-	UUID                   *string    `db:"uuid"`
-	Flow                   *string    `db:"flow"`
-	Password               *string    `db:"password"`
-	SNI                    *string    `db:"sni"`
-	CertID                 *int64     `db:"cert_id"`
-	RealityPrivateKey      *string    `db:"reality_private_key"`
-	RealityPublicKey       *string    `db:"reality_public_key"`
-	RealityShortID         *string    `db:"reality_short_id"`
-	RealityHandshakeServer *string    `db:"reality_handshake_server"`
-	RealityHandshakePort   *int64     `db:"reality_handshake_port"`
-	TransportPath          *string    `db:"transport_path"`
-	TransportHost          *string    `db:"transport_host"`
-	AlterID                *int64     `db:"alter_id"`
-	SSMethod               *string    `db:"ss_method"`
-	UpstreamInboundID      *int64     `db:"upstream_inbound_id"`
+	ID                     int64   `db:"id"`
+	ServerID               int64   `db:"server_id"`
+	Tag                    string  `db:"tag"`
+	Alias                  string  `db:"alias"`
+	Port                   int     `db:"port"`
+	Role                   string  `db:"role"`     // "landing" | "relay"
+	Protocol               string  `db:"protocol"` // e.g. "vless-reality", "hysteria2"
+	UUID                   *string `db:"uuid"`
+	Flow                   *string `db:"flow"`
+	Password               *string `db:"password"`
+	SNI                    *string `db:"sni"`
+	CertID                 *int64  `db:"cert_id"`
+	RealityPrivateKey      *string `db:"reality_private_key"`
+	RealityPublicKey       *string `db:"reality_public_key"`
+	RealityShortID         *string `db:"reality_short_id"`
+	RealityHandshakeServer *string `db:"reality_handshake_server"`
+	RealityHandshakePort   *int64  `db:"reality_handshake_port"`
+	TransportPath          *string `db:"transport_path"`
+	TransportHost          *string `db:"transport_host"`
+	AlterID                *int64  `db:"alter_id"`
+	SSMethod               *string `db:"ss_method"`
+	UpstreamInboundID      *int64  `db:"upstream_inbound_id"`
 	// RelayMode is meaningful only when Role=="relay":
 	//   "proxy"   = legacy dual-termination (relay has its own keys)
 	//   "forward" = transparent forwarder via sing-box "direct" inbound
@@ -45,26 +45,32 @@ type Inbound struct {
 	//               relay's IP:port).
 	// On landings the column carries the DB default "proxy" but is ignored
 	// by render. Set-once at insert; immutable via Patch.
-	RelayMode              string     `db:"relay_mode"`
-	ExtraJSON              *string    `db:"extra_json"` // raw JSON text; *string, not []byte
-	CreatedAt              time.Time  `db:"created_at"`
-	UpdatedAt              time.Time  `db:"updated_at"`
+	RelayMode         string    `db:"relay_mode"`
+	ExtraJSON         *string   `db:"extra_json"` // raw JSON text; *string, not []byte
+	SSHForwardEnabled bool      `db:"ssh_forward_enabled"`
+	SSHHost           string    `db:"ssh_host"`
+	SSHPort           int       `db:"ssh_port"`
+	SSHUsername       string    `db:"ssh_username"`
+	SSHPrivateKey     string    `db:"ssh_private_key"`
+	SSHUseLocalhost   bool      `db:"ssh_use_localhost"`
+	CreatedAt         time.Time `db:"created_at"`
+	UpdatedAt         time.Time `db:"updated_at"`
 }
 
 // InboundView extends Inbound with upstream JOIN fields and the own server name.
 // Upstream fields are sql.Null* — NULL for landing rows (no upstream).
 type InboundView struct {
 	Inbound
-	ServerName             string         `db:"server_name"`
-	UpstreamTag            sql.NullString `db:"upstream_tag"`
-	UpstreamPort           sql.NullInt64  `db:"upstream_port"`
-	UpstreamServerID       sql.NullInt64  `db:"upstream_server_id"`
-	UpstreamServerName     sql.NullString `db:"upstream_server_name"`
-	UpstreamAddress        sql.NullString `db:"upstream_address"`
-	UpstreamProtocol       sql.NullString `db:"upstream_protocol"`
-	UpstreamUUID           sql.NullString `db:"upstream_uuid"`
-	UpstreamPassword       sql.NullString `db:"upstream_password"`
-	UpstreamSNI            sql.NullString `db:"upstream_sni"`
+	ServerName               string         `db:"server_name"`
+	UpstreamTag              sql.NullString `db:"upstream_tag"`
+	UpstreamPort             sql.NullInt64  `db:"upstream_port"`
+	UpstreamServerID         sql.NullInt64  `db:"upstream_server_id"`
+	UpstreamServerName       sql.NullString `db:"upstream_server_name"`
+	UpstreamAddress          sql.NullString `db:"upstream_address"`
+	UpstreamProtocol         sql.NullString `db:"upstream_protocol"`
+	UpstreamUUID             sql.NullString `db:"upstream_uuid"`
+	UpstreamPassword         sql.NullString `db:"upstream_password"`
+	UpstreamSNI              sql.NullString `db:"upstream_sni"`
 	UpstreamRealityPublicKey sql.NullString `db:"upstream_reality_public_key"`
 	UpstreamRealityShortID   sql.NullString `db:"upstream_reality_short_id"`
 	UpstreamTransportPath    sql.NullString `db:"upstream_transport_path"`
@@ -94,6 +100,12 @@ type InboundPatch struct {
 	AlterID                *int64
 	SSMethod               *string
 	ExtraJSON              *string
+	SSHForwardEnabled      *bool
+	SSHHost                *string
+	SSHPort                *int
+	SSHUsername            *string
+	SSHPrivateKey          *string
+	SSHUseLocalhost        *bool
 }
 
 // InboundStore is the DAO for singbox_inbounds.
@@ -126,6 +138,9 @@ func (s *InboundStore) Insert(ctx context.Context, in Inbound) (int64, error) {
 		// Inbound struct reads the same value the caller saw written.
 		in.RelayMode = "proxy"
 	}
+	if in.SSHPort == 0 {
+		in.SSHPort = 22
+	}
 	now := s.now()
 	var id int64
 	if err := s.DB.QueryRowxContext(ctx, `
@@ -136,8 +151,9 @@ func (s *InboundStore) Insert(ctx context.Context, in Inbound) (int64, error) {
 		  reality_handshake_server, reality_handshake_port,
 		  transport_path, transport_host, alter_id, ss_method,
 		  upstream_inbound_id, relay_mode, extra_json,
+		  ssh_forward_enabled, ssh_host, ssh_port, ssh_username, ssh_private_key, ssh_use_localhost,
 		  created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6, $7,$8,$9,$10,$11, $12,$13,$14, $15,$16, $17,$18,$19,$20, $21,$22,$23, $24,$25)
+		) VALUES ($1,$2,$3,$4,$5,$6, $7,$8,$9,$10,$11, $12,$13,$14, $15,$16, $17,$18,$19,$20, $21,$22,$23, $24,$25,$26,$27,$28,$29,$30,$31)
 		RETURNING id`,
 		in.ServerID, in.Tag, in.Alias, in.Port, in.Role, in.Protocol,
 		in.UUID, in.Flow, in.Password, in.SNI, in.CertID,
@@ -145,6 +161,7 @@ func (s *InboundStore) Insert(ctx context.Context, in Inbound) (int64, error) {
 		in.RealityHandshakeServer, in.RealityHandshakePort,
 		in.TransportPath, in.TransportHost, in.AlterID, in.SSMethod,
 		in.UpstreamInboundID, in.RelayMode, in.ExtraJSON,
+		in.SSHForwardEnabled, in.SSHHost, in.SSHPort, in.SSHUsername, in.SSHPrivateKey, in.SSHUseLocalhost,
 		now, now).Scan(&id); err != nil {
 		return 0, err
 	}
@@ -178,6 +195,8 @@ func (s *InboundStore) ListAllWithUpstream(ctx context.Context) ([]InboundView, 
 		  i.reality_handshake_server, i.reality_handshake_port,
 		  i.transport_path, i.transport_host, i.alter_id, i.ss_method,
 		  i.upstream_inbound_id, i.relay_mode, i.extra_json,
+		  i.ssh_forward_enabled, i.ssh_host, i.ssh_port,
+		  i.ssh_username, i.ssh_private_key, i.ssh_use_localhost,
 		  i.created_at, i.updated_at,
 		  s.name                    AS server_name,
 		  u.tag                     AS upstream_tag,
@@ -235,9 +254,15 @@ func (s *InboundStore) Update(ctx context.Context, id int64, patch InboundPatch)
 	if patch.RealityHandshakePort != nil   { app("reality_handshake_port", *patch.RealityHandshakePort) }
 	if patch.TransportPath != nil          { app("transport_path", *patch.TransportPath) }
 	if patch.TransportHost != nil          { app("transport_host", *patch.TransportHost) }
-	if patch.AlterID != nil               { app("alter_id", *patch.AlterID) }
+	if patch.AlterID != nil                { app("alter_id", *patch.AlterID) }
 	if patch.SSMethod != nil               { app("ss_method", *patch.SSMethod) }
 	if patch.ExtraJSON != nil              { app("extra_json", *patch.ExtraJSON) }
+	if patch.SSHForwardEnabled != nil      { app("ssh_forward_enabled", *patch.SSHForwardEnabled) }
+	if patch.SSHHost != nil                { app("ssh_host", *patch.SSHHost) }
+	if patch.SSHPort != nil                { app("ssh_port", *patch.SSHPort) }
+	if patch.SSHUsername != nil            { app("ssh_username", *patch.SSHUsername) }
+	if patch.SSHPrivateKey != nil          { app("ssh_private_key", *patch.SSHPrivateKey) }
+	if patch.SSHUseLocalhost != nil        { app("ssh_use_localhost", *patch.SSHUseLocalhost) }
 
 	if len(set) == 0 {
 		return nil

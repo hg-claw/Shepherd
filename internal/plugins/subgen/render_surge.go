@@ -121,6 +121,14 @@ func (r *SurgeRenderer) proxyLine(n Node, target string) string {
 	return b.String()
 }
 
+func surgeSSHProxyName(n Node) string {
+	return n.Name + " SSH"
+}
+
+func surgeSSHLine(name string, ssh *SSHForward) string {
+	return fmt.Sprintf("%s = ssh, %s, %d, username=%s, private-key=%s", name, ssh.Host, ssh.Port, ssh.Username, ssh.PrivateKey)
+}
+
 // snellVersionFor picks the snell version to write for a target client.
 // Surge speaks 4/5/6 natively. Every other Surge-syntax client caps out
 // at v4 — a v5 landing is dialed as v4 (the v5 wire protocol is
@@ -180,13 +188,26 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 			}
 			continue
 		}
-		line := r.proxyLine(n, target)
+		renderNode := n
+		underlying := ""
+		if target == "surge" && n.SSH != nil {
+			sshName := surgeSSHProxyName(n)
+			proxies.WriteString(surgeSSHLine(sshName, n.SSH) + "\n")
+			underlying = sshName
+			if n.SSH.UseLocalhost {
+				renderNode.Server = "localhost"
+			}
+		}
+		line := r.proxyLine(renderNode, target)
 		if line == "" {
 			// The client can't represent this node at all (e.g. a snell v6
 			// landing on a Surge-syntax client without v6 support) — drop
 			// it entirely so it leaves no [Proxy] line and no dangling
 			// name in any group/policy list below.
 			continue
+		}
+		if underlying != "" {
+			line += ", underlying-proxy=" + underlying
 		}
 		names = append(names, n.Name)
 		proxies.WriteString(line + "\n")

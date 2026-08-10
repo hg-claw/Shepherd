@@ -470,6 +470,10 @@ export default function InboundsTab() {
       {dialog?.kind === 'new' && (
         <InboundDialog
           serverID={dialog.serverID ?? (serversQ.data?.[0]?.id ?? 0)}
+          serverHost={(() => {
+            const s = serversQ.data?.find((v) => v.id === (dialog.serverID ?? serversQ.data?.[0]?.id))
+            return s?.ssh_host?.Valid ? s.ssh_host.String : undefined
+          })()}
           open
           onClose={() => setDialog(null)}
           onSaved={() => setDialog(null)}
@@ -478,6 +482,10 @@ export default function InboundsTab() {
       {dialog?.kind === 'edit' && (
         <InboundDialog
           serverID={dialog.inbound.server_id}
+          serverHost={(() => {
+            const s = serversQ.data?.find((v) => v.id === dialog.inbound.server_id)
+            return s?.ssh_host?.Valid ? s.ssh_host.String : undefined
+          })()}
           initial={dialog.inbound}
           open
           onClose={() => setDialog(null)}

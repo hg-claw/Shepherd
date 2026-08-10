@@ -60,6 +60,55 @@ func TestRoute_CreateLanding(t *testing.T) {
 	}
 }
 
+func TestRoute_CreateLandingWithSSHForward(t *testing.T) {
+	deps := newRouteDeps(t)
+	rr := postJSON(t, postInboundHandler(deps), map[string]any{
+		"server_id": 1, "port": 8443, "role": "landing", "protocol": "vmess-tcp", "uuid": "uuid-ssh",
+		"ssh_forward_enabled": true, "ssh_host": "10.0.0.8", "ssh_port": 2222,
+		"ssh_username": "root", "ssh_private_key": "edge-key", "ssh_use_localhost": true,
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("want 201, got %d: %s", rr.Code, rr.Body)
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	for key, want := range map[string]any{
+		"ssh_forward_enabled": true, "ssh_host": "10.0.0.8", "ssh_port": float64(2222),
+		"ssh_username": "root", "ssh_private_key": "edge-key", "ssh_use_localhost": true,
+	} {
+		if got := resp[key]; got != want {
+			t.Errorf("%s = %#v, want %#v", key, got, want)
+		}
+	}
+}
+
+func TestValidateSSHForward(t *testing.T) {
+	if err := validateSSHForward(false, "", 0, "", ""); err != nil {
+		t.Fatalf("disabled SSH forwarding must not require settings: %v", err)
+	}
+	if err := validateSSHForward(true, "10.0.0.8", 22, "root", "edge-key"); err != nil {
+		t.Fatalf("valid SSH forwarding rejected: %v", err)
+	}
+	for _, tc := range []struct {
+		name                string
+		host, username, key string
+		port                int
+	}{
+		{name: "host", port: 22, username: "root", key: "edge-key"},
+		{name: "port", host: "10.0.0.8", username: "root", key: "edge-key"},
+		{name: "username", host: "10.0.0.8", port: 22, key: "edge-key"},
+		{name: "private key", host: "10.0.0.8", port: 22, username: "root"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := validateSSHForward(true, tc.host, tc.port, tc.username, tc.key); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
 func TestRoute_RejectsPortConflict(t *testing.T) {
 	deps := newRouteDeps(t)
 	h := postInboundHandler(deps)

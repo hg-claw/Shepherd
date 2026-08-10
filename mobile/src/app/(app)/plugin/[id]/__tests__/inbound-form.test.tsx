@@ -41,6 +41,12 @@ jest.mock('@/api/plugins', () => ({
   useSingboxCerts: () => mockUseCerts(),
 }))
 
+jest.mock('@/api/servers', () => ({
+  useServers: () => ({
+    data: [{ id: 7, name: 'alpha', ssh_host: { Valid: true, String: '10.0.0.8' } }],
+  }),
+}))
+
 const ACTIVE_CERT = {
   id: 5, domain: 'proxy.example.com', status: 'active', issuer: 'LE',
   expires_at: new Date(Date.now() + 40 * 86_400_000).toISOString(),
@@ -106,6 +112,27 @@ test('singbox create posts role=landing, no tag, with the reality fields', async
   expect(body.protocol).toBe('vless-reality')
   expect(body).not.toHaveProperty('tag')
   expect(mockBack).toHaveBeenCalled()
+})
+
+test('singbox create submits Surge SSH forwarding and uses the server SSH host by default', async () => {
+  const { getByTestId } = render(<InboundFormScreen />)
+  fireEvent.press(getByTestId('ssh-enabled'))
+  expect(getByTestId('ssh-host').props.value).toBe('10.0.0.8')
+  fireEvent.changeText(getByTestId('ssh-port'), '2222')
+  fireEvent.changeText(getByTestId('ssh-username'), 'deploy')
+  fireEvent.changeText(getByTestId('ssh-private-key'), 'edge-key')
+  fireEvent.press(getByTestId('ssh-localhost'))
+  fireEvent.press(getByTestId('save'))
+
+  await waitFor(() => expect(mockCreate).toHaveBeenCalled())
+  expect(mockCreate.mock.calls[0][1]).toEqual(expect.objectContaining({
+    ssh_forward_enabled: true,
+    ssh_host: '10.0.0.8',
+    ssh_port: 2222,
+    ssh_username: 'deploy',
+    ssh_private_key: 'edge-key',
+    ssh_use_localhost: true,
+  }))
 })
 
 test('Generate keypair calls the shared xray endpoint and fills public key', async () => {

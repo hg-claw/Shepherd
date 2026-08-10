@@ -71,6 +71,7 @@ type InboundView struct {
 	UpstreamTransportHost    sql.NullString `db:"upstream_transport_host"`
 	UpstreamSSMethod         sql.NullString `db:"upstream_ss_method"`
 	UpstreamExtraJSON        sql.NullString `db:"upstream_extra_json"`
+	UpstreamCertDomain       sql.NullString `db:"upstream_cert_domain"`
 }
 
 // InboundPatch carries mutable fields for Update. nil pointer = leave unchanged.
@@ -188,6 +189,7 @@ func (s *InboundStore) ListAllWithUpstream(ctx context.Context) ([]InboundView, 
 		  u.uuid                    AS upstream_uuid,
 		  u.password                AS upstream_password,
 		  u.sni                     AS upstream_sni,
+		  uc.domain                 AS upstream_cert_domain,
 		  u.reality_public_key      AS upstream_reality_public_key,
 		  u.reality_short_id        AS upstream_reality_short_id,
 		  u.transport_path          AS upstream_transport_path,
@@ -198,6 +200,7 @@ func (s *InboundStore) ListAllWithUpstream(ctx context.Context) ([]InboundView, 
 		JOIN servers s ON s.id = i.server_id
 		LEFT JOIN singbox_inbounds u  ON u.id = i.upstream_inbound_id
 		LEFT JOIN servers us ON us.id = u.server_id
+		LEFT JOIN singbox_certificates uc ON uc.id = u.cert_id
 		ORDER BY i.server_id, i.id`)
 	return rows, err
 }

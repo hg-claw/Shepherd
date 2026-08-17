@@ -38,6 +38,7 @@ type Inbound struct {
 	AlterID                *int64  `db:"alter_id"`
 	SSMethod               *string `db:"ss_method"`
 	UpstreamInboundID      *int64  `db:"upstream_inbound_id"`
+	CustomUpstreamURL      string  `db:"custom_upstream_url"`
 	// RelayMode is meaningful only when Role=="relay":
 	//   "proxy"   = legacy dual-termination (relay has its own keys)
 	//   "forward" = transparent forwarder via sing-box "direct" inbound
@@ -82,6 +83,7 @@ type InboundView struct {
 
 // InboundPatch carries mutable fields for Update. nil pointer = leave unchanged.
 // Immutable post-create: server_id, tag, role, protocol, upstream_inbound_id.
+// custom_upstream_url is mutable for relays that were created with a custom landing.
 type InboundPatch struct {
 	Port                   *int
 	Alias                  *string
@@ -100,6 +102,7 @@ type InboundPatch struct {
 	AlterID                *int64
 	SSMethod               *string
 	ExtraJSON              *string
+	CustomUpstreamURL      *string
 	SSHForwardEnabled      *bool
 	SSHHost                *string
 	SSHPort                *int
@@ -150,17 +153,17 @@ func (s *InboundStore) Insert(ctx context.Context, in Inbound) (int64, error) {
 		  reality_private_key, reality_public_key, reality_short_id,
 		  reality_handshake_server, reality_handshake_port,
 		  transport_path, transport_host, alter_id, ss_method,
-		  upstream_inbound_id, relay_mode, extra_json,
+		  upstream_inbound_id, custom_upstream_url, relay_mode, extra_json,
 		  ssh_forward_enabled, ssh_host, ssh_port, ssh_username, ssh_private_key, ssh_use_localhost,
 		  created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6, $7,$8,$9,$10,$11, $12,$13,$14, $15,$16, $17,$18,$19,$20, $21,$22,$23, $24,$25,$26,$27,$28,$29,$30,$31)
+		) VALUES ($1,$2,$3,$4,$5,$6, $7,$8,$9,$10,$11, $12,$13,$14, $15,$16, $17,$18,$19,$20, $21,$22,$23,$24, $25,$26,$27,$28,$29,$30,$31,$32)
 		RETURNING id`,
 		in.ServerID, in.Tag, in.Alias, in.Port, in.Role, in.Protocol,
 		in.UUID, in.Flow, in.Password, in.SNI, in.CertID,
 		in.RealityPrivateKey, in.RealityPublicKey, in.RealityShortID,
 		in.RealityHandshakeServer, in.RealityHandshakePort,
 		in.TransportPath, in.TransportHost, in.AlterID, in.SSMethod,
-		in.UpstreamInboundID, in.RelayMode, in.ExtraJSON,
+		in.UpstreamInboundID, in.CustomUpstreamURL, in.RelayMode, in.ExtraJSON,
 		in.SSHForwardEnabled, in.SSHHost, in.SSHPort, in.SSHUsername, in.SSHPrivateKey, in.SSHUseLocalhost,
 		now, now).Scan(&id); err != nil {
 		return 0, err
@@ -195,6 +198,7 @@ func (s *InboundStore) ListAllWithUpstream(ctx context.Context) ([]InboundView, 
 		  i.reality_handshake_server, i.reality_handshake_port,
 		  i.transport_path, i.transport_host, i.alter_id, i.ss_method,
 		  i.upstream_inbound_id, i.relay_mode, i.extra_json,
+		  i.custom_upstream_url,
 		  i.ssh_forward_enabled, i.ssh_host, i.ssh_port,
 		  i.ssh_username, i.ssh_private_key, i.ssh_use_localhost,
 		  i.created_at, i.updated_at,
@@ -240,29 +244,78 @@ func (s *InboundStore) Update(ctx context.Context, id int64, patch InboundPatch)
 	args := []any{}
 	app := func(col string, val any) { set = append(set, col+"=?"); args = append(args, val) }
 
-	if patch.Port != nil                   { app("port", *patch.Port) }
-	if patch.Alias != nil                  { app("alias", *patch.Alias) }
-	if patch.UUID != nil                   { app("uuid", *patch.UUID) }
-	if patch.Flow != nil                   { app("flow", *patch.Flow) }
-	if patch.Password != nil               { app("password", *patch.Password) }
-	if patch.SNI != nil                    { app("sni", *patch.SNI) }
-	if patch.CertID != nil                 { app("cert_id", *patch.CertID) }
-	if patch.RealityPrivateKey != nil      { app("reality_private_key", *patch.RealityPrivateKey) }
-	if patch.RealityPublicKey != nil       { app("reality_public_key", *patch.RealityPublicKey) }
-	if patch.RealityShortID != nil         { app("reality_short_id", *patch.RealityShortID) }
-	if patch.RealityHandshakeServer != nil { app("reality_handshake_server", *patch.RealityHandshakeServer) }
-	if patch.RealityHandshakePort != nil   { app("reality_handshake_port", *patch.RealityHandshakePort) }
-	if patch.TransportPath != nil          { app("transport_path", *patch.TransportPath) }
-	if patch.TransportHost != nil          { app("transport_host", *patch.TransportHost) }
-	if patch.AlterID != nil                { app("alter_id", *patch.AlterID) }
-	if patch.SSMethod != nil               { app("ss_method", *patch.SSMethod) }
-	if patch.ExtraJSON != nil              { app("extra_json", *patch.ExtraJSON) }
-	if patch.SSHForwardEnabled != nil      { app("ssh_forward_enabled", *patch.SSHForwardEnabled) }
-	if patch.SSHHost != nil                { app("ssh_host", *patch.SSHHost) }
-	if patch.SSHPort != nil                { app("ssh_port", *patch.SSHPort) }
-	if patch.SSHUsername != nil            { app("ssh_username", *patch.SSHUsername) }
-	if patch.SSHPrivateKey != nil          { app("ssh_private_key", *patch.SSHPrivateKey) }
-	if patch.SSHUseLocalhost != nil        { app("ssh_use_localhost", *patch.SSHUseLocalhost) }
+	if patch.Port != nil {
+		app("port", *patch.Port)
+	}
+	if patch.Alias != nil {
+		app("alias", *patch.Alias)
+	}
+	if patch.UUID != nil {
+		app("uuid", *patch.UUID)
+	}
+	if patch.Flow != nil {
+		app("flow", *patch.Flow)
+	}
+	if patch.Password != nil {
+		app("password", *patch.Password)
+	}
+	if patch.SNI != nil {
+		app("sni", *patch.SNI)
+	}
+	if patch.CertID != nil {
+		app("cert_id", *patch.CertID)
+	}
+	if patch.RealityPrivateKey != nil {
+		app("reality_private_key", *patch.RealityPrivateKey)
+	}
+	if patch.RealityPublicKey != nil {
+		app("reality_public_key", *patch.RealityPublicKey)
+	}
+	if patch.RealityShortID != nil {
+		app("reality_short_id", *patch.RealityShortID)
+	}
+	if patch.RealityHandshakeServer != nil {
+		app("reality_handshake_server", *patch.RealityHandshakeServer)
+	}
+	if patch.RealityHandshakePort != nil {
+		app("reality_handshake_port", *patch.RealityHandshakePort)
+	}
+	if patch.TransportPath != nil {
+		app("transport_path", *patch.TransportPath)
+	}
+	if patch.TransportHost != nil {
+		app("transport_host", *patch.TransportHost)
+	}
+	if patch.AlterID != nil {
+		app("alter_id", *patch.AlterID)
+	}
+	if patch.SSMethod != nil {
+		app("ss_method", *patch.SSMethod)
+	}
+	if patch.ExtraJSON != nil {
+		app("extra_json", *patch.ExtraJSON)
+	}
+	if patch.CustomUpstreamURL != nil {
+		app("custom_upstream_url", *patch.CustomUpstreamURL)
+	}
+	if patch.SSHForwardEnabled != nil {
+		app("ssh_forward_enabled", *patch.SSHForwardEnabled)
+	}
+	if patch.SSHHost != nil {
+		app("ssh_host", *patch.SSHHost)
+	}
+	if patch.SSHPort != nil {
+		app("ssh_port", *patch.SSHPort)
+	}
+	if patch.SSHUsername != nil {
+		app("ssh_username", *patch.SSHUsername)
+	}
+	if patch.SSHPrivateKey != nil {
+		app("ssh_private_key", *patch.SSHPrivateKey)
+	}
+	if patch.SSHUseLocalhost != nil {
+		app("ssh_use_localhost", *patch.SSHUseLocalhost)
+	}
 
 	if len(set) == 0 {
 		return nil

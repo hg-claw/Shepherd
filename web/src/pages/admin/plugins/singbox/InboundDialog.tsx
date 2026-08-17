@@ -196,13 +196,16 @@ export default function InboundDialog({ serverID, serverHost, initial, open, onC
   const [role, setRole]             = useState<'landing' | 'relay'>('landing')
   const [upstreamID, setUpstreamID] = useState<string>('')
   const [relayMode, setRelayMode]   = useState<'forward' | 'proxy'>('forward')
+  const [landingSource, setLandingSource] = useState<'existing' | 'custom'>(initial?.custom_upstream_url ? 'custom' : 'existing')
+  const [customUpstreamURL, setCustomUpstreamURL] = useState<string>(initial?.custom_upstream_url ?? '')
 
   const selectedLanding = landings.find((l) => String(l.id) === upstreamID)
+  const isCustomRelay = isEdit ? !!initial?.custom_upstream_url : role === 'relay' && landingSource === 'custom'
 
   // Forward relays render as a sing-box "direct" inbound — the protocol
   // switch is short-circuited server-side, so every protocol field is
   // dead weight. Collapse them and inherit the landing's protocol.
-  const isForward = role === 'relay' && relayMode === 'forward'
+  const isForward = !isCustomRelay && role === 'relay' && relayMode === 'forward'
 
   // `role`/`relayMode` are create-only state and are deliberately never
   // seeded from `initial`, so `isForward` is structurally false for every
@@ -269,6 +272,8 @@ export default function InboundDialog({ serverID, serverHost, initial, open, onC
       body.ssh_private_key = sshPrivateKey
       body.ssh_use_localhost = sshEnabled && sshUseLocalhost
 
+      if (isCustomRelay) body.custom_upstream_url = customUpstreamURL.trim()
+
       if (!isForward) {
         if (needsUUID(protocol))       body.uuid = uuid
         if (needsPassword(protocol))   body.password = password
@@ -316,7 +321,7 @@ export default function InboundDialog({ serverID, serverHost, initial, open, onC
       if (role === 'relay') {
         body.role = 'relay'
         body.relay_mode = relayMode
-        body.upstream_inbound_id = Number(upstreamID)
+        if (!isCustomRelay) body.upstream_inbound_id = Number(upstreamID)
       } else {
         body.role = 'landing'
       }
@@ -367,12 +372,31 @@ export default function InboundDialog({ serverID, serverHost, initial, open, onC
         return
       }
     }
+    if (!isEdit && role === 'relay' && landingSource === 'custom') {
+      try {
+        const u = new URL(customUpstreamURL.trim())
+        const scheme = u.protocol.replace(':', '').toLowerCase()
+        if (!['anytls', 'http', 'https', 'socks', 'socks5'].includes(scheme) || !u.hostname || !u.port) {
+          throw new Error('Custom landing must be anytls://, http(s)://, socks://, or socks5:// with host and port')
+        }
+        if (scheme === 'anytls' && !u.username && !u.password && !u.searchParams.get('password')) {
+          throw new Error('AnyTLS custom landing requires a password before @ or in ?password=')
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+        return
+      }
+    }
+    if (isEdit && isCustomRelay && !customUpstreamURL.trim()) {
+      setError(t('singbox.inbound_dialog.custom_landing_required', 'Custom landing URL is required'))
+      return
+    }
     // Guard on the resolved landing, not just the raw id: a set-but-
     // unresolvable upstreamID would otherwise fall through and submit the
     // relay's own hidden `protocol` state as a forward relay's inherited
     // label (the reality carve-out now lets such a body pass validation),
     // silently persisting the wrong protocol.
-    if (!isEdit && role === 'relay' && !selectedLanding) {
+    if (!isEdit && role === 'relay' && landingSource === 'existing' && !selectedLanding) {
       setError(t('singbox.inbound_dialog.upstream_required', 'Select an upstream landing'))
       return
     }
@@ -441,6 +465,18 @@ export default function InboundDialog({ serverID, serverHost, initial, open, onC
               {role === 'relay' && (
                 <>
                   <div>
+                    <Label className={labelCls} htmlFor="ib-landing-source">{t('singbox.inbound_dialog.landing_source', 'Landing source')}</Label>
+                    <select id="ib-landing-source" className={selectCls} value={landingSource}
+                      onChange={(e) => {
+                        const next = e.target.value as 'existing' | 'custom'
+                        setLandingSource(next)
+                        if (next === 'custom') setRelayMode('proxy')
+                      }}>
+                      <option value="existing">{t('singbox.inbound_dialog.landing_existing', 'Existing landing')}</option>
+                      <option value="custom">{t('singbox.inbound_dialog.landing_custom', 'Custom proxy URL')}</option>
+                    </select>
+                  </div>
+                  {landingSource === 'existing' ? <div>
                     <Label className={labelCls} htmlFor="ib-upstream">{t('singbox.inbound_dialog.upstream', 'Upstream landing')}</Label>
                     <select id="ib-upstream"
                       className={selectCls}
@@ -453,7 +489,15 @@ export default function InboundDialog({ serverID, serverHost, initial, open, onC
                         </option>
                       ))}
                     </select>
-                  </div>
+                  </div> : <div>
+                    <Label className={labelCls} htmlFor="ib-custom-upstream">{t('singbox.inbound_dialog.custom_landing_url', 'Custom landing URL')}</Label>
+                    <Input id="ib-custom-upstream" className={inputCls} value={customUpstreamURL}
+                      onChange={(e) => setCustomUpstreamURL(e.target.value)}
+                      placeholder="anytls://password@example.com:443?sni=proxy.example.com" />
+                    <p className="text-2xs text-muted-foreground mt-0.5">
+                      {t('singbox.inbound_dialog.custom_landing_hint', 'Supported: anytls://, http://, https://, socks://, socks5://. Include host and port; AnyTLS needs a password.')}
+                    </p>
+                  </div>}
                   <div>
                     <Label className={labelCls}>{t('singbox.inbound_dialog.relay_mode', 'Relay mode')}</Label>
                     <div className="flex gap-2">
@@ -462,7 +506,8 @@ export default function InboundDialog({ serverID, serverHost, initial, open, onC
                         size="sm"
                         variant={relayMode === 'forward' ? 'default' : 'outline'}
                         aria-pressed={relayMode === 'forward'}
-                        onClick={() => setRelayMode('forward')}
+                        onClick={() => { if (landingSource === 'existing') setRelayMode('forward') }}
+                        disabled={landingSource === 'custom'}
                       >
                         {t('singbox.inbound_dialog.mode_forward', 'Forward')}
                       </Button>
@@ -485,6 +530,18 @@ export default function InboundDialog({ serverID, serverHost, initial, open, onC
                 </>
               )}
             </>
+          )}
+
+          {isRelayEdit && isCustomRelay && (
+            <div>
+              <Label className={labelCls} htmlFor="ib-custom-upstream-edit">{t('singbox.inbound_dialog.custom_landing_url', 'Custom landing URL')}</Label>
+              <Input id="ib-custom-upstream-edit" className={inputCls} value={customUpstreamURL}
+                onChange={(e) => setCustomUpstreamURL(e.target.value)}
+                placeholder="anytls://password@example.com:443?sni=proxy.example.com" />
+              <p className="text-2xs text-muted-foreground mt-0.5">
+                {t('singbox.inbound_dialog.custom_landing_hint', 'Supported: anytls://, http://, https://, socks://, socks5://. Include host and port; AnyTLS needs a password.')}
+              </p>
+            </div>
           )}
 
           {/* ── Port + Protocol ── Protocol is omitted for forward relays:

@@ -59,6 +59,21 @@ func RenderServerConfig(inbounds []InboundView, certs []CertView) ([]byte, error
 			hasLanding = true
 		}
 		if in.Role == "relay" {
+			if in.CustomUpstreamURL != "" {
+				if in.RelayMode == "forward" {
+					return nil, fmt.Errorf("relay %s: custom landing only supports proxy mode", in.Tag)
+				}
+				ob, err := renderCustomRelayOutbound(in)
+				if err != nil {
+					return nil, fmt.Errorf("relay outbound %s: %w", in.Tag, err)
+				}
+				outbounds = append(outbounds, ob)
+				routeRules = append(routeRules, map[string]any{
+					"inbound":  []any{in.Tag},
+					"outbound": "to-custom-" + in.Tag,
+				})
+				continue
+			}
 			if !in.UpstreamTag.Valid {
 				return nil, fmt.Errorf("relay %s missing upstream JOIN fields", in.Tag)
 			}

@@ -61,13 +61,7 @@ func parseCustomLandingURL(raw string) (customLanding, error) {
 	if value := q.Get("insecure"); value != "" {
 		c.Insecure, err = strconv.ParseBool(value)
 		if err != nil {
-			if value == "1" {
-				c.Insecure = true
-			} else if value == "0" {
-				c.Insecure = false
-			} else {
-				return customLanding{}, fmt.Errorf("custom landing insecure must be true, false, 1, or 0")
-			}
+			return customLanding{}, fmt.Errorf("custom landing insecure must be true, false, 1, or 0")
 		}
 	}
 	if scheme == "anytls" && c.Password == "" {

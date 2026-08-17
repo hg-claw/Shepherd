@@ -59,6 +59,7 @@ type postInboundBody struct {
 	SSMethod               *string `json:"ss_method"`
 	Extra                  *string `json:"extra"`
 	UpstreamInboundID      *int64  `json:"upstream_inbound_id"`
+	CustomUpstreamURL      string  `json:"custom_upstream_url"`
 	Alias                  string  `json:"alias"`
 	// RelayMode is honored only when role="relay". Values: "proxy"
 	// (legacy dual-termination), "forward" (transparent sing-box
@@ -124,16 +125,31 @@ func validatePostInbound(ctx context.Context, store *InboundStore, body postInbo
 		}
 	}
 	if body.Role == "relay" {
-		if body.UpstreamInboundID == nil {
-			return errors.New("upstream_inbound_id required when role=relay")
+		customURL := strings.TrimSpace(body.CustomUpstreamURL)
+		if customURL != "" {
+			if body.UpstreamInboundID != nil {
+				return errors.New("custom_upstream_url and upstream_inbound_id are mutually exclusive")
+			}
+			if body.RelayMode == "forward" {
+				return errors.New("custom landing only supports relay_mode=proxy")
+			}
+			if _, err := parseCustomLandingURL(customURL); err != nil {
+				return err
+			}
+		} else {
+			if body.UpstreamInboundID == nil {
+				return errors.New("upstream_inbound_id or custom_upstream_url required when role=relay")
+			}
+			upstream, err := store.GetByID(ctx, *body.UpstreamInboundID)
+			if err != nil {
+				return fmt.Errorf("upstream inbound %d not found", *body.UpstreamInboundID)
+			}
+			if upstream.Role != "landing" {
+				return fmt.Errorf("upstream inbound %d is not a landing (role=%s)", upstream.ID, upstream.Role)
+			}
 		}
-		upstream, err := store.GetByID(ctx, *body.UpstreamInboundID)
-		if err != nil {
-			return fmt.Errorf("upstream inbound %d not found", *body.UpstreamInboundID)
-		}
-		if upstream.Role != "landing" {
-			return fmt.Errorf("upstream inbound %d is not a landing (role=%s)", upstream.ID, upstream.Role)
-		}
+	} else if strings.TrimSpace(body.CustomUpstreamURL) != "" || body.UpstreamInboundID != nil {
+		return errors.New("landing cannot have an upstream inbound or custom landing URL")
 	}
 	// vless-reality needs handshake target + private key — without them
 	// sing-box fails at runtime with "REALITY: failed to dial dest:
@@ -208,6 +224,7 @@ func inboundToMap(v InboundView) map[string]any {
 		"ss_method":                v.SSMethod,
 		"extra_json":               v.ExtraJSON,
 		"upstream_inbound_id":      v.UpstreamInboundID,
+		"custom_upstream_url":      v.CustomUpstreamURL,
 		"relay_mode":               v.RelayMode,
 		"ssh_forward_enabled":      v.SSHForwardEnabled,
 		"ssh_host":                 v.SSHHost,
@@ -283,6 +300,7 @@ func postInboundHandler(deps plugins.Deps) http.HandlerFunc {
 			SSMethod:               body.SSMethod,
 			ExtraJSON:              body.Extra,
 			UpstreamInboundID:      body.UpstreamInboundID,
+			CustomUpstreamURL:      strings.TrimSpace(body.CustomUpstreamURL),
 			RelayMode:              body.RelayMode,
 			SSHForwardEnabled:      body.SSHForwardEnabled,
 			SSHHost:                body.SSHHost,
@@ -388,6 +406,9 @@ func patchInboundHandler(deps plugins.Deps) http.HandlerFunc {
 		if v, ok := body["extra"].(string); ok {
 			patch.ExtraJSON = &v
 		}
+		if v, ok := body["custom_upstream_url"].(string); ok {
+			patch.CustomUpstreamURL = &v
+		}
 		if v, ok := body["ssh_forward_enabled"].(bool); ok {
 			patch.SSHForwardEnabled = &v
 		}
@@ -422,6 +443,26 @@ func patchInboundHandler(deps plugins.Deps) http.HandlerFunc {
 		if err != nil {
 			writeErr(w, 404, "inbound not found")
 			return
+		}
+		if patch.CustomUpstreamURL != nil {
+			if row.Role != "relay" {
+				writeErr(w, 409, "custom_upstream_url is only valid for relay inbounds")
+				return
+			}
+			customURL := strings.TrimSpace(*patch.CustomUpstreamURL)
+			if customURL == "" {
+				writeErr(w, 409, "custom_upstream_url cannot be empty")
+				return
+			}
+			if row.UpstreamInboundID != nil {
+				writeErr(w, 409, "cannot add custom landing to a relay using an existing landing")
+				return
+			}
+			if _, err := parseCustomLandingURL(customURL); err != nil {
+				writeErr(w, 409, err.Error())
+				return
+			}
+			*patch.CustomUpstreamURL = customURL
 		}
 		if row.Protocol == "snell-v6" && row.RelayMode != "forward" && patch.Password != nil {
 			if n := len([]byte(*patch.Password)); n < 12 || n > 255 {

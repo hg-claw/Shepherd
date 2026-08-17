@@ -84,6 +84,36 @@ func TestRoute_CreateLandingWithSSHForward(t *testing.T) {
 	}
 }
 
+func TestRoute_CreateCustomRelay(t *testing.T) {
+	deps := newRouteDeps(t)
+	rr := postJSON(t, postInboundHandler(deps), map[string]any{
+		"server_id": 1, "port": 8444, "role": "relay", "protocol": "vmess-tcp",
+		"uuid": "relay-custom-uuid", "relay_mode": "proxy",
+		"custom_upstream_url": "http://user:pass@example.com:8080",
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("want 201, got %d: %s", rr.Code, rr.Body)
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp["custom_upstream_url"] != "http://user:pass@example.com:8080" || resp["upstream_inbound_id"] != nil {
+		t.Fatalf("unexpected custom relay response: %#v", resp)
+	}
+}
+
+func TestRoute_RejectCustomRelayForward(t *testing.T) {
+	deps := newRouteDeps(t)
+	rr := postJSON(t, postInboundHandler(deps), map[string]any{
+		"server_id": 1, "port": 8444, "role": "relay", "protocol": "vmess-tcp",
+		"relay_mode": "forward", "custom_upstream_url": "socks5://example.com:1080",
+	})
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("want 409, got %d: %s", rr.Code, rr.Body)
+	}
+}
+
 func TestValidateSSHForward(t *testing.T) {
 	if err := validateSSHForward(false, "", 0, "", ""); err != nil {
 		t.Fatalf("disabled SSH forwarding must not require settings: %v", err)

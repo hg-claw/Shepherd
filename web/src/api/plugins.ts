@@ -310,6 +310,7 @@ export interface SingboxInbound {
   ssh_use_localhost?: boolean
   // upstream JOIN fields (relay rows only)
   upstream_inbound_id?: number | null
+  custom_upstream_url?: string
   upstream_tag?: string | null
   upstream_server_id?: number | null
   upstream_server_name?: string | null
@@ -346,6 +347,7 @@ export interface CreateSingboxInboundBody {
   // sent. Naming this field extra_json made it a silent no-op.
   extra?: string
   upstream_inbound_id?: number
+  custom_upstream_url?: string
   // Honoured only when role='relay'. "proxy" = legacy dual-termination
   // (relay has its own keys, re-encapsulates to landing). "forward" =
   // transparent sing-box "direct" inbound — no per-relay keys, client
@@ -382,6 +384,7 @@ export interface PatchSingboxInboundBody {
   // See CreateSingboxInboundBody.extra — the PATCH handler reads
   // body["extra"], not extra_json.
   extra?: string | null
+  custom_upstream_url?: string
   ssh_forward_enabled?: boolean
   ssh_host?: string
   ssh_port?: number

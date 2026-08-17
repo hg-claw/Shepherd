@@ -25,6 +25,7 @@ func loadMigrations(driver shepdb.Driver) []plugins.Migration {
 		"0006_relay_mode.up.sql",
 		"0007_inbound_alias.up.sql",
 		"0008_ssh_forward.up.sql",
+		"0009_custom_relay_landing.up.sql",
 	}
 	subdir := "sqlite"
 	if driver == shepdb.DriverPostgres {

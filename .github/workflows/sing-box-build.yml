@@ -106,11 +106,12 @@ jobs:
         id: tags
         working-directory: sing-box-src
         run: |
-          # Start from upstream's DEFAULT_BUILD_TAGS, drop with_naive_outbound
-          # (needs naiveproxy toolchain — too much for a daily cron), append
-          # with_v2ray_api + with_grpc (the point of this whole pipeline).
+          # Start from upstream's DEFAULT_BUILD_TAGS, drop integrations that
+          # need extra toolchains and badlinkname (an optional TLS read-wait
+          # optimization that can break on Go patch releases by referencing
+          # private crypto/tls symbols), then append the API tags we need.
           default_tags=$(cat release/DEFAULT_BUILD_TAGS)
-          tags=$(echo "$default_tags" | tr ',' '\n' | grep -v -E '^(with_naive_outbound|with_cloudflared|with_usbip|with_openvpn|with_openconnect)$' | paste -sd,)
+          tags=$(echo "$default_tags" | tr ',' '\n' | grep -v -E '^(with_naive_outbound|with_cloudflared|with_usbip|with_openvpn|with_openconnect|badlinkname)$' | paste -sd,)
           tags="${tags},with_v2ray_api,with_grpc"
           echo "tags=${tags}"
           echo "tags=${tags}" >> "$GITHUB_OUTPUT"

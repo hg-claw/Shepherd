@@ -294,11 +294,26 @@ func TestSurge_SnellV6UnsafeRawMode(t *testing.T) {
 
 func TestSurge_SkipProxyDrops10Net(t *testing.T) {
 	out := (&SurgeRenderer{}).Render(Intermediate{}, "https://sub", DefaultRulesetBase)
-	if strings.Contains(out, "10.0.0.0/8") {
-		t.Fatalf("skip-proxy must not contain 10.0.0.0/8\n%s", out)
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(line, "skip-proxy =") && strings.Contains(line, "10.0.0.0/8") {
+			t.Fatalf("skip-proxy must not contain 10.0.0.0/8\n%s", line)
+		}
 	}
 	// neighbouring private ranges must remain
 	if !strings.Contains(out, "172.16.0.0/12") || !strings.Contains(out, "192.168.0.0/16") {
 		t.Fatalf("skip-proxy lost other private ranges\n%s", out)
+	}
+}
+
+func TestSurge_TunExcludedRoutesIncludes10Net(t *testing.T) {
+	out := (&SurgeRenderer{}).Render(Intermediate{}, "https://sub", DefaultRulesetBase)
+	want := "tun-excluded-routes = 192.168.0.0/16,172.16.0.0/12,10.0.0.0/8,10.254.253.0/24"
+	if !strings.Contains(out, want) {
+		t.Fatalf("missing tun-excluded-routes %q\n%s", want, out)
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "tun-excluded-routes") && strings.HasPrefix(strings.TrimSpace(line), "#") {
+			t.Fatalf("tun-excluded-routes must not be commented\n%s", line)
+		}
 	}
 }

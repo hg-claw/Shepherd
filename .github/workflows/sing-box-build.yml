@@ -2,8 +2,9 @@ name: Build sing-box (v2ray-api)
 
 # Builds sing-box from source with the with_v2ray_api tag so the agent's
 # gRPC stats sampler has counters to read (upstream's release binaries are
-# compiled without it). Cron picks up the latest upstream stable and beta
-# tags daily; we only build & publish versions we have not already shipped.
+# compiled without it). Cron picks up new upstream stable tags daily; we
+# only build & publish when the upstream version is ahead of what we
+# already shipped.
 #
 # Artifacts land as a GitHub Release on THIS repo, tagged
 # `singbox-vX.Y.Z-v2rayapi`. The Shepherd server's release fetcher resolves
@@ -12,12 +13,12 @@ name: Build sing-box (v2ray-api)
 on:
   schedule:
     # 03:00 UTC daily. Upstream usually tags in the morning UTC, so this
-    # catches new stable/beta releases within ~6h. Manual dispatch overrides cron.
+    # catches new stables within ~6h. Manual dispatch overrides cron.
     - cron: '0 3 * * *'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Upstream sing-box tag to build (e.g. v1.14.0-beta.2). Leave empty to check the latest stable and beta.'
+        description: 'Upstream sing-box tag to build (e.g. v1.14.0-beta.2). Leave empty to use upstream latest stable.'
         required: false
       force:
         description: 'Rebuild even if our release already exists for that version.'
@@ -32,8 +33,9 @@ jobs:
     name: Decide whether to build
     runs-on: ubuntu-latest
     outputs:
+      version:      ${{ steps.resolve.outputs.version }}
+      release_tag:  ${{ steps.resolve.outputs.release_tag }}
       should_build: ${{ steps.resolve.outputs.should_build }}
-      matrix:       ${{ steps.resolve.outputs.matrix }}
     steps:
       - id: resolve
         env:
@@ -43,75 +45,65 @@ jobs:
         run: |
           set -euo pipefail
 
-          # 1) Pick candidates. Manual input wins. Scheduled runs check both
-          #    GitHub's latest stable and the newest non-draft prerelease.
+          # 1) Pick upstream version: manual input wins, otherwise query
+          #    upstream's "latest" (which already filters out prereleases).
           if [[ -n "${INPUT_VERSION}" ]]; then
-            candidates=$(jq -nc --arg version "${INPUT_VERSION}" '[ $version ]')
+            version="${INPUT_VERSION}"
           else
-            stable=$(gh api repos/SagerNet/sing-box/releases/latest --jq '.tag_name')
-            beta=$(gh api 'repos/SagerNet/sing-box/releases?per_page=100' \
-              --jq '[.[] | select(.draft == false and .prerelease == true)][0].tag_name // ""')
-            candidates=$(jq -nc --arg stable "${stable}" --arg beta "${beta}" \
-              '[ $stable, $beta ] | map(select(length > 0)) | unique')
+            version=$(gh api repos/SagerNet/sing-box/releases/latest --jq '.tag_name')
           fi
-          echo "Upstream candidates: ${candidates}"
+          echo "Upstream version: ${version}"
 
-          # 2) Build a job matrix containing only versions that are missing.
-          matrix='{"include":[]}'
-          while IFS= read -r version; do
-            release_tag="singbox-${version}-v2rayapi"
-            if [[ "${INPUT_FORCE}" != "true" ]] && \
-               gh release view "${release_tag}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-              echo "Already published: ${release_tag}"
-              continue
-            fi
-            matrix=$(jq -c \
-              --arg version "${version}" \
-              --arg release_tag "${release_tag}" \
-              '.include += [{version: $version, release_tag: $release_tag}]' <<< "${matrix}")
-          done < <(jq -r '.[]' <<< "${candidates}")
+          # 2) Compute our release tag.
+          release_tag="singbox-${version}-v2rayapi"
+          echo "Our release tag: ${release_tag}"
 
-          if [[ $(jq '.include | length' <<< "${matrix}") -gt 0 ]]; then
+          # 3) Decide if we already published this version.
+          if [[ "${INPUT_FORCE}" == "true" ]]; then
             should_build="true"
-          else
+          elif gh release view "${release_tag}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
             should_build="false"
+          else
+            should_build="true"
           fi
-          echo "matrix=${matrix}"
           echo "should_build=${should_build}"
 
           {
+            echo "version=${version}"
+            echo "release_tag=${release_tag}"
             echo "should_build=${should_build}"
-            echo "matrix=${matrix}"
           } >> "$GITHUB_OUTPUT"
 
   build:
-    name: Build (${{ matrix.release.version }}, ${{ matrix.arch }})
+    name: Build (${{ matrix.arch }})
     needs: decide
     if: needs.decide.outputs.should_build == 'true'
     strategy:
       fail-fast: false
       matrix:
-        release: ${{ fromJSON(needs.decide.outputs.matrix).include }}
-        arch: [amd64, arm64]
-    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout sing-box source
         uses: actions/checkout@v6
         with:
           repository: SagerNet/sing-box
-          ref: ${{ matrix.release.version }}
+          ref: ${{ needs.decide.outputs.version }}
           path: sing-box-src
 
       - name: Read upstream default build tags
         id: tags
         working-directory: sing-box-src
         run: |
-          # Start from upstream's DEFAULT_BUILD_TAGS, drop integrations that
-          # need extra toolchains and badlinkname (an optional TLS read-wait
-          # optimization that can break on Go patch releases by referencing
-          # private crypto/tls symbols), then append the API tags we need.
+          # Start from upstream's DEFAULT_BUILD_TAGS, drop with_naive_outbound
+          # (needs naiveproxy toolchain — too much for a daily cron), append
+          # with_v2ray_api + with_grpc (the point of this whole pipeline).
           default_tags=$(cat release/DEFAULT_BUILD_TAGS)
-          tags=$(echo "$default_tags" | tr ',' '\n' | grep -v -E '^(with_naive_outbound|with_cloudflared|with_usbip|with_openvpn|with_openconnect|badlinkname)$' | paste -sd,)
+          tags=$(echo "$default_tags" | tr ',' '\n' | grep -v -E '^(with_naive_outbound|with_cloudflared|with_usbip|with_openvpn|with_openconnect)$' | paste -sd,)
           tags="${tags},with_v2ray_api,with_grpc"
           echo "tags=${tags}"
           echo "tags=${tags}" >> "$GITHUB_OUTPUT"
@@ -129,7 +121,7 @@ jobs:
         working-directory: sing-box-src
         env:
           BUILD_TAGS: ${{ steps.tags.outputs.tags }}
-          VERSION: ${{ matrix.release.version }}
+          VERSION: ${{ needs.decide.outputs.version }}
         run: |
           set -euo pipefail
           # Strip leading "v" for the Version ldflag, matching upstream's
@@ -153,7 +145,7 @@ jobs:
 
       - name: Package
         env:
-          VERSION: ${{ matrix.release.version }}
+          VERSION: ${{ needs.decide.outputs.version }}
           ARCH:    ${{ matrix.arch }}
         run: |
           set -euo pipefail
@@ -177,46 +169,36 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: shepherd-singbox-${{ matrix.release.version }}-v2rayapi-linux-${{ matrix.arch }}
+          name: shepherd-singbox-${{ needs.decide.outputs.version }}-v2rayapi-linux-${{ matrix.arch }}
           path: |
-            shepherd-singbox-${{ matrix.release.version }}-v2rayapi-linux-${{ matrix.arch }}.tar.gz
-            shepherd-singbox-${{ matrix.release.version }}-v2rayapi-linux-${{ matrix.arch }}.tar.gz.sha256
+            shepherd-singbox-${{ needs.decide.outputs.version }}-v2rayapi-linux-${{ matrix.arch }}.tar.gz
+            shepherd-singbox-${{ needs.decide.outputs.version }}-v2rayapi-linux-${{ matrix.arch }}.tar.gz.sha256
           retention-days: 7
 
   release:
-    name: Publish release (${{ matrix.release.version }})
+    name: Publish release
     needs: [decide, build]
     if: needs.decide.outputs.should_build == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        release: ${{ fromJSON(needs.decide.outputs.matrix).include }}
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v8
         with:
           path: artifacts
-          pattern: shepherd-singbox-${{ matrix.release.version }}-v2rayapi-linux-*
           merge-multiple: true
 
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ matrix.release.version }}
-          TAG:     ${{ matrix.release.release_tag }}
+          VERSION: ${{ needs.decide.outputs.version }}
+          TAG:     ${{ needs.decide.outputs.release_tag }}
         run: |
           set -euo pipefail
           # The release is a passive artifact host (no Shepherd code
           # changes when we cut one) — short, factual body is plenty.
-          release_flags=()
-          if [[ "${VERSION}" == *-* ]]; then
-            release_flags+=(--prerelease)
-          fi
           gh release create "${TAG}" \
             --repo "${{ github.repository }}" \
             --title "sing-box ${VERSION} + v2ray-api" \
             --notes "Auto-built from sagernet/sing-box at ${VERSION} with the with_v2ray_api build tag, plus the rest of upstream's DEFAULT_BUILD_TAGS minus with_naive_outbound. Consumed by Shepherd server's release fetcher." \
-            "${release_flags[@]}" \
             artifacts/*.tar.gz \
             artifacts/*.tar.gz.sha256

@@ -122,3 +122,35 @@ func TestShadowRocket_FiltersDevice(t *testing.T) {
 		t.Fatalf("shadowrocket must drop all DEVICE refs:\n%s", out)
 	}
 }
+
+// TestShadowrocket_UsesEncryptedDNS guards the anti-pollution contract:
+// Shadowrocket ignores Surge's `doh-server` and will use whatever is in
+// `dns-server`. Putting `system` (ISP DNS) first means GFW-injected A
+// records win, then GEOIP,CN sends the connection DIRECT — the site looks
+// blocked. dns-server must be DoH URLs with no system resolver; hijack-dns
+// must also catch the 114 DNS that CN apps hardcode.
+func TestShadowrocket_UsesEncryptedDNS(t *testing.T) {
+	out := (&ShadowRocketRenderer{}).Render(Intermediate{}, "https://x?target=shadowrocket", DefaultRulesetBase)
+	var dnsLine, hijackLine string
+	for _, line := range strings.Split(out, "\n") {
+		trim := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trim, "dns-server"):
+			dnsLine = trim
+		case strings.HasPrefix(trim, "hijack-dns"):
+			hijackLine = trim
+		}
+	}
+	if dnsLine == "" {
+		t.Fatal("missing dns-server")
+	}
+	if strings.Contains(dnsLine, "system") {
+		t.Fatalf("dns-server must not use system/ISP DNS (pollutable): %s", dnsLine)
+	}
+	if !strings.Contains(dnsLine, "https://") {
+		t.Fatalf("dns-server must use DoH; Shadowrocket ignores Surge doh-server: %s", dnsLine)
+	}
+	if !strings.Contains(hijackLine, "114.114.114.114") {
+		t.Fatalf("hijack-dns must catch CN-app hardcoded 114 DNS: %s", hijackLine)
+	}
+}

@@ -252,6 +252,9 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 	out = strings.ReplaceAll(out, "{{GENERAL_EXTRA}}", strings.TrimSpace(im.General))
 	out = strings.ReplaceAll(out, "{{URLREWRITE_EXTRA}}", strings.TrimSpace(im.URLRewrite))
 	out = strings.ReplaceAll(out, "{{MITM}}", mitm)
+	if target == "shadowrocket" {
+		out = applyShadowrocketDNS(out)
+	}
 	return fmt.Sprintf("#!MANAGED-CONFIG %s interval=43200 strict=false\n", subURL) + out
 }
 

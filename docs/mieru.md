@@ -21,7 +21,7 @@
 
 `BOTH`：TCP 监听 `port`，UDP 监听 `port+1`。用户名/密码 1–64 字节，不能含控制字符。
 
-分享链接为官方简单格式 `mierus://user:pass@host:port?...`。Clash/mihomo 渲染 `type: mieru`；ShadowRocket 渲染 `[Proxy]` 的 `mieru` 行。Surge 跳过（无原生支持）。
+分享链接为官方简单格式 `mierus://user:pass@host?port=N&protocol=TCP&...`。Clash/mihomo 渲染 `type: mieru`（含 `handshake-mode`）；ShadowRocket 渲染 `[Proxy]` 的 `mieru` 行。Surge 跳过（无原生支持）。
 
 ## 明确不做（v1）
 

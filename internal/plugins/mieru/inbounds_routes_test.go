@@ -124,6 +124,34 @@ func TestDeleteInbound(t *testing.T) {
 	}
 }
 
+func TestPatchInbound_RejectsPortConflictIncludingBOTH(t *testing.T) {
+	deps := newRoutesDB(t)
+	w := postJSON(t, postInboundHandler(deps), map[string]any{
+		"server_id": 1, "port": 3000, "protocol": "TCP", "username": "a", "password": "b",
+	})
+	if w.Code != 201 {
+		t.Fatalf("first: %d %s", w.Code, w.Body.String())
+	}
+	w = postJSON(t, postInboundHandler(deps), map[string]any{
+		"server_id": 1, "port": 4000, "protocol": "TCP", "username": "c", "password": "d",
+	})
+	if w.Code != 201 {
+		t.Fatalf("second: %d %s", w.Code, w.Body.String())
+	}
+	var second map[string]any
+	_ = json.NewDecoder(w.Body).Decode(&second)
+	id := int(second["id"].(float64))
+	b, _ := json.Marshal(map[string]any{"port": 3000, "protocol": "BOTH"})
+	pw := httptest.NewRecorder()
+	req := httptest.NewRequest("PATCH", "/inbounds/"+strconv.Itoa(id), bytes.NewReader(b))
+	req.SetPathValue("id", strconv.Itoa(id))
+	patchInboundHandler(deps)(pw, req)
+	if pw.Code != 409 {
+		t.Fatalf("want 409 for BOTH overlapping existing TCP, got %d %s", pw.Code, pw.Body.String())
+	}
+}
+
+
 func TestMetaHostAware(t *testing.T) {
 	var _ plugins.HostAware = New()
 	var _ plugins.LogStreamer = New()

@@ -433,6 +433,9 @@ func clashProxy(n Node) map[string]any {
 		if m, _ := n.Extra["multiplexing"].(string); m != "" {
 			p["multiplexing"] = m
 		}
+		if h, _ := n.Extra["handshake_mode"].(string); h != "" {
+			p["handshake-mode"] = h
+		}
 	case "wireguard":
 		p["type"] = "wireguard"
 		p["private-key"] = wgField(n, "private_key")

@@ -81,22 +81,43 @@ func portsUsed(in Inbound) []int {
 	return []int{in.Port}
 }
 
-func validatePostInbound(ctx context.Context, store *InboundStore, body postInboundBody) error {
-	if body.ServerID == 0 {
-		return errors.New("server_id required")
-	}
-	if body.Port < 1025 || body.Port > 65535 {
+func validateEndpoints(ctx context.Context, store *InboundStore, serverID, exceptID int64, port int, proto string) error {
+	if port < 1025 || port > 65535 {
 		return errors.New("port must be 1025-65535")
 	}
-	proto := body.Protocol
 	if proto == "" {
 		proto = "TCP"
 	}
 	if !validProtocol(proto) {
-		return fmt.Errorf("protocol must be TCP, UDP, or BOTH, got %q", body.Protocol)
+		return fmt.Errorf("protocol must be TCP, UDP, or BOTH, got %q", proto)
 	}
-	if proto == "BOTH" && body.Port >= 65535 {
+	if proto == "BOTH" && port >= 65535 {
 		return errors.New("BOTH requires port+1 <= 65535")
+	}
+	want := map[int]struct{}{}
+	for _, p := range portsUsed(Inbound{Port: port, Protocol: proto}) {
+		want[p] = struct{}{}
+	}
+	existing, err := store.ListByServer(ctx, serverID)
+	if err != nil {
+		return err
+	}
+	for _, e := range existing {
+		if e.ID == exceptID {
+			continue
+		}
+		for _, p := range portsUsed(e) {
+			if _, ok := want[p]; ok {
+				return fmt.Errorf("server %d already has inbound on port %d (tag=%s)", serverID, p, e.Tag)
+			}
+		}
+	}
+	return nil
+}
+
+func validatePostInbound(ctx context.Context, store *InboundStore, body postInboundBody) error {
+	if body.ServerID == 0 {
+		return errors.New("server_id required")
 	}
 	if err := validCred(body.Username, "username"); err != nil {
 		return err
@@ -104,19 +125,7 @@ func validatePostInbound(ctx context.Context, store *InboundStore, body postInbo
 	if err := validCred(body.Password, "password"); err != nil {
 		return err
 	}
-	want := map[int]struct{}{}
-	for _, p := range portsUsed(Inbound{Port: body.Port, Protocol: proto}) {
-		want[p] = struct{}{}
-	}
-	existing, _ := store.ListByServer(ctx, body.ServerID)
-	for _, e := range existing {
-		for _, p := range portsUsed(e) {
-			if _, ok := want[p]; ok {
-				return fmt.Errorf("server %d already has inbound on port %d (tag=%s)", body.ServerID, p, e.Tag)
-			}
-		}
-	}
-	return nil
+	return validateEndpoints(ctx, store, body.ServerID, 0, body.Port, body.Protocol)
 }
 
 func postInboundHandler(deps plugins.Deps) http.HandlerFunc {
@@ -235,6 +244,18 @@ func patchInboundHandler(deps plugins.Deps) http.HandlerFunc {
 		}
 		if v, ok := body["handshake_mode"].(string); ok {
 			patch.HandshakeMode = &v
+		}
+		port := row.Port
+		proto := row.Protocol
+		if patch.Port != nil {
+			port = *patch.Port
+		}
+		if patch.Protocol != nil {
+			proto = *patch.Protocol
+		}
+		if err := validateEndpoints(r.Context(), store, row.ServerID, id, port, proto); err != nil {
+			writeRouteError(w, 409, err.Error())
+			return
 		}
 		if err := store.Update(r.Context(), id, patch); err != nil {
 			writeRouteError(w, 500, err.Error())

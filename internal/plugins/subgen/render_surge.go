@@ -201,7 +201,8 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 	var names []string
 	wgN := 0
 	for _, n := range im.Nodes {
-		if !r.Supports(n.Protocol) && !(target == "shadowrocket" && n.Protocol == "mieru") {
+		supported := r.Supports(n.Protocol) || (target == "shadowrocket" && n.Protocol == "mieru")
+		if !supported {
 			continue
 		}
 		if n.Protocol == "wireguard" {

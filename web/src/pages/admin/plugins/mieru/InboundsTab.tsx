@@ -26,7 +26,7 @@ function shareURL(i: MieruInbound, host: string): string {
   }
   const user = encodeURIComponent(i.username)
   const pass = encodeURIComponent(i.password)
-  return `mierus://${user}:${pass}@${host}:${i.port}?${q.toString()}`
+  return `mierus://${user}:${pass}@${host}?${q.toString()}`
 }
 
 export default function InboundsTab() {

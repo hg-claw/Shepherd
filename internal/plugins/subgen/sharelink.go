@@ -296,8 +296,13 @@ func parseMierus(line string) (Node, error) {
 		return Node{}, fmt.Errorf("mieru: parse error")
 	}
 	host := u.Hostname()
-	port, err := strconv.Atoi(u.Port())
-	if err != nil || host == "" {
+	q := u.Query()
+	portStr := firstNonEmpty(q.Get("port"), u.Port())
+	if i := strings.IndexByte(portStr, '-'); i > 0 {
+		portStr = portStr[:i]
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil || host == "" || port < 1 {
 		return Node{}, fmt.Errorf("mieru: missing host/port")
 	}
 	user := ""
@@ -309,7 +314,6 @@ func parseMierus(line string) (Node, error) {
 	if user == "" || pass == "" {
 		return Node{}, fmt.Errorf("mieru: missing username/password")
 	}
-	q := u.Query()
 	transport := q.Get("protocol")
 	if transport == "" {
 		transport = "TCP"

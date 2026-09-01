@@ -476,7 +476,7 @@ export function buildSingboxShareURL(i: ProxyInboundFull, hostname: string): str
 
   if (p === 'tuic-v5') {
     if (!i.uuid || !i.password || !i.sni) return null
-    const q = qs([['congestion_control', 'bbr'], ['udp_relay_mode', 'native'], ['sni', i.sni]])
+    const q = qs([['congestion_control', 'cubic'], ['udp_relay_mode', 'native'], ['sni', i.sni]])
     return `tuic://${i.uuid}:${encodeURIComponent(i.password)}@${hostname}:${i.port}?${q}#${label}`
   }
 

@@ -376,11 +376,14 @@ export default function InboundDialog({ serverID, serverHost, initial, open, onC
       try {
         const u = new URL(customUpstreamURL.trim())
         const scheme = u.protocol.replace(':', '').toLowerCase()
-        if (!['anytls', 'http', 'https', 'socks', 'socks5'].includes(scheme) || !u.hostname || !u.port) {
-          throw new Error('Custom landing must be anytls://, http(s)://, socks://, or socks5:// with host and port')
+        if (!['tuic', 'anytls', 'http', 'https', 'socks', 'socks5'].includes(scheme) || !u.hostname || !u.port) {
+          throw new Error('Custom landing must be tuic://, anytls://, http(s)://, socks://, or socks5:// with host and port')
         }
         if (scheme === 'anytls' && !u.username && !u.password && !u.searchParams.get('password')) {
           throw new Error('AnyTLS custom landing requires a password before @ or in ?password=')
+        }
+        if (scheme === 'tuic' && (!u.username || !u.password)) {
+          throw new Error('TUIC custom landing requires uuid:password before @')
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
@@ -493,9 +496,9 @@ export default function InboundDialog({ serverID, serverHost, initial, open, onC
                     <Label className={labelCls} htmlFor="ib-custom-upstream">{t('singbox.inbound_dialog.custom_landing_url', 'Custom landing URL')}</Label>
                     <Input id="ib-custom-upstream" className={inputCls} value={customUpstreamURL}
                       onChange={(e) => setCustomUpstreamURL(e.target.value)}
-                      placeholder="anytls://password@example.com:443?sni=proxy.example.com" />
+                      placeholder="tuic://uuid:password@example.com:443?sni=example.com" />
                     <p className="text-2xs text-muted-foreground mt-0.5">
-                      {t('singbox.inbound_dialog.custom_landing_hint', 'Supported: anytls://, http://, https://, socks://, socks5://. Include host and port; AnyTLS needs a password.')}
+                      {t('singbox.inbound_dialog.custom_landing_hint', 'Supported: tuic://, anytls://, http://, https://, socks://, socks5://. Include host and port; TUIC needs uuid:password, AnyTLS needs a password.')}
                     </p>
                   </div>}
                   <div>
@@ -537,9 +540,9 @@ export default function InboundDialog({ serverID, serverHost, initial, open, onC
               <Label className={labelCls} htmlFor="ib-custom-upstream-edit">{t('singbox.inbound_dialog.custom_landing_url', 'Custom landing URL')}</Label>
               <Input id="ib-custom-upstream-edit" className={inputCls} value={customUpstreamURL}
                 onChange={(e) => setCustomUpstreamURL(e.target.value)}
-                placeholder="anytls://password@example.com:443?sni=proxy.example.com" />
+                placeholder="tuic://uuid:password@example.com:443?sni=example.com" />
               <p className="text-2xs text-muted-foreground mt-0.5">
-                {t('singbox.inbound_dialog.custom_landing_hint', 'Supported: anytls://, http://, https://, socks://, socks5://. Include host and port; AnyTLS needs a password.')}
+                {t('singbox.inbound_dialog.custom_landing_hint', 'Supported: tuic://, anytls://, http://, https://, socks://, socks5://. Include host and port; TUIC needs uuid:password, AnyTLS needs a password.')}
               </p>
             </div>
           )}

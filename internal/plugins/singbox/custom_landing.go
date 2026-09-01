@@ -8,13 +8,15 @@ import (
 )
 
 type customLanding struct {
-	Scheme   string
-	Server   string
-	Port     int
-	Username string
-	Password string
-	SNI      string
-	Insecure bool
+	Scheme            string
+	Server            string
+	Port              int
+	Username          string
+	Password          string
+	SNI               string
+	Insecure          bool
+	CongestionControl string
+	UDPRelayMode      string
 }
 
 func parseCustomLandingURL(raw string) (customLanding, error) {
@@ -24,7 +26,7 @@ func parseCustomLandingURL(raw string) (customLanding, error) {
 		return customLanding{}, fmt.Errorf("invalid custom landing URL: %w", err)
 	}
 	scheme := strings.ToLower(u.Scheme)
-	if scheme != "anytls" && scheme != "http" && scheme != "https" && scheme != "socks5" && scheme != "socks" {
+	if scheme != "anytls" && scheme != "http" && scheme != "https" && scheme != "socks5" && scheme != "socks" && scheme != "tuic" {
 		return customLanding{}, fmt.Errorf("unsupported custom landing scheme %q", u.Scheme)
 	}
 	if u.Hostname() == "" {
@@ -63,9 +65,24 @@ func parseCustomLandingURL(raw string) (customLanding, error) {
 		if err != nil {
 			return customLanding{}, fmt.Errorf("custom landing insecure must be true, false, 1, or 0")
 		}
+	} else if scheme == "tuic" {
+		c.Insecure = true
 	}
 	if scheme == "anytls" && c.Password == "" {
 		return customLanding{}, fmt.Errorf("anytls custom landing requires a password")
+	}
+	if scheme == "tuic" {
+		if c.Username == "" || c.Password == "" {
+			return customLanding{}, fmt.Errorf("tuic custom landing requires uuid and password")
+		}
+		c.CongestionControl = q.Get("congestion_control")
+		if c.CongestionControl != "" && c.CongestionControl != "cubic" && c.CongestionControl != "new_reno" && c.CongestionControl != "bbr" {
+			return customLanding{}, fmt.Errorf("tuic congestion_control must be cubic, new_reno, or bbr")
+		}
+		c.UDPRelayMode = q.Get("udp_relay_mode")
+		if c.UDPRelayMode != "" && c.UDPRelayMode != "native" && c.UDPRelayMode != "quic" {
+			return customLanding{}, fmt.Errorf("tuic udp_relay_mode must be native or quic")
+		}
 	}
 	return c, nil
 }
@@ -101,6 +118,27 @@ func renderCustomRelayOutbound(in InboundView) (map[string]any, error) {
 		}
 		if c.Password != "" {
 			ob["password"] = c.Password
+		}
+	case "tuic":
+		ob["type"] = "tuic"
+		ob["uuid"] = c.Username
+		ob["password"] = c.Password
+		cc := c.CongestionControl
+		if cc == "" {
+			cc = "cubic"
+		}
+		mode := c.UDPRelayMode
+		if mode == "" {
+			mode = "native"
+		}
+		ob["congestion_control"] = cc
+		ob["udp_relay_mode"] = mode
+		ob["zero_rtt_handshake"] = false
+		ob["tls"] = map[string]any{
+			"enabled":     true,
+			"server_name": c.SNI,
+			"insecure":    c.Insecure,
+			"alpn":        []any{"h3"},
 		}
 	}
 	return ob, nil

@@ -1044,4 +1044,33 @@ describe('singbox/InboundDialog', () => {
     expect(patch.reality_handshake_server).toBeUndefined()
     expect(patch.reality_handshake_port).toBeUndefined()
   })
+
+  it('accepts a tuic:// custom landing URL', async () => {
+    const spy = vi.spyOn(pluginsAPI, 'createSingboxInbound')
+    render(
+      <InboundDialog serverID={1} open onClose={() => {}} onSaved={() => {}} />,
+      { wrapper },
+    )
+    fireEvent.change(screen.getByLabelText(/role/i), { target: { value: 'relay' } })
+    fireEvent.change(screen.getByLabelText(/landing source/i), { target: { value: 'custom' } })
+
+    const url = 'tuic://22222222-2222-2222-2222-222222222222:hexpass@tuic.example.com:8443?sni=edge.example.com'
+    fireEvent.change(screen.getByLabelText(/custom landing url/i), { target: { value: url } })
+    fireEvent.change(screen.getByRole('combobox', { name: /protocol/i }), { target: { value: 'snell-v5' } })
+    await waitFor(() => expect(screen.getByLabelText(/psk/i)).toBeTruthy())
+    fireEvent.change(screen.getByLabelText(/psk/i), { target: { value: 'relay-psk-value' } })
+    fireEvent.click(screen.getByRole('button', { name: /create/i }))
+
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          role: 'relay',
+          relay_mode: 'proxy',
+          custom_upstream_url: url,
+          protocol: 'snell-v5',
+          password: 'relay-psk-value',
+        }),
+      ),
+    )
+  })
 })

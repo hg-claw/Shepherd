@@ -14,6 +14,10 @@
 - **Inbounds → 新建（角色=中继）**：支持转发/代理两种模式；代理模式下协议自由选择，可与落地不同。
 - **批量创建中继（Bulk relay）**：只按落地的协议批量铺量，转发和代理模式下新建的中继协议都固定等于落地协议，不支持跨协议。
 
+自定义落地（Custom landing）让代理模式中继把流量打到 Shepherd 之外的上游，而不是本舰队的 landing。在 **新建 → 角色=中继 → Landing source=Custom proxy URL** 里贴分享链接。支持 `tuic://`、`anytls://`、`http://`、`https://`、`socks://`、`socks5://`。
+
+`tuic://uuid:password@host:port?sni=...` 按 NoBrand TUIC v5 合同渲染出站：`congestion_control=cubic`（可用 query 改成 `bbr` / `new_reno`）、`udp_relay_mode=native`、`zero_rtt_handshake=false`、TLS ALPN `h3`。未写 `insecure` 时默认 `true`（NoBrand 自签证书）；真实证书用 `insecure=0`。
+
 ## 协议支持
 
 在 **插件 → sing-box → Inbounds → 新建** 里可选的协议：

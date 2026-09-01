@@ -4,7 +4,7 @@
 
 自托管的服务器舰队管理工具，agent 零凭据架构。监控一批 Linux 主机、用 SSH 一次性
 装 agent（凭据用完即弃），并通过单一 WebSocket 长连远程运维——终端、脚本、文件、
-插件（xray / sing-box / cloudflare / 网络质量 / 订阅生成）、审计日志，外加移动端
+插件（xray / sing-box / mieru / cloudflare / 网络质量 / 订阅生成）、审计日志，外加移动端
 配套 App。
 
 **状态：** 当前版本 [`v0.32.0`](https://github.com/hg-claw/Shepherd/releases/latest)

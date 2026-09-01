@@ -15,7 +15,7 @@ func (*ClashRenderer) Target() string { return "clash" }
 
 func (*ClashRenderer) Supports(p string) bool {
 	switch p {
-	case "shadowsocks", "vmess", "trojan", "vless", "hysteria2", "tuic", "anytls", "wireguard", "snell":
+	case "shadowsocks", "vmess", "trojan", "vless", "hysteria2", "tuic", "anytls", "wireguard", "snell", "mieru":
 		return true
 	}
 	return false
@@ -417,6 +417,24 @@ func clashProxy(n Node) map[string]any {
 				opts["host"] = h
 			}
 			p["obfs-opts"] = opts
+		}
+	case "mieru":
+		p["type"] = "mieru"
+		if u, _ := n.Extra["username"].(string); u != "" {
+			p["username"] = u
+		}
+		p["password"] = n.Password
+		if tr, _ := n.Extra["transport"].(string); tr != "" {
+			p["transport"] = tr
+		} else {
+			p["transport"] = "TCP"
+		}
+		p["udp"] = true
+		if m, _ := n.Extra["multiplexing"].(string); m != "" {
+			p["multiplexing"] = m
+		}
+		if h, _ := n.Extra["handshake_mode"].(string); h != "" {
+			p["handshake-mode"] = h
 		}
 	case "wireguard":
 		p["type"] = "wireguard"

@@ -140,6 +140,24 @@ func TestClash_TUICInsecureSkipCertVerify(t *testing.T) {
 	}
 }
 
+func TestClash_MieruHandshakeMode(t *testing.T) {
+	im := Intermediate{
+		Nodes: []Node{{
+			Name: "m", Protocol: "mieru", Server: "1.2.3.4", Port: 8964, Password: "p",
+			Extra: map[string]any{"username": "alice", "transport": "TCP", "multiplexing": "MULTIPLEXING_OFF", "handshake_mode": "HANDSHAKE_NO_WAIT"},
+		}},
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"m"}}},
+		Rules:  []Rule{{Final: true, Target: "PROXY"}},
+	}
+	out := (&ClashRenderer{}).Render(im, "x", DefaultRulesetBase)
+	for _, want := range []string{"type: mieru", "username: alice", "handshake-mode: HANDSHAKE_NO_WAIT", "multiplexing: MULTIPLEXING_OFF"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q\n%s", want, out)
+		}
+	}
+}
+
+
 func TestClash_FiltersDevice(t *testing.T) {
 	im := Intermediate{
 		Groups: []Group{{Name: "Home", Type: "select", Members: []string{"DEVICE:HomeMac", "DIRECT"}, Verbatim: true}},

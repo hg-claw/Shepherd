@@ -136,6 +136,22 @@ func TestSurge_ProxyLine_VmessTrojanTuic(t *testing.T) {
 	}
 }
 
+func TestSurge_SkipsMieru(t *testing.T) {
+	im := Intermediate{
+		Nodes: []Node{{
+			Name: "hk-mieru", Protocol: "mieru", Server: "1.2.3.4", Port: 8964,
+			Password: "secret", Extra: map[string]any{"username": "alice"},
+		}},
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"hk-mieru"}}},
+		Rules:  []Rule{{Final: true, Target: "PROXY"}},
+	}
+	out := (&SurgeRenderer{}).Render(im, "https://x?target=surge", DefaultRulesetBase)
+	if strings.Contains(out, "= mieru,") {
+		t.Fatalf("surge must skip mieru proxy lines:\n%s", out)
+	}
+}
+
+
 func TestSurge_CustomGroupVerbatimKeepsDevice(t *testing.T) {
 	im := Intermediate{
 		Groups: []Group{{Name: "Home", Type: "select", Members: []string{"DEVICE:HomeMac", "PROXY"}, Verbatim: true}},

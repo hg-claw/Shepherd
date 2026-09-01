@@ -104,3 +104,22 @@ func TestParseShareLinks_VMessAndLegacySS(t *testing.T) {
 		t.Fatalf("legacy ss = %+v", leg)
 	}
 }
+
+func TestParseShareLinks_MierusOfficialQueryPort(t *testing.T) {
+	official := "mierus://baozi:manlianpenfen@1.2.3.4?handshake-mode=HANDSHAKE_NO_WAIT&mtu=1400&multiplexing=MULTIPLEXING_HIGH&port=6666&port=9998-9999&profile=default&protocol=TCP&protocol=TCP#HK"
+	nodes, warns := ParseShareLinks(official)
+	if len(warns) != 0 {
+		t.Fatalf("warns=%v", warns)
+	}
+	if len(nodes) != 1 {
+		t.Fatalf("want 1 node, got %d (%+v)", len(nodes), nodes)
+	}
+	n := nodes[0]
+	if n.Protocol != "mieru" || n.Server != "1.2.3.4" || n.Port != 6666 || n.Password != "manlianpenfen" {
+		t.Fatalf("node=%+v", n)
+	}
+	if n.Extra["username"] != "baozi" || n.Extra["transport"] != "TCP" || n.Extra["multiplexing"] != "MULTIPLEXING_HIGH" || n.Extra["handshake_mode"] != "HANDSHAKE_NO_WAIT" || n.Extra["mtu"] != 1400 {
+		t.Fatalf("extra=%+v", n.Extra)
+	}
+}
+

@@ -10,7 +10,7 @@ interface LogLine { ts: string; level: string; line: string }
 // PluginLogsTab streams a plugin's live logs for a selected host. Pause is a
 // display gate (a ref read inside onmessage), NOT an effect dependency — so
 // pausing neither reconnects the socket nor clears the buffer.
-export function PluginLogsTab({ plugin }: { plugin: 'xray' | 'singbox' }) {
+export function PluginLogsTab({ plugin }: { plugin: 'xray' | 'singbox' | 'mieru' }) {
   const { t } = useTranslation()
   const hostsQ = useQuery({ queryKey: ['plugin-hosts', plugin], queryFn: () => listPluginHosts(plugin) })
   const [serverID, setServerID] = useState<number | null>(null)

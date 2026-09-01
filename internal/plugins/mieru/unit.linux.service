@@ -1,0 +1,16 @@
+[Unit]
+Description=Shepherd-managed mita (mieru)
+After=network-online.target
+
+[Service]
+Type=simple
+Environment=MITA_CONFIG_JSON_FILE=/etc/shepherd-mieru/server.json
+Environment=MITA_UDS_PATH=/run/shepherd-mieru/mita.sock
+RuntimeDirectory=shepherd-mieru
+ExecStart=/usr/local/bin/shepherd-mita run
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

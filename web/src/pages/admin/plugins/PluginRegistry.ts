@@ -44,6 +44,14 @@ export const PluginRegistry: Record<string, PluginUIEntry> = {
       { key: 'logs',         label: 'Logs' },
     ],
   },
+  mieru: {
+    module: () => import('./mieru'),
+    tabs: [
+      { key: 'deploy',   label: 'Deploy' },
+      { key: 'inbounds', label: 'Inbounds' },
+      { key: 'logs',     label: 'Logs' },
+    ],
+  },
   netquality: {
     module: () => import('./netquality'),
     tabs: [

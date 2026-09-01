@@ -45,6 +45,31 @@ func TestShadowRocket_RendersAndReportsTarget(t *testing.T) {
 	}
 }
 
+func TestShadowrocket_MieruLine(t *testing.T) {
+	im := Intermediate{
+		Nodes: []Node{{
+			Name: "hk-mieru", Protocol: "mieru", Server: "1.2.3.4", Port: 8964,
+			Password: "secret",
+			Extra: map[string]any{
+				"username": "alice", "transport": "TCP",
+				"multiplexing": "MULTIPLEXING_OFF", "handshake_mode": "HANDSHAKE_NO_WAIT",
+				"mtu": 1400,
+			},
+		}},
+		Groups: []Group{{Name: "PROXY", Type: "select", Members: []string{"hk-mieru"}}},
+		Rules:  []Rule{{Final: true, Target: "PROXY"}},
+	}
+	out := (&ShadowRocketRenderer{}).Render(im, "https://x?target=shadowrocket", DefaultRulesetBase)
+	want := "hk-mieru = mieru, 1.2.3.4, 8964, username=alice, password=secret, transport=TCP, multiplexing=MULTIPLEXING_OFF, handshake-mode=HANDSHAKE_NO_WAIT, mtu=1400, udp=true"
+	if !strings.Contains(out, want) {
+		t.Fatalf("shadowrocket missing mieru line:\n%s", out)
+	}
+	if !strings.Contains(out, "PROXY = select, hk-mieru, DIRECT") {
+		t.Fatalf("mieru node missing from PROXY group:\n%s", out)
+	}
+}
+
+
 func TestShadowrocket_SnellV5DowngradesToV4(t *testing.T) {
 	n := Node{
 		Name: "hk1", Protocol: "snell", Server: "1.2.3.4", Port: 8443,

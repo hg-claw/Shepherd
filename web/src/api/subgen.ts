@@ -18,7 +18,7 @@ export interface SubgenSubscription {
 }
 
 export interface SubgenSelection {
-  source: 'xray' | 'singbox'
+  source: 'xray' | 'singbox' | 'mieru'
   inbound_id: number
 }
 

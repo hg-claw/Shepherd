@@ -25,12 +25,13 @@
 
 ## 协议支持与降级
 
-绝大多数协议（vless、vmess、trojan、hysteria2、tuic、anytls、shadowsocks-2022、wireguard）在 surge、shadowrocket、clash 三个 `target` 下渲染方式一致，不做版本区分。目前只有 **snell**（来自 sing-box 插件的 `snell-v5` / `snell-v6` 入站）按目标客户端能力做版本降级或整节点跳过：
+绝大多数协议（vless、vmess、trojan、hysteria2、tuic、anytls、shadowsocks-2022、wireguard）在 surge、shadowrocket、clash 三个 `target` 下渲染方式一致，不做版本区分。**mieru** 在 clash 与 shadowrocket 下渲染，Surge 跳过（无原生支持）。目前只有 **snell**（来自 sing-box 插件的 `snell-v5` / `snell-v6` 入站）按目标客户端能力做版本降级或整节点跳过：
 
 | 节点 | surge | shadowrocket | clash |
 |---|---|---|---|
 | snell-v5 | `version=5` | `version=4` | `version: 4` |
 | snell-v6 | `version=6` | 跳过 | 跳过 |
+| mieru | 跳过 | `mieru, …` | `type: mieru` |
 
 - snell-v5 向 shadowrocket / clash 降级写 `version=4` 是安全的：snell v5 的线路协议向下兼容 v4 客户端。
 - snell-v6 在 shadowrocket / clash 上直接**跳过**（该节点不出现在这两种输出的 `[Proxy]`/`proxies` 列表里），而不是降级：mihomo/Clash.Meta 的实现对 `version: 6` 会直接报错 `snell version error: 6`，一旦降级失败会导致整份订阅解析失败；而 v6 没有像 v5 那样向 v4 兼容的回退协议。跳过只影响 v6 节点本身，订阅里的其它节点不受影响。

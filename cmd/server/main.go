@@ -23,6 +23,7 @@ import (
 	"github.com/hg-claw/Shepherd/internal/installer"
 	"github.com/hg-claw/Shepherd/internal/plugins"
 	_ "github.com/hg-claw/Shepherd/internal/plugins/cloudflare"                // registers via init()
+	_ "github.com/hg-claw/Shepherd/internal/plugins/mieru"                     // registers via init()
 	netqualityplugin "github.com/hg-claw/Shepherd/internal/plugins/netquality" // registers via init() + WS push helper
 	singboxplugin "github.com/hg-claw/Shepherd/internal/plugins/singbox"       // registers via init()
 	_ "github.com/hg-claw/Shepherd/internal/plugins/sshaudit"                  // registers via init()

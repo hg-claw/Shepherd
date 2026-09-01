@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, Plus, RotateCw, Server, Trash2 } from 'lucide-react'
 import { useServers } from '@/api/servers'
-import { listXrayInbounds, listSingboxInbounds } from '@/api/plugins'
+import { listXrayInbounds, listSingboxInbounds, listMieruInbounds } from '@/api/plugins'
 import {
   listSubgenSubscriptions,
   listSubgenTemplates,
@@ -294,6 +294,10 @@ function NodePickerDialog({
     queryKey: ['subgen-picker-singbox'],
     queryFn: () => listSingboxInbounds(),
   })
+  const mieruQ = useQuery({
+    queryKey: ['subgen-picker-mieru'],
+    queryFn: () => listMieruInbounds(),
+  })
   const currentQ = useQuery({
     queryKey: ['subgen-inbounds', subscription.id],
     queryFn: () => getSubgenInbounds(subscription.id),
@@ -330,7 +334,7 @@ function NodePickerDialog({
     onError: (e: any) => toast('error', String(e?.message ?? e)),
   })
 
-  const loading = serversQ.isLoading || xrayQ.isLoading || singboxQ.isLoading || currentQ.isLoading
+  const loading = serversQ.isLoading || xrayQ.isLoading || singboxQ.isLoading || mieruQ.isLoading || currentQ.isLoading
 
   // Group inbounds by server_id for rendering.
   const xrayByServer = new Map<number, { id: number; tag: string; protocol: string; port: number }[]>()
@@ -344,6 +348,12 @@ function NodePickerDialog({
     const arr = singboxByServer.get(ib.server_id) ?? []
     arr.push({ id: ib.id, tag: ib.tag, protocol: ib.protocol, port: ib.port })
     singboxByServer.set(ib.server_id, arr)
+  }
+  const mieruByServer = new Map<number, { id: number; tag: string; protocol: string; port: number }[]>()
+  for (const ib of mieruQ.data ?? []) {
+    const arr = mieruByServer.get(ib.server_id) ?? []
+    arr.push({ id: ib.id, tag: ib.tag, protocol: ib.protocol, port: ib.port })
+    mieruByServer.set(ib.server_id, arr)
   }
 
   const servers = serversQ.data ?? []
@@ -359,7 +369,8 @@ function NodePickerDialog({
           {!loading && servers.map((srv) => {
             const xib = xrayByServer.get(srv.id) ?? []
             const sib = singboxByServer.get(srv.id) ?? []
-            if (xib.length === 0 && sib.length === 0) return null
+            const mib = mieruByServer.get(srv.id) ?? []
+            if (xib.length === 0 && sib.length === 0 && mib.length === 0) return null
             return (
               <div key={srv.id} className="rounded-md border bg-sunken/30 p-3">
                 <div className="font-mono text-sm mb-2">{srv.name}</div>
@@ -390,13 +401,26 @@ function NodePickerDialog({
                       </label>
                     )
                   })}
+                  {mib.map((ib) => {
+                    const sel: SubgenSelection = { source: 'mieru', inbound_id: ib.id }
+                    return (
+                      <label key={`m${ib.id}`} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox"
+                          checked={selected.has(selKey(sel))}
+                          onChange={() => toggle(sel)} />
+                        <span className="text-2xs uppercase rounded bg-muted px-1 py-0.5 text-muted-foreground">mieru</span>
+                        <span className="font-mono">{ib.tag}</span>
+                        <span className="text-fg-dim text-2xs">{ib.protocol} :{ib.port}</span>
+                      </label>
+                    )
+                  })}
                 </div>
               </div>
             )
           })}
-          {!loading && (xrayQ.data ?? []).length === 0 && (singboxQ.data ?? []).length === 0 && (
+          {!loading && (xrayQ.data ?? []).length === 0 && (singboxQ.data ?? []).length === 0 && (mieruQ.data ?? []).length === 0 && (
             <div className="text-sm text-muted-foreground">
-              {t('subgen.subscriptions.no_inbounds', 'No xray or sing-box inbounds exist yet. Create some on those plugins first.')}
+              {t('subgen.subscriptions.no_inbounds', 'No xray, sing-box, or mieru inbounds exist yet. Create some on those plugins first.')}
             </div>
           )}
         </div>

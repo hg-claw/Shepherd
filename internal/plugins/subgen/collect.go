@@ -35,6 +35,16 @@ func CollectNodes(ctx context.Context, db *sqlx.DB, sels []Selection) ([]Node, [
 			} else {
 				nodes = append(nodes, n)
 			}
+		case "mieru":
+			n, w, err := collectMieru(ctx, db, sel.InboundID)
+			if err != nil {
+				return nil, nil, err
+			}
+			if w != "" {
+				warns = append(warns, w)
+			} else {
+				nodes = append(nodes, n)
+			}
 		default:
 			warns = append(warns, fmt.Sprintf("unknown source %q for inbound %d", sel.Source, sel.InboundID))
 		}
@@ -219,4 +229,57 @@ func certVerificationInsecure(protocol, certDomain string, sni sql.NullString) b
 		return strings.HasPrefix(strings.TrimSpace(certDomain), "*.")
 	}
 	return !certMatchesSNI(certDomain, sni.String)
+}
+
+func collectMieru(ctx context.Context, db *sqlx.DB, id int64) (Node, string, error) {
+	var r struct {
+		Tag           string         `db:"tag"`
+		Alias         string         `db:"alias"`
+		Port          int            `db:"port"`
+		Protocol      string         `db:"protocol"`
+		Username      string         `db:"username"`
+		Password      string         `db:"password"`
+		MTU           int            `db:"mtu"`
+		Multiplexing  string         `db:"multiplexing"`
+		HandshakeMode string         `db:"handshake_mode"`
+		SrvName       string         `db:"srv_name"`
+		SrvHost       sql.NullString `db:"srv_host"`
+		SrvCountry    sql.NullString `db:"srv_country"`
+	}
+	err := db.GetContext(ctx, &r, `
+		SELECT i.tag, i.alias, i.port, i.protocol, i.username, i.password,
+		       i.mtu, i.multiplexing, i.handshake_mode,
+		       s.name AS srv_name, s.ssh_host AS srv_host, s.country_code AS srv_country
+		  FROM mieru_inbounds i
+		  JOIN servers s ON s.id=i.server_id
+		 WHERE i.id=$1`, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Node{}, fmt.Sprintf("mieru inbound %d not found", id), nil
+		}
+		return Node{}, "", err
+	}
+	if !r.SrvHost.Valid || r.SrvHost.String == "" {
+		return Node{}, fmt.Sprintf("mieru inbound %s has no server host", r.Tag), nil
+	}
+	transport := r.Protocol
+	if transport == "BOTH" {
+		transport = "TCP"
+	}
+	n := Node{
+		Name:     aliasOrDefault(r.Alias, serverLite{Name: r.SrvName, Host: r.SrvHost.String, Country: r.SrvCountry.String}, "mieru"),
+		Protocol: "mieru",
+		Server:   r.SrvHost.String,
+		Port:     r.Port,
+		Country:  r.SrvCountry.String,
+		Password: r.Password,
+		Extra: map[string]any{
+			"username":       r.Username,
+			"transport":      transport,
+			"multiplexing":   r.Multiplexing,
+			"handshake_mode": r.HandshakeMode,
+			"mtu":            r.MTU,
+		},
+	}
+	return n, "", nil
 }

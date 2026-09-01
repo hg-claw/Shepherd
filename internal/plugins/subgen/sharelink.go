@@ -50,6 +50,8 @@ func parseShareLink(line string) (Node, error) {
 		return parseURINode(line, "anytls")
 	case strings.HasPrefix(line, "wireguard://"), strings.HasPrefix(line, "wg://"):
 		return parseWireGuard(line)
+	case strings.HasPrefix(line, "mierus://"):
+		return parseMierus(line)
 	default:
 		return Node{}, fmt.Errorf("unsupported or unparseable share link")
 	}
@@ -284,6 +286,49 @@ func parseWireGuard(line string) (Node, error) {
 	return Node{
 		Protocol: "wireguard", Server: host, Port: port,
 		Name: nameOr(withFlag(q.Get("flag"), name), host, port), Extra: extra,
+	}, nil
+}
+
+func parseMierus(line string) (Node, error) {
+	body, name := splitFragment(line)
+	u, err := url.Parse(body)
+	if err != nil {
+		return Node{}, fmt.Errorf("mieru: parse error")
+	}
+	host := u.Hostname()
+	port, err := strconv.Atoi(u.Port())
+	if err != nil || host == "" {
+		return Node{}, fmt.Errorf("mieru: missing host/port")
+	}
+	user := ""
+	pass := ""
+	if u.User != nil {
+		user = u.User.Username()
+		pass, _ = u.User.Password()
+	}
+	if user == "" || pass == "" {
+		return Node{}, fmt.Errorf("mieru: missing username/password")
+	}
+	q := u.Query()
+	transport := q.Get("protocol")
+	if transport == "" {
+		transport = "TCP"
+	}
+	extra := map[string]any{"username": user, "transport": transport}
+	if m := q.Get("multiplexing"); m != "" {
+		extra["multiplexing"] = m
+	}
+	if h := q.Get("handshake-mode"); h != "" {
+		extra["handshake_mode"] = h
+	}
+	if mtu := q.Get("mtu"); mtu != "" {
+		if n, err := strconv.Atoi(mtu); err == nil {
+			extra["mtu"] = n
+		}
+	}
+	return Node{
+		Protocol: "mieru", Server: host, Port: port, Password: pass,
+		Name: nameOr(name, host, port), Extra: extra,
 	}, nil
 }
 

@@ -117,6 +117,34 @@ func (r *SurgeRenderer) proxyLine(n Node, target string) string {
 				}
 			}
 		}
+	case "mieru":
+		if target != "shadowrocket" {
+			return ""
+		}
+		user, _ := n.Extra["username"].(string)
+		fmt.Fprintf(&b, "%s = mieru, %s, %d, username=%s, password=%s", n.Name, n.Server, n.Port, user, n.Password)
+		tr, _ := n.Extra["transport"].(string)
+		if tr == "" {
+			tr = "TCP"
+		}
+		b.WriteString(", transport=" + tr)
+		if m, _ := n.Extra["multiplexing"].(string); m != "" {
+			b.WriteString(", multiplexing=" + m)
+		}
+		if h, _ := n.Extra["handshake_mode"].(string); h != "" {
+			b.WriteString(", handshake-mode=" + h)
+		}
+		switch mtu := n.Extra["mtu"].(type) {
+		case int:
+			if mtu > 0 {
+				fmt.Fprintf(&b, ", mtu=%d", mtu)
+			}
+		case int64:
+			if mtu > 0 {
+				fmt.Fprintf(&b, ", mtu=%d", mtu)
+			}
+		}
+		b.WriteString(", udp=true")
 	}
 	return b.String()
 }
@@ -173,7 +201,7 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 	var names []string
 	wgN := 0
 	for _, n := range im.Nodes {
-		if !r.Supports(n.Protocol) {
+		if !r.Supports(n.Protocol) && !(target == "shadowrocket" && n.Protocol == "mieru") {
 			continue
 		}
 		if n.Protocol == "wireguard" {

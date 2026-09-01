@@ -205,6 +205,59 @@ export const patchXrayServerVersion = (
     { version, use_mirror: useMirror },
   )
 
+// ── mieru ────────────────────────────────────────────────────────────────────
+
+export interface MieruInbound {
+  id: number
+  server_id: number
+  server_name: string
+  tag: string
+  alias: string
+  port: number
+  protocol: 'TCP' | 'UDP' | 'BOTH'
+  username: string
+  password: string
+  mtu: number
+  multiplexing: string
+  handshake_mode: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateMieruInboundBody {
+  server_id: number
+  port: number
+  alias?: string
+  username: string
+  password: string
+  protocol?: 'TCP' | 'UDP' | 'BOTH'
+  mtu?: number
+  multiplexing?: string
+  handshake_mode?: string
+}
+
+export const listMieruInbounds = (params: { server_id?: number } = {}) => {
+  const q = new URLSearchParams()
+  if (params.server_id) q.set('server_id', String(params.server_id))
+  const qs = q.toString()
+  return api.get<MieruInbound[]>(`/api/admin/plugins/mieru/inbounds${qs ? '?' + qs : ''}`)
+}
+
+export const createMieruInbound = (body: CreateMieruInboundBody) =>
+  api.post<MieruInbound>('/api/admin/plugins/mieru/inbounds', body)
+
+export const patchMieruInbound = (id: number, body: Partial<CreateMieruInboundBody>) =>
+  api.patch<MieruInbound>(`/api/admin/plugins/mieru/inbounds/${id}`, body)
+
+export const deleteMieruInbound = (id: number) =>
+  api.del(`/api/admin/plugins/mieru/inbounds/${id}`)
+
+export const fetchMieruVersions = () =>
+  api.get<{ cached: { version: string; os: string; arch: string }[]; latest: string[] }>('/api/admin/plugins/mieru/versions')
+
+export const patchMieruServerVersion = (serverID: number, version: string, useMirror: boolean = false) =>
+  api.patch<{ ok: true; version: string }>(`/api/admin/plugins/mieru/servers/${serverID}`, { version, use_mirror: useMirror })
+
 // ── xray traffic monitoring ──────────────────────────────────────────────────
 
 export interface XrayTrafficPoint {
@@ -483,7 +536,7 @@ const postLifecycle = (plugin: string, serverID: number, action: 'start' | 'stop
 const getRefreshStatus = (plugin: string, serverID: number) =>
   api.get<PluginHost>(`/api/admin/plugins/${plugin}/hosts/${serverID}/refresh-status`)
 
-export function useHostLifecycle(plugin: 'xray' | 'singbox', serverID: number) {
+export function useHostLifecycle(plugin: 'xray' | 'singbox' | 'mieru', serverID: number) {
   const qc = useQueryClient()
   const invalidate = () => qc.invalidateQueries({ queryKey: ['plugin-hosts', plugin] })
 

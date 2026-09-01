@@ -5,7 +5,7 @@
 Self-hosted server fleet management with zero-credential agents. Monitor a
 fleet of Linux hosts, install agents over SSH (creds discarded after use),
 and remote-operate via a single WebSocket connection per host — terminal,
-scripts, files, plugins (xray / sing-box / cloudflare / netquality /
+scripts, files, plugins (xray / sing-box / mieru / cloudflare / netquality /
 subscription generator), audit trail, and a mobile companion app.
 
 **Status:** current release [`v0.32.0`](https://github.com/hg-claw/Shepherd/releases/latest)

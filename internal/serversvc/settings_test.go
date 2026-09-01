@@ -53,17 +53,15 @@ func TestGetLines_RealNewlines(t *testing.T) {
 	}
 }
 
-// The default sandbox paths set by the 0002 migration must come back as 6
+// The default sandbox paths set by the 0002 migration must come back as
 // distinct entries — this would silently regress to 1 element if the
 // literal-\n tolerance broke.
 func TestGetLines_DefaultSandboxPaths(t *testing.T) {
 	s := newSettings(t)
 	got := s.GetLines(context.Background(), "file_sandbox_paths")
-	// 7 baseline paths + 5 plugin-related paths added in 0002/0005/0006.
 	want := []string{
 		"/tmp", "/var/log", "/etc/shepherd", "/home", "/Users", "/opt", "/srv",
-		// Plugin-related (xray, singbox, systemd, launchd, binary install dir).
-		"/etc/shepherd-xray", "/etc/shepherd-singbox",
+		"/etc/shepherd-xray", "/etc/shepherd-singbox", "/etc/shepherd-mieru",
 		"/etc/systemd/system", "/Library/LaunchDaemons", "/usr/local/bin",
 	}
 	if len(got) != len(want) {

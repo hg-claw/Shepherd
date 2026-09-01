@@ -6,6 +6,7 @@ After=network-online.target
 Type=simple
 Environment=MITA_CONFIG_JSON_FILE=/etc/shepherd-mieru/server.json
 Environment=MITA_UDS_PATH=/run/shepherd-mieru/mita.sock
+Environment=MITA_INSECURE_UDS=1
 RuntimeDirectory=shepherd-mieru
 ExecStart=/usr/local/bin/shepherd-mita run
 Restart=on-failure

@@ -2,6 +2,7 @@ package mieru
 
 import (
 	"context"
+	"strings"
 	"testing"
 )
 
@@ -17,3 +18,12 @@ func TestResolveFetchSpecRejectsNonLinux(t *testing.T) {
 		t.Fatal("expected linux-only error")
 	}
 }
+
+func TestUnitLinuxSkipsUDSPermissionEnforcement(t *testing.T) {
+	s := string(unitLinux)
+	if !strings.Contains(s, "MITA_INSECURE_UDS=") {
+		t.Fatalf("unit must set MITA_INSECURE_UDS so mita does not require a system user named mita:\n%s", s)
+	}
+}
+
+

@@ -6,7 +6,7 @@
 
 ## 部署
 
-**插件 → mieru → Deploy**：从 [enfein/mieru](https://github.com/enfein/mieru/releases) 拉取 `mita_<ver>_linux_{amd64,arm64}.tar.gz`，安装为 `/usr/local/bin/shepherd-mita`，配置写到 `/etc/shepherd-mieru/server.json`。
+**插件 → mieru → Deploy**：从 [enfein/mieru](https://github.com/enfein/mieru/releases) 拉取 `mita_<ver>_linux_{amd64,arm64}.tar.gz`，安装为 `/usr/local/bin/shepherd-mita`，配置写到 `/etc/shepherd-mieru/server.json`。单元设置 `MITA_INSECURE_UDS=1`（不创建官方 `mita` 系统用户；Shepherd 不走 UDS RPC）。
 
 ## 入站
 

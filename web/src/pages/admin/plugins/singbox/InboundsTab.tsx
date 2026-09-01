@@ -148,7 +148,7 @@ function buildSingboxShareURL(inbound: SingboxInbound, hostname: string): string
   if (p === 'tuic-v5') {
     if (!inbound.uuid || !inbound.password || !inbound.sni) return null
     const q = new URLSearchParams({
-      congestion_control: 'bbr',
+      congestion_control: 'cubic',
       udp_relay_mode: 'native',
       sni: inbound.sni,
     })

@@ -177,6 +177,7 @@ test('singbox trojan / hysteria2 / tuic / anytls builders', () => {
   expect(hy2).toContain('sni=www.cloudflare.com')
   const tuic = buildSingboxShareURL({ ...base, protocol: 'tuic-v5' }, 'h')!
   expect(tuic.startsWith('tuic://uuid-1:pw%2Fwith%2Bspecial@h:8443?')).toBe(true)
+  expect(tuic).toContain('congestion_control=cubic')
   const anytls = buildSingboxShareURL({ ...base, protocol: 'anytls' }, 'h')!
   expect(anytls.startsWith('anytls://')).toBe(true)
 })

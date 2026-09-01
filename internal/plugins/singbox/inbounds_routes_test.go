@@ -103,6 +103,38 @@ func TestRoute_CreateCustomRelay(t *testing.T) {
 	}
 }
 
+func TestRoute_CreateCustomTUICRelay(t *testing.T) {
+	deps := newRouteDeps(t)
+	url := "tuic://22222222-2222-2222-2222-222222222222:hexpass@tuic.example.com:8443?sni=edge.example.com"
+	rr := postJSON(t, postInboundHandler(deps), map[string]any{
+		"server_id": 1, "port": 8445, "role": "relay", "protocol": "vmess-tcp",
+		"uuid": "relay-tuic-uuid", "relay_mode": "proxy",
+		"custom_upstream_url": url,
+	})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("want 201, got %d: %s", rr.Code, rr.Body)
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp["custom_upstream_url"] != url {
+		t.Fatalf("unexpected custom TUIC relay response: %#v", resp)
+	}
+}
+
+func TestRoute_RejectCustomTUICRelayWithoutPassword(t *testing.T) {
+	deps := newRouteDeps(t)
+	rr := postJSON(t, postInboundHandler(deps), map[string]any{
+		"server_id": 1, "port": 8446, "role": "relay", "protocol": "vmess-tcp",
+		"uuid": "relay-tuic-uuid", "relay_mode": "proxy",
+		"custom_upstream_url": "tuic://uuid-only@tuic.example.com:8443",
+	})
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("want 409, got %d: %s", rr.Code, rr.Body)
+	}
+}
+
 func TestRoute_RejectCustomRelayForward(t *testing.T) {
 	deps := newRouteDeps(t)
 	rr := postJSON(t, postInboundHandler(deps), map[string]any{

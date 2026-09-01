@@ -60,12 +60,12 @@ func TestShadowrocket_MieruLine(t *testing.T) {
 		Rules:  []Rule{{Final: true, Target: "PROXY"}},
 	}
 	out := (&ShadowRocketRenderer{}).Render(im, "https://x?target=shadowrocket", DefaultRulesetBase)
-	want := "hk-mieru = mieru, 1.2.3.4, 8964, user=alice, password=secret, transport=TCP, multiplexing=MULTIPLEXING_OFF, handshake-mode=HANDSHAKE_NO_WAIT, mtu=1400, udp=true"
+	want := "hk-mieru = mieru, 1.2.3.4, 8964, alice, password=secret, transport=TCP, multiplexing=MULTIPLEXING_OFF, handshake-mode=HANDSHAKE_NO_WAIT, mtu=1400, udp=true"
 	if !strings.Contains(out, want) {
 		t.Fatalf("shadowrocket missing mieru line:\n%s", out)
 	}
-	if strings.Contains(out, "username=") {
-		t.Fatalf("shadowrocket mieru must not emit username=:\n%s", out)
+	if strings.Contains(out, "username=") || strings.Contains(out, "user=") {
+		t.Fatalf("shadowrocket mieru username is positional, not user=/username=:\n%s", out)
 	}
 	if !strings.Contains(out, "PROXY = select, hk-mieru, DIRECT") {
 		t.Fatalf("mieru node missing from PROXY group:\n%s", out)

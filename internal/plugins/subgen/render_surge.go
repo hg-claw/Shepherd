@@ -122,7 +122,7 @@ func (r *SurgeRenderer) proxyLine(n Node, target string) string {
 			return ""
 		}
 		user, _ := n.Extra["username"].(string)
-		fmt.Fprintf(&b, "%s = mieru, %s, %d, user=%s, password=%s", n.Name, n.Server, n.Port, user, n.Password)
+		fmt.Fprintf(&b, "%s = mieru, %s, %d, %s, password=%s", n.Name, n.Server, n.Port, user, n.Password)
 		tr, _ := n.Extra["transport"].(string)
 		if tr == "" {
 			tr = "TCP"

@@ -2,6 +2,7 @@ package sshaudit
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,7 +16,11 @@ import (
 
 // fakeHostExec is a canned HostExec. journalOut is returned for the
 // journalctl call; whoOut for `who`. It records every command for assertions.
+// mu guards cmds: upsertHost kicks a background collect per host, so two
+// hosts sharing one fake append concurrently (production allows this —
+// collectGuarded only serializes per-serverID).
 type fakeHostExec struct {
+	mu         sync.Mutex
 	journalOut string
 	journalErr error
 	whoOut     string
@@ -31,7 +36,9 @@ func (f *fakeHostExec) StreamCmd(context.Context, int64, string, []string, func(
 }
 
 func (f *fakeHostExec) RunCmd(_ context.Context, _ int64, name string, args ...string) ([]byte, []byte, int, error) {
+	f.mu.Lock()
 	f.cmds = append(f.cmds, append([]string{name}, args...))
+	f.mu.Unlock()
 	switch name {
 	case "journalctl":
 		return []byte(f.journalOut), nil, 0, f.journalErr

@@ -27,6 +27,12 @@ type PublicAPI struct {
 	Hub          *agentsvc.Hub
 	Tokens       *agentsvc.Service // for AgentStatus token lookup
 	BuildVersion string            // injected from cfg.BuildVersion; surfaced via /api/version
+	// DBDriver is the configured database driver ("sqlite" or "postgres");
+	// surfaced via /api/version so the admin UI can show the real backend
+	// instead of a hardcoded "SQLite" label. The driver name itself is not
+	// sensitive (no DSN/credentials leaked), so exposing it on the public
+	// endpoint is fine.
+	DBDriver string
 	// LiveNet is the live-net hub used to stream per-server throughput to
 	// anonymous public browsers. Optional — nil disables the endpoint.
 	LiveNet *livenet.Hub
@@ -68,15 +74,21 @@ type NetqualityISPHistoryPoint struct {
 	LossPct  *float64  `json:"loss_pct,omitempty"`
 }
 
-// Version returns the running server's BuildVersion. Public — admin UI uses
-// this to display the current release tag in the settings page and side
-// nav, replacing a previously hardcoded version literal that went stale.
+// Version returns the running server's BuildVersion and DB driver. Public —
+// admin UI uses this to display the current release tag in the settings page
+// and side nav, replacing a previously hardcoded version literal that went
+// stale. db_driver lets the Storage settings tab show the real database
+// backend instead of a hardcoded "SQLite" pill.
 func (a *PublicAPI) Version(w http.ResponseWriter, _ *http.Request) {
 	v := a.BuildVersion
 	if v == "" {
 		v = "dev"
 	}
-	writeJSON(w, 200, map[string]any{"version": v})
+	d := a.DBDriver
+	if d == "" {
+		d = "sqlite"
+	}
+	writeJSON(w, 200, map[string]any{"version": v, "db_driver": d})
 }
 
 // InitRateLimit configures the per-token rate limit for AgentStatus.

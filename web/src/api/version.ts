@@ -3,6 +3,8 @@ import { api } from './client'
 
 export interface VersionResponse {
   version: string
+  /** Configured database driver: "sqlite" or "postgres". Fixed at boot. */
+  db_driver: string
 }
 
 // useVersion fetches the server's BuildVersion once and caches it for the

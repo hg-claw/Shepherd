@@ -195,7 +195,10 @@ function AboutTab() {
         <div className="px-4 py-1">
           <KV k="Version" v={versionQ.data?.version ?? '…'} />
           <KV k="Admin" v={<span>admin (single-user)</span>} />
-          <KV k="Database" v="set via DATABASE_URL — see Storage" />
+          <KV
+            k="Database"
+            v={`${versionQ.data?.db_driver ?? 'sqlite'} — set via DATABASE_DRIVER / DATABASE_DSN, see Storage`}
+          />
           <KV k="Public wall" v={<span>enabled · /</span>} />
         </div>
       </div>
@@ -217,20 +220,26 @@ function StorageTab({
   form: ReturnType<typeof useForm<FormVals>>
 }) {
   const verboseOn = form.watch('agent_log_verbose')
+  const versionQ = useVersion()
+  const driver = versionQ.data?.db_driver ?? 'sqlite'
+  const driverLabel = driver === 'postgres' ? 'Postgres' : driver === 'sqlite' ? 'SQLite' : driver
   return (
     <div className="space-y-4">
       <div className="border rounded-lg bg-elev overflow-hidden">
         <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
           <span className="text-foreground font-medium text-sm">Database</span>
           <span className="text-fg-dim font-mono text-2xs ml-auto">
-            Set DATABASE_URL=postgres://… and restart to migrate to Postgres.
+            Set DATABASE_DRIVER=postgres and DATABASE_DSN=postgres://… before
+            starting, then restart (manual dump/restore required).
           </span>
         </div>
         <div className="px-4 py-3.5">
           <div className="flex flex-wrap items-center gap-3">
-            <Pill kind="ok">SQLite</Pill>
+            <Pill kind="ok">{driverLabel}</Pill>
             <span className="font-mono text-xs text-muted-foreground truncate">
-              configured via SHEPHERD_DSN or default ./shepherd.db
+              {driver === 'postgres'
+                ? 'configured via DATABASE_DSN'
+                : 'configured via DATABASE_DSN or default file:./shepherd.db?_fk=1'}
             </span>
           </div>
         </div>

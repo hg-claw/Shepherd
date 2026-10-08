@@ -89,6 +89,16 @@ func (in *Installer) Run(ctx context.Context, p InstallParams) error {
 		return err
 	}
 
+	// Wipe state left by a PREVIOUS Shepherd server (or older install) on this
+	// machine. The state file carries a machine_token the new server never
+	// issued; while it exists the agent skips enrollment entirely (the fresh
+	// ENROLLMENT_TOKEN above is ignored) and gets a permanent 401 on the WS
+	// dial — install looks fine but the host stays offline forever.
+	if err := in.runCmd(c, `rm -f /etc/shepherd/agent.state.json`); err != nil {
+		return err
+	}
+	in.log("cleared stale agent state (forces fresh enrollment)")
+
 	unit := `[Unit]
 Description=Shepherd agent
 After=network-online.target

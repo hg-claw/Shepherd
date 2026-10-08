@@ -84,6 +84,26 @@ func (s *Store) RevokeSession(ctx context.Context, token string) error {
 	return err
 }
 
+// UpdatePassword replaces the admin's stored bcrypt hash. Callers MUST have
+// already verified the current password — this performs no checks itself.
+func (s *Store) UpdatePassword(ctx context.Context, adminID int64, newPlain string) error {
+	hash, err := HashPassword(newPlain)
+	if err != nil {
+		return err
+	}
+	_, err = s.DB.ExecContext(ctx, "UPDATE admins SET password_hash=$1 WHERE id=$2", hash, adminID)
+	return err
+}
+
+// RevokeOtherSessions deletes every session belonging to adminID except
+// keepToken ("" keeps none). Used after a password change so stolen cookies
+// die immediately while the browser that just changed the password stays
+// logged in.
+func (s *Store) RevokeOtherSessions(ctx context.Context, adminID int64, keepToken string) error {
+	_, err := s.DB.ExecContext(ctx, "DELETE FROM sessions WHERE admin_id=$1 AND token<>$2", adminID, keepToken)
+	return err
+}
+
 func randomToken(n int) (string, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {

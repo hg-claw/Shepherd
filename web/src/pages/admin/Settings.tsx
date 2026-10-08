@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Pill } from '@/components/Pill'
 import { useSettings, usePatchSettings } from '@/api/settings'
+import { useChangePassword } from '@/api/auth'
 import { useVersion } from '@/api/version'
 import { useUI } from '@/store/ui'
 import { cn } from '@/lib/utils'
@@ -31,10 +32,11 @@ const schema = z.object({
 })
 type FormVals = z.infer<typeof schema>
 
-type TabKey = 'about' | 'storage' | 'keys' | 'security' | 'audit' | 'appearance' | 'traffic'
+type TabKey = 'about' | 'account' | 'storage' | 'keys' | 'security' | 'audit' | 'appearance' | 'traffic'
 
 const TABS: { key: TabKey; labelKey: string; defaultLabel: string }[] = [
   { key: 'about', labelKey: 'settings.tab.about', defaultLabel: 'About' },
+  { key: 'account', labelKey: 'settings.tab.account', defaultLabel: 'Account' },
   { key: 'storage', labelKey: 'settings.tab.storage', defaultLabel: 'Storage' },
   { key: 'keys', labelKey: 'settings.tab.keys', defaultLabel: 'Recovery key' },
   { key: 'security', labelKey: 'settings.tab.security', defaultLabel: 'Security & sandbox' },
@@ -143,6 +145,8 @@ export default function Settings() {
         <form onSubmit={onSubmit} className="min-w-0 space-y-4">
           {tab === 'about' && <AboutTab />}
 
+          {tab === 'account' && <AccountTab />}
+
           {tab === 'storage' && (
             <StorageTab register={form.register} errors={form.formState.errors} form={form} />
           )}
@@ -161,7 +165,7 @@ export default function Settings() {
 
           {tab === 'traffic' && <TrafficTab settings={settings.data} patch={patch} toast={toast} />}
 
-          {tab !== 'about' && tab !== 'keys' && tab !== 'appearance' && tab !== 'traffic' && (
+          {tab !== 'about' && tab !== 'account' && tab !== 'keys' && tab !== 'appearance' && tab !== 'traffic' && (
             <div className="flex items-center gap-2 pt-1">
               <Button type="submit" size="sm" className="px-4">
                 {t('admin.save')}
@@ -206,6 +210,86 @@ function AboutTab() {
         Workspace name, default channels, timezone, and team membership are not configurable in
         this release.
       </p>
+    </div>
+  )
+}
+
+function AccountTab() {
+  const { t } = useTranslation()
+  const toast = useUI((s) => s.toast)
+  const changePwd = useChangePassword()
+  const [cur, setCur] = useState('')
+  const [next, setNext] = useState('')
+  const [confirm, setConfirm] = useState('')
+
+  const mismatch = confirm !== '' && next !== confirm
+  const canSubmit = cur !== '' && next.length >= 8 && next === confirm && !changePwd.isPending
+
+  const submit = async () => {
+    try {
+      await changePwd.mutateAsync({ current_password: cur, new_password: next })
+      toast(
+        'success',
+        t('settings.account.changed', 'Password updated — other sessions were signed out.'),
+      )
+      setCur('')
+      setNext('')
+      setConfirm('')
+    } catch (e) {
+      toast('error', e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  return (
+    <div className="border rounded-lg bg-elev overflow-hidden">
+      <div className="flex items-center gap-2 px-3.5 py-2.5 border-b">
+        <span className="text-foreground font-medium text-sm">
+          {t('settings.account.title', 'Change password')}
+        </span>
+        <span className="text-fg-dim font-mono text-2xs ml-auto">
+          {t('settings.account.hint', 'Other sessions are signed out on change.')}
+        </span>
+      </div>
+      <div className="px-4 py-3.5 space-y-3 max-w-sm">
+        <div className="space-y-1.5">
+          <Label htmlFor="cur-pwd">{t('settings.account.current', 'Current password')}</Label>
+          <Input
+            id="cur-pwd"
+            type="password"
+            autoComplete="current-password"
+            value={cur}
+            onChange={(e) => setCur(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="new-pwd">{t('settings.account.new', 'New password (min 8 chars)')}</Label>
+          <Input
+            id="new-pwd"
+            type="password"
+            autoComplete="new-password"
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="confirm-pwd">{t('settings.account.confirm', 'Confirm new password')}</Label>
+          <Input
+            id="confirm-pwd"
+            type="password"
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+          />
+          {mismatch && (
+            <p className="text-err text-xs">
+              {t('settings.account.mismatch', 'Passwords do not match.')}
+            </p>
+          )}
+        </div>
+        <Button type="button" size="sm" className="px-4" disabled={!canSubmit} onClick={submit}>
+          {changePwd.isPending ? t('admin.saving', 'Saving…') : t('settings.account.submit', 'Update password')}
+        </Button>
+      </div>
     </div>
   )
 }

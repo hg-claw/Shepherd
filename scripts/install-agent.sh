@@ -17,6 +17,12 @@ BIN_DIR="/usr/local/bin"
 BIN_PATH="${BIN_DIR}/shepherd-agent"
 ENV_DIR="/etc/shepherd-agent"
 ENV_FILE="${ENV_DIR}/env"
+# Agent state file (machine_token cache), written by the agent at its
+# STATE_PATH default — deliberately NOT under ENV_DIR. A reinstall must
+# wipe it: a stale machine_token from a previous server suppresses
+# enrollment of the fresh ENROLLMENT_TOKEN below, and the agent then
+# exits permanent-failure on the WS 401 (host shows offline forever).
+STATE_FILE="/etc/shepherd/agent.state.json"
 LINUX_UNIT="/etc/systemd/system/shepherd-agent.service"
 DARWIN_PLIST="/Library/LaunchDaemons/com.shepherd.agent.plist"
 LAUNCHD_LABEL="com.shepherd.agent"
@@ -167,6 +173,7 @@ SERVER_URL=${SERVER_URL}
 ENROLLMENT_TOKEN=${TOKEN}
 EOF
 	chmod 0600 "$ENV_FILE"
+	rm -f "$STATE_FILE" # force re-enrollment with the fresh token above
 
 	cat > "$LINUX_UNIT" <<'EOF'
 [Unit]
@@ -215,6 +222,7 @@ SERVER_URL=${SERVER_URL}
 ENROLLMENT_TOKEN=${TOKEN}
 EOF
 	chmod 0600 "$ENV_FILE"
+	rm -f "$STATE_FILE" # force re-enrollment with the fresh token above
 
 	cat > "$DARWIN_PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>

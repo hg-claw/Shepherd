@@ -2,6 +2,7 @@ package sshaudit
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -117,6 +118,42 @@ func TestCollectHost_InsertsAndIsIdempotent(t *testing.T) {
 	_ = db.Get(&total, `SELECT COUNT(*) FROM sshaudit_events WHERE server_id=1`)
 	if total != 3 {
 		t.Errorf("total events=%d want 3", total)
+	}
+}
+
+// The journalctl query must cover BOTH _COMM=sshd (listener, pre-OpenSSH-10
+// auth lines) and _COMM=sshd-session (OpenSSH 10+ per-connection process,
+// e.g. Debian 13) — filtering only sshd silently collects zero auth events
+// on new distros, and because listener lines keep the output non-empty the
+// auth.log fallback never fires either.
+func TestCollectHost_JournalctlMatchesSshdSession(t *testing.T) {
+	db := openTestDB(t)
+	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+	exec := &fakeHostExec{journalOut: `2026-06-16T10:33:01+0000 h sshd-session[9]: Accepted password for root from 1.2.3.4 port 55012 ssh2`}
+	p := New()
+	deps := plugins.Deps{DB: db, HostExec: exec, Now: fixedNow(now)}
+
+	n, err := p.collectHost(context.Background(), deps, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("inserted %d, want 1", n)
+	}
+	found := false
+	for _, c := range exec.cmds {
+		if len(c) > 1 && c[0] == "journalctl" {
+			joined := ""
+			for _, a := range c {
+				joined += a + " "
+			}
+			if strings.Contains(joined, "_COMM=sshd-session") {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Errorf("journalctl was not queried with _COMM=sshd-session; cmds=%v", exec.cmds)
 	}
 }
 

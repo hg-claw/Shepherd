@@ -54,6 +54,35 @@ func TestParseLines_JournalctlShortISO(t *testing.T) {
 	}
 }
 
+// Real lines captured from a Debian 13 (OpenSSH 10.0p2) host where the
+// per-connection process is sshd-session — auth events no longer carry
+// the sshd[ framing, so a parser keyed on "sshd[" sees nothing.
+func TestParseLines_SshdSessionOpenSSH10(t *testing.T) {
+	loc := time.UTC
+	text := `2026-10-07T16:04:49+0000 host sshd-session[273153]: Invalid user sbot from 125.91.35.169 port 56345
+2026-10-07T16:05:51+0000 host sshd-session[273165]: Failed password for invalid user ethdocker from 2.57.122.53 port 52710 ssh2
+2026-10-07T16:06:02+0000 host sshd-session[273170]: Accepted publickey for root from 23.249.27.1 port 41022 ssh2: ED25519 SHA256:abc
+2026-10-07T16:07:56+0000 host sshd[1153]: Timeout before authentication for connection from 182.43.76.120 to 23.249.27.181`
+
+	evs := parseLines(text, 2026, loc)
+	if len(evs) != 3 {
+		t.Fatalf("got %d events, want 3: %+v", len(evs), evs)
+	}
+	cases := []Event{
+		{Result: "failed", Method: "", InvalidUser: true, Username: "sbot", SourceIP: "125.91.35.169", Port: ptr(56345)},
+		{Result: "failed", Method: "password", InvalidUser: true, Username: "ethdocker", SourceIP: "2.57.122.53", Port: ptr(52710)},
+		{Result: "accepted", Method: "publickey", Username: "root", SourceIP: "23.249.27.1", Port: ptr(41022)},
+	}
+	for i, want := range cases {
+		got := evs[i]
+		if got.Result != want.Result || got.Method != want.Method ||
+			got.InvalidUser != want.InvalidUser || got.Username != want.Username ||
+			got.SourceIP != want.SourceIP || !portEq(got.Port, want.Port) {
+			t.Errorf("case %d:\n got=%+v\nwant=%+v", i, got, want)
+		}
+	}
+}
+
 func TestParseLines_SyslogPrefix(t *testing.T) {
 	loc := time.UTC
 	text := `Jun 16 10:33:01 host sshd[123]: Accepted password for root from 1.2.3.4 port 55012 ssh2

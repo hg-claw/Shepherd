@@ -127,8 +127,13 @@ func (p *Plugin) gatherEvents(ctx context.Context, deps plugins.Deps, serverID i
 	loc := time.UTC
 
 	sinceStr := since.Format("2006-01-02 15:04:05")
+	// _COMM=sshd-session: OpenSSH 10 (Debian 13 / Ubuntu 25.10+) moved auth
+	// logging to the per-connection sshd-session process; filtering only
+	// sshd collects zero auth events there. Multiple _COMM matches are
+	// OR'ed by journalctl, and the listener's own sshd lines are ignored by
+	// the parser, so widening the filter is safe on older distros too.
 	stdout, _, code, err := deps.HostExec.RunCmd(ctx, serverID,
-		"journalctl", "_COMM=sshd", "-o", "short-iso", "--no-pager", "-q", "--since", sinceStr)
+		"journalctl", "_COMM=sshd", "_COMM=sshd-session", "-o", "short-iso", "--no-pager", "-q", "--since", sinceStr)
 	if err != nil {
 		return nil, err
 	}

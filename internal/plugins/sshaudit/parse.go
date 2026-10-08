@@ -79,13 +79,18 @@ func parseLinesAt(text string, ref time.Time, loc *time.Location) []Event {
 // line, returning the parsed timestamp and the bare message. ok=false for
 // non-sshd lines or unparseable prefixes.
 func splitPrefix(line string, ref time.Time, loc *time.Location) (time.Time, string, bool) {
-	// Find the "sshd[" program marker; the message starts after the
-	// following "]: ". This is robust to either prefix style and to the
-	// hostname token being present or absent.
-	idx := strings.Index(line, "sshd[")
+	// Find the program marker; the message starts after the following
+	// "]: ". OpenSSH 10 renamed the per-connection process to sshd-session,
+	// so check that framing first ("sshd[" alone would not match
+	// "sshd-session["). Robust to either prefix style and to the hostname
+	// token being present or absent.
+	idx := strings.Index(line, "sshd-session[")
+	if idx < 0 {
+		idx = strings.Index(line, "sshd[")
+	}
 	var procEnd int
 	if idx >= 0 {
-		// "sshd[123]: msg"
+		// "sshd[123]: msg" / "sshd-session[123]: msg"
 		bracket := strings.Index(line[idx:], "]:")
 		if bracket < 0 {
 			return time.Time{}, "", false
@@ -93,11 +98,16 @@ func splitPrefix(line string, ref time.Time, loc *time.Location) (time.Time, str
 		procEnd = idx + bracket + len("]:")
 	} else {
 		// Some daemons log "... sshd: msg" with no pid bracket.
-		idx = strings.Index(line, "sshd:")
+		idx = strings.Index(line, "sshd-session:")
 		if idx < 0 {
-			return time.Time{}, "", false
+			idx = strings.Index(line, "sshd:")
+			if idx < 0 {
+				return time.Time{}, "", false
+			}
+			procEnd = idx + len("sshd:")
+		} else {
+			procEnd = idx + len("sshd-session:")
 		}
-		procEnd = idx + len("sshd:")
 	}
 	prefix := strings.TrimSpace(line[:idx])
 	msg := strings.TrimSpace(line[procEnd:])

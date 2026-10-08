@@ -75,6 +75,56 @@ func (a *AuthAPI) Login(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+type changePasswordReq struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+// ChangePassword lets the logged-in admin rotate their own password. The
+// current password is required as proof of possession (a stolen session
+// cookie alone must not suffice). On success every OTHER session for this
+// admin is revoked — the caller's session survives so the browser isn't
+// abruptly logged out.
+func (a *AuthAPI) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	var req changePasswordReq
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	admin, ok := auth.AdminFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	if !auth.VerifyPassword(admin.PasswordHash, req.CurrentPassword) {
+		writeError(w, http.StatusBadRequest, "current password is incorrect")
+		return
+	}
+	if len(req.NewPassword) < 8 {
+		writeError(w, http.StatusBadRequest, "new password must be at least 8 characters")
+		return
+	}
+	if req.NewPassword == req.CurrentPassword {
+		writeError(w, http.StatusBadRequest, "new password must differ from the current one")
+		return
+	}
+	if err := a.Auth.Store.UpdatePassword(r.Context(), admin.ID, req.NewPassword); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	tok := auth.BearerToken(r)
+	if tok == "" {
+		if c, err := r.Cookie(a.Auth.CookieName()); err == nil {
+			tok = c.Value
+		}
+	}
+	if err := a.Auth.Store.RevokeOtherSessions(r.Context(), admin.ID, tok); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 func (a *AuthAPI) Logout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(a.Auth.CookieName()); err == nil && c.Value != "" {
 		_ = a.Auth.Store.RevokeSession(r.Context(), c.Value)

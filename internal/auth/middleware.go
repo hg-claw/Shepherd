@@ -20,6 +20,13 @@ func AdminFromContext(ctx context.Context) (*Admin, bool) {
 	return a, ok
 }
 
+// WithAdmin returns a ctx carrying admin, exactly as RequireAdmin sets it.
+// Exported so tests in other packages can invoke admin-gated handlers
+// directly without standing up the middleware.
+func WithAdmin(ctx context.Context, a *Admin) context.Context {
+	return context.WithValue(ctx, ctxKeyAdmin, a)
+}
+
 type Handler struct {
 	Store  *Store
 	Secure bool // set true when behind TLS reverse proxy

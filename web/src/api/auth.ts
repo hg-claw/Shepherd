@@ -38,3 +38,10 @@ export function useLogout() {
     },
   })
 }
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (input: { current_password: string; new_password: string }) =>
+      api.post<{ ok: true }>('/api/auth/password', input),
+  })
+}

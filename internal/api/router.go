@@ -80,6 +80,7 @@ func (r *Router) Handler() http.Handler {
 	// admin sub-mux (gated by requireAdmin)
 	admin := http.NewServeMux()
 	admin.HandleFunc("GET /api/admins/me", r.Auth.Me)
+	admin.HandleFunc("POST /api/auth/password", r.Auth.ChangePassword)
 
 	admin.HandleFunc("GET /api/servers", r.Servers.List)
 	admin.HandleFunc("POST /api/servers", r.Servers.Create)

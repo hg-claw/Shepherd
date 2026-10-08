@@ -176,3 +176,70 @@ func TestLogout_BearerRevokes(t *testing.T) {
 		t.Fatal("token should be revoked after bearer logout")
 	}
 }
+
+// changePassword invokes the handler the way RequireAdmin would: session
+// token carried as a bearer header, resolved admin injected into the ctx.
+func changePassword(t *testing.T, a *AuthAPI, tok, cur, next string) (int, map[string]any) {
+	t.Helper()
+	_, admin, err := a.Auth.Store.LookupSession(context.Background(), tok)
+	if err != nil {
+		t.Fatalf("lookup session: %v", err)
+	}
+	body, _ := json.Marshal(changePasswordReq{CurrentPassword: cur, NewPassword: next})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/auth/password", bytes.NewReader(body))
+	r.Header.Set("Authorization", "Bearer "+tok)
+	r = r.WithContext(auth.WithAdmin(r.Context(), admin))
+	a.ChangePassword(w, r)
+	var out map[string]any
+	_ = json.Unmarshal(w.Body.Bytes(), &out)
+	return w.Code, out
+}
+
+func TestChangePassword_WrongCurrentRejected(t *testing.T) {
+	a, _ := newAuthAPI(t)
+	_, out := loginBody(t, a, loginReq{Username: "alice", Password: "hunter2", Client: "mobile"}, "")
+	code, body := changePassword(t, a, out["token"].(string), "wrong", "new-secret-1")
+	if code != 400 {
+		t.Fatalf("status=%d want 400 (%v)", code, body)
+	}
+	// Old password must still work.
+	if code := doLogin(t, a, "alice", "hunter2"); code != 200 {
+		t.Fatalf("old password should still log in, got %d", code)
+	}
+}
+
+func TestChangePassword_TooShortRejected(t *testing.T) {
+	a, _ := newAuthAPI(t)
+	_, out := loginBody(t, a, loginReq{Username: "alice", Password: "hunter2", Client: "mobile"}, "")
+	code, _ := changePassword(t, a, out["token"].(string), "hunter2", "short")
+	if code != 400 {
+		t.Fatalf("status=%d want 400", code)
+	}
+}
+
+func TestChangePassword_OK_RotatesAndRevokesOthers(t *testing.T) {
+	a, _ := newAuthAPI(t)
+	_, out1 := loginBody(t, a, loginReq{Username: "alice", Password: "hunter2", Client: "mobile"}, "")
+	_, out2 := loginBody(t, a, loginReq{Username: "alice", Password: "hunter2", Client: "mobile"}, "")
+	tok1, tok2 := out1["token"].(string), out2["token"].(string)
+
+	code, body := changePassword(t, a, tok1, "hunter2", "new-secret-1")
+	if code != 200 {
+		t.Fatalf("status=%d body=%v", code, body)
+	}
+	// New password logs in; old one doesn't.
+	if code := doLogin(t, a, "alice", "new-secret-1"); code != 200 {
+		t.Fatalf("new password should log in, got %d", code)
+	}
+	if code := doLogin(t, a, "alice", "hunter2"); code == 200 {
+		t.Fatal("old password should no longer log in")
+	}
+	// Caller's session survives; the other session is revoked.
+	if _, _, err := a.Auth.Store.LookupSession(context.Background(), tok1); err != nil {
+		t.Fatal("caller session should survive password change")
+	}
+	if _, _, err := a.Auth.Store.LookupSession(context.Background(), tok2); err == nil {
+		t.Fatal("other session should be revoked")
+	}
+}

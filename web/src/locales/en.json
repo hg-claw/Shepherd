@@ -301,7 +301,11 @@
       "ttl_auto": "auto",
       "name_placeholder": "record name",
       "content_placeholder": "content",
-      "add": "Add"
+      "add": "Add",
+      "edit": "Edit",
+      "edit_title": "Edit record",
+      "ttl_hint": "1 = auto",
+      "proxied": "Proxied (orange cloud)"
     },
     "hosts": {
       "description_pre": "Per-server domain mappings. The \"Add default\" button creates",

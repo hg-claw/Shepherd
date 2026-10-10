@@ -270,6 +270,12 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 	}
 
 	out := filterSurgeGroups(templates.Surge, disabledServiceSet(im.DisabledGroups))
+	if target == "shadowrocket" {
+		// Rewrite Surge-only group constructs before {{NODES}} expansion so
+		// the marker flows through the normal substitution below. The Surge
+		// target keeps the oixCloud group ordering untouched.
+		out = applyShadowrocketGroups(out)
+	}
 	if nodeList == "" {
 		out = strings.ReplaceAll(out, ", {{NODES}}", "")
 	}

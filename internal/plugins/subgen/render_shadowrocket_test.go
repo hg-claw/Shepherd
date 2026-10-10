@@ -24,6 +24,64 @@ func TestShadowRocket_WireGuard(t *testing.T) {
 	}
 }
 
+// ShadowRocket's home page selection is the built-in PROXY keyword ("the
+// highlighted record decides where a PROXY action sends traffic"). The
+// oixCloud template instead defines a `Proxy = select, Auto - Smart, …`
+// group — `smart` is Surge-only, so ShadowRocket silently skipped members
+// and pinned the home page with no working node picker. For the
+// shadowrocket target the Proxy group is removed, its rule retargeted to
+// the PROXY keyword, and every select group is rebuilt as
+// `select, <default>, <other policy>, <nodes>, policy-select-name=<default>`
+// where <default> preserves the group's original first member.
+func TestShadowRocket_ProxyGroupIsSelectable(t *testing.T) {
+	im := Intermediate{
+		Nodes: []Node{
+			{Name: "🟢 A", Protocol: "trojan", Server: "1.1.1.1", Port: 443, Password: "p", SNI: "s.com"},
+			{Name: "🔵 B", Protocol: "trojan", Server: "2.2.2.2", Port: 443, Password: "p", SNI: "s.com"},
+		},
+	}
+	out := (&ShadowRocketRenderer{}).Render(im, "https://x?target=shadowrocket", DefaultRulesetBase)
+
+	// Proxy group gone; no Surge-only smart group anywhere.
+	if strings.Contains(out, "Proxy = select") {
+		t.Fatalf("Proxy group must be removed for shadowrocket:\n%s", out)
+	}
+	if strings.Contains(out, "smart") {
+		t.Fatalf("Surge-only smart group must not reach ShadowRocket:\n%s", out)
+	}
+
+	// Groups rebuilt with the default (original first member) first.
+	for _, want := range []string{
+		"Others = select, PROXY, DIRECT, 🟢 A, 🔵 B, policy-select-name=PROXY",
+		"Domestic = select, DIRECT, PROXY, 🟢 A, 🔵 B, policy-select-name=DIRECT",
+		"AdBlock = select, REJECT, DIRECT, PROXY, 🟢 A, 🔵 B, policy-select-name=REJECT",
+		"Netflix = select, PROXY, DIRECT, 🟢 A, 🔵 B, policy-select-name=PROXY",
+	} {
+		if !strings.Contains(out, "\n"+want+"\n") {
+			t.Errorf("missing rewritten group %q:\n%s", want, out)
+		}
+	}
+
+	// The Proxy.list rule follows the home-page pick via the PROXY keyword.
+	if !strings.Contains(out, "Provider/Proxy.list,PROXY,extended-matching") {
+		t.Errorf("Proxy.list rule not retargeted to PROXY keyword:\n%s", out)
+	}
+	if strings.Contains(out, ",Proxy,extended-matching") {
+		t.Errorf("dangling Proxy group reference remains:\n%s", out)
+	}
+
+	// url-test stays valid ShadowRocket; it must survive untouched.
+	if !strings.Contains(out, "Auto - UrlTest = url-test") {
+		t.Errorf("Auto - UrlTest group missing:\n%s", out)
+	}
+
+	// No nodes: the marker slot collapses cleanly, no trailing comma.
+	out2 := (&ShadowRocketRenderer{}).Render(Intermediate{}, "https://x?target=shadowrocket", DefaultRulesetBase)
+	if !strings.Contains(out2, "\nOthers = select, PROXY, DIRECT, policy-select-name=PROXY\n") {
+		t.Fatalf("empty-node group line malformed:\n%s", out2)
+	}
+}
+
 func TestShadowRocket_RendersAndReportsTarget(t *testing.T) {
 	r := &ShadowRocketRenderer{}
 	if r.Target() != "shadowrocket" {

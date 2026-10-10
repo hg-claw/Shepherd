@@ -320,7 +320,11 @@
       "ttl_auto": "自动",
       "name_placeholder": "记录名称",
       "content_placeholder": "内容",
-      "add": "添加"
+      "add": "添加",
+      "edit": "编辑",
+      "edit_title": "编辑记录",
+      "ttl_hint": "1 = 自动",
+      "proxied": "代理（橙色云）"
     },
     "hosts": {
       "description_pre": "按服务器配置域名映射。点击「添加默认」会创建",

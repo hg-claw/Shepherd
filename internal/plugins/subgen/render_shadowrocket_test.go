@@ -130,7 +130,6 @@ func TestShadowrocket_MieruLine(t *testing.T) {
 	}
 }
 
-
 func TestShadowrocket_SnellV5DowngradesToV4(t *testing.T) {
 	n := Node{
 		Name: "hk1", Protocol: "snell", Server: "1.2.3.4", Port: 8443,
@@ -236,7 +235,7 @@ func TestShadowrocket_UsesEncryptedDNS(t *testing.T) {
 	if !strings.Contains(dnsLine, "https://") {
 		t.Fatalf("dns-server must use DoH; Shadowrocket ignores Surge doh-server: %s", dnsLine)
 	}
-	if !strings.Contains(hijackLine, "114.114.114.114") {
+	if hijackLine != "hijack-dns = *:53" {
 		t.Fatalf("hijack-dns must catch CN-app hardcoded 114 DNS: %s", hijackLine)
 	}
 }

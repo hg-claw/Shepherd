@@ -48,7 +48,11 @@ func (s *Service) Generate(ctx context.Context, token, target string) (body, con
 	}
 	im := Assemble(nodes, spec)
 	subURL := fmt.Sprintf("%s/sub/%s?target=%s", s.PublicURL, token, target)
-	return r.Render(im, subURL, s.base()), "text/plain; charset=utf-8", nil
+	body = r.Render(im, subURL, s.base())
+	if err := validateRenderedConfig(body, target); err != nil {
+		return "", "", err
+	}
+	return body, "text/plain; charset=utf-8", nil
 }
 
 // PreviewTemplate renders rulesJSON against a fixed set of sample nodes so the
@@ -67,7 +71,11 @@ func (s *Service) PreviewTemplate(rulesJSON, target string) (body, contentType s
 	}
 	im := Assemble(sampleNodes(), spec)
 	subURL := fmt.Sprintf("%s/sub/PREVIEW?target=%s", s.PublicURL, target)
-	return r.Render(im, subURL, s.base()), "text/plain; charset=utf-8", nil
+	body = r.Render(im, subURL, s.base())
+	if err := validateRenderedConfig(body, target); err != nil {
+		return "", "", err
+	}
+	return body, "text/plain; charset=utf-8", nil
 }
 
 // sampleNodes returns placeholder nodes used only by PreviewTemplate. They span

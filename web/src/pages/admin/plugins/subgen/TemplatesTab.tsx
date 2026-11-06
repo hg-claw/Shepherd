@@ -428,7 +428,7 @@ export function TemplateEditor({
                   <Label className="text-xs">[General]</Label>
                   <p className="text-fg-dim text-2xs mt-0.5 mb-1">
                     {t('subgen.templates.raw_surge_prefix', 'Raw Surge')} <code>[General]</code>{' '}
-                    {t('subgen.templates.general_desc_mid', 'directives. Leave empty for the default (')}<code>bypass-system = true</code>).
+                    {t('subgen.templates.general_desc_mid', 'overrides by key. Leave empty to retain proxied DNS and UDP rejection.')}
                   </p>
                   <textarea
                     value={general}
@@ -436,7 +436,7 @@ export function TemplateEditor({
                     rows={4}
                     spellCheck={false}
                     className="w-full px-2 py-1.5 rounded-md border bg-background text-xs font-mono"
-                    placeholder="dns-server = 119.29.29.29, 223.5.5.5"
+                    placeholder="loglevel = notify"
                   />
                 </div>
 
@@ -476,7 +476,7 @@ export function TemplateEditor({
                   <Label className="text-xs">[Clash] general</Label>
                   <p className="text-fg-dim text-2xs mt-0.5 mb-1">
                     {t('subgen.templates.clash_general_desc_pre', 'Raw Clash YAML top-level keys (')}<code>dns</code>, <code>mode</code>
-                    {t('subgen.templates.clash_general_desc_mid', '…); used only for the clash target. Leave empty for')} <code>mode: rule</code>.
+                    {t('subgen.templates.clash_general_desc_mid', '…); mappings merge recursively, arrays replace. Leave empty to retain safe defaults.')}
                   </p>
                   <textarea
                     value={clashGeneral}

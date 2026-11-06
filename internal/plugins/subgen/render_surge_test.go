@@ -101,7 +101,7 @@ func TestSurge_WireGuard(t *testing.T) {
 		"[WireGuard wg0]",
 		"private-key = PRIV",
 		"self-ip = 10.254.253.3",
-		"dns-server = 8.8.8.8, 114.114.114.114",
+		"dns-server = 1.1.1.1, 8.8.8.8",
 		"mtu = 1420",
 		`peer = (public-key = PUB, allowed-ips = "0.0.0.0/0, ::/0", endpoint = home.hg.ht:51820, preshared-key = PSK, keepalive = 5)`,
 	} {
@@ -150,7 +150,6 @@ func TestSurge_SkipsMieru(t *testing.T) {
 		t.Fatalf("surge must skip mieru proxy lines:\n%s", out)
 	}
 }
-
 
 func TestSurge_CustomGroupVerbatimKeepsDevice(t *testing.T) {
 	im := Intermediate{

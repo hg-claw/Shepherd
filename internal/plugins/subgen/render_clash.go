@@ -22,9 +22,9 @@ func (*ClashRenderer) Supports(p string) bool {
 }
 
 // Render fills the embedded fixed oixCloud Clash template (templates.Clash) by
-// TEXT substitution, preserving the file's exact formatting and comments. subURL
-// and rulesetBase are unused — the template hard-codes the dler.io rule-providers.
-// Only the user's custom nodes/groups/rules feed the {{...}} markers.
+// text substitution, then structurally merges ClashGeneral. With no overrides,
+// the template's exact formatting and comments are preserved. subURL and
+// rulesetBase are unused — the template hard-codes the dler.io rule-providers.
 func (r *ClashRenderer) Render(im Intermediate, _ string, _ string) string {
 	// {{PROXIES}}: each node as a 4-space-indented YAML block-style list item.
 	var proxies strings.Builder
@@ -60,6 +60,10 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, _ string) string {
 	var crules, cproviders strings.Builder
 	for _, rl := range im.Rules {
 		if strings.HasPrefix(rl.Target, "DEVICE:") {
+			continue
+		}
+		if rl.Final {
+			crules.WriteString("    - 'MATCH," + rl.Target + "'\n")
 			continue
 		}
 		if u, ok := domainSetURL(rl.Match); ok {
@@ -100,6 +104,13 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, _ string) string {
 	}
 
 	out := filterClashGroups(templates.Clash, disabledServiceSet(im.DisabledGroups))
+	dnsPolicy := dnsPolicyName(im)
+	dnsMembers := nodeList
+	if dnsMembers == "" {
+		dnsMembers = "REJECT"
+	}
+	out = strings.ReplaceAll(out, "{{DNS_POLICY}}", dnsPolicy)
+	out = strings.ReplaceAll(out, "{{DNS_GROUP}}", "    - { name: '"+dnsPolicy+"', type: select, proxies: ["+dnsMembers+"] }")
 	out = strings.ReplaceAll(out, "{{PROXIES}}", strings.TrimRight(proxies.String(), "\n"))
 	if nodeList == "" {
 		out = strings.ReplaceAll(out, ", {{NODES}}", "")
@@ -110,8 +121,23 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, _ string) string {
 	out = strings.ReplaceAll(out, "{{CUSTOM_RULES}}", strings.TrimRight(crules.String(), "\n"))
 	out = strings.ReplaceAll(out, "{{CUSTOM_GROUPS}}", strings.TrimRight(cgroups.String(), "\n"))
 	out = strings.ReplaceAll(out, "{{CUSTOM_PROVIDERS}}", strings.TrimRight(cproviders.String(), "\n"))
-	out = strings.ReplaceAll(out, "{{CLASH_EXTRA}}", strings.TrimSpace(im.ClashGeneral))
-	return out
+	out = strings.ReplaceAll(out, "{{CLASH_EXTRA}}", "")
+	merged, err := mergeClashGeneral(out, im.ClashGeneral)
+	if err == nil {
+		err = validateClashDNSPolicy(merged, dnsPolicy)
+	}
+	if err == nil {
+		merged, err = guardClashUDP(merged)
+	}
+	if err != nil {
+		// ParseTemplate rejects invalid overrides on the normal request path.
+		// Render cannot return an error, so direct callers or broken generated
+		// YAML get a deliberately invalid document, not an unsafe fallback that
+		// silently drops the user's overrides. Quote the error onto one line to
+		// prevent YAML injection; do not echo the rendered configuration.
+		return fmt.Sprintf("# Clash render error: %q\n!shepherd-render-error [\n", err.Error())
+	}
+	return merged
 }
 
 // filterClashGroups removes the proxy-group, rule, and rule-provider entries of
@@ -314,7 +340,7 @@ func domainSetName(u string) string {
 
 // clashProxy maps a Node to a mihomo proxy map, or nil if unsupported.
 func clashProxy(n Node) map[string]any {
-	p := map[string]any{"name": n.Name, "server": n.Server, "port": n.Port}
+	p := map[string]any{"name": n.Name, "server": n.Server, "port": n.Port, "udp": true}
 	switch n.Protocol {
 	case "shadowsocks":
 		p["type"] = "ss"

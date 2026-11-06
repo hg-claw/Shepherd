@@ -1,9 +1,12 @@
 package subgen
 
 import (
+	"io"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/hg-claw/Shepherd/internal/plugins/subgen/templates"
 	"gopkg.in/yaml.v3"
 )
 
@@ -107,6 +110,227 @@ func TestClash_DoesNotCorruptBackslashValues(t *testing.T) {
 	}
 }
 
+// decodeRenderedClash checks the emitted bytes independently of the merge helper:
+// decoding to a map rejects duplicate keys, and a second Decode must reach EOF.
+func decodeRenderedClash(t *testing.T, out string) map[string]any {
+	t.Helper()
+	dec := yaml.NewDecoder(strings.NewReader(out))
+	var doc map[string]any
+	if err := dec.Decode(&doc); err != nil {
+		t.Fatalf("invalid final Clash YAML: %v\n%s", err, out)
+	}
+	if len(doc) == 0 {
+		t.Fatalf("empty final Clash document:\n%s", out)
+	}
+	var next any
+	if err := dec.Decode(&next); err != io.EOF {
+		t.Fatalf("expected one final YAML document, got next=%#v err=%v", next, err)
+	}
+	return doc
+}
+
+func TestClash_GeneralOverridesMode(t *testing.T) {
+	out := (&ClashRenderer{}).Render(Intermediate{ClashGeneral: "mode: global"}, "", "")
+	doc := decodeRenderedClash(t, out)
+	if doc["mode"] != "global" {
+		t.Fatalf("mode = %v, want global", doc["mode"])
+	}
+	if n := strings.Count("\n"+out, "\nmode:"); n != 1 {
+		t.Fatalf("want one top-level mode key, got %d", n)
+	}
+}
+
+func TestClash_GeneralDeepMergesDNS(t *testing.T) {
+	r := &ClashRenderer{}
+	base := decodeRenderedClash(t, r.Render(Intermediate{}, "", ""))
+	im := Intermediate{ClashGeneral: "dns:\n  listen: 127.0.0.1:5353\n  nameserver-policy:\n    example.test: https://resolver.example/dns-query\n"}
+	out := r.Render(im, "", "")
+	doc := decodeRenderedClash(t, out)
+	dns := doc["dns"].(map[string]any)
+	baseDNS := base["dns"].(map[string]any)
+	if dns["listen"] != "127.0.0.1:5353" {
+		t.Fatalf("listen override lost: %#v", dns)
+	}
+	// Future privacy defaults must survive an override of unrelated DNS keys.
+	for key, want := range baseDNS {
+		if key != "listen" && key != "nameserver-policy" && !reflect.DeepEqual(dns[key], want) {
+			t.Errorf("base DNS key %q lost: got %#v, want %#v", key, dns[key], want)
+		}
+	}
+	policy := dns["nameserver-policy"].(map[string]any)
+	if policy["example.test"] != "https://resolver.example/dns-query" {
+		t.Fatalf("new nested DNS policy lost: %#v", policy)
+	}
+	if basePolicy, ok := baseDNS["nameserver-policy"].(map[string]any); ok {
+		for key, want := range basePolicy {
+			if !reflect.DeepEqual(policy[key], want) {
+				t.Errorf("base DNS policy %q lost: got %#v, want %#v", key, policy[key], want)
+			}
+		}
+	}
+	if n := strings.Count("\n"+out, "\ndns:"); n != 1 {
+		t.Fatalf("want one top-level dns key, got %d", n)
+	}
+}
+
+func TestClash_GeneralReplacesArraysAndPreservesUnknownKeys(t *testing.T) {
+	im := Intermediate{ClashGeneral: `dns:
+  default-nameserver: [9.9.9.9]
+  nameserver: [https://resolver.example/dns-query]
+rules: ['MATCH,REJECT']
+x-future-feature:
+  enabled: true
+  values: [one, two]
+`}
+	out := (&ClashRenderer{}).Render(im, "", "")
+	doc := decodeRenderedClash(t, out)
+	dns := doc["dns"].(map[string]any)
+	if want := []any{"9.9.9.9"}; !reflect.DeepEqual(dns["default-nameserver"], want) {
+		t.Errorf("array appended rather than replaced: %#v", dns["default-nameserver"])
+	}
+	if want := []any{"https://resolver.example/dns-query"}; !reflect.DeepEqual(dns["nameserver"], want) {
+		t.Errorf("nameserver = %#v, want %#v", dns["nameserver"], want)
+	}
+	if want := []any{"MATCH,REJECT"}; !reflect.DeepEqual(doc["rules"], want) {
+		t.Errorf("rules array was not replaced: %#v", doc["rules"])
+	}
+	wantUnknown := map[string]any{"enabled": true, "values": []any{"one", "two"}}
+	if !reflect.DeepEqual(doc["x-future-feature"], wantUnknown) {
+		t.Errorf("unknown config changed: %#v", doc["x-future-feature"])
+	}
+}
+
+func TestClash_GeneralRetainsRuleAndGroupFiltering(t *testing.T) {
+	im := Intermediate{
+		DisabledGroups: []string{"Asian TV"},
+		Nodes:          []Node{{Name: "n1", Protocol: "trojan", Server: "proxy.example", Port: 443, Password: "p"}},
+		Groups:         []Group{{Name: "Home", Type: "select", Members: []string{"DEVICE:HomeMac", "{{NODES}}", "DIRECT"}}},
+		Rules: []Rule{
+			{Match: "IP-CIDR,192.168.1.0/24", Target: "DEVICE:HomeMac"},
+			{Match: "DOMAIN,example.test", Target: "Home"},
+		},
+	}
+	r := &ClashRenderer{}
+	base := decodeRenderedClash(t, r.Render(im, "", ""))
+	im.ClashGeneral = "mode: global"
+	out := r.Render(im, "", "")
+	doc := decodeRenderedClash(t, out)
+	for _, key := range []string{"proxies", "proxy-groups", "rules", "rule-providers"} {
+		if !reflect.DeepEqual(doc[key], base[key]) {
+			t.Errorf("override changed filtered %s", key)
+		}
+	}
+	for _, forbidden := range []string{"DEVICE:", "Asian TV", "Abema TV", "Bahamut"} {
+		if strings.Contains(out, forbidden) {
+			t.Errorf("filtered value %q leaked into merged output", forbidden)
+		}
+	}
+	if !strings.Contains(out, "Home") || !strings.Contains(out, "DOMAIN,example.test,Home") {
+		t.Fatal("custom groups or rules were lost")
+	}
+	if again := r.Render(im, "", ""); again != out {
+		t.Fatal("merged output is not deterministic")
+	}
+}
+
+func TestClash_EmptyGeneralPreservesTemplateBytes(t *testing.T) {
+	want := strings.NewReplacer(
+		"{{PROXIES}}", "", ", {{NODES}}", "", "{{NODES}}", "",
+		"{{CUSTOM_RULES}}", "", "{{CUSTOM_GROUPS}}", "", "{{CUSTOM_PROVIDERS}}", "", "{{CLASH_EXTRA}}", "",
+		"{{DNS_POLICY}}", "Shepherd-DNS", "{{DNS_GROUP}}", "    - { name: 'Shepherd-DNS', type: select, proxies: [REJECT] }",
+	).Replace(templates.Clash)
+	var err error
+	want, err = guardClashUDP(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, extra := range []string{"", " \t\n", "{}", "# no overrides\n"} {
+		got := (&ClashRenderer{}).Render(Intermediate{ClashGeneral: extra}, "", "")
+		if got != want {
+			t.Errorf("empty override %q changed original template bytes", extra)
+		}
+		decodeRenderedClash(t, got)
+	}
+}
+
+func TestMergeClashGeneral_RecursiveReplacement(t *testing.T) {
+	base := "dns:\n  enable: true\n  policy:\n    keep: [old]\n    replace: [old]\nsequence: [old]\nscalar: old\nremove: {nested: old}\n"
+	extra := "dns:\n  policy:\n    replace: [new]\nsequence: {nested: new}\nscalar: [new]\nremove: null\n"
+	out, err := mergeClashGeneral(base, extra)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := decodeRenderedClash(t, out)
+	want := map[string]any{
+		"dns": map[string]any{
+			"enable": true,
+			"policy": map[string]any{"keep": []any{"old"}, "replace": []any{"new"}},
+		},
+		"sequence": map[string]any{"nested": "new"},
+		"scalar":   []any{"new"},
+		"remove":   nil,
+	}
+	if !reflect.DeepEqual(doc, want) {
+		t.Fatalf("merged = %#v, want %#v", doc, want)
+	}
+}
+
+func TestMergeClashGeneral_ResolvesAliasesBeforeOverlay(t *testing.T) {
+	base := "dns:\n  enable: true\n  listen: 127.0.0.1:1053\n  nameserver-policy: {keep.test: 9.9.9.9}\n"
+	extra := "x-dns: &dns\n  nameserver-policy: {new.test: https://resolver.example/dns-query}\ndns:\n  <<: *dns\n  listen: 127.0.0.1:5353\n"
+	out, err := mergeClashGeneral(base, extra)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := decodeRenderedClash(t, out)
+	dns := doc["dns"].(map[string]any)
+	wantPolicy := map[string]any{"keep.test": "9.9.9.9", "new.test": "https://resolver.example/dns-query"}
+	if dns["enable"] != true || dns["listen"] != "127.0.0.1:5353" || !reflect.DeepEqual(dns["nameserver-policy"], wantPolicy) {
+		t.Fatalf("alias merge lost inherited or base DNS keys: %#v", dns)
+	}
+	if strings.Contains(out, "<<:") || strings.Contains(out, "*dns") {
+		t.Fatalf("unresolved alias/merge key in output:\n%s", out)
+	}
+}
+
+func TestMergeClashGeneral_RejectsInvalidRenderedYAML(t *testing.T) {
+	for _, base := range []string{
+		"mode: rule\nmode: global\n",
+		"dns: {enable: true, enable: false}\n",
+		"mode: rule\n---\nmode: global\n",
+		"rules: [unterminated\n",
+	} {
+		for _, extra := range []string{"", "mode: global"} {
+			out, err := mergeClashGeneral(base, extra)
+			if err == nil || out != "" {
+				t.Errorf("invalid base %q with extra %q: out=%q err=%v", base, extra, out, err)
+			}
+		}
+	}
+}
+
+func TestClash_RenderFailsClosedOnInvalidYAML(t *testing.T) {
+	for _, im := range []Intermediate{
+		{ClashGeneral: "mode: rule\nmode: global\n"},
+		{ClashGeneral: "mode: rule\n---\nmode: global\n"},
+		// This provider collides with a built-in name after text substitution.
+		{Rules: []Rule{{Match: "DOMAIN-SET,https://example.test/AdBlock.yaml", Target: "Proxy"}}},
+		{Rules: []Rule{{Match: "DOMAIN,can't.example", Target: "Proxy"}}},
+	} {
+		out := (&ClashRenderer{}).Render(im, "", "")
+		if !strings.HasPrefix(out, "# Clash render error:") {
+			t.Fatalf("invalid config returned without an error marker:\n%s", out)
+		}
+		var doc map[string]any
+		if err := yaml.Unmarshal([]byte(out), &doc); err == nil {
+			t.Fatalf("failure output could be accepted as a Clash config:\n%s", out)
+		}
+		if strings.Contains(out, "external-controller:") {
+			t.Fatal("invalid config fell back to the base configuration")
+		}
+	}
+}
+
 func TestClashDomainSetURL(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{
@@ -156,7 +380,6 @@ func TestClash_MieruHandshakeMode(t *testing.T) {
 		}
 	}
 }
-
 
 func TestClash_FiltersDevice(t *testing.T) {
 	im := Intermediate{

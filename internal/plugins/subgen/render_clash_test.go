@@ -235,9 +235,8 @@ func TestClash_GeneralRetainsRuleAndGroupFiltering(t *testing.T) {
 
 func TestClash_EmptyGeneralPreservesTemplateBytes(t *testing.T) {
 	want := strings.NewReplacer(
-		"{{PROXIES}}", "", ", {{NODES}}", "", "{{NODES}}", "",
+		"{{PROXIES}}", "", "proxies: [{{NODES}}]", "proxies: [REJECT]", ", {{NODES}}", "", "{{NODES}}", "",
 		"{{CUSTOM_RULES}}", "", "{{CUSTOM_GROUPS}}", "", "{{CUSTOM_PROVIDERS}}", "", "{{CLASH_EXTRA}}", "",
-		"{{DNS_POLICY}}", "Shepherd-DNS", "{{DNS_GROUP}}", "    - { name: 'Shepherd-DNS', type: select, proxies: [REJECT] }",
 	).Replace(templates.Clash)
 	var err error
 	want, err = guardClashUDP(want)

@@ -7,7 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestSurge_DNSUsesDedicatedProxyAndExactBootstrap(t *testing.T) {
+func TestSurge_DNSFollowsProxyAndKeepsExactBootstrap(t *testing.T) {
 	im := Intermediate{Nodes: []Node{
 		{Name: "domain-node", Protocol: "trojan", Server: "edge.example", Port: 443, Password: "p", SNI: "edge.example"},
 		{Name: "ip-node", Protocol: "trojan", Server: "192.0.2.1", Port: 443, Password: "p", SNI: "edge.example"},
@@ -16,8 +16,8 @@ func TestSurge_DNSUsesDedicatedProxyAndExactBootstrap(t *testing.T) {
 	for _, want := range []string{
 		"encrypted-dns-server = " + primaryDoH,
 		"encrypted-dns-follow-outbound-mode = true",
-		"Shepherd-DNS = select, domain-node, ip-node\n",
-		"PROTOCOL,DOH,Shepherd-DNS\n",
+		"Proxy = select, Auto - Smart, Auto - UrlTest, Direct, domain-node, ip-node\n",
+		"PROTOCOL,DOH,Proxy\n",
 		"edge.example = server:223.5.5.5\n",
 		"hijack-dns = *:53\n",
 		"Domestic = select, Direct, Proxy",
@@ -26,7 +26,7 @@ func TestSurge_DNSUsesDedicatedProxyAndExactBootstrap(t *testing.T) {
 			t.Errorf("missing %q", want)
 		}
 	}
-	for _, forbidden := range []string{"dns-server = system", "cloud-nodes.com", "*.taobao.com = server:", "192.0.2.1 = server:"} {
+	for _, forbidden := range []string{"Shepherd-DNS", "dns-server = system", "cloud-nodes.com", "*.taobao.com = server:", "192.0.2.1 = server:"} {
 		if strings.Contains(out, forbidden) {
 			t.Errorf("unexpected resolver bypass %q", forbidden)
 		}
@@ -64,8 +64,8 @@ func TestClash_DNSSeparatesBusinessAndBootstrap(t *testing.T) {
 	}
 	dns := doc["dns"].(map[string]any)
 	for _, server := range dns["nameserver"].([]any) {
-		if !strings.HasSuffix(server.(string), "#Shepherd-DNS") {
-			t.Fatalf("business resolver is not explicitly proxied: %v", server)
+		if !strings.HasSuffix(server.(string), "#Proxy") {
+			t.Fatalf("business resolver does not follow Proxy: %v", server)
 		}
 	}
 	if dns["proxy-server-nameserver"].([]any)[0] != bootstrapDoH {
@@ -78,25 +78,28 @@ func TestClash_DNSSeparatesBusinessAndBootstrap(t *testing.T) {
 	for _, value := range doc["proxy-groups"].([]any) {
 		group := value.(map[string]any)
 		if group["name"] == "Shepherd-DNS" {
+			t.Fatal("independent DNS group must not be emitted")
+		}
+		if group["name"] == "Proxy" {
 			members := group["proxies"].([]any)
-			if len(members) != 1 || members[0] != "n" {
-				t.Fatalf("DNS group must not include DIRECT: %v", members)
+			if len(members) != 3 || members[0] != "Auto - UrlTest" || members[1] != "DIRECT" || members[2] != "n" {
+				t.Fatalf("business Proxy selection changed: %v", members)
 			}
 			found = true
 		}
 	}
 	if !found {
-		t.Fatal("missing DNS group")
+		t.Fatal("missing business Proxy group")
 	}
 }
 
 func TestClash_DNSPolicySurvivesOverridesOrRejects(t *testing.T) {
 	for _, extra := range []string{
 		"proxy-groups: []",
-		"proxy-groups:\n  - {name: Shepherd-DNS, type: select, proxies: [DIRECT]}",
-		"proxy-groups:\n  - {name: Shepherd-DNS, type: select, proxies: [Other]}\n  - {name: Other, type: select, proxies: [DIRECT]}",
-		"proxy-groups:\n  - {name: Shepherd-DNS, type: select, proxies: [Shepherd-DNS]}",
-		"proxies:\n  - {name: Local, type: direct}\nproxy-groups:\n  - {name: Shepherd-DNS, type: select, proxies: [Local]}",
+		"proxy-groups:\n  - {name: Proxy, type: select, proxies: [Missing]}",
+		"proxy-groups:\n  - {name: Proxy, type: select, proxies: [Other]}\n  - {name: Other, type: select, proxies: [Proxy]}",
+		"proxy-groups:\n  - {name: Proxy, type: select, proxies: [Proxy]}",
+		"proxies:\n  - {name: Proxy, type: direct}\nproxy-groups:\n  - {name: Proxy, type: select, proxies: [DIRECT]}",
 	} {
 		out := (&ClashRenderer{}).Render(Intermediate{ClashGeneral: extra}, "", "")
 		if !strings.HasPrefix(out, "# Clash render error:") {
@@ -115,11 +118,44 @@ func TestClash_DNSPolicySurvivesOverridesOrRejects(t *testing.T) {
 	}
 }
 
-func TestDNSPolicyNameAvoidsUserCollisions(t *testing.T) {
-	im := Intermediate{Nodes: []Node{{Name: "Shepherd-DNS"}}, Groups: []Group{{Name: "Shepherd-DNS-DNS"}}}
-	if got := dnsPolicyName(im); got != "Shepherd-DNS-DNS-DNS" {
-		t.Fatalf("name = %q", got)
+func TestClash_DNSAllowsExplicitProxyDirectSelection(t *testing.T) {
+	for _, extra := range []string{
+		"proxy-groups:\n  - {name: Proxy, type: select, proxies: [DIRECT]}",
+		"proxy-groups:\n  - {name: Proxy, type: select, proxies: [Other]}\n  - {name: Other, type: select, proxies: [DIRECT]}",
+		"proxies:\n  - {name: Local, type: direct}\nproxy-groups:\n  - {name: Proxy, type: select, proxies: [Local]}",
+	} {
+		out := (&ClashRenderer{}).Render(Intermediate{ClashGeneral: extra + "\nrules: ['MATCH,Proxy']"}, "", "")
+		if strings.HasPrefix(out, "# Clash render error:") {
+			t.Fatalf("explicit Proxy direct selection rejected:\n%s", out)
+		}
+		var doc map[string]any
+		if err := yaml.Unmarshal([]byte(out), &doc); err != nil {
+			t.Fatal(err)
+		}
+		dns := doc["dns"].(map[string]any)
+		if dns["nameserver"].([]any)[0] != primaryDoH+"#Proxy" {
+			t.Fatal("resolver stopped following Proxy")
+		}
 	}
+}
+
+func TestClash_EmptyNodesKeepProxyDNSReferenceValid(t *testing.T) {
+	out := (&ClashRenderer{}).Render(Intermediate{}, "", "")
+	var doc map[string]any
+	if err := yaml.Unmarshal([]byte(out), &doc); err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range doc["proxy-groups"].([]any) {
+		group := value.(map[string]any)
+		if group["name"] == "Auto - UrlTest" {
+			members := group["proxies"].([]any)
+			if len(members) != 1 || members[0] != "REJECT" {
+				t.Fatalf("empty auto group should reject: %v", members)
+			}
+			return
+		}
+	}
+	t.Fatal("missing auto group referenced by Proxy")
 }
 
 func TestSurgeBootstrapHostsUsesSSHEntryAndDeduplicates(t *testing.T) {

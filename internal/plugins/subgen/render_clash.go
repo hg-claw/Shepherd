@@ -104,15 +104,11 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, _ string) string {
 	}
 
 	out := filterClashGroups(templates.Clash, disabledServiceSet(im.DisabledGroups))
-	dnsPolicy := dnsPolicyName(im)
-	dnsMembers := nodeList
-	if dnsMembers == "" {
-		dnsMembers = "REJECT"
-	}
-	out = strings.ReplaceAll(out, "{{DNS_POLICY}}", dnsPolicy)
-	out = strings.ReplaceAll(out, "{{DNS_GROUP}}", "    - { name: '"+dnsPolicy+"', type: select, proxies: ["+dnsMembers+"] }")
 	out = strings.ReplaceAll(out, "{{PROXIES}}", strings.TrimRight(proxies.String(), "\n"))
 	if nodeList == "" {
+		// Keep the auto group referenced by Proxy valid when no compatible
+		// nodes are selected. Never synthesize a direct DNS fallback.
+		out = strings.ReplaceAll(out, "proxies: [{{NODES}}]", "proxies: [REJECT]")
 		out = strings.ReplaceAll(out, ", {{NODES}}", "")
 		out = strings.ReplaceAll(out, "{{NODES}}", "")
 	} else {
@@ -124,7 +120,7 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, _ string) string {
 	out = strings.ReplaceAll(out, "{{CLASH_EXTRA}}", "")
 	merged, err := mergeClashGeneral(out, im.ClashGeneral)
 	if err == nil {
-		err = validateClashDNSPolicy(merged, dnsPolicy)
+		err = validateClashDNSPolicy(merged, "Proxy")
 	}
 	if err == nil {
 		merged, err = guardClashUDP(merged)

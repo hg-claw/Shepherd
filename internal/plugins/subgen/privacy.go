@@ -27,23 +27,6 @@ func validateRenderedConfig(body, target string) error {
 	return nil
 }
 
-// dnsPolicyName avoids collisions with both user-defined groups and nodes.
-// The DNS group must never inherit a user's business group containing DIRECT.
-func dnsPolicyName(im Intermediate) string {
-	used := make(map[string]bool)
-	for _, n := range im.Nodes {
-		used[n.Name] = true
-	}
-	for _, g := range im.Groups {
-		used[g.Name] = true
-	}
-	name := "Shepherd-DNS"
-	for used[name] {
-		name += "-DNS"
-	}
-	return name
-}
-
 // surgeBootstrapHosts limits traditional DNS to proxy entry hostnames. Surge
 // permits proxied encrypted DNS through domain nodes when they have a local
 // mapping to a traditional resolver (Mac 5.6+); otherwise it can fall back to

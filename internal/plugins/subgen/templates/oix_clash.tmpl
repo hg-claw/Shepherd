@@ -19,6 +19,10 @@ dns:
     default-nameserver: ['https://223.5.5.5/dns-query']
     proxy-server-nameserver: ['https://223.5.5.5/dns-query']
     nameserver: ['https://1.1.1.1/dns-query#Proxy', 'https://8.8.8.8/dns-query#Proxy']
+    # Used when the selected business outbound is DIRECT, without a second
+    # domain list. IP-rule pre-resolution still uses nameserver above.
+    direct-nameserver: ['https://223.5.5.5/dns-query#DIRECT']
+    direct-nameserver-follow-policy: false
 proxies:
 {{PROXIES}}
 proxy-groups:

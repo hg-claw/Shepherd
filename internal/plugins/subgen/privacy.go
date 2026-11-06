@@ -10,8 +10,9 @@ const (
 	// IP-literal DoH URLs avoid a resolver-hostname bootstrap dependency.
 	primaryDoH = "https://1.1.1.1/dns-query"
 	backupDoH  = "https://8.8.8.8/dns-query"
-	// Compatibility exception: only proxy entry names may use this direct resolver.
-	bootstrapDoH = "https://223.5.5.5/dns-query"
+	// Direct business lookups and proxy-entry bootstrap use domestic CDN answers.
+	domesticDoH  = "https://223.5.5.5/dns-query"
+	bootstrapDoH = domesticDoH
 )
 
 func validateRenderedConfig(body, target string) error {

@@ -877,7 +877,7 @@
       "custom_rules_desc_pre": "One",
       "custom_rules_desc_post": "per line (e.g.",
       "raw_surge_prefix": "Raw Surge",
-      "general_desc_mid": "overrides by key. Leave empty to retain proxied DNS and UDP rejection.",
+      "general_desc_mid": "overrides by key. Leave empty to retain outbound-aware DNS and UDP rejection.",
       "mitm_desc_post": "directives. Leave empty to omit the section.",
       "url_rewrite_desc_post": "lines (Surge / ShadowRocket only; Clash ignores). Leave empty to omit.",
       "clash_general_desc_pre": "Raw Clash YAML top-level keys (",

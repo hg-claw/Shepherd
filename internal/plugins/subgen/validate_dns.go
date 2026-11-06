@@ -6,9 +6,11 @@ import (
 )
 
 // validateClashDNSPolicy prevents an unrelated proxy-groups override from
-// removing or weakening the policy still referenced by the default DNS URLs.
-// Mihomo treats an unknown #name as an interface, not a missing proxy error.
-// Explicit replacement of the DNS URLs is an administrator override.
+// removing the policy still referenced by the default DNS URLs. DNS deliberately
+// follows the user's Proxy selection, including DIRECT; this validates references
+// and cycles, not a proxy-only membership constraint. Mihomo treats an unknown
+// #name as an interface, not a missing proxy error. Explicit replacement of the
+// DNS URLs remains an administrator override.
 func validateClashDNSPolicy(conf, policy string) error {
 	doc, err := decodeClashMapping(conf, false)
 	if err != nil {
@@ -43,9 +45,9 @@ func validateClashDNSPolicy(conf, policy string) error {
 	var visit func(string, map[string]bool) error
 	visit = func(name string, stack map[string]bool) error {
 		switch name {
-		case "REJECT", "REJECT-DROP":
+		case "DIRECT", "REJECT", "REJECT-DROP":
 			return nil
-		case "DIRECT", "COMPATIBLE", "PASS", "GLOBAL":
+		case "COMPATIBLE", "PASS", "GLOBAL":
 			return fmt.Errorf("DNS policy %q must not reach %s", policy, name)
 		}
 		entry, exists := entries[name]
@@ -57,8 +59,10 @@ func validateClashDNSPolicy(conf, policy string) error {
 		}
 		kind, _ := entry["type"].(string)
 		switch strings.ToLower(kind) {
-		case "direct", "pass", "compatible":
-			return fmt.Errorf("DNS policy %q contains a direct/pass adapter", policy)
+		case "direct", "reject":
+			return nil
+		case "pass", "compatible":
+			return fmt.Errorf("DNS policy %q contains a pass/compatible adapter", policy)
 		}
 		if providers, ok := entry["use"].([]any); ok && len(providers) > 0 {
 			return fmt.Errorf("DNS policy %q cannot verify dynamic provider members", policy)

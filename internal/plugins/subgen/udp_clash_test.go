@@ -179,9 +179,8 @@ func TestGuardClashUDP_ExistingLateGuardDoesNotReplaceImmediateGuard(t *testing.
 
 func TestGuardClashUDP_TemplateFormatting(t *testing.T) {
 	in := strings.NewReplacer(
-		"{{PROXIES}}", "", ", {{NODES}}", "", "{{NODES}}", "",
+		"{{PROXIES}}", "", "proxies: [{{NODES}}]", "proxies: [REJECT]", ", {{NODES}}", "", "{{NODES}}", "",
 		"{{CUSTOM_RULES}}", "", "{{CUSTOM_GROUPS}}", "", "{{CUSTOM_PROVIDERS}}", "", "{{CLASH_EXTRA}}", "",
-		"{{DNS_POLICY}}", "Shepherd-DNS", "{{DNS_GROUP}}", "    - { name: 'Shepherd-DNS', type: select, proxies: [REJECT] }",
 	).Replace(templates.Clash)
 	got, err := guardClashUDP(in)
 	if err != nil {

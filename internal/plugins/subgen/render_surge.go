@@ -288,19 +288,14 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 	out = strings.ReplaceAll(out, "{{CUSTOM_RULES}}", strings.TrimRight(crules.String(), "\n"))
 	out = strings.ReplaceAll(out, "{{CUSTOM_GROUPS}}", strings.TrimRight(cgroups.String(), "\n"))
 	out = strings.ReplaceAll(out, "{{GENERAL_EXTRA}}", "")
-	dnsPolicy := dnsPolicyName(im)
-	dnsMembers := nodeList
-	if dnsMembers == "" {
-		dnsMembers = "REJECT"
-	}
-	dnsGroup := dnsPolicy + " = select, " + dnsMembers
-	dnsRules := "PROTOCOL,DOH," + dnsPolicy
+	// Follow the same selection as proxied business traffic, including an
+	// explicit Direct selection. Bootstrap mappings still prevent DNS cycles.
+	dnsRules := "PROTOCOL,DOH,Proxy"
 	bootstrapHosts := surgeBootstrapHosts(renderedNodes)
 	if target == "shadowrocket" {
 		// Shadowrocket's #proxy uses the home-page node, not a Surge group.
-		dnsGroup, dnsRules, bootstrapHosts = "", "", ""
+		dnsRules, bootstrapHosts = "", ""
 	}
-	out = strings.ReplaceAll(out, "{{DNS_GROUP}}", dnsGroup)
 	out = strings.ReplaceAll(out, "{{DNS_RULES}}", dnsRules)
 	out = strings.ReplaceAll(out, "{{BOOTSTRAP_HOSTS}}", bootstrapHosts)
 	out = strings.ReplaceAll(out, "{{URLREWRITE_EXTRA}}", strings.TrimSpace(im.URLRewrite))

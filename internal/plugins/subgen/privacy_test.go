@@ -7,17 +7,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestSurge_DNSFollowsProxyAndKeepsExactBootstrap(t *testing.T) {
+func TestSurge_DirectDNSIsDomesticAndProxiesResolveRemotely(t *testing.T) {
 	im := Intermediate{Nodes: []Node{
 		{Name: "domain-node", Protocol: "trojan", Server: "edge.example", Port: 443, Password: "p", SNI: "edge.example"},
 		{Name: "ip-node", Protocol: "trojan", Server: "192.0.2.1", Port: 443, Password: "p", SNI: "edge.example"},
 	}}
 	out := (&SurgeRenderer{}).Render(im, "https://example.com/sub/test", "")
 	for _, want := range []string{
-		"encrypted-dns-server = " + primaryDoH,
-		"encrypted-dns-follow-outbound-mode = true",
+		"encrypted-dns-server = " + domesticDoH,
+		"encrypted-dns-follow-outbound-mode = false",
+		"use-local-host-item-for-proxy = false",
 		"Proxy = select, Auto - Smart, Auto - UrlTest, Direct, domain-node, ip-node\n",
-		"PROTOCOL,DOH,Proxy\n",
 		"edge.example = server:223.5.5.5\n",
 		"hijack-dns = *:53\n",
 		"Domestic = select, Direct, Proxy",
@@ -26,13 +26,10 @@ func TestSurge_DNSFollowsProxyAndKeepsExactBootstrap(t *testing.T) {
 			t.Errorf("missing %q", want)
 		}
 	}
-	for _, forbidden := range []string{"Shepherd-DNS", "dns-server = system", "cloud-nodes.com", "*.taobao.com = server:", "192.0.2.1 = server:"} {
+	for _, forbidden := range []string{"Shepherd-DNS", "PROTOCOL,DOH,", "dns-server = system", "cloud-nodes.com", "*.taobao.com = server:", "192.0.2.1 = server:"} {
 		if strings.Contains(out, forbidden) {
 			t.Errorf("unexpected resolver bypass %q", forbidden)
 		}
-	}
-	if strings.Index(out, "PROTOCOL,DOH,") > strings.Index(out, "RULE-SET,https://") {
-		t.Fatal("DoH routing must precede business rule sets")
 	}
 }
 
@@ -42,6 +39,8 @@ func TestShadowrocket_DNSPrimaryAndBackupUseProxy(t *testing.T) {
 		"dns-server = " + primaryDoH + "#proxy," + backupDoH + "#proxy\n",
 		"fallback-dns-server = " + backupDoH + "#proxy," + primaryDoH + "#proxy\n",
 		"proxy-dns-server = " + bootstrapDoH + "\n",
+		"direct-dns-server = " + domesticDoH + "\n",
+		"use-local-host-item-for-proxy = false\n",
 		"dns-direct-system = false\n", "dns-direct-fallback-proxy = false\n",
 	} {
 		if !strings.Contains(out, want) {
@@ -70,6 +69,13 @@ func TestClash_DNSSeparatesBusinessAndBootstrap(t *testing.T) {
 	}
 	if dns["proxy-server-nameserver"].([]any)[0] != bootstrapDoH {
 		t.Fatal("node bootstrap must be explicit and independent")
+	}
+	direct := dns["direct-nameserver"].([]any)
+	if len(direct) != 1 || direct[0] != domesticDoH+"#DIRECT" {
+		t.Fatalf("DIRECT business must use independent domestic DoH: %v", direct)
+	}
+	if dns["direct-nameserver-follow-policy"] != false {
+		t.Fatal("DIRECT resolver must not inherit proxy nameserver-policy")
 	}
 	if _, exists := dns["nameserver-policy"]; exists {
 		t.Fatal("template must not retain owner-specific DNS policy")
@@ -183,6 +189,23 @@ func TestSurgeFamily_GeneralOverridesOnceAfterTargetDefaults(t *testing.T) {
 		if !strings.Contains(general, "ipv6 = true\n") || !strings.Contains(general, "dns-server = https://resolver.example/dns-query\n") {
 			t.Errorf("%s override was overwritten", target)
 		}
+	}
+}
+
+func TestAdaptiveDNSOverridesRemainExplicit(t *testing.T) {
+	out := (&SurgeRenderer{}).Render(Intermediate{General: "encrypted-dns-server = https://resolver.example/dns-query\nencrypted-dns-follow-outbound-mode = true"}, "x", "")
+	if strings.Count(out, "\nencrypted-dns-server = ") != 1 || !strings.Contains(out, "encrypted-dns-server = https://resolver.example/dns-query\n") {
+		t.Fatal("Surge explicit DNS override lost or duplicated")
+	}
+	out = (&ShadowRocketRenderer{}).Render(Intermediate{General: "direct-dns-server = https://resolver.example/dns-query"}, "x", "")
+	if strings.Count(out, "\ndirect-dns-server = ") != 1 || !strings.Contains(out, "direct-dns-server = https://resolver.example/dns-query\n") {
+		t.Fatal("SR explicit direct DNS override lost or duplicated")
+	}
+	out = (&ClashRenderer{}).Render(Intermediate{ClashGeneral: "dns:\n  listen: 127.0.0.1:5353"}, "", "")
+	doc := decodeRenderedClash(t, out)
+	dns := doc["dns"].(map[string]any)
+	if dns["direct-nameserver"].([]any)[0] != domesticDoH+"#DIRECT" || dns["nameserver"].([]any)[0] != primaryDoH+"#Proxy" {
+		t.Fatal("unrelated override removed adaptive DNS defaults")
 	}
 }
 

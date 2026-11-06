@@ -199,6 +199,7 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 
 	var proxies, wg strings.Builder
 	var names []string
+	var renderedNodes []Node
 	wgN := 0
 	for _, n := range im.Nodes {
 		supported := r.Supports(n.Protocol) || (target == "shadowrocket" && n.Protocol == "mieru")
@@ -206,6 +207,7 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 			continue
 		}
 		if n.Protocol == "wireguard" {
+			renderedNodes = append(renderedNodes, n)
 			names = append(names, n.Name)
 			if wgInline {
 				proxies.WriteString(shadowrocketWGLine(n) + "\n")
@@ -238,6 +240,7 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 		if underlying != "" {
 			line += ", underlying-proxy=" + underlying
 		}
+		renderedNodes = append(renderedNodes, n)
 		names = append(names, n.Name)
 		proxies.WriteString(line + "\n")
 	}
@@ -284,11 +287,30 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 	out = strings.ReplaceAll(out, "{{NODES}}", nodeList)
 	out = strings.ReplaceAll(out, "{{CUSTOM_RULES}}", strings.TrimRight(crules.String(), "\n"))
 	out = strings.ReplaceAll(out, "{{CUSTOM_GROUPS}}", strings.TrimRight(cgroups.String(), "\n"))
-	out = strings.ReplaceAll(out, "{{GENERAL_EXTRA}}", strings.TrimSpace(im.General))
+	out = strings.ReplaceAll(out, "{{GENERAL_EXTRA}}", "")
+	dnsPolicy := dnsPolicyName(im)
+	dnsMembers := nodeList
+	if dnsMembers == "" {
+		dnsMembers = "REJECT"
+	}
+	dnsGroup := dnsPolicy + " = select, " + dnsMembers
+	dnsRules := "PROTOCOL,DOH," + dnsPolicy
+	bootstrapHosts := surgeBootstrapHosts(renderedNodes)
+	if target == "shadowrocket" {
+		// Shadowrocket's #proxy uses the home-page node, not a Surge group.
+		dnsGroup, dnsRules, bootstrapHosts = "", "", ""
+	}
+	out = strings.ReplaceAll(out, "{{DNS_GROUP}}", dnsGroup)
+	out = strings.ReplaceAll(out, "{{DNS_RULES}}", dnsRules)
+	out = strings.ReplaceAll(out, "{{BOOTSTRAP_HOSTS}}", bootstrapHosts)
 	out = strings.ReplaceAll(out, "{{URLREWRITE_EXTRA}}", strings.TrimSpace(im.URLRewrite))
 	out = strings.ReplaceAll(out, "{{MITM}}", mitm)
 	if target == "shadowrocket" {
 		out = applyShadowrocketDNS(out)
+	}
+	out, err := mergeGeneral(out, im.General)
+	if err != nil {
+		return fmt.Sprintf("# General render error: %q\n[INVALID GENERAL\n", err.Error())
 	}
 	return fmt.Sprintf("#!MANAGED-CONFIG %s interval=43200 strict=false\n", subURL) + out
 }
@@ -303,7 +325,7 @@ func surgeWGSection(n Node, sec string) string {
 		fmt.Fprintf(&b, "self-ip = %s\n", ip)
 	}
 	// Fixed operational defaults for Surge WireGuard.
-	b.WriteString("dns-server = 8.8.8.8, 114.114.114.114\n")
+	b.WriteString("dns-server = 1.1.1.1, 8.8.8.8\n")
 	b.WriteString("mtu = 1420\n")
 	fmt.Fprintf(&b, `peer = (public-key = %s, allowed-ips = "0.0.0.0/0, ::/0", endpoint = %s:%d`, wgField(n, "public_key"), n.Server, n.Port)
 	if psk := wgField(n, "preshared_key"); psk != "" {

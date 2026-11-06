@@ -91,6 +91,21 @@ func TestService_PreviewTemplate_CustomNodes(t *testing.T) {
 	}
 }
 
+func TestService_PreviewRejectsInvalidRenderedConfiguration(t *testing.T) {
+	svc := &Service{}
+	// The fragment is valid YAML but cannot form safe UDP rules in the result.
+	for _, rules := range []string{
+		`{"clash_general":"rules: null"}`,
+		`{"custom_rules":[{"match":"UNKNOWN,example.test","policy":"Proxy"}]}`,
+		`{"general":"ipv6 = true\nIPV6 = false"}`,
+	} {
+		body, _, err := svc.PreviewTemplate(rules, "clash")
+		if err == nil || body != "" {
+			t.Fatalf("invalid config served as success: body=%q err=%v", body, err)
+		}
+	}
+}
+
 func TestService_UnknownTokenAndTarget(t *testing.T) {
 	s := newStore(t)
 	svc := &Service{Store: s, Now: time.Now}

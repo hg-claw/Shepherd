@@ -2,6 +2,8 @@ package subgen
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -66,6 +68,58 @@ func TestParseTemplate_ClashGeneral(t *testing.T) {
 	// non-object YAML (bare scalar) rejected
 	if _, err := ParseTemplate(`{"final":"PROXY","clash_general":"just a string"}`); err == nil {
 		t.Fatal("scalar clash_general accepted")
+	}
+}
+
+func TestParseTemplate_ClashGeneralStrictYAML(t *testing.T) {
+	cases := []struct {
+		name, extra, wantError string
+	}{
+		{"empty", "", ""},
+		{"whitespace", " \t\n", ""},
+		{"comments", "# keep defaults\n", ""},
+		{"empty map", "{}", ""},
+		{"document markers", "---\nmode: global\n...\n", ""},
+		{"unknown fields", "x-new-feature: {enabled: true, values: [one, two]}\n", ""},
+		{"aliases and merge", "defaults: &defaults {enable: true}\ndns:\n  <<: *defaults\n  listen: 127.0.0.1:5353\n", ""},
+		{"top-level duplicate", "mode: rule\nmode: global\n", "duplicate key \"mode\""},
+		{"quoted duplicate", "dns: {}\n'dns': {}\n", "duplicate key \"dns\""},
+		{"nested duplicate", "dns: {enable: true, enable: false}\n", "duplicate key \"enable\""},
+		{"sequence duplicate", "x-list: [{name: first, name: second}]\n", "duplicate key \"name\""},
+		{"duplicate merge keys", "defaults: &defaults {enable: true}\ndns:\n  <<: *defaults\n  <<: *defaults\n", "duplicate key \"<<\""},
+		{"multiple documents", "mode: rule\n---\ndns: {enable: true}\n", "multiple YAML documents"},
+		{"second empty document", "mode: rule\n---\n", "multiple YAML documents"},
+		{"second invalid document", "mode: rule\n---\nx: [unterminated\n", "invalid YAML after first document"},
+		{"scalar", "rule", "expected a YAML mapping"},
+		{"sequence", "[one, two]", "expected a YAML mapping"},
+		{"null", "null", "expected a YAML mapping"},
+		{"explicit empty document", "---\n", "expected a YAML mapping"},
+		{"non-string key", "123: true\n", "must be a string"},
+		{"nested non-string key", "dns: {false: value}\n", "must be a string"},
+		{"complex key", "? [one, two]\n: value\n", "must be a string"},
+		{"invalid merge value", "dns: {<<: 123}\n", "map merge requires map"},
+		{"recursive alias", "x: &x {self: *x}\n", "contains itself"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := json.Marshal(TemplateSpec{ClashGeneral: tc.extra})
+			if err != nil {
+				t.Fatal(err)
+			}
+			spec, err := ParseTemplate(string(raw))
+			if tc.wantError == "" {
+				if err != nil {
+					t.Fatalf("valid extra rejected: %v", err)
+				}
+				if spec.ClashGeneral != tc.extra {
+					t.Fatalf("validation changed extra: got %q, want %q", spec.ClashGeneral, tc.extra)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), "bad clash_general:") || !strings.Contains(err.Error(), tc.wantError) {
+				t.Fatalf("error = %v, want bad clash_general containing %q", err, tc.wantError)
+			}
+		})
 	}
 }
 

@@ -41,10 +41,10 @@
 
 模板描述流量如何分流。内置模板只读 —— 克隆一份再自定义。编辑器有 **表单（Form）** 模式和 **原始 JSON（Raw JSON）** 模式，外加一个实时 **预览（Preview）** 面板（选择目标格式即可查看渲染结果）。
 
-- **分类（Categories）** —— 勾选某分类（Telegram、Streaming、Location:CN …）以分流其规则集。每个所选分类会生成一个 **以该分类命名的可切换代理组**；你选的 **策略（policy）** 是该组的默认成员，客户端可随时切换（例如把 Telegram 改走 DIRECT）。每个分类附带它所用的 blackmatrix7 GitHub 规则集地址。
-- **自定义规则（Custom rules）** —— 每行一条 `TYPE,VALUE,policy`，例如 `DOMAIN-SUFFIX,example.com,DIRECT` 或 `IP-CIDR,10.0.0.0/24,PROXY`。这些保留各自的显式策略（不生成组）。
-- **Final** —— 兜底策略（Surge 为 `FINAL`，Clash 为 `MATCH`）。
-- **包含自动选择组（Include auto-select group）** —— 增加一个对所有节点做 url-test 的 `Auto Select` 组；主 `PROXY` 组会把它列在第一位。
+- **服务组** —— 使用固定的 dler.io/oixCloud 分组及规则集；编辑器可排除服务组，核心 Proxy / Domestic / Others / Auto 保留。
+- **自定义规则（Custom rules）** —— 每行一条 `TYPE,VALUE,policy`，例如 `DOMAIN-SUFFIX,example.com,DIRECT`。自定义规则先于内置业务规则，Surge 的加密 DNS 专用规则优先于自定义业务规则。
+- **兼容旧 JSON 字段** —— `categories`、`final`、`include_auto_select` 仍可解析，但不控制固定模板的输出。默认兜底为 Surge `FINAL,Others,dns-failed` / Clash `MATCH,Others`；不要以为修改旧 `final` 字段就已启用阻断兜底。
+- **DNS 组** —— Surge / Clash 自动增加 `Shepherd-DNS`，只包含实际可渲染节点（无节点时 REJECT），不含 DIRECT。与自定义名称冲突时自动追加 `-DNS`。请在客户端将其选择到预期境外出口；它不跟随普通 Proxy 组切换。Shadowrocket 的 DNS 使用主页所选节点。
 
 ## 节点命名与别名
 
@@ -71,17 +71,30 @@
 
 不同客户端的配置段不同，因此这些字段彼此独立：
 
-- **`[General]`**（仅 Surge / ShadowRocket）—— 原始 Surge 指令，例如 `dns-server = 119.29.29.29, 223.5.5.5`。留空 → 默认 `bypass-system = true`。
+- **`[General]`**（仅 Surge / ShadowRocket）—— `key = value` 覆盖项，在客户端默认配置生成后按键替换，最终每个覆盖键仅出现一次。留空保留安全默认值；不接受段落标题、重复键。显式改回 `udp-policy-not-supported-behaviour = DIRECT` 或直连 DNS 会取消相应保护。
 - **`[MITM]`**（仅 Surge / ShadowRocket）—— 原始 Surge MITM 指令，例如 `hostname = *.googlevideo.com`。留空 → 省略该段。Clash 没有 MITM，因此 `clash` 目标会忽略它。
 - **`[URL Rewrite]`**（仅 Surge / ShadowRocket）—— 原始 Surge URL Rewrite 规则，每行 `正则 替换 模式`（模式如 `header`/`302`/`reject`），例如 `^https://example.com/x $1 header`。留空 → 省略该段。Clash 无对应,会忽略它。
-- **`[Clash] general`**（仅 Clash）—— 原始 Clash YAML 顶层键，例如：
+- **`[Clash] general`**（仅 Clash）—— 单文档 YAML 对象，映射递归合并，数组/标量/null 替换；不再生成重复顶层键。例：
   ```yaml
-  mode: rule
   dns:
-    enable: true
-    nameserver: [223.5.5.5, 119.29.29.29]
+    listen: 127.0.0.1:1053
   ```
-  留空 → 默认 `mode: rule`。Surge/ShadowRocket 目标会忽略它。
+  只改监听地址会保留默认代理 DNS。留空保留模板原格式；非空合并会规范化 YAML 排版。重复键、多文档和非对象输入拒绝。最终配置再经过 UDP guard 与 YAML 校验，失败不会静默返回基础配置。自定义 rules 必须为可安全转换的规则序列；SUB-RULE、组内 PASS、包含否定 IP/provider 的可变匹配逻辑等不支持安全转换的控制流会明确拒绝生成（字面 PASS 规则仍支持）。只覆盖 proxy-groups 时，若默认 DNS 仍引用内部组，最终校验会拒绝缺失、循环或含直连后代的 DNS 组。Surge/ShadowRocket 忽略该字段。
+
+## UDP 与 DNS 隐私默认值
+
+这是**兼容性优先的分流配置**，不是全局匿名或“零直连 DNS”承诺：国内业务仍按原规则直连，仅将业务解析和节点引导分离。
+
+- **Surge / Shadowrocket UDP**：不支持 UDP 的代理策略默认 REJECT，绝不为此自动转 DIRECT。可能影响不支持 UDP 节点上的通话、游戏；HTTP/3 可回退 TCP。
+- **Mihomo UDP**：节点显式启用 UDP；每条可能走代理的规则后紧跟相同条件的 UDP REJECT。内核在节点不支持 UDP 而跳过原规则时，guard 阻止继续落入国内 DIRECT。正常支持 UDP 的节点及显式选 DIRECT 的组仍由原规则处理。自定义覆盖之后也会补 guard。
+- **Surge DNS**：IP-literal Cloudflare / Google DoH，开启 `encrypted-dns-follow-outbound-mode`，最前 `PROTOCOL,DOH,Shepherd-DNS` 固定解析出口。仅对实际代理入口域名生成精确 `[Host] name = server:223.5.5.5`；SSH 跳板只映射跳板入口。这是避免域名节点解析循环所需的**传统 DNS 引导例外**。全局传统 DNS 还可用于 Surge 连通性检测。该映射解环行为要求支持它的 Surge 版本（Mac 5.6+；iOS 请按实际版本验证）。
+- **Shadowrocket DNS**：主/备 IP-literal DoH 均带 `#proxy`；`proxy-dns-server` 单独采用直连加密 AliDNS 引导节点域名。不能删空 fallback，因为其空值可能等同系统 DNS。`dns-direct-system=false`，不通过 DNS 失败擅自改变国内业务规则。
+- **Mihomo DNS**：业务 `nameserver` 显式指定 `#Shepherd-DNS`，不依赖国内 IP 分流决定 DNS 出口；`proxy-server-nameserver` / `default-nameserver` 使用直连加密 AliDNS 引导。默认 fake-ip、关闭 DNS IPv6，未强制开启系统 TUN。
+- 移除原始商业模板的 `cloud-nodes.com` 专用解析、国内电商/媒体域名 Host 明文 DNS 覆盖；保留 LAN/router/system 解析例外。WireGuard 隧道内 DNS 使用 Cloudflare / Google。
+
+**适用边界：**需要客户端规则模式，DNS 组/主页节点须有正确的预期出口；节点国旗不保证真实出口地区。仅系统 HTTP 代理不能接管所有 UDP、IPv6、应用内 DoH。Surge 的 `ipv6=false` 和 Mihomo 的 `dns.ipv6=false` 不是 OS 级 IPv6 防火墙。请自行启用适合平台的增强/TUN 模式，并核查浏览器 DNS/WebRTC。Shadowrocket 主备 DoH 同时失败后的闭源客户端行为仍需实机抓包验证，配置与语法校验不能证明无隐式系统回退。
+
+**升级验收：**更新订阅后分别检查 HTTP IPv4/IPv6 出口、DNS leak、WebRTC 与请求日志；再测试代理失效、DoH 超时、节点域名冷缓存、Wi-Fi/移动网络切换。除了上述节点引导/连通性/LAN 例外，业务解析应经预期代理，失败不得改走本地明文 DNS。不要只看测试页出现“中国 DNS”就断言本地公网 IP 泄露。
 
 ## 分流分类
 

@@ -25,7 +25,7 @@ type Intermediate struct {
 	General        string   // Surge [General] body; empty → renderer default
 	MITM           string   // Surge [MITM] body; empty → section omitted
 	URLRewrite     string   // Surge [URL Rewrite] body; empty → section omitted
-	ClashGeneral   string   // Clash YAML preamble; empty → {mode: rule}
+	ClashGeneral   string   // Clash YAML mapping overrides; empty → renderer defaults
 	DisabledGroups []string // excluded oixCloud service groups (normalized)
 }
 

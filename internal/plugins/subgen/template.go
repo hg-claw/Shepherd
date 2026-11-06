@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"gopkg.in/yaml.v3"
 )
 
 type CategorySel struct {
@@ -34,7 +33,7 @@ type TemplateSpec struct {
 	General           string        `json:"general,omitempty"`       // Surge [General] body
 	MITM              string        `json:"mitm,omitempty"`          // Surge [MITM] body
 	URLRewrite        string        `json:"url_rewrite,omitempty"`   // Surge [URL Rewrite] body
-	ClashGeneral      string        `json:"clash_general,omitempty"` // Clash YAML preamble (top-level keys)
+	ClashGeneral      string        `json:"clash_general,omitempty"` // Clash YAML overrides (deep-merged mappings)
 	CustomNodes       string        `json:"custom_nodes,omitempty"`  // newline-separated proxy share links
 	CustomGroups      []CustomGroup `json:"custom_groups,omitempty"`
 	DisabledGroups    []string      `json:"disabled_groups,omitempty"` // excluded service groups; empty = all on
@@ -57,11 +56,11 @@ func ParseTemplate(rulesJSON string) (TemplateSpec, error) {
 	if t.Final == "" {
 		t.Final = "PROXY"
 	}
-	if t.ClashGeneral != "" {
-		var m map[string]any
-		if err := yaml.Unmarshal([]byte(t.ClashGeneral), &m); err != nil {
-			return t, fmt.Errorf("bad clash_general: %w", err)
-		}
+	if _, _, err := parseGeneral(t.General); err != nil {
+		return t, fmt.Errorf("bad general: %w", err)
+	}
+	if _, err := decodeClashMapping(t.ClashGeneral, true); err != nil {
+		return t, fmt.Errorf("bad clash_general: %w", err)
 	}
 	for _, c := range t.Categories {
 		if _, ok := categoryByName(c.Name); !ok {

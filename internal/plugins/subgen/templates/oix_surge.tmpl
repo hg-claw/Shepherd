@@ -1,8 +1,10 @@
 [General]
 loglevel = notify
 
-dns-server = system,119.29.29.29,223.5.5.5,223.6.6.6
-# doh-server = https://doh.pub/dns-query,https://dns.alidns.com/dns-query
+# Traditional DNS is restricted to connectivity checks and node bootstrap.
+dns-server = 223.5.5.5
+encrypted-dns-server = https://1.1.1.1/dns-query, https://8.8.8.8/dns-query
+encrypted-dns-follow-outbound-mode = true
 skip-proxy = localhost,*.local,*.ts.net,captive.apple.com,e.crashlytics.com,passenger.t3go.cn,yunbusiness.ccb.com,wxh.wo.cn,gate.lagou.com,www.abchina.com.cn,login-service.mobile-bank.psbc.com,mobile-bank.psbc.com,100.64.0.0/10,169.254.0.0/16,172.16.0.0/12,192.168.0.0/16,224.0.0.0/4,::1/128,fc00::/7,fd00::/8,fe80::/10,ff00::/8,::ffff:0:0:0:0/96
 # tun-excluded-routes = 192.168.0.0/16,172.16.0.0/12
 # tun-included-routes = 192.168.1.12/32
@@ -11,7 +13,7 @@ exclude-simple-hostnames = true
 
 always-real-ip = *.lan,*.direct,cable.auth.com,*.msftconnecttest.com,*.msftncsi.com,network-test.debian.org,detectportal.firefox.com,resolver1.opendns.com,*.srv.nintendo.net,*.stun.playstation.net,xbox.*.microsoft.com,*.xboxlive.com,stun.*,global.turn.twilio.com,global.stun.twilio.com,app.yinxiang.com,injections.adguard.org,local.adguard.org,cable.auth.com,localhost.*.qq.com,localhost.*.weixin.qq.com,*.logon.battlenet.com.cn,*.logon.battle.net,*.blzstatic.cn,music.163.com,*.music.163.com,*.126.net,musicapi.taihe.com,music.taihe.com,songsearch.kugou.com,trackercdn.kugou.com,*.kuwo.cn,api-jooxtt.sanook.com,api.joox.com,joox.com,y.qq.com,*.y.qq.com,streamoc.music.tc.qq.com,mobileoc.music.tc.qq.com,isure.stream.qqmusic.qq.com,dl.stream.qqmusic.qq.com,aqqmusic.tc.qq.com,amobile.music.tc.qq.com,*.xiami.com,*.music.migu.cn,music.migu.cn,proxy.golang.org,*.mcdn.bilivideo.cn,*.cmpassport.com,id6.me,open.e.189.cn,opencloud.wostore.cn,id.mail.wo.cn,mdn.open.wo.cn,hmrz.wo.cn,nishub1.10010.com,enrichgw.10010.com,*.wosms.cn,*.jegotrip.com.cn,*.icitymobile.mobi,*.pingan.com.cn,*.cmbchina.com,*.10099.com.cn,*.microdone.cn,pool.ntp.org,*.pool.ntp.org,ntp.*.com,time.*.com,ntp?.*.com,time?.*.com,time.*.gov,time.*.edu.cn,*.ntp.org.cn,PDC._msDCS.*.*,DC._msDCS.*.*,GC._msDCS.*.*
 
-hijack-dns = 8.8.8.8:53,8.8.4.4:53,1.1.1.1:53,1.0.0.1:53
+hijack-dns = *:53
 
 http-listen = 0.0.0.0
 socks5-listen = 0.0.0.0
@@ -26,7 +28,8 @@ test-timeout = 3
 
 allow-wifi-access = true
 show-error-page-for-reject = true
-udp-policy-not-supported-behaviour = DIRECT
+# Never expose the local address when the selected proxy cannot relay UDP.
+udp-policy-not-supported-behaviour = REJECT
 ipv6 = false
 wifi-assist = false
 all-hybrid = false
@@ -39,6 +42,7 @@ Block = reject
 {{WIREGUARD}}
 
 [Proxy Group]
+{{DNS_GROUP}}
 Proxy = select, Auto - Smart, Auto - UrlTest, Direct, {{NODES}}
 Domestic = select, Direct, Proxy, {{NODES}}
 Others = select, Proxy, Direct, {{NODES}}
@@ -71,6 +75,7 @@ Auto - Smart = smart, {{NODES}}, evaluate-before-use = true
 
 {{CUSTOM_GROUPS}}
 [Rule]
+{{DNS_RULES}}
 {{CUSTOM_RULES}}
 
 RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/AdBlock.list,AdBlock,extended-matching
@@ -160,36 +165,10 @@ FINAL,Others,dns-failed
 
 
 [Host]
-*.cloud-nodes.com = server:124.221.68.73:1053
+# Exact proxy entry hostnames only; business domains use proxied DoH.
+{{BOOTSTRAP_HOSTS}}
 ip6-localhost = ::1
 ip6-loopback = ::1
-taobao.com = server:223.6.6.6
-*.taobao.com = server:223.6.6.6
-tmall.com = server:223.6.6.6
-*.tmall.com = server:223.6.6.6
-jd.com = server:119.29.29.29
-*.jd.com = server:119.28.28.28
-*.qq.com = server:119.28.28.28
-*.tencent.com = server:119.28.28.28
-*.alicdn.com = server:223.5.5.5
-aliyun.com = server:223.5.5.5
-*.aliyun.com = server:223.5.5.5
-weixin.com = server:119.28.28.28
-*.weixin.com = server:119.28.28.28
-bilibili.com = server:119.29.29.29
-*.bilibili.com = server:119.29.29.29
-*.hdslb.com = server:119.29.29.29
-163.com = server:119.29.29.29
-*.163.com = server:119.29.29.29
-126.com = server:119.29.29.29
-*.126.com = server:119.29.29.29
-*.126.net = server:119.29.29.29
-*.127.net = server:119.29.29.29
-*.netease.com = server:119.29.29.29
-mi.com = server:119.29.29.29
-*.mi.com = server:119.29.29.29
-xiaomi.com = server:119.29.29.29
-*.xiaomi.com = server:119.29.29.29
 routerlogin.net = server:system
 _hotspot_.m2m = server:system
 router.asus.com = server:system

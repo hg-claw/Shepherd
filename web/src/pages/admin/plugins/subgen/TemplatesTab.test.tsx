@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { renderWithProviders } from '@/test-utils/render'
 
 // Mock the api module so the editor's queries/mutations don't hit the network.
@@ -14,11 +14,36 @@ vi.mock('@/api/subgen', async (orig) => {
 })
 
 import { TemplateEditor } from './TemplatesTab'
+import { previewSubgenTemplate } from '@/api/subgen'
 
 const noop = () => {}
 
 beforeEach(() => {
   vi.clearAllMocks()
+})
+
+describe('TemplateEditor DNS mode', () => {
+  it('persists rule-aware selection in preview and keeps the warning visible', async () => {
+    renderWithProviders(
+      <TemplateEditor editing={{ id: null, name: 'x', rules: '{}' }} onClose={noop} onSaved={noop} />,
+    )
+    const select = await screen.findByLabelText(/DNS/i) as HTMLSelectElement
+    expect(select.value).toBe('private')
+    fireEvent.change(select, { target: { value: 'rule-aware' } })
+    expect(select.value).toBe('rule-aware')
+    await waitFor(() => {
+      const calls = vi.mocked(previewSubgenTemplate).mock.calls
+      expect(calls.some(([rules]) => JSON.parse(rules).dns_mode === 'rule-aware')).toBe(true)
+    })
+    expect(screen.getByText(/Application-initiated DNS|应用主动 DNS/)).toBeTruthy()
+  })
+
+  it('loads an existing rule-aware template without resetting it', async () => {
+    renderWithProviders(
+      <TemplateEditor editing={{ id: 1, name: 'x', rules: '{"dns_mode":"rule-aware"}' }} onClose={noop} onSaved={noop} />,
+    )
+    expect((await screen.findByLabelText(/DNS/i) as HTMLSelectElement).value).toBe('rule-aware')
+  })
 })
 
 describe('TemplateEditor proxy-group checklist', () => {

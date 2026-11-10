@@ -126,6 +126,12 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, _ string) string {
 	out = strings.ReplaceAll(out, "{{CUSTOM_GROUPS}}", strings.TrimRight(cgroups.String(), "\n"))
 	out = strings.ReplaceAll(out, "{{CUSTOM_PROVIDERS}}", strings.TrimRight(cproviders.String(), "\n"))
 	out = strings.ReplaceAll(out, "{{CLASH_EXTRA}}", "")
+	if ruleAwareDNS(im) {
+		out, err = mergeClashGeneral(out, ruleAwareClashGeneral())
+		if err != nil {
+			return fmt.Sprintf("# Clash render error: %q\n!shepherd-render-error [\n", err.Error())
+		}
+	}
 	merged, err := mergeClashGeneral(out, im.ClashGeneral)
 	if err == nil {
 		err = validateClashDNSPolicy(merged, "Proxy")

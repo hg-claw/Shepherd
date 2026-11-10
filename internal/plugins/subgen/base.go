@@ -19,6 +19,7 @@ type Rule struct {
 }
 
 type Intermediate struct {
+	DNSMode        string // private (default) | rule-aware
 	Nodes          []Node
 	Groups         []Group
 	Rules          []Rule
@@ -40,6 +41,7 @@ func Assemble(nodes []Node, spec TemplateSpec) Intermediate {
 	}
 	dedupeNodeNames(nodes)
 	im := Intermediate{
+		DNSMode:        spec.DNSMode,
 		Nodes:          nodes,
 		General:        spec.General,
 		MITM:           spec.MITM,

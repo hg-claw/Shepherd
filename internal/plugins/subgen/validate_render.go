@@ -54,6 +54,9 @@ func safeExtraValue(value any) bool {
 // reinterpreted as a later template marker. Raw administrator section overrides
 // are intentionally separate and disable automatic domestic DNS exceptions.
 func validateRenderValues(im Intermediate) error {
+	if !validDNSMode(im.DNSMode) {
+		return fmt.Errorf("unknown DNS mode")
+	}
 	for _, node := range im.Nodes {
 		for _, value := range []string{node.Name, node.Protocol, node.Server, node.UUID, node.Password,
 			node.SNI, node.Flow, node.RealityPublicKey, node.RealityShortID, node.Transport,

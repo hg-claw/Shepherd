@@ -3,6 +3,13 @@ import { describe, expect, it } from 'vitest'
 import { parseRules, selectedToDisabled } from './TemplatesTab'
 
 describe('subgen template selection logic', () => {
+  it('keeps private defaults for legacy templates and preserves an explicit DNS mode', () => {
+    expect(parseRules('{}').dns_mode).toBe('private')
+    expect(parseRules('{"dns_mode":"rule-aware"}').dns_mode).toBe('rule-aware')
+    // Do not silently coerce invalid raw modes to private; backend validation rejects them.
+    expect(parseRules('{"dns_mode":"invalid"}').dns_mode).toBe('invalid')
+  })
+
   it('defaults disabled_groups to [] when the key is absent (legacy → all checked)', () => {
     expect(parseRules('{"final":"PROXY"}').disabled_groups).toEqual([])
   })

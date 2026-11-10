@@ -28,6 +28,7 @@ type CustomGroup struct {
 }
 
 type TemplateSpec struct {
+	DNSMode           string        `json:"dns_mode,omitempty"` // private (default) | rule-aware (explicit opt-in)
 	Categories        []CategorySel `json:"categories"`
 	CustomRules       []CustomRule  `json:"custom_rules"`
 	Final             string        `json:"final"`
@@ -61,6 +62,9 @@ func ParseTemplate(rulesJSON string) (TemplateSpec, error) {
 	var t TemplateSpec
 	if err := json.Unmarshal([]byte(rulesJSON), &t); err != nil {
 		return t, fmt.Errorf("bad rules_json: %w", err)
+	}
+	if !validDNSMode(t.DNSMode) {
+		return t, fmt.Errorf("unknown dns_mode %q", t.DNSMode)
 	}
 	if t.Final == "" {
 		t.Final = "PROXY"

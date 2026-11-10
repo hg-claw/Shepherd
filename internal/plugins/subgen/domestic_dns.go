@@ -118,6 +118,13 @@ func dnsRuleOverlap(a, b domesticDNSRule) bool {
 // Explicit DIRECT rules never enlarge the reviewed snapshot. Client-side group
 // choices cannot be observed by a generated subscription, and are documented.
 func domesticDNSRules(im Intermediate, target string) ([]domesticDNSRule, error) {
+	if !validDNSMode(im.DNSMode) {
+		return nil, fmt.Errorf("unknown DNS mode")
+	}
+	if ruleAwareDNS(im) {
+		// Native direct/remote resolution, not a global static DNS scope.
+		return nil, nil
+	}
 	rules, err := decodeDomesticDNS(domesticDNSSnapshot)
 	if err != nil {
 		return nil, err

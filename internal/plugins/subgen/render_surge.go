@@ -296,6 +296,12 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 		return fmt.Sprintf("# General render error: %q\n[INVALID GENERAL\n", err.Error())
 	}
 	dnsRules := "PROTOCOL,DOH,Proxy"
+	if ruleAwareDNS(im) {
+		if target == "shadowrocket" {
+			return "# General render error: rule-aware DNS is supported only for Surge and Mihomo\n[INVALID GENERAL\n"
+		}
+		dnsRules = ""
+	}
 	if len(domesticRules) > 0 {
 		dnsRules = "IP-CIDR,223.5.5.5/32,DIRECT,no-resolve\n" + dnsRules
 	}
@@ -311,6 +317,12 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 	out = strings.ReplaceAll(out, "{{MITM}}", mitm)
 	if target == "shadowrocket" {
 		out = applyShadowrocketDNS(out)
+	}
+	if ruleAwareDNS(im) {
+		out, err = applyRuleAwareSurgeDNS(out)
+		if err != nil {
+			return fmt.Sprintf("# General render error: %q\n[INVALID GENERAL\n", err.Error())
+		}
 	}
 	out, err = mergeGeneral(out, im.General)
 	if err != nil {

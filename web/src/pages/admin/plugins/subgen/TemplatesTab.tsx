@@ -34,6 +34,7 @@ interface CategoryRule { name: string; policy: Policy }
 interface CustomRule { match: string; policy: Policy }
 interface CustomGroupModel { name: string; type: string; members: string[] }
 interface RulesModel {
+  dns_mode: string
   categories: CategoryRule[]
   custom_rules: CustomRule[]
   final: string
@@ -51,6 +52,7 @@ export function parseRules(rules_json: string): RulesModel {
   let raw: any = {}
   try { raw = JSON.parse(rules_json || '{}') } catch { raw = {} }
   return {
+    dns_mode: String(raw.dns_mode ?? 'private'),
     categories: Array.isArray(raw.categories)
       ? raw.categories.map((c: any) => ({ name: String(c.name ?? ''), policy: String(c.policy ?? 'PROXY') }))
       : [],
@@ -272,6 +274,7 @@ export function TemplateEditor({
   const checkAllGroups = () => setDisabledGroups(new Set())
   const clearAllGroups = () => setDisabledGroups(new Set(oixGroups))
 
+  const [dnsMode, setDnsMode] = useState(initial.dns_mode)
   const [customText, setCustomText] = useState(customRulesToText(initial.custom_rules))
   const [final, setFinal] = useState<string>(initial.final)
   const [includeAutoSelect, setIncludeAutoSelect] = useState(initial.include_auto_select)
@@ -284,6 +287,7 @@ export function TemplateEditor({
   const [rawJson, setRawJson] = useState('')
 
   const buildModel = (): RulesModel => ({
+    dns_mode: dnsMode,
     categories: [],
     custom_rules: textToCustomRules(customText),
     final,
@@ -312,6 +316,7 @@ export function TemplateEditor({
     // Re-read whatever's in the raw box back into the form. Invalid JSON falls
     // back to an empty model (parseRules swallows the parse error).
     const m = parseRules(rawJson)
+    setDnsMode(m.dns_mode)
     setDisabledGroups(new Set(m.disabled_groups))
     setCustomText(customRulesToText(m.custom_rules))
     setFinal(m.final)
@@ -383,6 +388,19 @@ export function TemplateEditor({
 
             {mode === 'form' ? (
               <>
+                <div>
+                  <Label htmlFor="subgen-dns-mode" className="text-xs">{t('subgen.templates.dns_mode', 'DNS mode')}</Label>
+                  <select id="subgen-dns-mode" value={dnsMode} onChange={(e) => setDnsMode(e.target.value)}
+                    className="mt-1 w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+                    <option value="private">{t('subgen.templates.dns_mode_private', 'Private defaults + reviewed domestic exceptions')}</option>
+                    <option value="rule-aware">{t('subgen.templates.dns_mode_rule_aware', 'Rule-aware / domain-first (Surge + Mihomo)')}</option>
+                  </select>
+                  <p className="text-fg-dim text-2xs mt-1">
+                    {dnsMode === 'rule-aware'
+                      ? t('subgen.templates.dns_rule_aware_warning', 'Opt-in: Surge skips DNS lookups for IP/GEOIP rule matching; unlisted domains default to proxy. Application-initiated DNS can still use domestic DoH. Mihomo uses its native DIRECT resolver. Not a strict DNS-leak mode; ShadowRocket is unsupported.')
+                      : t('subgen.templates.dns_private_desc', 'Keeps existing private DNS defaults. Complex custom process/group rules can disable automatic domestic exceptions.')}
+                  </p>
+                </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <Label className="text-xs">{t('subgen.templates.proxy_groups', 'Proxy groups')}</Label>

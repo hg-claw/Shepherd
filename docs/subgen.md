@@ -46,6 +46,39 @@
 - **兼容旧 JSON 字段** —— `categories`、`final`、`include_auto_select` 仍可解析，但不控制固定模板的输出。默认兜底为 Surge `FINAL,Others,dns-failed` / Clash `MATCH,Others`；不要以为修改旧 `final` 字段就已启用阻断兜底。
 - **DNS 默认私密，国内明确例外** —— 不生成独立 `Shepherd-DNS` 组；默认/未知域名和 IP/GEOIP 预解析使用经 `Proxy` 的境外 DoH。Surge / Mihomo 仅对固定审核的国内站点使用直连国内 DoH，以兼顾 CDN 选址。DNS 例外是静态域名范围，不跟随客户端任意策略组的实时切换；显式将 `Proxy` 选为 Direct 也会改变默认 DNS 出口。
 
+## 可选 DNS 模式
+
+模板编辑器新增 **DNS 模式**，同时保留原始 JSON 字段 `dns_mode`：
+
+```json
+{"dns_mode":"rule-aware"}
+```
+
+- **`private`（默认，字段缺失等价）**：保持 v0.39.15 的默认代理解析与审核国内范围。不会静默迁移现有订阅；复杂进程/分组规则仍可能使国内例外取消。
+- **`rule-aware`（主动选择）**：用于优先按业务出站处理解析。它不是严格防 DNS 泄露模式，也不保证每个客户端/协议拥有同等能力；当前仅支持 Surge 与 Mihomo。用同一模板请求 ShadowRocket 会明确返回生成错误，而不是悄悄使用另一种 DNS 策略；请为 SR 保留 `private` 模板。
+
+### Surge：域名/进程优先，而非完整的最终策略 DNS 钩子
+
+本地 DNS 使用直连 AliDNS DoH，保留 `use-local-host-item-for-proxy=false`。对先命中域名或进程规则、且目标域名仍保留的普通连接：
+
+- 最终选择 DIRECT → 本地国内 DoH 解析并直连，以获得合适的 CDN。
+- 最终选择支持域名的代理 → 把原始域名交给**业务组实际选择的节点**远端解析，不固定套用主 `Proxy`。
+- 自定义进程规则不会再因为“无法化成域名范围”而关闭其他普通业务的直连解析器；此模式不生成静态国内 Host DNS 范围。
+
+为避免**规则匹配阶段**先把未知域名交给国内 DNS，所有 RULE-SET、IP-CIDR/IP-CIDR6/IP-ASN/GEOIP 规则增加 `no-resolve`。规则顺序、域名子规则和进程规则保留；纯 IP 连接仍可匹配 IP 规则。**代价：未被域名/进程等规则收录的域名，不再主动解析后凭 GeoIP 国内兜底，而是继续到 FINAL（默认 Others→Proxy）；内网仅靠 IP 探测的域名也可能受影响。** `always-real-ip` 默认收窄到 LAN 的 `*.lan, *.local`，避免大量公共模式预先真实解析。含未知脚本/复杂规则类型且无法保证其解析副作用的配置会拒绝该模式，不能猜测后静默放行。
+
+**隐私边界必须接受：**应用主动 DNS、浏览器自带 DoH/HTTPDNS、真实 IP/SNI 路径、用户覆盖、缓存与已建立连接，并不一定拥有可用的业务进程/最终策略上下文；本地国内解析器仍可能收到最终走代理的域名。这不是“所有代理域名绝不出现国内 DNS”的承诺。IP/GeoIP 的原始域名兜底与严格预解析隐私无法靠这个模式同时保留。仅 IP/隧道类代理、WireGuard 等也不保证原生远端域名解析。
+
+### Mihomo：实际 DIRECT 专用解析器与独立安全预解析
+
+启用 `direct-nameserver: [https://223.5.5.5/dns-query#DIRECT]`、`direct-nameserver-follow-policy: false`，移除本模板的静态国内 DNS policy。`nameserver` 保持境外 DoH `#Proxy`，所以需要 IP/GeoIP 判定时先走独立安全预解析；最终 DIRECT 连接在保留域名的路径上用国内解析器重新取地址。支持域名转发的 TCP 代理连接则交给业务组当前节点，不统一经主 Proxy 解析。
+
+这不等于任意 UDP 协议都远端解析：部分 UDP 出站会使用默认解析器；DNS mapping/hosts、应用只传真实 IP 时可能丢失域名，无法二次选址。默认 fake-ip/域名代理路径更接近此模式的设计。缓存与 UDP 会话还会延续先前选择，切组后必须新建连接/独立 UDP 关联再验证。
+
+### 启用与验收
+
+升级后克隆/编辑实际订阅使用的模板，选择 **按出站／域名优先**，预览目标格式确认变化后保存，再刷新客户端订阅。清理相关 DNS 缓存并建立新连接；不要只升级服务端就认为旧模板自动启用。至少分别验证：普通国内站点 DIRECT 与延迟、相同域名在进程代理规则下的业务节点、两个服务组选不同节点、未知域名兜底以及解析器/节点失效。显式 General/Clash 覆盖依旧可改变上述默认；MITM 证书失败应独立排查，DNS 模式不会修复它。
+
 ## 节点命名与别名
 
 默认情况下，订阅里每个节点名按 `<国旗> <服务器名> <协议>` 生成（如 `🇺🇸 Tokyo vless`）。在 xray / sing-box 的 inbound 上设置 **别名（Alias）** 后，该节点在所有订阅里直接用别名命名（原样输出，国旗/协议都不再自动添加，需要的话自己写进别名）。留空则回退默认命名。别名是 inbound 自身的属性，使用该 inbound 的所有订阅共用。
@@ -81,9 +114,9 @@
   ```
   只改监听地址会保留审核域名 DNS 例外及经 Proxy 的默认查询路径；覆盖 rules/rule-providers/proxy-groups 会取消自动国内例外。留空保留模板原格式；非空合并会规范化 YAML 排版。重复键、多文档和非对象输入拒绝。最终配置再经过 UDP guard 与 YAML 校验，失败不会静默返回基础配置。自定义 rules 必须为可安全转换的规则序列；SUB-RULE、组内 PASS、包含否定 IP/provider 的可变匹配逻辑等不支持安全转换的控制流会明确拒绝生成（字面 PASS 规则仍支持）。只覆盖 proxy-groups 时，若默认 DNS 仍引用 Proxy，最终校验会拒绝缺失、重名、循环或不受支持的成员引用；允许显式 DIRECT 成员，以保持与业务 Proxy 选择一致。Surge/ShadowRocket 忽略该字段。
 
-## UDP 与 DNS 隐私默认值
+## Private 模式的 UDP 与 DNS 默认值
 
-这是**默认经代理解析、国内显式例外的分流配置**，不是全局匿名或“零直连 DNS”承诺。业务分流规则不变；查询国内例外、代理节点引导和 LAN 服务仍可能使用本地网络。DoH 加密传输，不对解析器隐藏被查域名。
+以下描述 `dns_mode=private`（含旧模板缺省），`rule-aware` 的不同取舍见上节。这是**默认经代理解析、国内显式例外的分流配置**，不是全局匿名或“零直连 DNS”承诺。业务分流规则不变；查询国内例外、代理节点引导和 LAN 服务仍可能使用本地网络。DoH 加密传输，不对解析器隐藏被查域名。
 
 - **Surge / Shadowrocket UDP**：不支持 UDP 的代理策略默认 REJECT，绝不为此自动转 DIRECT。可能影响不支持 UDP 节点上的通话、游戏；HTTP/3 可回退 TCP。
 - **Mihomo UDP**：节点显式启用 UDP；每条可能走代理的规则后紧跟相同条件的 UDP REJECT。内核在节点不支持 UDP 而跳过原规则时，guard 阻止继续落入国内 DIRECT。正常支持 UDP 的节点及显式选 DIRECT 的组仍由原规则处理。自定义覆盖之后也会补 guard。

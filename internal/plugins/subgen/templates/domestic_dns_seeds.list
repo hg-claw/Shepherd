@@ -1,0 +1,28 @@
+# Reviewed CDN/local-service candidates, not an exhaustive China routing list.
+# scripts/update-domestic-dns.py requires each rule to exist in BOTH upstream
+# Domestic formats and excludes overlaps with earlier proxy/service providers.
+# AdBlock is intentionally not a proxy/service deny source: its default is REJECT.
+DOMAIN-SUFFIX,taobao.com
+DOMAIN-SUFFIX,alicdn.com
+DOMAIN-SUFFIX,tmall.com
+DOMAIN-SUFFIX,alipay.com
+DOMAIN-SUFFIX,alipayobjects.com
+DOMAIN-SUFFIX,jd.com
+DOMAIN-SUFFIX,360buy.com
+DOMAIN-SUFFIX,360buyimg.com
+DOMAIN-SUFFIX,baidu.com
+DOMAIN-SUFFIX,bdimg.com
+DOMAIN-SUFFIX,bdstatic.com
+DOMAIN-SUFFIX,gtimg.com
+DOMAIN-SUFFIX,bytednsdoc.com
+DOMAIN-SUFFIX,byted-static.com
+DOMAIN-SUFFIX,byteimg.com
+DOMAIN-SUFFIX,douyin.com
+DOMAIN-SUFFIX,xhscdn.com
+DOMAIN-SUFFIX,xiaohongshu.com
+DOMAIN-SUFFIX,mi.com
+DOMAIN-SUFFIX,xiaomi.com
+DOMAIN-SUFFIX,meituan.com
+DOMAIN-SUFFIX,pinduoduo.com
+DOMAIN-SUFFIX,pddpic.com
+DOMAIN-SUFFIX,pddcdn.com

@@ -3,10 +3,10 @@ loglevel = notify
 
 # Traditional DNS is restricted to connectivity checks and node bootstrap.
 dns-server = 223.5.5.5
-# Local lookups serve DIRECT and rule pre-resolution. Domain-capable proxies
-# receive the original hostname and resolve it remotely instead.
-encrypted-dns-server = https://223.5.5.5/dns-query
-encrypted-dns-follow-outbound-mode = false
+# Unknown domains and IP/GEOIP pre-resolution use proxied encrypted DNS.
+# Only reviewed Host mappings below may use domestic encrypted DNS directly.
+encrypted-dns-server = https://1.1.1.1/dns-query, https://8.8.8.8/dns-query
+encrypted-dns-follow-outbound-mode = true
 use-local-host-item-for-proxy = false
 skip-proxy = localhost,*.local,*.ts.net,captive.apple.com,e.crashlytics.com,passenger.t3go.cn,yunbusiness.ccb.com,wxh.wo.cn,gate.lagou.com,www.abchina.com.cn,login-service.mobile-bank.psbc.com,mobile-bank.psbc.com,100.64.0.0/10,169.254.0.0/16,172.16.0.0/12,192.168.0.0/16,224.0.0.0/4,::1/128,fc00::/7,fd00::/8,fe80::/10,ff00::/8,::ffff:0:0:0:0/96
 # tun-excluded-routes = 192.168.0.0/16,172.16.0.0/12
@@ -77,6 +77,7 @@ Auto - Smart = smart, {{NODES}}, evaluate-before-use = true
 
 {{CUSTOM_GROUPS}}
 [Rule]
+{{DNS_RULES}}
 {{CUSTOM_RULES}}
 
 RULE-SET,https://fastly.jsdelivr.net/gh/dler-io/Rules@main/Surge/Surge%203/Provider/AdBlock.list,AdBlock,extended-matching
@@ -166,7 +167,8 @@ FINAL,Others,dns-failed
 
 
 [Host]
-# Exact proxy entry bootstrap only; business DNS follows native outbound behavior.
+# Reviewed domestic exceptions and exact proxy-entry bootstrap only.
+{{DOMESTIC_DNS_HOSTS}}
 {{BOOTSTRAP_HOSTS}}
 ip6-localhost = ::1
 ip6-loopback = ::1

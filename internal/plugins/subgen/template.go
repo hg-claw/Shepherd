@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -39,7 +41,14 @@ type TemplateSpec struct {
 	DisabledGroups    []string      `json:"disabled_groups,omitempty"` // excluded service groups; empty = all on
 }
 
+func safeRuleText(s string) bool {
+	return !strings.ContainsAny(s, "\u0085\u2028\u2029") && !strings.ContainsFunc(s, unicode.IsControl)
+}
+
 func validPolicy(p string) bool {
+	if !safeRuleText(p) || strings.ContainsAny(p, ",[]") {
+		return false
+	}
 	switch p {
 	case "PROXY", "DIRECT", "REJECT":
 		return true
@@ -71,12 +80,12 @@ func ParseTemplate(rulesJSON string) (TemplateSpec, error) {
 		}
 	}
 	for _, r := range t.CustomRules {
-		if r.Match == "" || !validPolicy(r.Policy) {
+		if r.Match == "" || !safeRuleText(r.Match) || !validPolicy(r.Policy) {
 			return t, fmt.Errorf("bad custom rule %+v", r)
 		}
 	}
 	for _, g := range t.CustomGroups {
-		if g.Name == "" {
+		if g.Name == "" || !validPolicy(g.Name) {
 			return t, fmt.Errorf("custom group: empty name")
 		}
 		if g.Type != "select" && g.Type != "url-test" {
@@ -84,6 +93,11 @@ func ParseTemplate(rulesJSON string) (TemplateSpec, error) {
 		}
 		if len(g.Members) == 0 {
 			return t, fmt.Errorf("custom group %q: needs at least one member", g.Name)
+		}
+		for _, member := range g.Members {
+			if !safeRuleText(member) {
+				return t, fmt.Errorf("custom group %q: member must be a single line", g.Name)
+			}
 		}
 	}
 	for _, g := range t.DisabledGroups {

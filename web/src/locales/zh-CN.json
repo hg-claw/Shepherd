@@ -896,7 +896,7 @@
       "custom_rules_desc_pre": "格式为每行一条",
       "custom_rules_desc_post": "(例如",
       "raw_surge_prefix": "原始 Surge",
-      "general_desc_mid": "按键覆盖。留空保留按出站解析的 DNS 和 UDP 拒绝回退默认值。",
+      "general_desc_mid": "按键覆盖。留空保留默认代理 DNS、审核国内例外及 UDP 拒绝保护。",
       "mitm_desc_post": "指令。留空则省略该段。",
       "url_rewrite_desc_post": "行（仅 Surge / ShadowRocket 支持；Clash 会忽略）。留空则省略。",
       "clash_general_desc_pre": "原始 Clash YAML 顶层字段（",

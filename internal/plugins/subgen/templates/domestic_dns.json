@@ -1,0 +1,576 @@
+{
+  "revision": "4b030fbcf5cfc3b1240b3d497b56d19f1e098954",
+  "seeds_sha256": "fda658a1623834fc7720effdd58dda6ff894523da73d80e90fc5dbd51157d495",
+  "sources": [
+    {
+      "path": "Surge/Surge 3/Provider/Domestic.list",
+      "sha256": "1f82e320cc5859d7a9eaee8264df713a8c58cd439d62a0bc5c65d4f77eec9d84"
+    },
+    {
+      "path": "Clash/Provider/Domestic.yaml",
+      "sha256": "41fed461cefcdbee7ce5ae667c0103e15b004ab46df59d3918a124911cbd4653"
+    },
+    {
+      "path": "Clash/Provider/AI Suite.yaml",
+      "sha256": "b70f363673501a5afd42b4423bb93ecc12b9325ce157dffd8b0be3a933a62126"
+    },
+    {
+      "path": "Clash/Provider/Apple Push.yaml",
+      "sha256": "c244a0bb8729633f0a0c73db1c9406f0bbed4aeace437eefaf3f2a9d92281f30"
+    },
+    {
+      "path": "Clash/Provider/Apple.yaml",
+      "sha256": "2e664f2700fcb5b473c36ee3e80d32aeb6e49dd31ae307d59f05652f2417a778"
+    },
+    {
+      "path": "Clash/Provider/Crypto.yaml",
+      "sha256": "b817f689b5db2885f39c607167e7a69c706928af2cdc52ff293dedf8dade79e1"
+    },
+    {
+      "path": "Clash/Provider/Discord.yaml",
+      "sha256": "ca040ed9085646a39b8900adfe154ba0049c053b381d9e93dce9ca69052d2563"
+    },
+    {
+      "path": "Clash/Provider/Google FCM.yaml",
+      "sha256": "d4727c4a2647c62c01fc78a386551085befaf68371a379ce2d8319d4fc6c0820"
+    },
+    {
+      "path": "Clash/Provider/Media/ABC.yaml",
+      "sha256": "40953adeac94301548768ff35b1dea19e35feac4fc65783681f47d4777d7256c"
+    },
+    {
+      "path": "Clash/Provider/Media/Abema TV.yaml",
+      "sha256": "088ed5d57dacf9fcba2c486a6fea5cceee8b5a590f765115162fad2e68ce9766"
+    },
+    {
+      "path": "Clash/Provider/Media/Amazon.yaml",
+      "sha256": "9cfb81521347c818ecc9d9b4ea0f1587df6c544ac2e20cd488e6cf1e5302a8a4"
+    },
+    {
+      "path": "Clash/Provider/Media/Apple Music.yaml",
+      "sha256": "6df8c93c8e373361a866aaa28227c730654f9f4159e4a1f4cc1efef28e9c3fb6"
+    },
+    {
+      "path": "Clash/Provider/Media/Apple News.yaml",
+      "sha256": "047f784878902bfd45274a68336dc00982b7acb8576a3ce14e43ad7a534fe43d"
+    },
+    {
+      "path": "Clash/Provider/Media/Apple TV.yaml",
+      "sha256": "990a57ae9bf1d1d20b7a508075d51c0abe76c0a6491e912f072ab48c92a72e4c"
+    },
+    {
+      "path": "Clash/Provider/Media/BBC iPlayer.yaml",
+      "sha256": "525870363332e909f081c251474165553304e774438cdb22051ebe7c2fc9d637"
+    },
+    {
+      "path": "Clash/Provider/Media/Bahamut.yaml",
+      "sha256": "8bf3120139ceded2938224ffb85e285ee885b737850ac7484d9f1d318bfb5e65"
+    },
+    {
+      "path": "Clash/Provider/Media/Bilibili.yaml",
+      "sha256": "7dd8b470d18709437152cbff1224f28c3e24845da1475e3c23f5097d7fe478cf"
+    },
+    {
+      "path": "Clash/Provider/Media/DAZN.yaml",
+      "sha256": "8cb932d57e200a977ef13a9ec64a2607fac567d6a662207eb6fa8de6e62ef869"
+    },
+    {
+      "path": "Clash/Provider/Media/DMM.yaml",
+      "sha256": "e323818aa4b86f2eb6b5db7586a9a4af58d5d806d2871fe70a0789f7775141ef"
+    },
+    {
+      "path": "Clash/Provider/Media/Discovery Plus.yaml",
+      "sha256": "b91bd5c9f455efb9e89b1e8f242fcdaad0dc522592e419571385518f6f4eb3d4"
+    },
+    {
+      "path": "Clash/Provider/Media/Disney Plus.yaml",
+      "sha256": "65d48aa9267dab3d8da8dbbb5aceccea288448db313d5835e5afb930d0bfc662"
+    },
+    {
+      "path": "Clash/Provider/Media/F1 TV.yaml",
+      "sha256": "d602edb5ebba452e25a02c0ce0c16f236c5b286de7eb91a5dd0d689aa544f51c"
+    },
+    {
+      "path": "Clash/Provider/Media/Fox Now.yaml",
+      "sha256": "fc05cb113bb1160ed687d418a1eeda084de64a02da204d8ded3cbd5acbc14949"
+    },
+    {
+      "path": "Clash/Provider/Media/Fox+.yaml",
+      "sha256": "bd1d147b0784b280a43e5562c3f521d25dbaa3763cee410fe2bde0436e159f02"
+    },
+    {
+      "path": "Clash/Provider/Media/Hulu Japan.yaml",
+      "sha256": "cb8b74dbfbd6993e24cb736110bfb3dca1121de84e43df284b747016c1b801f3"
+    },
+    {
+      "path": "Clash/Provider/Media/Hulu.yaml",
+      "sha256": "63d0a595afe1e4d59fc3396dbcce68b690015954a70fd68efd9ad092f80c6f15"
+    },
+    {
+      "path": "Clash/Provider/Media/IQ.yaml",
+      "sha256": "02f26af9be9a595e91dcdd58f9d78492015c06eb1cde0c53c25d1be3432a91b1"
+    },
+    {
+      "path": "Clash/Provider/Media/IQIYI.yaml",
+      "sha256": "9c7f636efa4bd28a51aae3d996dc95e2cd39196ebc3402c8320140152517ca2e"
+    },
+    {
+      "path": "Clash/Provider/Media/JOOX.yaml",
+      "sha256": "bb16e1b8fc6a10446a051c827d2933da9d8b65468096ea9d6717e5dc97e223fb"
+    },
+    {
+      "path": "Clash/Provider/Media/Japonx.yaml",
+      "sha256": "8517299d8a6b3d99f84d128551ccfb7fcb0d99701b51df97be553a419dd13c91"
+    },
+    {
+      "path": "Clash/Provider/Media/KKBOX.yaml",
+      "sha256": "f65b92099ff8b865265cf24bf71694a8c6b0c11770b826b1f3d5758b883a6f78"
+    },
+    {
+      "path": "Clash/Provider/Media/KKTV.yaml",
+      "sha256": "61b8fe06a5909fe6f1b7e6b51fdbaba63d026614df165b80315f2da06474ddc8"
+    },
+    {
+      "path": "Clash/Provider/Media/Letv.yaml",
+      "sha256": "5fba5545bf80b0c5f14826b95d0e5b3818b52cb668a2819ab875f6d441939be3"
+    },
+    {
+      "path": "Clash/Provider/Media/Line TV.yaml",
+      "sha256": "334b77da4efd83adc1e36c6a0d9fa44060a92a9b63527342d0d1ac24d91b6ee7"
+    },
+    {
+      "path": "Clash/Provider/Media/Max.yaml",
+      "sha256": "961624acb9bc721cdff4c0901043f608fd7b4c3e96adc2d550902fead40ba90b"
+    },
+    {
+      "path": "Clash/Provider/Media/Netease Music.yaml",
+      "sha256": "bffcbf0989053066817e1e7fc908b3a2410e0754ded7b28437fa3c037e35ed3c"
+    },
+    {
+      "path": "Clash/Provider/Media/Netflix.yaml",
+      "sha256": "a2e579973bf79634b4e6b84ec2a65d2a8cb1b73f7141bdcd9a93971f2847a2b5"
+    },
+    {
+      "path": "Clash/Provider/Media/Niconico.yaml",
+      "sha256": "39583c0d9de0b2a0205617a01187920c7e0a954fb20fae005c5674a6202f6ef4"
+    },
+    {
+      "path": "Clash/Provider/Media/PBS.yaml",
+      "sha256": "5bdce5d1cf9e11f16c34be4279a46a43f8efdb8bd2257e8c0ca9c9adb8979190"
+    },
+    {
+      "path": "Clash/Provider/Media/Pandora.yaml",
+      "sha256": "19a05939acde18c95d05f03694a07db0da937f114e63a2ed0fae35375e204afd"
+    },
+    {
+      "path": "Clash/Provider/Media/Pornhub.yaml",
+      "sha256": "4843ee7448b7a4e4de0095deef4e94e1f768fb4c4e03b1e5f8d4ded29cb4956e"
+    },
+    {
+      "path": "Clash/Provider/Media/Soundcloud.yaml",
+      "sha256": "3c2cdb5e046e19da45ed8178232ed778e0dcaf12715f01c0c9c69e827d1e973a"
+    },
+    {
+      "path": "Clash/Provider/Media/Spotify.yaml",
+      "sha256": "3b8c9175878c3d1c5386db19d1004d1d38bae884e4f1384d99c6f2dbc04285a5"
+    },
+    {
+      "path": "Clash/Provider/Media/Tencent Video.yaml",
+      "sha256": "f31e00409849f4bcbb542272df3a009e468a7b81b57a94a8c5d080be3ca77a03"
+    },
+    {
+      "path": "Clash/Provider/Media/ViuTV.yaml",
+      "sha256": "224340e30f06b6cf7037480d6c2591f3044f5f32671d5d1b990e11e900d36131"
+    },
+    {
+      "path": "Clash/Provider/Media/WeTV.yaml",
+      "sha256": "0b44b0e744202a99bf7b78df19922ebb29b7ac82db22dd8bbf2988e32668a842"
+    },
+    {
+      "path": "Clash/Provider/Media/YouTube.yaml",
+      "sha256": "bec671331cb35fd8137b38758dc3f96c50bc8ff4162fdcb3c6d970f65a073c98"
+    },
+    {
+      "path": "Clash/Provider/Media/Youku.yaml",
+      "sha256": "584d4378741c216c33604f642682fe12abd814a8d0c78f19b66af53d4f1697b9"
+    },
+    {
+      "path": "Clash/Provider/Media/encoreTVB.yaml",
+      "sha256": "469af02a4d76600b498ffc26dffe3c19ea54ef8225b6ad3089448c2823ceb7cd"
+    },
+    {
+      "path": "Clash/Provider/Media/myTV SUPER.yaml",
+      "sha256": "90934fabe0ba8901453495aeeede12377416628b94798f416ec81d91d3e9b1cd"
+    },
+    {
+      "path": "Clash/Provider/Microsoft.yaml",
+      "sha256": "bd6ed02fd36108aadeb59087e1f9eca918a75a00bd40d1b2d4ccde3bfec9d548"
+    },
+    {
+      "path": "Clash/Provider/PayPal.yaml",
+      "sha256": "c7bbbdfdb4aa10c94b49356fa76ae6038f535f2f3957578df0eac64c281774f7"
+    },
+    {
+      "path": "Clash/Provider/Proxy.yaml",
+      "sha256": "6e1d01cea0ddc1d4e51e26c35b93ae072344b5ccae20a40752902c12c3da0f42"
+    },
+    {
+      "path": "Clash/Provider/Scholar.yaml",
+      "sha256": "fa1d8a6ab654c7e1f6acb743efee72bd491140ab17950fb8cbd3eb575da3a3b9"
+    },
+    {
+      "path": "Clash/Provider/Speedtest.yaml",
+      "sha256": "310621603b3f0e52074d75e813941335e5a54043212228642d87fcd4757e471b"
+    },
+    {
+      "path": "Clash/Provider/Steam.yaml",
+      "sha256": "a8771dede053015f542af48e1e250a63878f5d60919fc821235b20ebc3955c3c"
+    },
+    {
+      "path": "Clash/Provider/Telegram.yaml",
+      "sha256": "cf56d88371d52d39b92664f74e504b79efaec9147ef4265bbaf7239c480b2afb"
+    },
+    {
+      "path": "Clash/Provider/TikTok.yaml",
+      "sha256": "ae447ba8e35deaed306bb04db5f5ac8852daffa49e7780709975758126a6a7ab"
+    },
+    {
+      "path": "Clash/Provider/miHoYo.yaml",
+      "sha256": "fedb2c7744579a254d5962edd1abda73edcd2819c408ce1f19a83876444ab845"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/AI Suite.list",
+      "sha256": "3d942e22380bf000725bd15191445e5f003a7456256f36d070a2a8c599dfeba8"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Apple Push.list",
+      "sha256": "9419362817c19ed4dc9c4b7d5a94cd43b1aa2f1906e2eef07a3938ce99256ea2"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Apple.list",
+      "sha256": "ba2f5742f0e747cdbb33b1264ca253138bbf326d9904090edbce15d2467d6495"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Crypto.list",
+      "sha256": "e465b1f84f70e983c50472764b83e1fddd2809a1520b39729baefb9de59933f1"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Discord.list",
+      "sha256": "9dd9bea68c9bc77d94cb4d4e908841cfff9a20beafacb9c84664d7f0b7256a4e"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Google FCM.list",
+      "sha256": "bebc9f9cee170caf65b7b537103c71ee7d75e7ea1c51c98e75ce837aafa301f6"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/ABC.list",
+      "sha256": "64ebc862643f7d1ca6f3e43f7b0627d734294781712770114e6aa2decdd2f1c2"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Abema TV.list",
+      "sha256": "eb1e95cb53ccc9139feb3b46320110d683420f1ba2fcd43d75f4b42dbc75a516"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Amazon.list",
+      "sha256": "6c4de18fa73b47e1f634b5139a1a13d6117cce52cba9c7506f48155da65f39fb"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Apple Music.list",
+      "sha256": "f6eb3ea61018441b01f2895456029736dcf4589c687fadb23c6fee8c6cce39e1"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Apple News.list",
+      "sha256": "646f934e65dfe08de88001b0271e1537e3f029092d421913c5576bb4e3424a1d"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Apple TV.list",
+      "sha256": "36fd7a5476895fb2292b064898d0ba6e109d4a105affbafaba66a5e1b8b3ad96"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/BBC iPlayer.list",
+      "sha256": "8040bac7e8d4eb47504150ff387ad9d29510e39fda2ccc89a965a35bfa5dbf5c"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Bahamut.list",
+      "sha256": "74e89095321bbf3854553d10fc53bd1a6d3da3877ae6d03e79c60e536e035920"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Bilibili.list",
+      "sha256": "f085e8a129c9e021e7bc3845b590de808c5ffb79a31281fb93fdb62f0cfdb857"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/DAZN.list",
+      "sha256": "1b2d595e960af514b1246a3638dac385e13d9ccb9190d17261ba7e4cca2c8852"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/DMM.list",
+      "sha256": "79fdd816b930602ff7456625da6c67397ef4fadd64ec2e3f26363fae41b0124b"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Discovery Plus.list",
+      "sha256": "20ad5fb21c6bfc5cad64d1797c4c21e764d447268e5c2fb75b6c28c1f832cd1c"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Disney Plus.list",
+      "sha256": "f29be41b9f1d64536863369597bf31d6d62d8210842adbd0af78fd94fbbbac87"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/F1 TV.list",
+      "sha256": "a9993f555d1e8fa46ae58ed3102e162878cb702859d3a8b052b7f862da380e09"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Fox Now.list",
+      "sha256": "a950968abb06a8e6e9fb296ad83428846cd4f17f4814da36b1dca281c9204bd9"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Fox+.list",
+      "sha256": "ecf7e54808b58b392d0d72188108e071b37a229f82e1918e9b862dfe786fc0ac"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Hulu Japan.list",
+      "sha256": "cddbd254d830cea31b7d305d6b42a03a00bc35492ecc5607cae28e4df6912476"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Hulu.list",
+      "sha256": "0c67054007d01a365070fc0b63d0c3567fd424c47d1a6e8e63f10b992e11a102"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/IQ.list",
+      "sha256": "684b64076e64b7dc009f89926cd59b7057d1b98df7aab44e39b582a76107a4a1"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/IQIYI.list",
+      "sha256": "9f42e85cce98d796af255a74cbb3d3b46d951611e75092f4ab35dd71ce0add96"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/JOOX.list",
+      "sha256": "ef2e6fa59afd29c7e4d9060547b81ee7c73f3ae44bf2ecea9fa5644d098a0654"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Japonx.list",
+      "sha256": "8780a190087ef7ba83e7e87c251809be1758fe982915e339bd163cb47f062a97"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/KKBOX.list",
+      "sha256": "d6ba5166724ab8db889029565c2fe73e12e943dc12777ae3b98a54a8675ffda5"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/KKTV.list",
+      "sha256": "0f3d92c20a438a17fb07c241a37ecdb5a1e127e203fb14022fd4ddad5796f259"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Letv.list",
+      "sha256": "201ad72eef99a3d35017ab19c0234c1f75660960d1afe5de87b1977c9f5e65cc"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Line TV.list",
+      "sha256": "e355789abe71332c9b5ed14d00b98f3bb9ca198c553cf358fce30df365a49aec"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/MOO.list",
+      "sha256": "71bb2ad2720214b76d18a0fbb391f6450341dd70f60289b568c15d80f154bece"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Max.list",
+      "sha256": "5afcbd97ef00a3c0b95ee151efdbe49149a0fd3e2b0119d9f15057801cbbc906"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Netease Music.list",
+      "sha256": "8a0b7acd00eb56ac3283c61995e6d3711f4919011fa0624266c390b768a64d7b"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Netflix.list",
+      "sha256": "ef257b1f82bd2fa08d96a48d3820e5f614f29c725f9b5ae4ba7ac3e9d8d990ab"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Niconico.list",
+      "sha256": "3a69ea5749a54a5f3835502a1e37d5552e882016719a7f729c1c1b4bffba4458"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/PBS.list",
+      "sha256": "3fc1a1e51b80bb32385758876d6cb6bd906a902e57d626678575e7a0352c39b2"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Pandora.list",
+      "sha256": "1dda964b0c27c774ad03e7863b78355fa7f122cd7230f75374cadae0cd09c367"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Pornhub.list",
+      "sha256": "937538e6bfa6544b611cacf1cfbb36083334c8bd2d8f8c0f67d3ca3473060369"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Soundcloud.list",
+      "sha256": "4adfb93806711522c49ebfe9d26cebe6d58918dc0d7c3088858803247332fb15"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Spotify.list",
+      "sha256": "f246b37c350c0ada8916a3c2c17da2f87d481da7d2eab7cb687e2ba69d7b6c62"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Tencent Video.list",
+      "sha256": "6ef9330d05620dac9bd4e2bc6fb9858a74de93b554382ac99486d89f63fe13dd"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/ViuTV.list",
+      "sha256": "c37155868da96f4856f922b0482e478dd16d2224eccd2623bd392aa16eff0cce"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/WeTV.list",
+      "sha256": "d6cb9abafc4563dca5e7bb1c56e6c11d97abec3f1425ec06ccfa3103e51689e1"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/YouTube Music.list",
+      "sha256": "94ee2d1920f2556933a2987c41224926eb3090beb4b27023ae37ba2f6536f843"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/YouTube.list",
+      "sha256": "bbafe5c786f897023dad27f657ffaf33ff93570bc81cfd8e77d3a84cc36f1507"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/Youku.list",
+      "sha256": "57bbd2c45a65237981cdba1f754895b623e8fe3cd1862e02015cce9c93795cfe"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/encoreTVB.list",
+      "sha256": "d9633d77c4032a3790449b30a859bb2ebfda3a1fdae2bad1cb522f87607bddb6"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Media/myTV SUPER.list",
+      "sha256": "aa376158efed6d40dcd1b4c727dfa5b7cedeac29e1f25db6484b66b4592ed202"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Microsoft.list",
+      "sha256": "0c40330c1b696719c8dce50a6b569d253a12733fe7fb8611f926f2bb9ecec7e1"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/PayPal.list",
+      "sha256": "0f9f4786b546f86f4961b8a070e87e27e03e8008fe0fce1ea5fbfa769fee2079"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Proxy.list",
+      "sha256": "03b579285a82992d86bdfd6f25aa463be808902a78ddf0fb225fa197817ad7f4"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Scholar.list",
+      "sha256": "4a60f82cc5bac87b1bf3dfa4bf07f3869b3aa23166738c5f34ce28989faeb19e"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Speedtest.list",
+      "sha256": "1babeec8cff9e1ada9aa9f14ac6bdda05e3d3fbfbf607f605f485ffe960ebdb4"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Steam.list",
+      "sha256": "82cd3fca4608a462e314506dcd4b254166184c3ae1d07c25bc636a71d9e9a358"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/Telegram.list",
+      "sha256": "4b16068a69d1c0532197a7cb5e671e26d080b2e1d449af06d489d9b4e7de8836"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/TikTok.list",
+      "sha256": "7418a7f5215a6c3c74d37a8d7573d977e16c16e88bbffc33ca86d3ac66df0ebe"
+    },
+    {
+      "path": "Surge/Surge 3/Provider/miHoYo.list",
+      "sha256": "c082ad920c1e20ffe3c43ad2dc5dc1657f63b34f613f4098432f01e7aa8b9d42"
+    }
+  ],
+  "rules": [
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "360buy.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "360buyimg.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "alicdn.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "alipay.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "alipayobjects.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "baidu.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "bdimg.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "bdstatic.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "byted-static.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "bytednsdoc.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "byteimg.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "douyin.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "gtimg.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "jd.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "meituan.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "mi.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "pddcdn.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "pddpic.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "pinduoduo.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "taobao.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "tmall.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "xhscdn.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "xiaohongshu.com"
+    },
+    {
+      "kind": "DOMAIN-SUFFIX",
+      "domain": "xiaomi.com"
+    }
+  ]
+}

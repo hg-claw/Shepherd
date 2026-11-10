@@ -428,7 +428,7 @@ export function TemplateEditor({
                   <Label className="text-xs">[General]</Label>
                   <p className="text-fg-dim text-2xs mt-0.5 mb-1">
                     {t('subgen.templates.raw_surge_prefix', 'Raw Surge')} <code>[General]</code>{' '}
-                    {t('subgen.templates.general_desc_mid', 'overrides by key. Leave empty to retain outbound-aware DNS and UDP rejection.')}
+                    {t('subgen.templates.general_desc_mid', 'overrides by key. Leave empty for private default DNS, reviewed domestic exceptions, and UDP rejection.')}
                   </p>
                   <textarea
                     value={general}

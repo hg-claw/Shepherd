@@ -12,6 +12,9 @@ func parseGeneral(text string) (map[string]string, []string, error) {
 	var order []string
 	for i, raw := range strings.Split(text, "\n") {
 		line := strings.TrimSpace(raw)
+		if !safeRuleText(line) {
+			return nil, nil, fmt.Errorf("general line %d: control characters are not allowed", i+1)
+		}
 		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") {
 			continue
 		}

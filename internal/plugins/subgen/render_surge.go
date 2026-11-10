@@ -194,6 +194,9 @@ func (r *SurgeRenderer) Render(im Intermediate, subURL, rulesetBase string) stri
 // ShadowRocket gets inline WireGuard ([Proxy] line) and filters out Surge-only
 // DEVICE: members/rules; Surge keeps them.
 func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target string) string {
+	if err := validateRenderValues(im); err != nil {
+		return fmt.Sprintf("# General render error: %q\n[INVALID GENERAL\n", err.Error())
+	}
 	wgInline := target == "shadowrocket"
 	filterDevice := target != "surge"
 
@@ -288,18 +291,28 @@ func (r *SurgeRenderer) render(im Intermediate, subURL, rulesetBase, target stri
 	out = strings.ReplaceAll(out, "{{CUSTOM_RULES}}", strings.TrimRight(crules.String(), "\n"))
 	out = strings.ReplaceAll(out, "{{CUSTOM_GROUPS}}", strings.TrimRight(cgroups.String(), "\n"))
 	out = strings.ReplaceAll(out, "{{GENERAL_EXTRA}}", "")
+	domesticRules, err := domesticDNSRules(im, target)
+	if err != nil {
+		return fmt.Sprintf("# General render error: %q\n[INVALID GENERAL\n", err.Error())
+	}
+	dnsRules := "PROTOCOL,DOH,Proxy"
+	if len(domesticRules) > 0 {
+		dnsRules = "IP-CIDR,223.5.5.5/32,DIRECT,no-resolve\n" + dnsRules
+	}
 	bootstrapHosts := surgeBootstrapHosts(renderedNodes)
 	if target == "shadowrocket" {
 		// Shadowrocket has a separate proxy-dns-server bootstrap setting.
-		bootstrapHosts = ""
+		bootstrapHosts, dnsRules = "", ""
 	}
+	out = strings.ReplaceAll(out, "{{DNS_RULES}}", dnsRules)
+	out = strings.ReplaceAll(out, "{{DOMESTIC_DNS_HOSTS}}", domesticDNSHosts(domesticRules))
 	out = strings.ReplaceAll(out, "{{BOOTSTRAP_HOSTS}}", bootstrapHosts)
 	out = strings.ReplaceAll(out, "{{URLREWRITE_EXTRA}}", strings.TrimSpace(im.URLRewrite))
 	out = strings.ReplaceAll(out, "{{MITM}}", mitm)
 	if target == "shadowrocket" {
 		out = applyShadowrocketDNS(out)
 	}
-	out, err := mergeGeneral(out, im.General)
+	out, err = mergeGeneral(out, im.General)
 	if err != nil {
 		return fmt.Sprintf("# General render error: %q\n[INVALID GENERAL\n", err.Error())
 	}

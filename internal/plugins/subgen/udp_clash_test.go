@@ -182,6 +182,11 @@ func TestGuardClashUDP_TemplateFormatting(t *testing.T) {
 		"{{PROXIES}}", "", "proxies: [{{NODES}}]", "proxies: [REJECT]", ", {{NODES}}", "", "{{NODES}}", "",
 		"{{CUSTOM_RULES}}", "", "{{CUSTOM_GROUPS}}", "", "{{CUSTOM_PROVIDERS}}", "", "{{CLASH_EXTRA}}", "",
 	).Replace(templates.Clash)
+	rules, err := domesticDNSRules(Intermediate{}, "clash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	in = strings.ReplaceAll(in, "{{DOMESTIC_DNS_POLICY}}", domesticDNSClashPolicy(rules))
 	got, err := guardClashUDP(in)
 	if err != nil {
 		t.Fatal(err)

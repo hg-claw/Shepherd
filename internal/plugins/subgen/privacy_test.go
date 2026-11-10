@@ -7,15 +7,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestSurge_DirectDNSIsDomesticAndProxiesResolveRemotely(t *testing.T) {
+func TestSurge_DefaultDNSIsPrivateWithReviewedDomesticExceptions(t *testing.T) {
 	im := Intermediate{Nodes: []Node{
 		{Name: "domain-node", Protocol: "trojan", Server: "edge.example", Port: 443, Password: "p", SNI: "edge.example"},
 		{Name: "ip-node", Protocol: "trojan", Server: "192.0.2.1", Port: 443, Password: "p", SNI: "edge.example"},
 	}}
 	out := (&SurgeRenderer{}).Render(im, "https://example.com/sub/test", "")
 	for _, want := range []string{
-		"encrypted-dns-server = " + domesticDoH,
-		"encrypted-dns-follow-outbound-mode = false",
+		"encrypted-dns-server = " + primaryDoH + ", " + backupDoH,
+		"encrypted-dns-follow-outbound-mode = true",
+		"IP-CIDR,223.5.5.5/32,DIRECT,no-resolve\nPROTOCOL,DOH,Proxy\n",
+		"taobao.com = server:" + domesticDoH + "\n",
+		"*.taobao.com = server:" + domesticDoH + "\n",
 		"use-local-host-item-for-proxy = false",
 		"Proxy = select, Auto - Smart, Auto - UrlTest, Direct, domain-node, ip-node\n",
 		"edge.example = server:223.5.5.5\n",
@@ -26,7 +29,7 @@ func TestSurge_DirectDNSIsDomesticAndProxiesResolveRemotely(t *testing.T) {
 			t.Errorf("missing %q", want)
 		}
 	}
-	for _, forbidden := range []string{"Shepherd-DNS", "PROTOCOL,DOH,", "dns-server = system", "cloud-nodes.com", "*.taobao.com = server:", "192.0.2.1 = server:"} {
+	for _, forbidden := range []string{"Shepherd-DNS", "dns-server = system", "cloud-nodes.com", "*.cn = server:", "example.net = server:", "192.0.2.1 = server:"} {
 		if strings.Contains(out, forbidden) {
 			t.Errorf("unexpected resolver bypass %q", forbidden)
 		}
@@ -39,7 +42,6 @@ func TestShadowrocket_DNSPrimaryAndBackupUseProxy(t *testing.T) {
 		"dns-server = " + primaryDoH + "#proxy," + backupDoH + "#proxy\n",
 		"fallback-dns-server = " + backupDoH + "#proxy," + primaryDoH + "#proxy\n",
 		"proxy-dns-server = " + bootstrapDoH + "\n",
-		"direct-dns-server = " + domesticDoH + "\n",
 		"use-local-host-item-for-proxy = false\n",
 		"dns-direct-system = false\n", "dns-direct-fallback-proxy = false\n",
 	} {
@@ -47,7 +49,7 @@ func TestShadowrocket_DNSPrimaryAndBackupUseProxy(t *testing.T) {
 			t.Errorf("missing %q", want)
 		}
 	}
-	for _, forbidden := range []string{"encrypted-dns-", "PROTOCOL,DOH", "Shepherd-DNS", "fallback-dns-server = 223", "doh.pub", "dns.alidns.com"} {
+	for _, forbidden := range []string{"encrypted-dns-", "PROTOCOL,DOH", "Shepherd-DNS", "direct-dns-server =", "server:" + domesticDoH, "fallback-dns-server = 223", "doh.pub", "dns.alidns.com"} {
 		if strings.Contains(out, forbidden) {
 			t.Errorf("unexpected DNS setting %q", forbidden)
 		}
@@ -70,15 +72,17 @@ func TestClash_DNSSeparatesBusinessAndBootstrap(t *testing.T) {
 	if dns["proxy-server-nameserver"].([]any)[0] != bootstrapDoH {
 		t.Fatal("node bootstrap must be explicit and independent")
 	}
-	direct := dns["direct-nameserver"].([]any)
-	if len(direct) != 1 || direct[0] != domesticDoH+"#DIRECT" {
-		t.Fatalf("DIRECT business must use independent domestic DoH: %v", direct)
+	if _, exists := dns["direct-nameserver"]; exists {
+		t.Fatal("unknown DIRECT targets must not inherit a global domestic resolver")
 	}
-	if dns["direct-nameserver-follow-policy"] != false {
-		t.Fatal("DIRECT resolver must not inherit proxy nameserver-policy")
+	policy := dns["nameserver-policy"].(map[string]any)
+	if policy["+.taobao.com"].([]any)[0] != domesticDoH+"#DIRECT" {
+		t.Fatal("reviewed domestic CDN policy missing")
 	}
-	if _, exists := dns["nameserver-policy"]; exists {
-		t.Fatal("template must not retain owner-specific DNS policy")
+	for _, key := range []string{"+.cn", "+.qq.com", "example.net", "+.example.net", "+.cloud-nodes.com"} {
+		if _, exists := policy[key]; exists {
+			t.Errorf("unsafe or inherited DNS policy %s", key)
+		}
 	}
 	found := false
 	for _, value := range doc["proxy-groups"].([]any) {
@@ -204,8 +208,8 @@ func TestAdaptiveDNSOverridesRemainExplicit(t *testing.T) {
 	out = (&ClashRenderer{}).Render(Intermediate{ClashGeneral: "dns:\n  listen: 127.0.0.1:5353"}, "", "")
 	doc := decodeRenderedClash(t, out)
 	dns := doc["dns"].(map[string]any)
-	if dns["direct-nameserver"].([]any)[0] != domesticDoH+"#DIRECT" || dns["nameserver"].([]any)[0] != primaryDoH+"#Proxy" {
-		t.Fatal("unrelated override removed adaptive DNS defaults")
+	if dns["nameserver-policy"].(map[string]any)["+.taobao.com"].([]any)[0] != domesticDoH+"#DIRECT" || dns["nameserver"].([]any)[0] != primaryDoH+"#Proxy" {
+		t.Fatal("unrelated override removed private DNS defaults or reviewed exceptions")
 	}
 }
 

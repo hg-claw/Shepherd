@@ -42,9 +42,9 @@
 模板描述流量如何分流。内置模板只读 —— 克隆一份再自定义。编辑器有 **表单（Form）** 模式和 **原始 JSON（Raw JSON）** 模式，外加一个实时 **预览（Preview）** 面板（选择目标格式即可查看渲染结果）。
 
 - **服务组** —— 使用固定的 dler.io/oixCloud 分组及规则集；编辑器可排除服务组，核心 Proxy / Domestic / Others / Auto 保留。
-- **自定义规则（Custom rules）** —— 每行一条 `TYPE,VALUE,policy`，例如 `DOMAIN-SUFFIX,example.com,DIRECT`。自定义规则先于内置业务规则；DNS 不另复制一份国内域名列表。
+- **自定义规则（Custom rules）** —— 每行一条 `TYPE,VALUE,policy`，例如 `DOMAIN-SUFFIX,example.com,DIRECT`。自定义规则先于内置业务规则。非 DIRECT 的精确/后缀规则会削减自动国内 DNS 范围；无法映射为域名范围的自定义规则（进程、IP、远程规则集等）、自定义组、MITM/URL Rewrite 原始段落会保守取消全部自动国内 DNS 例外，避免业务走代理而查询进入国内解析器。
 - **兼容旧 JSON 字段** —— `categories`、`final`、`include_auto_select` 仍可解析，但不控制固定模板的输出。默认兜底为 Surge `FINAL,Others,dns-failed` / Clash `MATCH,Others`；不要以为修改旧 `final` 字段就已启用阻断兜底。
-- **DNS 按业务出站处理** —— 不生成独立 `Shepherd-DNS` 组，也不维护第二套国内域名名单。规则或策略组最终选择 DIRECT 时，使用客户端的直连解析能力取得国内 CDN 答案；选择支持域名转发的代理时，保留原始域名交给实际所选代理远端解析。Mihomo / Shadowrocket 仍保留经 Proxy / 主页节点的其他本地查询路径。不同客户端对预解析和缓存的限制见下文，不能把它理解为所有 DNS 包都能预知最终业务策略。
+- **DNS 默认私密，国内明确例外** —— 不生成独立 `Shepherd-DNS` 组；默认/未知域名和 IP/GEOIP 预解析使用经 `Proxy` 的境外 DoH。Surge / Mihomo 仅对固定审核的国内站点使用直连国内 DoH，以兼顾 CDN 选址。DNS 例外是静态域名范围，不跟随客户端任意策略组的实时切换；显式将 `Proxy` 选为 Direct 也会改变默认 DNS 出口。
 
 ## 节点命名与别名
 
@@ -79,24 +79,31 @@
   dns:
     listen: 127.0.0.1:1053
   ```
-  只改监听地址会保留直连专用 DNS 及经 Proxy 的默认查询路径。留空保留模板原格式；非空合并会规范化 YAML 排版。重复键、多文档和非对象输入拒绝。最终配置再经过 UDP guard 与 YAML 校验，失败不会静默返回基础配置。自定义 rules 必须为可安全转换的规则序列；SUB-RULE、组内 PASS、包含否定 IP/provider 的可变匹配逻辑等不支持安全转换的控制流会明确拒绝生成（字面 PASS 规则仍支持）。只覆盖 proxy-groups 时，若默认 DNS 仍引用 Proxy，最终校验会拒绝缺失、重名、循环或不受支持的成员引用；允许显式 DIRECT 成员，以保持与业务 Proxy 选择一致。Surge/ShadowRocket 忽略该字段。
+  只改监听地址会保留审核域名 DNS 例外及经 Proxy 的默认查询路径；覆盖 rules/rule-providers/proxy-groups 会取消自动国内例外。留空保留模板原格式；非空合并会规范化 YAML 排版。重复键、多文档和非对象输入拒绝。最终配置再经过 UDP guard 与 YAML 校验，失败不会静默返回基础配置。自定义 rules 必须为可安全转换的规则序列；SUB-RULE、组内 PASS、包含否定 IP/provider 的可变匹配逻辑等不支持安全转换的控制流会明确拒绝生成（字面 PASS 规则仍支持）。只覆盖 proxy-groups 时，若默认 DNS 仍引用 Proxy，最终校验会拒绝缺失、重名、循环或不受支持的成员引用；允许显式 DIRECT 成员，以保持与业务 Proxy 选择一致。Surge/ShadowRocket 忽略该字段。
 
 ## UDP 与 DNS 隐私默认值
 
-这是**兼容性优先的分流配置**，不是全局匿名或“零直连 DNS”承诺：国内业务仍按原规则直连，仅将业务解析和节点引导分离。
+这是**默认经代理解析、国内显式例外的分流配置**，不是全局匿名或“零直连 DNS”承诺。业务分流规则不变；查询国内例外、代理节点引导和 LAN 服务仍可能使用本地网络。DoH 加密传输，不对解析器隐藏被查域名。
 
 - **Surge / Shadowrocket UDP**：不支持 UDP 的代理策略默认 REJECT，绝不为此自动转 DIRECT。可能影响不支持 UDP 节点上的通话、游戏；HTTP/3 可回退 TCP。
 - **Mihomo UDP**：节点显式启用 UDP；每条可能走代理的规则后紧跟相同条件的 UDP REJECT。内核在节点不支持 UDP 而跳过原规则时，guard 阻止继续落入国内 DIRECT。正常支持 UDP 的节点及显式选 DIRECT 的组仍由原规则处理。自定义覆盖之后也会补 guard。
-- **Surge DNS**：本地解析使用 `https://223.5.5.5/dns-query`，`encrypted-dns-follow-outbound-mode=false` 使其直连，不再生成 `PROTOCOL,DOH,Proxy`。先命中域名规则的普通代理连接由 Surge 把原始域名发送给实际所选代理远端解析；`use-local-host-item-for-proxy=false` 避免本地 Host IP 映射强制覆盖代理目的域名。节点精确 Host 传统 DNS 引导和连通性检测例外保留。**用户已接受：IP/GEOIP 等规则在确定最终策略前需要 DNS 时，以及 always-real-ip / 真实 IP 路径，会先使用本地国内 DoH；最终走代理不代表此前没有国内查询。**
-- **Shadowrocket DNS**：新增 `direct-dns-server=https://223.5.5.5/dns-query`，用于匹配直连域名规则的解析；`dns-direct-system=false` 避免强制系统 DNS。普通代理连接可按客户端原生行为远端解析；其他本地查询的主/备 IP DoH 仍带 `#proxy`，节点使用 `proxy-dns-server` 加密引导。Direct DNS 失败会使用已配置 fallback（经代理），不会因删空 fallback 落回 system；`dns-direct-fallback-proxy=false` 不擅自把业务连接改为代理。任意嵌套组切换及双解析器失败行为仍需对应客户端真机验收。
-- **Mihomo DNS**：`direct-nameserver=['https://223.5.5.5/dns-query#DIRECT']` 用于实际 DIRECT 出站域名解析，`direct-nameserver-follow-policy=false` 防止再次套用其他解析器策略；普通域名代理连接可直接交给所选节点远端解析。仍需本地查询或 IP/GEOIP 预解析时，`nameserver` 使用 Cloudflare / Google DoH `#Proxy`；节点引导独立。默认 fake-ip，未强制开启系统 TUN。此设置改善最终 DIRECT 连接的选址，但不能倒推修正此前已经由 IP 规则作出的策略选择。
+- **Surge DNS**：默认 IP-literal Cloudflare / Google DoH，`encrypted-dns-follow-outbound-mode=true`，前置 `PROTOCOL,DOH,Proxy`，让未知域名和预解析不再统一进入国内 DoH。审核国内后缀生成 root 与 `*.root` 两条 `server:https://223.5.5.5/dns-query` Host 映射；`223.5.5.5/32,DIRECT,no-resolve` 必须在全部 DoH 代理规则之前。保留精确节点 Host 引导以防代理域名解析循环、保留 `use-local-host-item-for-proxy=false`。没有可安全推导的国内例外时，不生成国内解析器业务直连规则。
+- **Shadowrocket DNS**：保留主/备境外 DoH `#proxy`、`dns-direct-system=false`、独立节点引导和 `dns-direct-fallback-proxy=false`。删除全局 `direct-dns-server`，让直连规则域名也默认遵循 DNS 覆写；不能删空 fallback（可能回 system）。本版不生成未经证实的 SR per-Host DoH，因此其国内 CDN 优化不作保证；复杂组选择与双失败行为仍需真机验证。
+- **Mihomo DNS**：默认 `nameserver` 仍用境外 DoH `#Proxy`；审核国内后缀采用 `nameserver-policy` 的 `+.domain → 国内 DoH#DIRECT`。删除全局 `direct-nameserver`，所以未知域名即使最后选 DIRECT，也不会仅因此改用国内解析器。默认 fake-ip、节点引导独立，未强制开启系统 TUN。
 - 移除原始商业模板的 `cloud-nodes.com` 专用解析、国内电商/媒体域名 Host 明文 DNS 覆盖；保留 LAN/router/system 解析例外。WireGuard 隧道内 DNS 使用 Cloudflare / Google。
 
 **适用边界：**需要客户端规则模式，Proxy 组/主页节点须有正确的预期出口；节点国旗不保证真实出口地区。仅系统 HTTP 代理不能接管所有 UDP、IPv6、应用内 DoH。Surge 的 `ipv6=false` 和 Mihomo 的 `dns.ipv6=false` 不是 OS 级 IPv6 防火墙。请自行启用适合平台的增强/TUN 模式，并核查浏览器 DNS/WebRTC。Shadowrocket 主备 DoH 同时失败后的闭源客户端行为仍需实机抓包验证，配置与语法校验不能证明无隐式系统回退。
 
-**升级验收：**更新订阅后清理旧 DNS 缓存并重新建立测试连接，检查 HTTP IPv4/IPv6 出口、DNS leak、WebRTC 与请求日志；同一业务组分别选 DIRECT/代理测试。DIRECT 应优先获得本地适合的 CDN，普通域名代理连接应使用所选代理远端解析；再测试代理失效、DoH 超时、节点域名冷缓存、Wi-Fi/移动网络切换。GeoIP 预解析和已有连接/缓存不保证切组后即时重选。远端解析由代理服务器决定，并不保证其上游本身使用 DoH。此模式允许国内直连域名及 Surge 预解析进入国内 DoH，因此不能再以“中国 DNS 出现即失败”作为验收标准，更不能据此认定真实公网 IP 泄露。
+**升级验收：**更新订阅后清理旧 DNS 缓存并重建连接。默认配置下，未知域名（含随机 `.cn`）和 GeoIP 预解析应走代理解析；审核范围的淘宝/阿里 CDN应走直连国内 DoH。分别测试代理不可用、国内 DoH 失败、域名节点冷缓存和 Wi-Fi/移动切换；默认解析失败不应回退国内解析。已有连接/缓存不保证切组即时重选。远端解析由节点决定，上游不保证 DoH。DNS 检测页出现国内解析器仍需区分审核例外、节点引导、LAN 与真正未知域名旁路；DNS 结果本身不证明目标站获得真实公网 IP。
 
-**原理：**复用业务规则，不复制域名名单。规则可只凭域名/进程等信息确定时先选出站再解析；IP/GEOIP 依赖解析结果，无法在第一次查询前预知最终策略。`respect-rules` / `encrypted-dns-follow-outbound-mode` 控制的是 DNS 服务器连接自身的路由，不能单独实现上述按业务最终策略选择解析器。
+### 国内 DNS 范围的来源与限制
+
+- `internal/plugins/subgen/templates/domestic_dns_seeds.list` 是小范围人工审核候选（当前 24 个后缀），不是整个国内路由名单。每个候选须同时存在于固定版本 dler 的 Surge/Clash Domestic 中；与更早代理/服务域名条件有父子重叠的候选会删除，TLD 和公共/私有公共后缀（如 cn、com.cn、sinaapp.com）拒绝。固定来源、输入哈希和结果在同目录 `domestic_dns.json`。
+- AdBlock 按默认 REJECT 特判，不因广告子域删除 taobao.com/alicdn.com 的整个后缀；这**不表示主动 DNS 查询一定先被拦截**。手动把 AdBlock 或 Domestic 改走代理不会动态改写这份 DNS 范围，管理员应同时取消相应例外。其他非域名业务规则、CNAME/CDN 和上游在线 `@main` 漂移也不能由此静态筛选完整模拟。
+- 自定义 DOMAIN/DOMAIN-SUFFIX 的非 DIRECT 策略仅削减重叠范围；自定义 DIRECT 不新增候选。未知匹配条件、组或原始段落保守取消全部例外。覆盖 Clash 规则/provider/组也取消；显式 DNS/General 覆盖仍是管理员行为，可能取消保护。规则、节点、组的控制字符和保留模板标记会被拒绝，避免跨行插入绕过判断。
+- 显式维护：`python3 scripts/update-domestic-dns.py --revision <40字符提交SHA>`，审核差异后提交；`--check` 只验证当前快照一致性。该维护命令可联网读取 GitHub，订阅生成不会访问上游。更改候选未重生快照或无效快照将拒绝生成，不会偷偷放宽范围。
+
+**原理：**IP/GEOIP 要先解析才能判最终策略，不能同时保证“没有 DNS 域名范围、国内 CDN 本地最优、所有最终代理域名绝无国内查询”。本版选择默认经代理、国内明确范围；它不是最终出站动态 resolver 钩子。`respect-rules` / `encrypted-dns-follow-outbound-mode` 控制的是 DNS 服务器连接自身路由。
 
 ## 分流分类
 

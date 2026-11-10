@@ -25,8 +25,8 @@ func (r *ShadowRocketRenderer) Render(im Intermediate, subURL, rulesetBase strin
 
 // Shadowrocket uses DoH URLs in dns-server, with #proxy selecting the home-page
 // node. An omitted/empty fallback means SYSTEM, so explicitly proxy both primary
-// and backup resolvers. Direct domain rules use domestic DoH separately, while
-// node hostnames have explicit bootstrap DNS. This is distinct from
+// and backup resolvers. No global direct-dns-server is set: direct domains use
+// the same private defaults; node hostnames have explicit bootstrap DNS. This is distinct from
 // dns-direct-fallback-proxy (business routing on DNS failure).
 var (
 	reDNSServer = regexp.MustCompile(`(?m)^dns-server = .*$`)
@@ -38,7 +38,6 @@ func applyShadowrocketDNS(conf string) string {
 		"dns-server = " + primaryDoH + "#proxy," + backupDoH + "#proxy",
 		"fallback-dns-server = " + backupDoH + "#proxy," + primaryDoH + "#proxy",
 		"proxy-dns-server = " + bootstrapDoH,
-		"direct-dns-server = " + domesticDoH,
 		"dns-direct-system = false",
 		"dns-direct-fallback-proxy = false",
 	}, "\n"))

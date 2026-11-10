@@ -238,7 +238,11 @@ func TestClash_EmptyGeneralPreservesTemplateBytes(t *testing.T) {
 		"{{PROXIES}}", "", "proxies: [{{NODES}}]", "proxies: [REJECT]", ", {{NODES}}", "", "{{NODES}}", "",
 		"{{CUSTOM_RULES}}", "", "{{CUSTOM_GROUPS}}", "", "{{CUSTOM_PROVIDERS}}", "", "{{CLASH_EXTRA}}", "",
 	).Replace(templates.Clash)
-	var err error
+	rules, err := domesticDNSRules(Intermediate{}, "clash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = strings.ReplaceAll(want, "{{DOMESTIC_DNS_POLICY}}", domesticDNSClashPolicy(rules))
 	want, err = guardClashUDP(want)
 	if err != nil {
 		t.Fatal(err)

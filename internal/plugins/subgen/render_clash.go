@@ -26,6 +26,9 @@ func (*ClashRenderer) Supports(p string) bool {
 // the template's exact formatting and comments are preserved. subURL and
 // rulesetBase are unused — the template hard-codes the dler.io rule-providers.
 func (r *ClashRenderer) Render(im Intermediate, _ string, _ string) string {
+	if err := validateRenderValues(im); err != nil {
+		return fmt.Sprintf("# Clash render error: %q\n!shepherd-render-error [\n", err.Error())
+	}
 	// {{PROXIES}}: each node as a 4-space-indented YAML block-style list item.
 	var proxies strings.Builder
 	var names []string
@@ -103,7 +106,12 @@ func (r *ClashRenderer) Render(im Intermediate, _ string, _ string) string {
 			strings.ReplaceAll(g.Name, "'", "''"), g.Type, strings.Join(q, ", "), extra)
 	}
 
+	domesticRules, err := domesticDNSRules(im, "clash")
+	if err != nil {
+		return fmt.Sprintf("# Clash render error: %q\n!shepherd-render-error [\n", err.Error())
+	}
 	out := filterClashGroups(templates.Clash, disabledServiceSet(im.DisabledGroups))
+	out = strings.ReplaceAll(out, "{{DOMESTIC_DNS_POLICY}}", domesticDNSClashPolicy(domesticRules))
 	out = strings.ReplaceAll(out, "{{PROXIES}}", strings.TrimRight(proxies.String(), "\n"))
 	if nodeList == "" {
 		// Keep the auto group referenced by Proxy valid when no compatible
